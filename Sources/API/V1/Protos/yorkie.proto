@@ -1,0 +1,104 @@
+/*
+ * Copyright 2020 The Yorkie Authors. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+syntax = "proto3";
+
+package yorkie.v1;
+
+import "yorkie/v1/resources.proto";
+
+option go_package = ".;v1";
+
+// Yorkie is a service that provides a API for SDKs.
+service YorkieService {
+  rpc ActivateClient (ActivateClientRequest) returns (ActivateClientResponse) {}
+  rpc DeactivateClient (DeactivateClientRequest) returns (DeactivateClientResponse) {}
+  rpc UpdatePresence (UpdatePresenceRequest) returns (UpdatePresenceResponse) {}
+
+  rpc AttachDocument (AttachDocumentRequest) returns (AttachDocumentResponse) {}
+  rpc DetachDocument (DetachDocumentRequest) returns (DetachDocumentResponse) {}
+  rpc WatchDocuments (WatchDocumentsRequest) returns (stream WatchDocumentsResponse) {}
+  rpc PushPull (PushPullRequest) returns (PushPullResponse) {}
+}
+
+message ActivateClientRequest {
+  string client_key = 1;
+}
+
+message ActivateClientResponse {
+  string client_key = 1;
+  bytes client_id = 2;
+}
+
+message DeactivateClientRequest {
+  bytes client_id = 1;
+}
+
+message DeactivateClientResponse {
+  bytes client_id = 1;
+}
+
+message AttachDocumentRequest {
+  bytes client_id = 1;
+  ChangePack change_pack = 2;
+}
+
+message AttachDocumentResponse {
+  bytes client_id = 1;
+  ChangePack change_pack = 2;
+}
+
+message DetachDocumentRequest {
+  bytes client_id = 1;
+  ChangePack change_pack = 2;
+}
+
+message DetachDocumentResponse {
+  string client_key = 1;
+  ChangePack change_pack = 2;
+}
+
+message WatchDocumentsRequest {
+  Client client = 1;
+  repeated string document_keys = 2;
+}
+
+message WatchDocumentsResponse {
+  message Initialization {
+    map<string, Clients> peers_map_by_doc = 1;
+  }
+
+  oneof body {
+    Initialization initialization = 1;
+    DocEvent event = 2;
+  }
+}
+
+message PushPullRequest {
+  bytes client_id = 1;
+  ChangePack change_pack = 2;
+}
+
+message PushPullResponse {
+  bytes client_id = 1;
+  ChangePack change_pack = 2;
+}
+
+message UpdatePresenceRequest {
+  Client client = 1;
+  repeated string document_keys = 2;
+}
+
+message UpdatePresenceResponse {}
