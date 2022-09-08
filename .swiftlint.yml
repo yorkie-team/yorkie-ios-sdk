@@ -1,0 +1,18 @@
+included:
+  - Sources
+  - Tests
+excluded:
+  - Sources/API
+opt_in_rules:
+  - overridden_super_call
+  - private_outlet
+  - prohibited_super_call
+  - first_where
+  - closure_spacing
+  - unneeded_parentheses_in_closure_argument
+  - redundant_nil_coalescing
+  - explicit_init
+  - contains_over_first_not_nil
+disabled_rules:
+  - line_length
+
