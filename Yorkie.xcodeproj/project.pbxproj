@@ -10,6 +10,13 @@
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
 		CE6071E528C5D7EE00A8783E /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */; };
+		CE8C22ED28C9E7F200432DE5 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EC28C9E7F200432DE5 /* Client.swift */; };
+		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
+		CE8C22F128C9E86A00432DE5 /* Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F028C9E86A00432DE5 /* Root.swift */; };
+		CE8C22F328C9E87800432DE5 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F228C9E87800432DE5 /* Object.swift */; };
+		CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F428C9E88500432DE5 /* Operation.swift */; };
+		CE8C22F728C9E89100432DE5 /* Ticket.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F628C9E89100432DE5 /* Ticket.swift */; };
+		CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F828C9E8CA00432DE5 /* Heap.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E028C84D26004988DD /* yorkie.pb.swift */; };
 		CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E128C84D26004988DD /* resources.pb.swift */; };
@@ -35,6 +42,13 @@
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
+		CE8C22EC28C9E7F200432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
+		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
+		CE8C22F028C9E86A00432DE5 /* Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Root.swift; sourceTree = "<group>"; };
+		CE8C22F228C9E87800432DE5 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
+		CE8C22F428C9E88500432DE5 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
+		CE8C22F628C9E89100432DE5 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ticket.swift; sourceTree = "<group>"; };
+		CE8C22F828C9E8CA00432DE5 /* Heap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Heap.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CEEB17DC28C84CC3004988DD /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
 		CEEB17DD28C84CC3004988DD /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
@@ -67,7 +81,7 @@
 		96DA807828C5B7B400E2C1DA = {
 			isa = PBXGroup;
 			children = (
-				CE6071E628C5E99B00A8783E /* Documentation */,
+				CE8C22E228C9E4FD00432DE5 /* Documentation */,
 				96DA808428C5B7B400E2C1DA /* Sources */,
 				96DA808F28C5B7B400E2C1DA /* Tests */,
 				CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */,
@@ -88,9 +102,9 @@
 			isa = PBXGroup;
 			children = (
 				CE6071E828C5EC2500A8783E /* API */,
-				CE6071E928C5EC2C00A8783E /* Core */,
-				CE6071EA28C5EC8F00A8783E /* Document */,
-				CE6071E728C5EBAD00A8783E /* Util */,
+				CE8C22E328C9E53400432DE5 /* Core */,
+				CE8C22E428C9E53E00432DE5 /* Document */,
+				CE8C22E528C9E54500432DE5 /* Util */,
 				96DA808628C5B7B400E2C1DA /* Info.plist */,
 			);
 			path = Sources;
@@ -106,20 +120,6 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
-		CE6071E628C5E99B00A8783E /* Documentation */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Documentation;
-			sourceTree = "<group>";
-		};
-		CE6071E728C5EBAD00A8783E /* Util */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Util;
-			sourceTree = "<group>";
-		};
 		CE6071E828C5EC2500A8783E /* API */ = {
 			isa = PBXGroup;
 			children = (
@@ -128,31 +128,87 @@
 			path = API;
 			sourceTree = "<group>";
 		};
-		CE6071E928C5EC2C00A8783E /* Core */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Core;
-			sourceTree = "<group>";
-		};
-		CE6071EA28C5EC8F00A8783E /* Document */ = {
-			isa = PBXGroup;
-			children = (
-				CEEC4C2A28C998320093D97C /* change */,
-				CEEC4C2B28C9983D0093D97C /* crdt */,
-				CEEC4C2E28C998550093D97C /* json */,
-				CEEC4C2D28C9984F0093D97C /* operation */,
-				CEEC4C2C28C9984A0093D97C /* time */,
-			);
-			path = Document;
-			sourceTree = "<group>";
-		};
 		CE6071EB28C5ECA900A8783E /* API */ = {
 			isa = PBXGroup;
 			children = (
 				CECCCB8028C96BB500544204 /* V1 */,
 			);
 			path = API;
+			sourceTree = "<group>";
+		};
+		CE8C22E228C9E4FD00432DE5 /* Documentation */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Documentation;
+			sourceTree = "<group>";
+		};
+		CE8C22E328C9E53400432DE5 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22EC28C9E7F200432DE5 /* Client.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		CE8C22E428C9E53E00432DE5 /* Document */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22E628C9E55300432DE5 /* Change */,
+				CE8C22E728C9E55800432DE5 /* CRDT */,
+				CE8C22E828C9E55E00432DE5 /* Json */,
+				CE8C22E928C9E56400432DE5 /* Operation */,
+				CE8C22EA28C9E56B00432DE5 /* Time */,
+			);
+			path = Document;
+			sourceTree = "<group>";
+		};
+		CE8C22E528C9E54500432DE5 /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22F828C9E8CA00432DE5 /* Heap.swift */,
+			);
+			path = Util;
+			sourceTree = "<group>";
+		};
+		CE8C22E628C9E55300432DE5 /* Change */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22EE28C9E85900432DE5 /* Change.swift */,
+			);
+			path = Change;
+			sourceTree = "<group>";
+		};
+		CE8C22E728C9E55800432DE5 /* CRDT */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22F028C9E86A00432DE5 /* Root.swift */,
+			);
+			path = CRDT;
+			sourceTree = "<group>";
+		};
+		CE8C22E828C9E55E00432DE5 /* Json */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22F228C9E87800432DE5 /* Object.swift */,
+			);
+			path = Json;
+			sourceTree = "<group>";
+		};
+		CE8C22E928C9E56400432DE5 /* Operation */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22F428C9E88500432DE5 /* Operation.swift */,
+			);
+			path = Operation;
+			sourceTree = "<group>";
+		};
+		CE8C22EA28C9E56B00432DE5 /* Time */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C22F628C9E89100432DE5 /* Ticket.swift */,
+			);
+			path = Time;
 			sourceTree = "<group>";
 		};
 		CECCCB8028C96BB500544204 /* V1 */ = {
@@ -189,41 +245,6 @@
 				CEEB17DD28C84CC3004988DD /* yorkie.proto */,
 			);
 			path = Protos;
-			sourceTree = "<group>";
-		};
-		CEEC4C2A28C998320093D97C /* change */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = change;
-			sourceTree = "<group>";
-		};
-		CEEC4C2B28C9983D0093D97C /* crdt */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = crdt;
-			sourceTree = "<group>";
-		};
-		CEEC4C2C28C9984A0093D97C /* time */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = time;
-			sourceTree = "<group>";
-		};
-		CEEC4C2D28C9984F0093D97C /* operation */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = operation;
-			sourceTree = "<group>";
-		};
-		CEEC4C2E28C998550093D97C /* json */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = json;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -385,8 +406,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */,
+				CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */,
+				CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */,
 				CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */,
+				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
+				CE8C22F728C9E89100432DE5 /* Ticket.swift in Sources */,
+				CE8C22F328C9E87800432DE5 /* Object.swift in Sources */,
+				CE8C22ED28C9E7F200432DE5 /* Client.swift in Sources */,
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
+				CE8C22F128C9E86A00432DE5 /* Root.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
