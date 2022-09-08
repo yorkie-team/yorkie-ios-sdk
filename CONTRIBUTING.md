@@ -30,6 +30,10 @@ This is a rough outline of what a contributor's workflow looks like:
 
 Thanks for contributing!
 
+### Code style
+
+In order to format the code, we use [SwiftFormat](https://github.com/nicklockwood/SwiftFormat) and [SwiftLint](https://github.com/realm/SwiftLint).
+
 ### Format of the commit message
 
 We follow a rough convention for commit messages that is designed to answer two
