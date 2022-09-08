@@ -59,7 +59,6 @@ class GRPCTests: XCTestCase {
     func test_connect_yorkie_with_async() async throws {
         let testClientKey = UUID().uuidString
         let group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
-
         defer {
             try? group.syncShutdownGracefully()
         }
