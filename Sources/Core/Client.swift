@@ -19,16 +19,17 @@ import GRPC
 import NIO
 
 /**
- * `StreamConnectionStatus` is stream connection status types
+ * `ClientStatus` represents the status of the client.
  * @public
  */
 enum ClientStatus: String {
     /**
-     * client deactivated status
+     * Deactivated means that the client is not registered to the server.
      */
     case deactivated
     /**
-     * client activated status
+     * Activated means that the client is registered to the server.
+     * So, the client can sync documents with the server.
      */
     case activated
 }
