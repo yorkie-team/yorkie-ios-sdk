@@ -10,7 +10,9 @@
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
 		CE6071E528C5D7EE00A8783E /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */; };
-		CE8C22ED28C9E7F200432DE5 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EC28C9E7F200432DE5 /* Client.swift */; };
+		CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230428C9F1BD00432DE5 /* Client.swift */; };
+		CE8C230728D1514900432DE5 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230628D1514900432DE5 /* Logger.swift */; };
+		CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
 		CE8C22F128C9E86A00432DE5 /* Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F028C9E86A00432DE5 /* Root.swift */; };
 		CE8C22F328C9E87800432DE5 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F228C9E87800432DE5 /* Object.swift */; };
@@ -42,7 +44,9 @@
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
-		CE8C22EC28C9E7F200432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
+		CE8C230428C9F1BD00432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
+		CE8C230628D1514900432DE5 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Logger.swift; path = Sources/Core/Logger.swift; sourceTree = SOURCE_ROOT; };
+		CE8C230928D15F5A00432DE5 /* ClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientTests.swift; sourceTree = "<group>"; };
 		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
 		CE8C22F028C9E86A00432DE5 /* Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Root.swift; sourceTree = "<group>"; };
 		CE8C22F228C9E87800432DE5 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
@@ -113,6 +117,7 @@
 		96DA808F28C5B7B400E2C1DA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				CE8C230828D15F5200432DE5 /* Core */,
 				CECCCB8128C96C8500544204 /* TestUtils */,
 				CE6071EB28C5ECA900A8783E /* API */,
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
@@ -146,7 +151,7 @@
 		CE8C22E328C9E53400432DE5 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				CE8C22EC28C9E7F200432DE5 /* Client.swift */,
+				CE8C230428C9F1BD00432DE5 /* Client.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -169,6 +174,14 @@
 				CE8C22F828C9E8CA00432DE5 /* Heap.swift */,
 			);
 			path = Util;
+			sourceTree = "<group>";
+		};
+		CE8C230828D15F5200432DE5 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C230928D15F5A00432DE5 /* ClientTests.swift */,
+			);
+			path = Core;
 			sourceTree = "<group>";
 		};
 		CE8C22E628C9E55300432DE5 /* Change */ = {
@@ -405,14 +418,15 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */,
 				CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */,
 				CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */,
 				CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */,
+				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* Ticket.swift in Sources */,
 				CE8C22F328C9E87800432DE5 /* Object.swift in Sources */,
-				CE8C22ED28C9E7F200432DE5 /* Client.swift in Sources */,
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
 				CE8C22F128C9E86A00432DE5 /* Root.swift in Sources */,
 			);
@@ -423,6 +437,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
+				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
