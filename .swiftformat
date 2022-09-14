@@ -9,4 +9,4 @@
 --patternlet inline
 --stripunusedargs unnamed-only
 --ifdef no-indent
-
+--commas inline

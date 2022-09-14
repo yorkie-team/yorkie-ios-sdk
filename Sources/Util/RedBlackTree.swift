@@ -28,17 +28,20 @@ private enum RotationDirection {
 
 // MARK: - RBNode
 
-class RBTreeNode<T: Comparable>: Equatable {
-    typealias RBNode = RBTreeNode<T>
+class RBTreeNode<T: Comparable, V>: Equatable {
+    typealias RBNode = RBTreeNode<T, V>
 
     fileprivate var color: RBTreeColor = .black
     fileprivate var key: T?
+    fileprivate var value: V?
     var leftChild: RBNode?
     var rightChild: RBNode?
     fileprivate weak var parent: RBNode?
 
-    init(key: T?, leftChild: RBNode?, rightChild: RBNode?, parent: RBNode?) {
+    init(key: T?, value: V?, leftChild: RBNode?, rightChild: RBNode?, parent: RBNode?) {
         self.key = key
+        self.value = value
+
         self.leftChild = leftChild
         self.rightChild = rightChild
         self.parent = parent
@@ -47,13 +50,13 @@ class RBTreeNode<T: Comparable>: Equatable {
         self.rightChild?.parent = self
     }
 
-    convenience init(key: T?) {
-        self.init(key: key, leftChild: RBNode(), rightChild: RBNode(), parent: RBNode())
+    convenience init(key: T?, value: V?) {
+        self.init(key: key, value: value, leftChild: RBNode(), rightChild: RBNode(), parent: RBNode())
     }
 
     // For initialising the nullLeaf
     convenience init() {
-        self.init(key: nil, leftChild: nil, rightChild: nil, parent: nil)
+        self.init(key: nil, value: nil, leftChild: nil, rightChild: nil, parent: nil)
         self.color = .black
     }
 
@@ -96,8 +99,8 @@ class RBTreeNode<T: Comparable>: Equatable {
 
 // MARK: - RedBlackTree
 
-class RedBlackTree<T: Comparable> {
-    typealias RBNode = RBTreeNode<T>
+class RedBlackTree<T: Comparable, V> {
+    typealias RBNode = RBTreeNode<T, V>
 
     fileprivate(set) var root: RBNode
     fileprivate(set) var size = 0
@@ -121,15 +124,19 @@ extension RedBlackTree {
         return self.size == 0
     }
 
-    func allElements() -> [T] {
-        var nodes: [T] = []
+    func allValues() -> [V] {
+        return self.allElements().compactMap { $0.value }
+    }
+
+    private func allElements() -> [RBNode] {
+        var nodes: [RBNode] = []
 
         self.getAllElements(node: self.root, nodes: &nodes)
 
         return nodes
     }
 
-    private func getAllElements(node: RBTreeNode<T>, nodes: inout [T]) {
+    private func getAllElements(node: RBTreeNode<T, V>, nodes: inout [RBNode]) {
         guard !node.isNullLeaf else {
             return
         }
@@ -138,8 +145,8 @@ extension RedBlackTree {
             self.getAllElements(node: left, nodes: &nodes)
         }
 
-        if let key = node.key {
-            nodes.append(key)
+        if node.key != nil {
+            nodes.append(node)
         }
 
         if let right = node.rightChild {
@@ -151,7 +158,7 @@ extension RedBlackTree {
 // MARK: - Equatable protocol
 
 extension RBTreeNode {
-    static func == <T>(lhs: RBTreeNode<T>, rhs: RBTreeNode<T>) -> Bool {
+    static func == <T>(lhs: RBTreeNode<T, V>, rhs: RBTreeNode<T, V>) -> Bool {
         return lhs.key == rhs.key
     }
 }
@@ -218,13 +225,14 @@ extension RedBlackTree {
      * Returns the node with the given key |input| if existing
      */
     func search(input: T) -> RBNode? {
-        return self.search(key: input, node: self.root)
+        var floorNode: RBNode?
+        return self.search(key: input, node: self.root, floorNode: &floorNode)
     }
 
     /*
      * Returns the node with given |key| in subtree of |node|
      */
-    private func search(key: T, node: RBNode?) -> RBNode? {
+    private func search(key: T, node: RBNode?, floorNode: inout RBNode?) -> RBNode? {
         // If node nil -> key not found
         guard let node = node else {
             return nil
@@ -236,13 +244,31 @@ extension RedBlackTree {
                 if key == nodeKey {
                     return node
                 } else if key < nodeKey {
-                    return self.search(key: key, node: node.leftChild)
+                    return self.search(key: key, node: node.leftChild, floorNode: &floorNode)
                 } else {
-                    return self.search(key: key, node: node.rightChild)
+                    if floorNode == nil {
+                        floorNode = node
+                    } else if let floorNodeKey = floorNode?.key, floorNodeKey < nodeKey {
+                        floorNode = node
+                    }
+
+                    return self.search(key: key, node: node.rightChild, floorNode: &floorNode)
                 }
             }
         }
         return nil
+    }
+
+    /*
+     * Returns the node with given |key| in subtree of |node|
+     */
+    func floorEntry(input: T) -> T? {
+        var floorNode: RBNode?
+        var result = self.search(key: input, node: self.root, floorNode: &floorNode)
+        if result == nil {
+            result = floorNode
+        }
+        return result?.key
     }
 }
 
@@ -252,21 +278,21 @@ extension RedBlackTree {
     /*
      * Returns the minimum key value of the whole tree
      */
-    func minValue() -> T? {
+    func minValue() -> V? {
         guard let minNode = root.minimum() else {
             return nil
         }
-        return minNode.key
+        return minNode.value
     }
 
     /*
      * Returns the maximum key value of the whole tree
      */
-    func maxValue() -> T? {
+    func maxValue() -> V? {
         guard let maxNode = root.maximum() else {
             return nil
         }
-        return maxNode.key
+        return maxNode.value
     }
 }
 
@@ -279,16 +305,16 @@ extension RedBlackTree {
      * 2. Fix red-black properties
      * Runntime: O(log n)
      */
-    func insert(key: T) {
+    func insert(key: T, value: V) {
         // If key must be unique and find the key already existed, quit
         if self.search(input: key) != nil, !self.allowDuplicateNode {
             return
         }
 
         if self.root.isNullLeaf {
-            self.root = RBNode(key: key)
+            self.root = RBNode(key: key, value: value)
         } else {
-            self.insert(input: RBNode(key: key), node: self.root)
+            self.insert(input: RBNode(key: key, value: value), node: self.root)
         }
 
         self.size += 1
@@ -407,10 +433,11 @@ extension RedBlackTree {
      * Runntime: O(log n)
      */
     func delete(key: T) {
+        var floorNode: RBNode?
         if self.size == 1 {
             self.root = self.nullLeaf
             self.size -= 1
-        } else if let node = search(key: key, node: root) {
+        } else if let node = search(key: key, node: root, floorNode: &floorNode) {
             if !node.isNullLeaf {
                 self.delete(node: node)
                 self.size -= 1
@@ -460,6 +487,7 @@ extension RedBlackTree {
         }
         if nodeY != zNode {
             zNode.key = nodeY.key
+            zNode.value = nodeY.value
         }
         // If sliced out node was red -> nothing to do as red-black-property holds
         // If it was black -> fix red-black-property
@@ -730,27 +758,27 @@ extension RedBlackTree {
 
 extension RBTreeNode: CustomDebugStringConvertible {
     var debugDescription: String {
-        var result = ""
+        var str = ""
         if self.isNullLeaf {
-            result = "nullLeaf"
+            str = "nullLeaf"
         } else {
             if let key = key {
-                result = "key: \(key)"
+                str = "key: \(key)"
             } else {
-                result = "key: nil"
+                str = "key: nil"
             }
             if let parent = parent {
-                result += ", parent: \(String(describing: parent.key))"
+                str += ", parent: \(String(describing: parent.key))"
             }
             if let left = leftChild {
-                result += ", left = [" + left.debugDescription + "]"
+                str += ", left = [" + left.debugDescription + "]"
             }
             if let right = rightChild {
-                result += ", right = [" + right.debugDescription + "]"
+                str += ", right = [" + right.debugDescription + "]"
             }
-            result += ", color = \(self.color)"
+            str += ", color = \(self.color)"
         }
-        return result
+        return str
     }
 }
 
@@ -762,24 +790,24 @@ extension RedBlackTree: CustomDebugStringConvertible {
 
 extension RBTreeNode: CustomStringConvertible {
     var description: String {
-        var result = ""
+        var str = ""
         if self.isNullLeaf {
-            result += "nullLeaf"
+            str += "nullLeaf"
         } else {
             if let left = leftChild {
-                result += "(\(left.description)) <- "
+                str += "(\(left.description)) <- "
             }
             if let key = key {
-                result += "\(key)"
+                str += "\(key)"
             } else {
-                result += "nil"
+                str += "nil"
             }
-            result += ", \(self.color)"
+            str += ", \(self.color)"
             if let right = rightChild {
-                result += " -> (\(right.description))"
+                str += " -> (\(right.description))"
             }
         }
-        return result
+        return str
     }
 }
 
