@@ -15,4 +15,8 @@ opt_in_rules:
   - contains_over_first_not_nil
 disabled_rules:
   - line_length
-
+  - file_length
+# Rewrited rules
+cyclomatic_complexity: 
+  warning: 25
+function_body_length: 100

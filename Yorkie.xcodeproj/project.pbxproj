@@ -9,16 +9,19 @@
 /* Begin PBXBuildFile section */
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
+		CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94B28D1887B009471BC /* HeapTests.swift */; };
+		CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94E28D1922E009471BC /* RedBlackTree.swift */; };
+		CE3EC95228D195E4009471BC /* RedBlackTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */; };
 		CE6071E528C5D7EE00A8783E /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */; };
-		CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230428C9F1BD00432DE5 /* Client.swift */; };
-		CE8C230728D1514900432DE5 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230628D1514900432DE5 /* Logger.swift */; };
-		CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
 		CE8C22F128C9E86A00432DE5 /* Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F028C9E86A00432DE5 /* Root.swift */; };
 		CE8C22F328C9E87800432DE5 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F228C9E87800432DE5 /* Object.swift */; };
 		CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F428C9E88500432DE5 /* Operation.swift */; };
 		CE8C22F728C9E89100432DE5 /* Ticket.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F628C9E89100432DE5 /* Ticket.swift */; };
 		CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F828C9E8CA00432DE5 /* Heap.swift */; };
+		CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230428C9F1BD00432DE5 /* Client.swift */; };
+		CE8C230728D1514900432DE5 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230628D1514900432DE5 /* Logger.swift */; };
+		CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E028C84D26004988DD /* yorkie.pb.swift */; };
 		CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E128C84D26004988DD /* resources.pb.swift */; };
@@ -43,16 +46,19 @@
 		96DA808B28C5B7B400E2C1DA /* YorkieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YorkieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CE3EC94B28D1887B009471BC /* HeapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeapTests.swift; sourceTree = "<group>"; };
+		CE3EC94E28D1922E009471BC /* RedBlackTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedBlackTree.swift; sourceTree = "<group>"; };
+		CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedBlackTreeTests.swift; sourceTree = "<group>"; };
 		CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
-		CE8C230428C9F1BD00432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
-		CE8C230628D1514900432DE5 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Logger.swift; path = Sources/Core/Logger.swift; sourceTree = SOURCE_ROOT; };
-		CE8C230928D15F5A00432DE5 /* ClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientTests.swift; sourceTree = "<group>"; };
 		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
 		CE8C22F028C9E86A00432DE5 /* Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Root.swift; sourceTree = "<group>"; };
 		CE8C22F228C9E87800432DE5 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
 		CE8C22F428C9E88500432DE5 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
 		CE8C22F628C9E89100432DE5 /* Ticket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ticket.swift; sourceTree = "<group>"; };
 		CE8C22F828C9E8CA00432DE5 /* Heap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Heap.swift; sourceTree = "<group>"; };
+		CE8C230428C9F1BD00432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
+		CE8C230628D1514900432DE5 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Logger.swift; path = Sources/Core/Logger.swift; sourceTree = SOURCE_ROOT; };
+		CE8C230928D15F5A00432DE5 /* ClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientTests.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CEEB17DC28C84CC3004988DD /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
 		CEEB17DD28C84CC3004988DD /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
@@ -90,6 +96,7 @@
 				96DA808F28C5B7B400E2C1DA /* Tests */,
 				CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */,
 				96DA808328C5B7B400E2C1DA /* Products */,
+				CE3EC94928D18720009471BC /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -117,12 +124,30 @@
 		96DA808F28C5B7B400E2C1DA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				CE8C230828D15F5200432DE5 /* Core */,
-				CECCCB8128C96C8500544204 /* TestUtils */,
 				CE6071EB28C5ECA900A8783E /* API */,
+				CE8C230828D15F5200432DE5 /* Core */,
+				CE3EC94A28D1885F009471BC /* Util */,
+				CECCCB8128C96C8500544204 /* TestUtils */,
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		CE3EC94928D18720009471BC /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C230628D1514900432DE5 /* Logger.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
+		CE3EC94A28D1885F009471BC /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				CE3EC94B28D1887B009471BC /* HeapTests.swift */,
+				CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */,
+			);
+			path = Util;
 			sourceTree = "<group>";
 		};
 		CE6071E828C5EC2500A8783E /* API */ = {
@@ -172,16 +197,9 @@
 			isa = PBXGroup;
 			children = (
 				CE8C22F828C9E8CA00432DE5 /* Heap.swift */,
+				CE3EC94E28D1922E009471BC /* RedBlackTree.swift */,
 			);
 			path = Util;
-			sourceTree = "<group>";
-		};
-		CE8C230828D15F5200432DE5 /* Core */ = {
-			isa = PBXGroup;
-			children = (
-				CE8C230928D15F5A00432DE5 /* ClientTests.swift */,
-			);
-			path = Core;
 			sourceTree = "<group>";
 		};
 		CE8C22E628C9E55300432DE5 /* Change */ = {
@@ -222,6 +240,14 @@
 				CE8C22F628C9E89100432DE5 /* Ticket.swift */,
 			);
 			path = Time;
+			sourceTree = "<group>";
+		};
+		CE8C230828D15F5200432DE5 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				CE8C230928D15F5A00432DE5 /* ClientTests.swift */,
+			);
+			path = Core;
 			sourceTree = "<group>";
 		};
 		CECCCB8028C96BB500544204 /* V1 */ = {
@@ -423,6 +449,7 @@
 				CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */,
 				CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */,
 				CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */,
+				CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */,
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* Ticket.swift in Sources */,
@@ -439,6 +466,8 @@
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,
+				CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */,
+				CE3EC95228D195E4009471BC /* RedBlackTreeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
