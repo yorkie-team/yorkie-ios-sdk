@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+// Copyright (c) 2016 Matthijs Hollemans and contributors. Licensed under the MIT license.
+// See LICENSE in the project root for license information.
+
 import Foundation
 
 struct Heap<T: Comparable> {
