@@ -12,6 +12,8 @@
 		CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94B28D1887B009471BC /* HeapTests.swift */; };
 		CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94E28D1922E009471BC /* RedBlackTree.swift */; };
 		CE3EC95228D195E4009471BC /* RedBlackTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */; };
+		CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */; };
+		CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC96028D2D626009471BC /* SplayTree.swift */; };
 		CE6071E528C5D7EE00A8783E /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */; };
 		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
 		CE8C22F128C9E86A00432DE5 /* Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F028C9E86A00432DE5 /* Root.swift */; };
@@ -49,6 +51,8 @@
 		CE3EC94B28D1887B009471BC /* HeapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeapTests.swift; sourceTree = "<group>"; };
 		CE3EC94E28D1922E009471BC /* RedBlackTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedBlackTree.swift; sourceTree = "<group>"; };
 		CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedBlackTreeTests.swift; sourceTree = "<group>"; };
+		CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SplayTreeTests.swift; sourceTree = "<group>"; };
+		CE3EC96028D2D626009471BC /* SplayTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplayTree.swift; sourceTree = "<group>"; };
 		CE6071E428C5D7EE00A8783E /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
 		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
 		CE8C22F028C9E86A00432DE5 /* Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Root.swift; sourceTree = "<group>"; };
@@ -146,6 +150,7 @@
 			children = (
 				CE3EC94B28D1887B009471BC /* HeapTests.swift */,
 				CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */,
+				CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -198,6 +203,7 @@
 			children = (
 				CE8C22F828C9E8CA00432DE5 /* Heap.swift */,
 				CE3EC94E28D1922E009471BC /* RedBlackTree.swift */,
+				CE3EC96028D2D626009471BC /* SplayTree.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -444,6 +450,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */,
 				CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */,
@@ -464,6 +471,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
+				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,
 				CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */,
