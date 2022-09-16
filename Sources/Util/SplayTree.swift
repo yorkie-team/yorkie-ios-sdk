@@ -33,8 +33,7 @@ class SplayNode<V> {
     }
 
     func getLength() -> Int {
-        assertionFailure("Must be implemented.")
-        return 0
+        fatalError("Must be implemented.")
     }
 
     /**
