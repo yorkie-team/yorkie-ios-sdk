@@ -35,8 +35,8 @@ class GRPCTests: XCTestCase {
             return
         }
 
-        let client = Yorkie_V1_YorkieServiceNIOClient(channel: channel)
-        var activateRequest = Yorkie_V1_ActivateClientRequest()
+        let client = YorkieServiceNIOClient(channel: channel)
+        var activateRequest = ActivateClientRequest()
         activateRequest.clientKey = testClientKey
         let activateResponse = try? client.activateClient(activateRequest, callOptions: nil).response.wait()
         guard let activateResponse = activateResponse else {
@@ -46,7 +46,7 @@ class GRPCTests: XCTestCase {
 
         XCTAssertEqual(activateResponse.clientKey, testClientKey)
 
-        var deactivateRequest = Yorkie_V1_DeactivateClientRequest()
+        var deactivateRequest = DeactivateClientRequest()
         deactivateRequest.clientID = activateResponse.clientID
         guard let deactivatedResponse = try? client.deactivateClient(deactivateRequest).response.wait() else {
             XCTFail("The response of deactivate is nil.")
@@ -71,8 +71,8 @@ class GRPCTests: XCTestCase {
             return
         }
 
-        let client = Yorkie_V1_YorkieServiceAsyncClient(channel: channel)
-        var activateRequest = Yorkie_V1_ActivateClientRequest()
+        let client = YorkieServiceAsyncClient(channel: channel)
+        var activateRequest = ActivateClientRequest()
         activateRequest.clientKey = testClientKey
         let activateResponse = try? await client.activateClient(activateRequest, callOptions: nil)
         guard let activateResponse = activateResponse else {
@@ -82,7 +82,7 @@ class GRPCTests: XCTestCase {
 
         XCTAssertEqual(activateResponse.clientKey, testClientKey)
 
-        var deactivateRequest = Yorkie_V1_DeactivateClientRequest()
+        var deactivateRequest = DeactivateClientRequest()
         deactivateRequest.clientID = activateResponse.clientID
         guard let deactivatedResponse = try? await client.deactivateClient(deactivateRequest) else {
             XCTFail("The response of deactivate is nil.")

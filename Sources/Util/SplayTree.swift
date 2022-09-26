@@ -247,6 +247,7 @@ class SplayTree<V> {
     /**
      * `insertAfter` inserts the node after the given previous node.
      */
+    @discardableResult
     func insertAfter(_ target: SplayNode<V>?, newNode: SplayNode<V>) -> SplayNode<V> {
         guard let target = target else {
             self.root = newNode

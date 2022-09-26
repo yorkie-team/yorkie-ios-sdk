@@ -25,8 +25,6 @@ extension UInt64 {
 /**
  * `TimeTicket` is a timestamp of the logical clock. Ticket is immutable.
  * It is created by `ChangeID`.
- *
- * @public
  */
 class TimeTicket {
     private enum InitialValue {

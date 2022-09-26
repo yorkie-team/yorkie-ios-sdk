@@ -23,7 +23,7 @@ class CRDTElementTests: XCTestCase {
         let big = TimeTicket.maxTimeTicket
 
         let target = CRDTElement(createdAt: big)
-        let movedResult = target.setMovedAt(movedAt: small)
+        let movedResult = target.setMovedAt(small)
 
         XCTAssertEqual(movedResult, true)
         XCTAssertEqual(target.getMovedAt()?.compare(small), .orderedSame)
@@ -34,7 +34,7 @@ class CRDTElementTests: XCTestCase {
         let big = TimeTicket.maxTimeTicket
 
         let target = CRDTElement(createdAt: small)
-        let movedResult = target.setMovedAt(movedAt: big)
+        let movedResult = target.setMovedAt(big)
 
         XCTAssertEqual(movedResult, true)
         XCTAssertEqual(target.getMovedAt()?.compare(big), .orderedSame)
@@ -45,10 +45,10 @@ class CRDTElementTests: XCTestCase {
         let big = TimeTicket.maxTimeTicket
 
         let target = CRDTElement(createdAt: small)
-        target.setMovedAt(movedAt: big)
+        target.setMovedAt(big)
 
         let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)
-        let movedResult = target.setMovedAt(movedAt: timeTicket)
+        let movedResult = target.setMovedAt(timeTicket)
 
         XCTAssertEqual(movedResult, false)
         XCTAssertEqual(target.getMovedAt()?.compare(small), .orderedDescending)
@@ -74,14 +74,14 @@ class CRDTElementTests: XCTestCase {
 
     func test_can_remove_when_current_removeAt_is_not_nil_and_samll() {
         let target = CRDTElement(createdAt: TimeTicket.initialTimeTicket)
-        target.setRemovedAt(removedAt: TimeTicket.initialTimeTicket)
+        target.setRemovedAt(TimeTicket.initialTimeTicket)
 
         XCTAssertEqual(target.remove(TimeTicket.maxTimeTicket), true)
     }
 
     func test_can_not_remove_when_current_removeAt_is_not_nil_and_big() {
         let target = CRDTElement(createdAt: TimeTicket.initialTimeTicket)
-        target.setRemovedAt(removedAt: TimeTicket.maxTimeTicket)
+        target.setRemovedAt(TimeTicket.maxTimeTicket)
 
         let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)
         XCTAssertEqual(target.remove(timeTicket), false)

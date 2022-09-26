@@ -62,7 +62,7 @@ class CRDTElement {
      * `setMovedAt` sets the move time of this element.
      */
     @discardableResult
-    func setMovedAt(movedAt: TimeTicket?) -> Bool {
+    func setMovedAt(_ movedAt: TimeTicket?) -> Bool {
         guard let currentMoveAt = self.movedAt else {
             self.movedAt = movedAt
             return true
@@ -79,7 +79,7 @@ class CRDTElement {
     /**
      * `setRemovedAt` sets the remove time of this element.
      */
-    func setRemovedAt(removedAt: TimeTicket?) {
+    func setRemovedAt(_ removedAt: TimeTicket?) {
         self.removedAt = removedAt
     }
 
