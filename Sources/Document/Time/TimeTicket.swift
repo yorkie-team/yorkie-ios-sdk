@@ -29,8 +29,8 @@ extension UInt64 {
 class TimeTicket {
     private enum InitialValue {
         static let initialDelimiter: UInt32 = 0
-        static let maxDelemiter: UInt32 = UInt32.max
-        static let maxLamport: UInt64 = UInt64.max
+        static let maxDelemiter: UInt32 = .max
+        static let maxLamport: UInt64 = .max
     }
 
     static let initialTimeTicket = TimeTicket(lamport: 0, delimiter: InitialValue.initialDelimiter, actorID: ActorIds.initialActorID)
