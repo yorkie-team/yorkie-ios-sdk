@@ -16,12 +16,6 @@
 
 import Foundation
 
-extension UInt64 {
-    func toString() -> String {
-        return String(self)
-    }
-}
-
 /**
  * `TimeTicket` is a timestamp of the logical clock. Ticket is immutable.
  * It is created by `ChangeID`.
@@ -30,18 +24,18 @@ class TimeTicket {
     private enum InitialValue {
         static let initialDelimiter: UInt32 = 0
         static let maxDelemiter: UInt32 = .max
-        static let maxLamport: UInt64 = .max
+        static let maxLamport: Int64 = .max
     }
 
     static let initialTimeTicket = TimeTicket(lamport: 0, delimiter: InitialValue.initialDelimiter, actorID: ActorIds.initialActorID)
     static let maxTimeTicket = TimeTicket(lamport: InitialValue.maxLamport, delimiter: InitialValue.maxDelemiter, actorID: ActorIds.maxActorID)
 
-    private var lamport: UInt64
+    private var lamport: Int64
     private var delimiter: UInt32
     private var actorID: ActorID?
 
     /** @hideconstructor */
-    init(lamport: UInt64, delimiter: UInt32, actorID: ActorID?) {
+    init(lamport: Int64, delimiter: UInt32, actorID: ActorID?) {
         self.lamport = lamport
         self.delimiter = delimiter
         self.actorID = actorID
@@ -50,7 +44,7 @@ class TimeTicket {
     /**
      * `of` creates an instance of Ticket.
      */
-    public static func of(lamport: UInt64, delimiter: UInt32, actorID: ActorID?) -> TimeTicket {
+    public static func of(lamport: Int64, delimiter: UInt32, actorID: ActorID?) -> TimeTicket {
         return TimeTicket(lamport: lamport, delimiter: delimiter, actorID: actorID)
     }
 
@@ -59,9 +53,9 @@ class TimeTicket {
      */
     func toIDString() -> String {
         guard let actorID = self.actorID else {
-            return "\(self.lamport.toString()):nil:\(self.delimiter)"
+            return "\(self.lamport):nil:\(self.delimiter)"
         }
-        return "\(self.lamport.toString()):\(actorID):\(self.delimiter)"
+        return "\(self.lamport):\(actorID):\(self.delimiter)"
     }
 
     /**
@@ -70,9 +64,9 @@ class TimeTicket {
      */
     func getStructureAsString() -> String {
         guard let actorID = self.actorID else {
-            return "\(self.lamport.toString()):nil:\(self.delimiter)"
+            return "\(self.lamport):nil:\(self.delimiter)"
         }
-        return "\(self.lamport.toString()):\(actorID):\(self.delimiter)"
+        return "\(self.lamport):\(actorID):\(self.delimiter)"
     }
 
     /**
@@ -86,7 +80,7 @@ class TimeTicket {
      * `getLamportAsString` returns the lamport string.
      */
     func getLamportAsString() -> String {
-        return self.lamport.toString()
+        return "\(self.lamport)"
     }
 
     /**
