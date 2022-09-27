@@ -404,10 +404,10 @@ class SplayTree<V> {
     }
 
     /**
-     * `getAnnotatedString` returns a string containing the meta data of the Node
+     * `getStructureAsString` returns a string containing the meta data of the Node
      * for debugging purpose.
      */
-    func getAnnotatedString() -> String {
+    func getStructureAsString() -> String {
         var metaString: [SplayNode<V>] = []
         self.traverseInorder(self.root!, stack: &metaString)
         return metaString

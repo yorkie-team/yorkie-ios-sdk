@@ -29,8 +29,8 @@ extension UInt64 {
 class TimeTicket {
     private enum InitialValue {
         static let initialDelimiter: UInt32 = 0
-        static let maxDelemiter: UInt32 = 4_294_967_295
-        static let maxLamport: UInt64 = 18_446_744_073_709_551_615
+        static let maxDelemiter: UInt32 = UInt32.max
+        static let maxLamport: UInt64 = UInt64.max
     }
 
     static let initialTimeTicket = TimeTicket(lamport: 0, delimiter: InitialValue.initialDelimiter, actorID: ActorIds.initialActorID)
@@ -65,10 +65,10 @@ class TimeTicket {
     }
 
     /**
-     * `getAnnotatedString` returns a string containing the meta data of the ticket
+     * `getStructureAsString` returns a string containing the meta data of the ticket
      * for debugging purpose.
      */
-    func getAnnotatedString() -> String {
+    func getStructureAsString() -> String {
         guard let actorID = self.actorID else {
             return "\(self.lamport.toString()):nil:\(self.delimiter)"
         }

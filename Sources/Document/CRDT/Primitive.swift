@@ -41,8 +41,8 @@ class Primitive: CRDTElement {
 
     /**
      * `toJSON` returns the JSON encoding of the value.
-     * 
-     * TODO: We need to consider the case where the value is
+     *
+     * TODOs: We need to consider the case where the value is
      * a byte array and a date.
      */
     var toJSON: String {
