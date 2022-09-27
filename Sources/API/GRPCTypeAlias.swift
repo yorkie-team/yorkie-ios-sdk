@@ -1,7 +1,7 @@
 /*
  * Copyright 2022 The Yorkie Authors. All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -14,4 +14,13 @@
  * limitations under the License.
  */
 
+// Use a Swift typealias to remap the type names of Protobuf locally
+// Swift Protobuf Guide: https://github.com/apple/swift-protobuf/blob/main/Documentation/API.md#generated-struct-name
 import Foundation
+
+typealias ValueType = Yorkie_V1_ValueType
+typealias YorkieServiceNIOClient = Yorkie_V1_YorkieServiceNIOClient
+typealias ActivateClientRequest = Yorkie_V1_ActivateClientRequest
+typealias DeactivateClientRequest = Yorkie_V1_DeactivateClientRequest
+typealias YorkieServiceAsyncClient = Yorkie_V1_YorkieServiceAsyncClient
+

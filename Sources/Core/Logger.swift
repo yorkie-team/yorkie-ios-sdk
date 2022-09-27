@@ -21,6 +21,7 @@ enum LogLevel: String {
     case info = "INFO"
     case warn = "WARN"
     case error = "ERROR"
+    case fatal = "FATAL"
 }
 
 enum Logger {
@@ -38,6 +39,10 @@ enum Logger {
 
     static func error(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
         self.log(level: .error, message, error: error, filename: filename, function: function, line: line)
+    }
+
+    static func fatal(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
+        self.log(level: .fatal, message, error: error, filename: filename, function: function, line: line)
     }
 
     static func log(level: LogLevel, _ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {

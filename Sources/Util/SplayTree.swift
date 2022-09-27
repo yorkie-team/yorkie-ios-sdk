@@ -33,8 +33,7 @@ class SplayNode<V> {
     }
 
     func getLength() -> Int {
-        assertionFailure("Must be implemented.")
-        return 0
+        fatalError("Must be implemented.")
     }
 
     /**
@@ -248,6 +247,7 @@ class SplayTree<V> {
     /**
      * `insertAfter` inserts the node after the given previous node.
      */
+    @discardableResult
     func insertAfter(_ target: SplayNode<V>?, newNode: SplayNode<V>) -> SplayNode<V> {
         guard let target = target else {
             self.root = newNode
@@ -404,10 +404,10 @@ class SplayTree<V> {
     }
 
     /**
-     * `getAnnotatedString` returns a string containing the meta data of the Node
+     * `getStructureAsString` returns a string containing the meta data of the Node
      * for debugging purpose.
      */
-    func getAnnotatedString() -> String {
+    func getStructureAsString() -> String {
         var metaString: [SplayNode<V>] = []
         self.traverseInorder(self.root!, stack: &metaString)
         return metaString
