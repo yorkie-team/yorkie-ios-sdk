@@ -19,7 +19,7 @@ import Foundation
 enum Converter {
     
     /**
-     * `valueFromBytes` parses the given bytes into value.
+     * parses the given bytes into value.
      */
     static func valueFrom(valueType: ValueType, data: Data) throws -> PrimitiveValue {
         switch valueType {

@@ -28,20 +28,20 @@ extension UInt64 {
  */
 class TimeTicket {
     private enum InitialValue {
-        static let initialDelimiter = 0
-        static let maxDelemiter = 4_294_967_295
-        static let maxLamport = UInt64("18446744073709551615") ?? 0
+        static let initialDelimiter: UInt32 = 0
+        static let maxDelemiter: UInt32 = 4_294_967_295
+        static let maxLamport: UInt64 = 18_446_744_073_709_551_615
     }
 
     static let initialTimeTicket = TimeTicket(lamport: 0, delimiter: InitialValue.initialDelimiter, actorID: ActorIds.initialActorID)
     static let maxTimeTicket = TimeTicket(lamport: InitialValue.maxLamport, delimiter: InitialValue.maxDelemiter, actorID: ActorIds.maxActorID)
 
     private var lamport: UInt64
-    private var delimiter: Int
+    private var delimiter: UInt32
     private var actorID: ActorID?
 
     /** @hideconstructor */
-    init(lamport: UInt64, delimiter: Int, actorID: ActorID?) {
+    init(lamport: UInt64, delimiter: UInt32, actorID: ActorID?) {
         self.lamport = lamport
         self.delimiter = delimiter
         self.actorID = actorID
@@ -50,7 +50,7 @@ class TimeTicket {
     /**
      * `of` creates an instance of Ticket.
      */
-    public static func of(lamport: UInt64, delimiter: Int, actorID: ActorID?) -> TimeTicket {
+    public static func of(lamport: UInt64, delimiter: UInt32, actorID: ActorID?) -> TimeTicket {
         return TimeTicket(lamport: lamport, delimiter: delimiter, actorID: actorID)
     }
 
@@ -58,10 +58,10 @@ class TimeTicket {
      * `toIDString` returns the lamport string for this Ticket.
      */
     func toIDString() -> String {
-        if self.actorID == nil {
+        guard let actorID = self.actorID else {
             return "\(self.lamport.toString()):nil:\(self.delimiter)"
         }
-        return "\(self.lamport.toString()):\(String(describing: self.actorID)):\(self.delimiter)"
+        return "\(self.lamport.toString()):\(actorID):\(self.delimiter)"
     }
 
     /**
@@ -69,10 +69,10 @@ class TimeTicket {
      * for debugging purpose.
      */
     func getAnnotatedString() -> String {
-        if self.actorID == nil {
+        guard let actorID = self.actorID else {
             return "\(self.lamport.toString()):nil:\(self.delimiter)"
         }
-        return "\(self.lamport.toString()):\(self.actorID ?? "nil"):\(self.delimiter)"
+        return "\(self.lamport.toString()):\(actorID):\(self.delimiter)"
     }
 
     /**
@@ -92,7 +92,7 @@ class TimeTicket {
     /**
      * `getDelimiter` returns delimiter.
      */
-    func getDelimiter() -> Int {
+    func getDelimiter() -> UInt32 {
         return self.delimiter
     }
 
