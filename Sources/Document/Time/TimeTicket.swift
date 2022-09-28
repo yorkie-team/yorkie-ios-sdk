@@ -20,7 +20,7 @@ import Foundation
  * `TimeTicket` is a timestamp of the logical clock. Ticket is immutable.
  * It is created by `ChangeID`.
  */
-class TimeTicket {
+struct TimeTicket {
     private enum InitialValue {
         static let initialDelimiter: UInt32 = 0
         static let maxDelemiter: UInt32 = .max
@@ -34,7 +34,6 @@ class TimeTicket {
     private var delimiter: UInt32
     private var actorID: ActorID?
 
-    /** @hideconstructor */
     init(lamport: Int64, delimiter: UInt32, actorID: ActorID?) {
         self.lamport = lamport
         self.delimiter = delimiter
@@ -44,7 +43,7 @@ class TimeTicket {
     /**
      * `of` creates an instance of Ticket.
      */
-    public static func of(lamport: Int64, delimiter: UInt32, actorID: ActorID?) -> TimeTicket {
+    static func of(lamport: Int64, delimiter: UInt32, actorID: ActorID?) -> TimeTicket {
         return TimeTicket(lamport: lamport, delimiter: delimiter, actorID: actorID)
     }
 
@@ -137,5 +136,17 @@ class TimeTicket {
         }
 
         return .orderedSame
+    }
+}
+
+extension TimeTicket: Hashable {
+    static func == (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
+        return lhs.toIDString() == rhs.toIDString()
+    }
+}
+
+extension TimeTicket: CustomStringConvertible {
+    var description: String {
+        self.toIDString()
     }
 }

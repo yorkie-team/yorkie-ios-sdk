@@ -119,7 +119,7 @@ class RGATreeList: Sequence, IteratorProtocol {
     private let dummyHead: RGATreeListNode
     private var last: RGATreeListNode
     private var nodeMapByIndex: SplayTree<CRDTElement>
-    private var nodeMapByCreatedAt: [String: RGATreeListNode]
+    private var nodeMapByCreatedAt: [TimeTicket: RGATreeListNode]
 
     init() {
         let dummyValue = Primitive(value: .null, createdAt: .initialTimeTicket)
@@ -128,7 +128,7 @@ class RGATreeList: Sequence, IteratorProtocol {
         self.last = self.dummyHead
         self.nodeMapByIndex = SplayTree()
         self.nodeMapByIndex.insert(self.dummyHead)
-        self.nodeMapByCreatedAt = [self.dummyHead.getCreatedAt().toIDString(): self.dummyHead]
+        self.nodeMapByCreatedAt = [self.dummyHead.getCreatedAt(): self.dummyHead]
     }
 
     /**
@@ -149,8 +149,8 @@ class RGATreeList: Sequence, IteratorProtocol {
      * - Returns: next node
      */
     private func findNode(fromCreatedAt createdAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode {
-        guard var node = self.nodeMapByCreatedAt[createdAt.toIDString()] else {
-            let log = "can't find the given node: \(createdAt.toIDString())"
+        guard var node = self.nodeMapByCreatedAt[createdAt] else {
+            let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -172,7 +172,7 @@ class RGATreeList: Sequence, IteratorProtocol {
 
         node.release()
         self.nodeMapByIndex.delete(node)
-        self.nodeMapByCreatedAt.removeValue(forKey: node.getValue().getCreatedAt().toIDString())
+        self.nodeMapByCreatedAt.removeValue(forKey: node.getValue().getCreatedAt())
     }
 
     /**
@@ -188,7 +188,7 @@ class RGATreeList: Sequence, IteratorProtocol {
         }
 
         self.nodeMapByIndex.insert(previousNode: previousNode, newNode: newNode)
-        self.nodeMapByCreatedAt[newNode.getCreatedAt().toIDString()] = newNode
+        self.nodeMapByCreatedAt[newNode.getCreatedAt()] = newNode
     }
 
     /**
@@ -196,14 +196,14 @@ class RGATreeList: Sequence, IteratorProtocol {
      * after the `previousCreatedAt` element.
      */
     func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
-        guard let previsousNode = self.nodeMapByCreatedAt[afterCreatedAt.toIDString()] else {
-            let log = "can't find the given node: \(afterCreatedAt.toIDString())"
+        guard let previsousNode = self.nodeMapByCreatedAt[afterCreatedAt] else {
+            let log = "can't find the given node: \(afterCreatedAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        guard let movingNode = self.nodeMapByCreatedAt[createdAt.toIDString()] else {
-            let log = "can't find the given node: \(createdAt.toIDString())"
+        guard let movingNode = self.nodeMapByCreatedAt[createdAt] else {
+            let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -239,8 +239,8 @@ class RGATreeList: Sequence, IteratorProtocol {
      * `get` returns the element of the given index.
      */
     func get(createdAt: TimeTicket) throws -> CRDTElement {
-        guard let node = self.nodeMapByCreatedAt[createdAt.toIDString()] else {
-            let log = "can't find the given node: \(createdAt.toIDString())"
+        guard let node = self.nodeMapByCreatedAt[createdAt] else {
+            let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -252,8 +252,8 @@ class RGATreeList: Sequence, IteratorProtocol {
      * `subpath` subpath  of JSONPath based on the creation time of the node.
      */
     func subPath(createdAt: TimeTicket) throws -> String {
-        guard let node = self.nodeMapByCreatedAt[createdAt.toIDString()] else {
-            let log = "can't find the given node: \(createdAt.toIDString())"
+        guard let node = self.nodeMapByCreatedAt[createdAt] else {
+            let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -265,8 +265,8 @@ class RGATreeList: Sequence, IteratorProtocol {
      * `purge` physically purges child element.
      */
     func purge(_ value: CRDTElement) throws {
-        guard let node = self.nodeMapByCreatedAt[value.getCreatedAt().toIDString()] else {
-            let log = "failed to find the given createdAt: \(value.getCreatedAt().toIDString())"
+        guard let node = self.nodeMapByCreatedAt[value.getCreatedAt()] else {
+            let log = "failed to find the given createdAt: \(value.getCreatedAt())"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -317,8 +317,8 @@ class RGATreeList: Sequence, IteratorProtocol {
      * `getPreviousCreatedAt` returns a creation time of the previous node.
      */
     func getPreviousCreatedAt(ofCreatedAt createdAt: TimeTicket) throws -> TimeTicket {
-        guard let node = self.nodeMapByCreatedAt[createdAt.toIDString()] else {
-            let log = "can't find the given node: \(createdAt.toIDString())"
+        guard let node = self.nodeMapByCreatedAt[createdAt] else {
+            let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -334,8 +334,8 @@ class RGATreeList: Sequence, IteratorProtocol {
      * `delete` deletes the node of the given creation time.
      */
     func delete(createdAt: TimeTicket, editedAt: TimeTicket) throws -> CRDTElement {
-        guard let node = self.nodeMapByCreatedAt[createdAt.toIDString()] else {
-            let log = "can't find the given node: \(createdAt.toIDString())"
+        guard let node = self.nodeMapByCreatedAt[createdAt] else {
+            let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -388,7 +388,7 @@ class RGATreeList: Sequence, IteratorProtocol {
         var result: [String] = []
 
         for node in self {
-            let value = "\(node.getCreatedAt().toIDString()):\(node.getValue().toJSON())"
+            let value = "\(node.getCreatedAt()):\(node.getValue().toJSON())"
             if node.isRemoved() {
                 result.append("{\(value)}")
             } else {
