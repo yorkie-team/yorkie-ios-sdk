@@ -25,6 +25,9 @@
 		CE7B997428E1766F00D56198 /* Converter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997328E1766F00D56198 /* Converter.swift */; };
 		CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
 		CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997128E1750000D56198 /* PrimitiveTests.swift */; };
+		CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997928E2820200D56198 /* RGATreeList.swift */; };
+		CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */; };
+		CE7B997E28E2FD7000D56198 /* Array.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997D28E2FD7000D56198 /* Array.swift */; };
 		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
 		CE8C22F328C9E87800432DE5 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F228C9E87800432DE5 /* Object.swift */; };
 		CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F428C9E88500432DE5 /* Operation.swift */; };
@@ -73,6 +76,9 @@
 		CE7B997128E1750000D56198 /* PrimitiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimitiveTests.swift; sourceTree = "<group>"; };
 		CE7B997328E1766F00D56198 /* Converter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Converter.swift; sourceTree = "<group>"; };
 		CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTypeAlias.swift; sourceTree = "<group>"; };
+		CE7B997928E2820200D56198 /* RGATreeList.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGATreeList.swift; sourceTree = "<group>"; };
+		CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RGATreeListTests.swift; sourceTree = "<group>"; };
+		CE7B997D28E2FD7000D56198 /* Array.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Array.swift; sourceTree = "<group>"; };
 		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
 		CE8C22F228C9E87800432DE5 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
 		CE8C22F428C9E88500432DE5 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
@@ -187,6 +193,7 @@
 			children = (
 				CE3EC97128D4042D009471BC /* CRDTElementTests.swift */,
 				CE7B997128E1750000D56198 /* PrimitiveTests.swift */,
+				CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -269,6 +276,8 @@
 			children = (
 				CE3EC96628D30E74009471BC /* CRDTElement.swift */,
 				CE3EC97428D41903009471BC /* Primitive.swift */,
+				CE7B997928E2820200D56198 /* RGATreeList.swift */,
+				CE7B997D28E2FD7000D56198 /* Array.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -503,12 +512,14 @@
 			files = (
 				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
 				CE3EC96928D30FEF009471BC /* ActorId.swift in Sources */,
+				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				CE3EC97528D41903009471BC /* Primitive.swift in Sources */,
 				CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */,
 				CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */,
 				CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */,
 				CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */,
+				CE7B997E28E2FD7000D56198 /* Array.swift in Sources */,
 				CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */,
 				CE7B997028E1453E00D56198 /* Strings.swift in Sources */,
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
@@ -531,6 +542,7 @@
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
+				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,
 				CE3EC96E28D3FFF0009471BC /* TimeTicketTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,

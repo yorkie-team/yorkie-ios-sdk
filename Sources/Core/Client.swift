@@ -20,7 +20,6 @@ import NIO
 
 /**
  * `ClientStatus` represents the status of the client.
- * @public
  */
 enum ClientStatus: String {
     /**
@@ -36,7 +35,6 @@ enum ClientStatus: String {
 
 /**
  * `StreamConnectionStatus` is stream connection status types
- * @public
  */
 enum StreamConnectionStatus {
     /**
@@ -51,7 +49,6 @@ enum StreamConnectionStatus {
 
 /**
  * `DocumentSyncResultType` is document sync result types
- * @public
  */
 enum DocumentSyncResultType: String {
     /**
@@ -66,7 +63,6 @@ enum DocumentSyncResultType: String {
 
 /**
  * `ClientEventType` is client event types
- * @public
  */
 enum ClientEventType: String {
     /**
@@ -91,17 +87,12 @@ enum ClientEventType: String {
     case documentSynced = "document-synced"
 }
 
-/**
- * @internal
- */
 protocol BaseClientEvent {
     var type: ClientEventType { get }
 }
 
 /**
  * `StatusChangedEvent` is an event that occurs when the Client's state changes.
- *
- * @public
  */
 struct StatusChangedEvent: BaseClientEvent {
     /**
@@ -117,8 +108,6 @@ struct StatusChangedEvent: BaseClientEvent {
 /**
  * `DocumentsChangedEvent` is an event that occurs when documents attached to
  * the client changes.
- *
- * @public
  */
 struct DocumentsChangedEvent: BaseClientEvent {
     /**
@@ -134,8 +123,6 @@ struct DocumentsChangedEvent: BaseClientEvent {
 /**
  * `StreamConnectionStatusChangedEvent` is an event that occurs when
  * the client's stream connection state changes.
- *
- * @public
  */
 struct StreamConnectionStatusChangedEvent: BaseClientEvent {
     /**
@@ -152,8 +139,6 @@ struct StreamConnectionStatusChangedEvent: BaseClientEvent {
 /**
  * `DocumentSyncedEvent` is an event that occurs when documents
  * attached to the client are synced.
- *
- * @public
  */
 struct DocumentSyncedEvent: BaseClientEvent {
     /**
@@ -169,8 +154,6 @@ struct DocumentSyncedEvent: BaseClientEvent {
 
 /**
  * `PresenceInfo` is presence information of this client.
- *
- * @public
  */
 struct PresenceInfo<P> {
     var clock: Int
@@ -179,8 +162,6 @@ struct PresenceInfo<P> {
 
 /**
  * `ClientOptions` are user-settable options used when defining clients.
- *
- * @public
  */
 struct ClientOptions {
     /**
@@ -233,15 +214,13 @@ struct RPCAddress {
  * `Client` is a normal client that can communicate with the server.
  * It has documents and sends changes of the documents in local
  * to the server to synchronize with other replicas in remote.
- *
- * @public
  */
 final class Client {
     private(set) var id: Data? // To be ActorID
     let key: String
     private(set) var status: ClientStatus
 
-    public var isActive: Bool {
+    var isActive: Bool {
         self.status == .activated
     }
 

@@ -27,7 +27,7 @@ class SplayNode<V> {
     var parent: SplayNode<V>?
     private(set) var weight: Int = 0
 
-    init(value: V) {
+    init(_ value: V) {
         self.value = value
         self.initWeight()
     }
@@ -175,30 +175,28 @@ class SplayTree<V> {
     /**
      * `find` returns the Node and offset of the given index.
      */
-    func find(position: Int) -> (node: SplayNode<V>?, position: Int) {
+    func find(position: Int) -> (node: SplayNode<V>?, offset: Int) {
         guard let root = self.root, position >= 0 else {
             return (nil, 0)
         }
-        var pos = position
+
+        var offset = position
         var node = root
         while true {
-            if node.hasLeft(), pos <= node.getLeftWeight() {
-                node = node.getLeft()!
-            } else if
-                node.hasRight(),
-                node.getLeftWeight() + node.getLength() < pos
-            {
-                pos -= node.getLeftWeight() + node.getLength()
+            if let left = node.left, offset <= node.getLeftWeight() {
+                node = left
+            } else if node.hasRight(), offset > node.getLeftWeight() + node.getLength() {
+                offset -= node.getLeftWeight() + node.getLength()
                 node = node.getRight()!
             } else {
-                pos -= node.getLeftWeight()
+                offset -= node.getLeftWeight()
                 break
             }
         }
-        if pos > node.getLength() {
-            Logger.error("out of index range: pos: \(pos) > node.length: \(node.getLength())")
+        if offset > node.getLength() {
+            Logger.error("out of index range: pos: \(offset) > node.length: \(node.getLength())")
         }
-        return (node, pos)
+        return (node, offset)
     }
 
     /**
@@ -214,16 +212,16 @@ class SplayTree<V> {
 
         var index = 0
         var tempCurrent: SplayNode<V>? = node
-        var prev: SplayNode<V>?
+        var previousNode: SplayNode<V>?
         while true {
             guard let current = tempCurrent else {
                 break
             }
 
-            if prev == nil || prev === current.getRight() {
+            if previousNode == nil || previousNode === current.getRight() {
                 index += current.getLength() + (current.hasLeft() ? current.getLeftWeight() : 0)
             }
-            prev = current
+            previousNode = current
             tempCurrent = current.getParent()
         }
         return index - node.getLength()
@@ -241,29 +239,29 @@ class SplayTree<V> {
      */
     @discardableResult
     func insert(_ newNode: SplayNode<V>) -> SplayNode<V> {
-        return self.insertAfter(self.root, newNode: newNode)
+        return self.insert(previousNode: self.root, newNode: newNode)
     }
 
     /**
      * `insertAfter` inserts the node after the given previous node.
      */
     @discardableResult
-    func insertAfter(_ target: SplayNode<V>?, newNode: SplayNode<V>) -> SplayNode<V> {
-        guard let target = target else {
+    func insert(previousNode: SplayNode<V>?, newNode: SplayNode<V>) -> SplayNode<V> {
+        guard let previousNode = previousNode else {
             self.root = newNode
             return newNode
         }
 
-        self.splayNode(target)
+        self.splayNode(previousNode)
         self.root = newNode
-        newNode.setRight(target.getRight())
-        if target.hasRight() {
-            target.getRight()?.setParent(newNode)
+        newNode.setRight(previousNode.getRight())
+        if previousNode.hasRight() {
+            previousNode.getRight()?.setParent(newNode)
         }
-        newNode.setLeft(target)
-        target.setParent(newNode)
-        target.setRight(nil)
-        self.updateWeight(target)
+        newNode.setLeft(previousNode)
+        previousNode.setParent(newNode)
+        previousNode.setRight(nil)
+        self.updateWeight(previousNode)
         self.updateWeight(newNode)
 
         return newNode
