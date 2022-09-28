@@ -45,7 +45,7 @@ class Primitive: CRDTElement {
      * TODOs: We need to consider the case where the value is
      * a byte array and a date.
      */
-    var toJSON: String {
+    override func toJSON() -> String {
         switch self.value {
         case .null:
             return "null"
@@ -56,7 +56,7 @@ class Primitive: CRDTElement {
         case .double(let value):
             return "\(value)"
         case .string(let value):
-            return "\(value.escaped())"
+            return "\"\(value.escaped())\""
         case .long(let value):
             return "\(value)"
         case .bytes(let value):
@@ -69,14 +69,14 @@ class Primitive: CRDTElement {
     /**
      * `toSortedJSON` returns the sorted JSON encoding of the value.
      */
-    var toSortedJSON: String {
-        return self.toJSON
+    override func toSortedJSON() -> String {
+        return self.toJSON()
     }
 
     /**
      * `deepcopy` copies itself deeply.
      */
-    var deepcopy: Primitive {
+    override func deepcopy() -> CRDTElement {
         let primitive = Primitive(value: self.value, createdAt: self.getCreatedAt())
         primitive.setMovedAt(self.getMovedAt())
         return primitive

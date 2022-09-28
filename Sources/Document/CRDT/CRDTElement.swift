@@ -86,6 +86,7 @@ class CRDTElement {
     /**
      * `remove` removes this element.
      */
+    @discardableResult
     func remove(_ removedAt: TimeTicket?) -> Bool {
         guard let removedAt = removedAt, removedAt.after(self.createdAt) else {
             return false
@@ -130,11 +131,11 @@ class CRDTElement {
  * @internal
  */
 class CRDTContainer: CRDTElement {
-    func keyOf(createdAt: TimeTicket) -> String? {
+    func subPath(createdAt: TimeTicket) -> String? {
         fatalError("Must be implemented.")
     }
 
-    func purge(element: CRDTElement) {
+    func purge(element: CRDTElement) throws {
         fatalError("Must be implemented.")
     }
 
@@ -142,7 +143,7 @@ class CRDTContainer: CRDTElement {
         fatalError("Must be implemented.")
     }
 
-    func getDescendants(callback: (_ elem: CRDTElement, _ parent: CRDTContainer) -> Bool) {
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
         fatalError("Must be implemented.")
     }
 }

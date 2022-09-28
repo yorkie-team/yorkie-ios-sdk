@@ -19,8 +19,8 @@ import XCTest
 
 private class StringNode: SplayNode<String> {
     var removed: Bool = false
-    init(_ value: String) {
-        super.init(value: value)
+    override init(_ value: String) {
+        super.init(value)
     }
 
     static func create(_ value: String) -> StringNode {
@@ -57,9 +57,37 @@ class SplayTreeTests: XCTestCase {
         XCTAssertEqual(tree.indexOf(nodeC), 5)
         XCTAssertEqual(tree.indexOf(nodeD), 9)
 
-        let result = tree.find(position: -1)
+        var result = tree.find(position: -1)
         XCTAssertNil(result.node)
-        XCTAssertEqual(result.position, 0)
+        XCTAssertEqual(result.offset, 0)
+
+        result = tree.find(position: 0)
+        XCTAssertEqual(result.node?.value, "A2")
+        XCTAssertEqual(result.offset, 0)
+
+        result = tree.find(position: 1)
+        XCTAssertEqual(result.node?.value, "A2")
+        XCTAssertEqual(result.offset, 1)
+
+        result = tree.find(position: 2)
+        XCTAssertEqual(result.node?.value, "A2")
+        XCTAssertEqual(result.offset, 2)
+
+        result = tree.find(position: 3)
+        XCTAssertEqual(result.node?.value, "B23")
+        XCTAssertEqual(result.offset, 1)
+
+        result = tree.find(position: 4)
+        XCTAssertEqual(result.node?.value, "B23")
+        XCTAssertEqual(result.offset, 2)
+
+        result = tree.find(position: 5)
+        XCTAssertEqual(result.node?.value, "B23")
+        XCTAssertEqual(result.offset, 3)
+
+        result = tree.find(position: 6)
+        XCTAssertEqual(result.node?.value, "C234")
+        XCTAssertEqual(result.offset, 1)
     }
 
     func test_can_delete_the_given_node() {
@@ -148,5 +176,28 @@ class SplayTreeTests: XCTestCase {
         XCTAssertEqual(testTree.nodes[8].getWeight(), 7)
         XCTAssertEqual(testTree.nodes[2].getWeight(), 6)
         XCTAssertEqual(self.sumOfWeight(testTree.nodes, from: 3, to: 7), 0)
+    }
+
+    func test_splay() {
+        let tree = SplayTree<String>()
+
+        let nodeA = tree.insert(StringNode.create("A2"))
+        XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2")
+        XCTAssertEqual(tree.getRoot()?.value, "A2")
+        let nodeB = tree.insert(StringNode.create("B23"))
+        XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23")
+        XCTAssertEqual(tree.getRoot()?.value, "B23")
+        let nodeC = tree.insert(StringNode.create("C234"))
+        XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23[9,4]C234")
+        XCTAssertEqual(tree.getRoot()?.value, "C234")
+        let nodeD = tree.insert(StringNode.create("D2345"))
+        XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23[9,4]C234[14,5]D2345")
+        XCTAssertEqual(tree.getRoot()?.value, "D2345")
+
+        tree.splayNode(nodeB)
+        XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[14,3]B23[9,4]C234[5,5]D2345")
+
+        let (node, offet) = tree.find(position: 6)
+        XCTAssertEqual(node?.getValue(), "C234")
     }
 }
