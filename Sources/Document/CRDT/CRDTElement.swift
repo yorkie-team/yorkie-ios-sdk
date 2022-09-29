@@ -125,13 +125,19 @@ class CRDTElement {
     }
 }
 
+extension CRDTElement: Equatable {
+    static func == (lhs: CRDTElement, rhs: CRDTElement) -> Bool {
+        return lhs.createdAt == rhs.createdAt && lhs.movedAt == rhs.movedAt && lhs.removedAt == rhs.removedAt
+    }
+}
+
 /**
  *
  * `CRDTContainer` represents CRDTArray or CRDtObject.
  * @internal
  */
 class CRDTContainer: CRDTElement {
-    func subPath(createdAt: TimeTicket) -> String? {
+    func subPath(createdAt: TimeTicket) throws -> String {
         fatalError("Must be implemented.")
     }
 

@@ -16,6 +16,7 @@ opt_in_rules:
 disabled_rules:
   - line_length
   - file_length
+  - opening_brace
 # Rewrited rules
 cyclomatic_complexity: 
   warning: 25

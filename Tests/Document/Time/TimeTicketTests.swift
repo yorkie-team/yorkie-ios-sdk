@@ -22,20 +22,20 @@ class TimeTicketTests: XCTestCase {
         let small = TimeTicket.initialTimeTicket
         let big = TimeTicket.maxTimeTicket
 
-        XCTAssertEqual(small.compare(big), .orderedAscending)
+        XCTAssertTrue(small < big)
     }
 
     func test_compare_with_a_small_thing() {
         let big = TimeTicket.maxTimeTicket
         let small = TimeTicket.initialTimeTicket
 
-        XCTAssertEqual(big.compare(small), .orderedDescending)
+        XCTAssertTrue(big > small)
     }
 
     func test_compare_with_a_same_thing() {
         let big = TimeTicket.maxTimeTicket
         let big2 = TimeTicket.maxTimeTicket
 
-        XCTAssertEqual(big.compare(big2), .orderedSame)
+        XCTAssertTrue(big == big2)
     }
 }
