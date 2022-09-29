@@ -265,7 +265,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        let result = try target.delete(createdAt: e2.getCreatedAt(), editedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
+        let result = try target.remove(createdAt: e2.getCreatedAt(), editedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
 
         XCTAssertEqual(result.isRemoved(), true)
         XCTAssertEqual(target.getStructureAsString(),
@@ -286,9 +286,9 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        let result = try target.delete(index: 1, editedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
+        let result = try target.remove(index: 1, editedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
 
-        XCTAssertEqual(result?.isRemoved(), true)
+        XCTAssertEqual(result.isRemoved(), true)
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-{2:999:0:\"B12\"}-[3:999:0:\"C123\"]")
     }

@@ -331,9 +331,9 @@ class RGATreeList {
     }
 
     /**
-     * `delete` deletes the node of the given creation time.
+     * `remove` removes the node of the given creation time.
      */
-    func delete(createdAt: TimeTicket, editedAt: TimeTicket) throws -> CRDTElement {
+    func remove(createdAt: TimeTicket, editedAt: TimeTicket) throws -> CRDTElement {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
@@ -348,9 +348,9 @@ class RGATreeList {
     }
 
     /**
-     * `delete` deletes the node of the given index.
+     * `remove` removes the node of the given index.
      */
-    func delete(index: Int, editedAt: TimeTicket) throws -> CRDTElement? {
+    func remove(index: Int, editedAt: TimeTicket) throws -> CRDTElement {
         let node = try self.getNode(index: index)
 
         if node.remove(editedAt) {
