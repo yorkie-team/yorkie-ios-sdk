@@ -50,7 +50,7 @@ class Primitive: CRDTElement {
         case .null:
             return "null"
         case .boolean(let value):
-            return "\(value)"
+            return "\"\(value)\""
         case .integer(let value):
             return "\(value)"
         case .double(let value):
