@@ -115,7 +115,7 @@ class RGATreeListNode: SplayNode<CRDTElement> {
 /**
  * `RGATreeList` is replicated growable array.
  */
-class RGATreeList: Sequence, IteratorProtocol {
+class RGATreeList {
     private let dummyHead: RGATreeListNode
     private var last: RGATreeListNode
     private var nodeMapByIndex: SplayTree<CRDTElement>
@@ -398,15 +398,21 @@ class RGATreeList: Sequence, IteratorProtocol {
 
         return result.joined(separator: "-")
     }
+}
 
-    // MARK: - Iterator
-
+extension RGATreeList: Sequence {
     typealias Element = RGATreeListNode
+
+    func makeIterator() -> RGATreeListIterator {
+        return RGATreeListIterator(self.dummyHead.getNext())
+    }
+}
+
+class RGATreeListIterator: IteratorProtocol {
     private weak var iteratorNext: RGATreeListNode?
 
-    func makeIterator() -> RGATreeList {
-        self.iteratorNext = self.dummyHead.getNext()
-        return self
+    init(_ firstNode: RGATreeListNode?) {
+        self.iteratorNext = firstNode
     }
 
     func next() -> RGATreeListNode? {
