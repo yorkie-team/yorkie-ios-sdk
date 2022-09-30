@@ -41,7 +41,7 @@ class CRDTArrayTests: XCTestCase {
         let deletedTime = TimeTicket(lamport: 4, delimiter: 0, actorID: actorId)
         try target.remove(createdAt: e2.getCreatedAt(), editedAt: deletedTime)
 
-        let resultRemovedE2 = try target.get(createdAt: e2.getCreatedAt())
+        let resultRemovedE2 = try? target.get(createdAt: e2.getCreatedAt())
         XCTAssertNil(resultRemovedE2)
     }
 
@@ -124,21 +124,5 @@ class CRDTArrayTests: XCTestCase {
         }
 
         XCTAssertEqual(elemetJsons.joined(separator: ", "), "\"11\", \"22\", \"33\"")
-    }
-
-    func test_toJS() throws {
-        let time = TimeTicket(lamport: 1, delimiter: 999, actorID: actorId)
-        let target = CRDTArray(createdAt: time)
-
-        let e1 = Primitive(value: .boolean(true), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initialTimeTicket)
-
-        let e2 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(value: e2, afterCreatedAt: e1.getCreatedAt())
-
-        let e3 = Primitive(value: .string("Hello."), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(value: e3, afterCreatedAt: e2.getCreatedAt())
-
-        XCTAssertEqual("\(target.toJS())", "[true, 1, Hello.]")
     }
 }

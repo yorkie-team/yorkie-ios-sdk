@@ -154,21 +154,6 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `toJS` return the javascript object of this array.
-     */
-    func toJS() -> [Any] {
-        guard let data = toJSON().data(using: .utf8) else {
-            return []
-        }
-
-        guard let jsonArray = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) as? [Any] else {
-            return []
-        }
-
-        return jsonArray
-    }
-
-    /**
      * `toSortedJSON` returns the sorted JSON encoding of this array.
      */
     override func toSortedJSON() -> String {
