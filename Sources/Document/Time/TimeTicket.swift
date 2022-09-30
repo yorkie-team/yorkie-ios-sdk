@@ -41,13 +41,6 @@ struct TimeTicket: Comparable {
     }
 
     /**
-     * `of` creates an instance of Ticket.
-     */
-    static func of(lamport: Int64, delimiter: UInt32, actorID: ActorID?) -> TimeTicket {
-        return TimeTicket(lamport: lamport, delimiter: delimiter, actorID: actorID)
-    }
-
-    /**
      * `toIDString` returns the lamport string for this Ticket.
      */
     func toIDString() -> String {
