@@ -39,7 +39,7 @@ class CRDTArrayTests: XCTestCase {
         XCTAssertNotNil(resultE2)
 
         let deletedTime = TimeTicket(lamport: 4, delimiter: 0, actorID: actorId)
-        try target.remove(createdAt: e2.getCreatedAt(), editedAt: deletedTime)
+        try target.remove(createdAt: e2.getCreatedAt(), executedAt: deletedTime)
 
         let resultRemovedE2 = try? target.get(createdAt: e2.getCreatedAt())
         XCTAssertNil(resultRemovedE2)

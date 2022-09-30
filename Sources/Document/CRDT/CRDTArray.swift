@@ -103,8 +103,8 @@ class CRDTArray: CRDTContainer {
      * `remove` removes the element of the given index.
      */
     @discardableResult
-    func remove(createdAt: TimeTicket, editedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(createdAt: createdAt, editedAt: editedAt)
+    override func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.remove(createdAt: createdAt, executedAt: executedAt)
     }
 
     /**
@@ -184,32 +184,34 @@ extension CRDTArray: Sequence {
     typealias Element = CRDTElement
 
     func makeIterator() -> CRDTArrayIterator {
-        return CRDTArrayIterator(self.elements.makeIterator().next())
+        return CRDTArrayIterator(self.elements)
     }
 }
 
 class CRDTArrayIterator: IteratorProtocol {
-    private weak var iteratorNext: RGATreeListNode?
+    private var values: [CRDTElement]
+    private var iteratorNext: Int = 0
 
-    init(_ firstNode: RGATreeListNode?) {
-        self.iteratorNext = firstNode
+    init(_ rgaTreeList: RGATreeList) {
+        self.values = rgaTreeList.map { $0.getValue() }
     }
 
     func next() -> CRDTElement? {
         defer {
-            self.iteratorNext = self.iteratorNext?.getNext()
+            self.iteratorNext += 1
         }
 
         repeat {
-            guard self.iteratorNext != nil else {
+            guard self.iteratorNext < self.values.count else {
                 break
             }
 
-            if let result = self.iteratorNext, result.isRemoved() == false {
-                return result.getValue()
+            let result = self.values[self.iteratorNext]
+            if result.isRemoved() == false {
+                return result
             }
 
-            self.iteratorNext = self.iteratorNext?.getNext()
+            self.iteratorNext += 1
 
         } while true
 
