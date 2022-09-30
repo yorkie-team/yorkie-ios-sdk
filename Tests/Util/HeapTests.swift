@@ -19,86 +19,121 @@ import XCTest
 
 class HeapTests: XCTestCase {
     func test_can_push_and_pop() {
-        var target = Heap<Int>()
+        let target = Heap<Int, Int>()
 
         for value in [8, 7, 5, 6, 2, 1, 9, 4, 0, 3] {
-            target.insert(value)
+            target.push(HeapNode(key: value, value: value))
         }
 
+        let result = target.map { "\($0.value)" }.joined(separator: ", ")
+        XCTAssertEqual(result, "9, 7, 8, 6, 3, 1, 5, 4, 0, 2")
+
         for value in (0 ... 9).reversed() {
-            XCTAssertEqual(target.remove(), value)
+            XCTAssertEqual(target.pop()?.value, value)
         }
     }
 
     func test_remove_root() {
+        let target = Heap<Int, Int>()
         let root = 9
-        var target = Heap(array: [8, 7, 5, 6, 2, 1, root, 4, 0, 3])
+        [8, 7, 5, 6, 2, 1, root, 4, 0, 3].forEach { value in
+            target.push(HeapNode(key: value, value: value))
+        }
 
-        XCTAssertEqual(target.remove(), root)
+        target.delete(HeapNode(key: root, value: root))
 
         for value in (0 ... 8).reversed() {
-            XCTAssertEqual(target.remove(), value)
+            XCTAssertEqual(target.pop()?.value, value)
         }
     }
 
     func test_remove_parent_node() {
         let parent = 5
-        var target = Heap(array: [8, 7, parent, 6, 2, 1, 9, 4, 0, 3])
+        let target = Heap<Int, Int>()
+        [8, 7, parent, 6, 2, 1, 9, 4, 0, 3].forEach { value in
+            target.push(HeapNode(key: value, value: value))
+        }
 
-        XCTAssertEqual(target.remove(node: parent), parent)
+        target.delete(HeapNode(key: parent, value: parent))
 
         for value in [0, 1, 2, 3, 4, 6, 7, 8, 9].reversed() {
-            XCTAssertEqual(target.remove(), value)
+            XCTAssertEqual(target.pop()?.value, value)
         }
     }
 
     func test_remove_leaf_node() {
         let leaf = 0
-        var target = Heap(array: [8, 7, 5, 6, 2, 1, 9, 4, leaf, 3])
+        let target = Heap<Int, Int>()
+        [8, 7, 5, 6, 2, 1, 9, 4, leaf, 3].forEach { value in
+            target.push(HeapNode(key: value, value: value))
+        }
 
-        XCTAssertEqual(target.remove(node: leaf), leaf)
+        target.delete(HeapNode(key: leaf, value: leaf))
 
         for value in [1, 2, 3, 4, 5, 6, 7, 8, 9].reversed() {
-            XCTAssertEqual(target.remove(), value)
+            XCTAssertEqual(target.pop()?.value, value)
         }
     }
 
     func test_empty() {
-        var target = Heap<Int>()
-
-        for value in [8, 7, 5, 6, 2, 1, 9, 4, 0, 3] {
-            target.insert(value)
+        let target = Heap<Int, Int>()
+        [8, 7, 5, 6, 2, 1, 9, 4, 0, 3].forEach { value in
+            target.push(HeapNode(key: value, value: value))
         }
 
         for value in (0 ... 9).reversed() {
-            target.remove(node: value)
+            target.delete(HeapNode(key: value, value: value))
         }
 
-        XCTAssertTrue(target.isEmpty)
-        XCTAssertEqual(target.count, 0)
+        XCTAssertEqual(target.length(), 0)
     }
 
     func test_remove_root_by_node() {
-        var target = Heap<Int>()
-
-        for value in [8, 7, 5, 6, 2, 1, 9, 4, 0, 3] {
-            target.insert(value)
+        let target = Heap<Int, Int>()
+        [8, 7, 5, 6, 2, 1, 9, 4, 0, 3].forEach { value in
+            target.push(HeapNode(key: value, value: value))
         }
 
-        target.remove(node: 9)
+        let current = target.map { "\($0.value)" }.joined(separator: ", ")
+        XCTAssertEqual(current, "9, 7, 8, 6, 3, 1, 5, 4, 0, 2")
 
-        XCTAssertEqual(target.remove(), 8)
+        target.delete(HeapNode(key: 9, value: 9))
+
+        XCTAssertEqual(target.pop()?.value, 8)
+
+        let result = target.map { "\($0.value)" }.joined(separator: ", ")
+        XCTAssertEqual(result, "7, 6, 5, 4, 3, 1, 2, 0")
     }
 
-    func test_remove_root_by_index() {
-        var target = Heap<Int>()
-
-        for value in [8, 7, 5, 6, 2, 1, 9, 4, 0, 3] {
-            target.insert(value)
+    func test_if_a_heap_has_one_node() {
+        let target = Heap<Int, Int>()
+        [3].forEach { value in
+            target.push(HeapNode(key: value, value: value))
         }
 
-        XCTAssertEqual(target.remove(at: 0), 9)
+        target.pop()
 
-        XCTAssertEqual(target.remove(), 8)
+        XCTAssertEqual(target.length(), 0)
+    }
+
+    func test_iterator() {
+        let target = Heap<Int, Int>()
+
+        for value in [8, 7, 5, 6, 2, 1, 9, 4, 0, 3] {
+            target.push(HeapNode(key: value, value: value))
+        }
+
+        let result = target.map { "\($0.value)" }.joined(separator: ", ")
+        XCTAssertEqual(result, "9, 7, 8, 6, 3, 1, 5, 4, 0, 2")
+    }
+
+    func test_root_is_maximum() {
+        let target = Heap<Int, Int>()
+
+        for value in [8, 7, 5, 6, 2, 1, 9, 4, 0, 3] {
+            target.push(HeapNode(key: value, value: value))
+        }
+
+        XCTAssertEqual(target.peek()?.value, 9)
     }
 }
