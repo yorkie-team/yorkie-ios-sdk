@@ -193,7 +193,9 @@ class CRDTArrayIterator: IteratorProtocol {
     private var iteratorNext: Int = 0
 
     init(_ rgaTreeList: RGATreeList) {
-        self.values = rgaTreeList.map { $0.getValue() }
+        self.values = rgaTreeList
+            .map { $0.getValue() }
+            .filter { $0.isRemoved() == false }
     }
 
     func next() -> CRDTElement? {
@@ -201,16 +203,10 @@ class CRDTArrayIterator: IteratorProtocol {
             self.iteratorNext += 1
         }
 
-        while self.iteratorNext < self.values.count {
-            let result = self.values[self.iteratorNext]
-            if result.isRemoved() {
-                self.iteratorNext += 1
-                continue
-            } else {
-                return result
-            }
+        guard self.iteratorNext < self.values.count else {
+            return nil
         }
 
-        return nil
+        return self.values[self.iteratorNext]
     }
 }
