@@ -108,10 +108,10 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `remove` removes the element of given index and editedAt.
+     * `remove` removes the element of given index and executedAt.
      */
-    func remove(index: Int, editedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(index: index, editedAt: editedAt)
+    func remove(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.remove(index: index, executedAt: executedAt)
     }
 
     /**
@@ -201,19 +201,15 @@ class CRDTArrayIterator: IteratorProtocol {
             self.iteratorNext += 1
         }
 
-        repeat {
-            guard self.iteratorNext < self.values.count else {
-                break
-            }
-
+        while self.iteratorNext < self.values.count {
             let result = self.values[self.iteratorNext]
-            if result.isRemoved() == false {
+            if result.isRemoved() {
+                self.iteratorNext += 1
+                continue
+            } else {
                 return result
             }
-
-            self.iteratorNext += 1
-
-        } while true
+        }
 
         return nil
     }

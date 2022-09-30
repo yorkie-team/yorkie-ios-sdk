@@ -142,7 +142,7 @@ class CRDTContainer: CRDTElement {
         fatalError("Must be implemented.")
     }
 
-    func delete(createdAt: TimeTicket, executedAt: TimeTicket) -> CRDTElement {
+    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
         fatalError("Must be implemented.")
     }
 

@@ -108,7 +108,7 @@ class RHTPQMapTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        try target.delete(element: a2)
+        try target.delete(value: a2)
 
         let result = try? target.get(key: "a2")
         XCTAssertNil(result)
@@ -123,7 +123,7 @@ class RHTPQMapTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        try target.delete(element: a2)
+        try target.delete(value: a2)
 
         XCTAssertTrue(target.has(key: "a1"))
         XCTAssertFalse(target.has(key: "a2"))
