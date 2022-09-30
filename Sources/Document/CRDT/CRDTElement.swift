@@ -18,8 +18,6 @@ import Foundation
 
 /**
  * `CRDTElement` represents element type containing logical clock.
- *
- * @internal
  */
 class CRDTElement {
     private var createdAt: TimeTicket
@@ -134,7 +132,6 @@ extension CRDTElement: Equatable {
 /**
  *
  * `CRDTContainer` represents CRDTArray or CRDtObject.
- * @internal
  */
 class CRDTContainer: CRDTElement {
     func subPath(createdAt: TimeTicket) throws -> String {
