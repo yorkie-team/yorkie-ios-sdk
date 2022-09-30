@@ -144,7 +144,7 @@ class SplayTreeTests: XCTestCase {
         XCTAssertEqual("[1,1]A[3,2]BB[6,3]CCC[10,4]DDDD[15,5]EEEEE[19,4]FFFF[22,3]GGG[24,2]HH[25,1]I", testTree.tree.getStructureAsString())
         self.removeNodes(testTree.nodes, from: 7, to: 8)
         XCTAssertEqual("[1,1]A[3,2]BB[6,3]CCC[10,4]DDDD[15,5]EEEEE[19,4]FFFF[22,3]GGG[24,0]HH[25,0]I", testTree.tree.getStructureAsString())
-        testTree.tree.deleteRange(leftBoundary: testTree.nodes[6])
+        testTree.tree.removeRange(leftBoundary: testTree.nodes[6])
         XCTAssertEqual(testTree.tree.indexOf(testTree.nodes[6]), 19)
         XCTAssertEqual("[1,1]A[3,2]BB[6,3]CCC[10,4]DDDD[15,5]EEEEE[19,4]FFFF[22,3]GGG[0,0]HH[0,0]I", testTree.tree.getStructureAsString())
         XCTAssertTrue(testTree.nodes[6] === testTree.tree.getRoot())
@@ -156,7 +156,7 @@ class SplayTreeTests: XCTestCase {
         let testTree = self.sampleTree
         // check the case 1 of rangeDelete
         self.removeNodes(testTree.nodes, from: 3, to: 6)
-        testTree.tree.deleteRange(leftBoundary: testTree.nodes[2], rightBoundary: testTree.nodes[7])
+        testTree.tree.removeRange(leftBoundary: testTree.nodes[2], rightBoundary: testTree.nodes[7])
         XCTAssertTrue(testTree.nodes[7] === testTree.tree.getRoot())
         XCTAssertTrue(testTree.nodes[2] === testTree.tree.getRoot()?.getLeft())
         XCTAssertEqual(testTree.nodes[7].getWeight(), 9)
@@ -170,7 +170,7 @@ class SplayTreeTests: XCTestCase {
         testTree.tree.splayNode(testTree.nodes[2])
         // check the case 2 of rangeDelete
         self.removeNodes(testTree.nodes, from: 3, to: 7)
-        testTree.tree.deleteRange(leftBoundary: testTree.nodes[2], rightBoundary: testTree.nodes[8])
+        testTree.tree.removeRange(leftBoundary: testTree.nodes[2], rightBoundary: testTree.nodes[8])
         XCTAssertTrue(testTree.nodes[8] === testTree.tree.getRoot())
         XCTAssertTrue(testTree.nodes[2] === testTree.tree.getRoot()?.getLeft())
         XCTAssertEqual(testTree.nodes[8].getWeight(), 7)

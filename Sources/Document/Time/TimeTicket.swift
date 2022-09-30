@@ -20,7 +20,7 @@ import Foundation
  * `TimeTicket` is a timestamp of the logical clock. Ticket is immutable.
  * It is created by `ChangeID`.
  */
-struct TimeTicket {
+struct TimeTicket: Comparable {
     private enum InitialValue {
         static let initialDelimiter: UInt32 = 0
         static let maxDelemiter: UInt32 = .max
@@ -100,42 +100,19 @@ struct TimeTicket {
      * `after` returns whether the given ticket was created later.
      */
     func after(_ other: TimeTicket) -> Bool {
-        return self.compare(other) == .orderedDescending
+        return self > other
     }
 
-    /**
-     * `equals` returns whether the given ticket was created.
-     */
-    func equals(other: TimeTicket) -> Bool {
-        return self.compare(other) == .orderedSame
-    }
-
-    /**
-     * `compare` returns an integer comparing two Ticket.
-     *  The result will be 0 if id==other, -1 if `id < other`, and +1 if `id > other`.
-     *  If the receiver or argument is nil, it would panic at runtime.
-     */
-    func compare(_ other: TimeTicket) -> ComparisonResult {
-        if self.lamport > other.lamport {
-            return .orderedDescending
-        } else if self.lamport < other.lamport {
-            return .orderedAscending
+    static func < (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
+        if lhs.lamport != rhs.lamport {
+            return lhs.lamport < rhs.lamport
         }
 
-        if let actorID = actorID, let otherActorID = other.actorID {
-            let compare = actorID.localizedCompare(otherActorID)
-            if compare != .orderedSame {
-                return compare
-            }
+        if let lhsActorID = lhs.actorID, let rhsActorID = rhs.actorID, lhsActorID.localizedCompare(rhsActorID) != .orderedSame {
+            return lhsActorID.localizedCompare(rhsActorID) == .orderedAscending
         }
 
-        if self.delimiter > other.delimiter {
-            return .orderedDescending
-        } else if other.delimiter > self.delimiter {
-            return .orderedAscending
-        }
-
-        return .orderedSame
+        return lhs.delimiter < rhs.delimiter
     }
 }
 

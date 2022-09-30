@@ -26,7 +26,7 @@ class CRDTElementTests: XCTestCase {
         let movedResult = target.setMovedAt(small)
 
         XCTAssertEqual(movedResult, true)
-        XCTAssertEqual(target.getMovedAt()?.compare(small), .orderedSame)
+        XCTAssertTrue(target.getMovedAt() == small)
     }
 
     func test_can_set_bigger_movedAt_when_movedAt_is_nil() {
@@ -37,7 +37,7 @@ class CRDTElementTests: XCTestCase {
         let movedResult = target.setMovedAt(big)
 
         XCTAssertEqual(movedResult, true)
-        XCTAssertEqual(target.getMovedAt()?.compare(big), .orderedSame)
+        XCTAssertTrue(target.getMovedAt() == big)
     }
 
     func test_can_not_set_bigger_movedAt_when_movedAt_is_non_nil() {
@@ -51,7 +51,8 @@ class CRDTElementTests: XCTestCase {
         let movedResult = target.setMovedAt(timeTicket)
 
         XCTAssertEqual(movedResult, false)
-        XCTAssertEqual(target.getMovedAt()?.compare(small), .orderedDescending)
+
+        XCTAssertTrue(target.getMovedAt()! > small)
     }
 
     func test_can_not_remove_when_nil() {

@@ -371,14 +371,14 @@ class SplayTree<V> {
     }
 
     /**
-     * `deleteRange` separates the range between given 2 boundaries from this Tree.
+     * `removeRange` separates the range between given 2 boundaries from this Tree.
      * This function separates the range to delete as a subtree
      * by splaying outer boundary nodes.
      * leftBoundary must exist because of 0-indexed initial dummy node of tree,
      * but rightBoundary can be nil means range to delete includes the end of tree.
      * Refer to the design document in https://github.com/yorkie-team/yorkie/tree/main/design
      */
-    func deleteRange(leftBoundary: SplayNode<V>, rightBoundary: SplayNode<V>? = nil) {
+    func removeRange(leftBoundary: SplayNode<V>, rightBoundary: SplayNode<V>? = nil) {
         guard let rightBoundary = rightBoundary else {
             self.splayNode(leftBoundary)
             self.cutOffRight(root: leftBoundary)
