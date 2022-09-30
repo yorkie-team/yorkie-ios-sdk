@@ -179,23 +179,23 @@ class SplayTreeTests: XCTestCase {
     func test_splay() {
         let tree = SplayTree<String>()
 
-        let nodeA = tree.insert(StringNode.create("A2"))
+        tree.insert(StringNode.create("A2"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2")
         XCTAssertEqual(tree.getRoot()?.value, "A2")
         let nodeB = tree.insert(StringNode.create("B23"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23")
         XCTAssertEqual(tree.getRoot()?.value, "B23")
-        let nodeC = tree.insert(StringNode.create("C234"))
+        tree.insert(StringNode.create("C234"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23[9,4]C234")
         XCTAssertEqual(tree.getRoot()?.value, "C234")
-        let nodeD = tree.insert(StringNode.create("D2345"))
+        tree.insert(StringNode.create("D2345"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23[9,4]C234[14,5]D2345")
         XCTAssertEqual(tree.getRoot()?.value, "D2345")
 
         tree.splayNode(nodeB)
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[14,3]B23[9,4]C234[5,5]D2345")
 
-        let (node, offet) = tree.find(position: 6)
+        let (node, _) = tree.find(position: 6)
         XCTAssertEqual(node?.getValue(), "C234")
     }
 }
