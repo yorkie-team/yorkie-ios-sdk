@@ -39,7 +39,7 @@ class GRPCTests: XCTestCase {
         var activateRequest = ActivateClientRequest()
         activateRequest.clientKey = testClientKey
         let activateResponse = try? client.activateClient(activateRequest, callOptions: nil).response.wait()
-        guard let activateResponse = activateResponse else {
+        guard let activateResponse else {
             XCTFail("The response of activate is nil.")
             return
         }
@@ -75,7 +75,7 @@ class GRPCTests: XCTestCase {
         var activateRequest = ActivateClientRequest()
         activateRequest.clientKey = testClientKey
         let activateResponse = try? await client.activateClient(activateRequest, callOptions: nil)
-        guard let activateResponse = activateResponse else {
+        guard let activateResponse else {
             XCTFail("The response of activate is nil.")
             return
         }

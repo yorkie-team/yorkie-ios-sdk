@@ -86,7 +86,7 @@ class Primitive: CRDTElement {
      * `getPrimitiveType` returns the primitive type of the value.
      */
     static func type(of value: Any?) -> PrimitiveValue? {
-        guard let value = value else {
+        guard let value else {
             return .null
         }
 

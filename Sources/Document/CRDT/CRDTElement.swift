@@ -86,7 +86,7 @@ class CRDTElement {
      */
     @discardableResult
     func remove(_ removedAt: TimeTicket?) -> Bool {
-        guard let removedAt = removedAt, removedAt.after(self.createdAt) else {
+        guard let removedAt, removedAt.after(self.createdAt) else {
             return false
         }
 

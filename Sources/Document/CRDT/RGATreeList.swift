@@ -304,7 +304,7 @@ class RGATreeList {
 
         } while nextRgaNode?.isRemoved() == true
 
-        guard let nextRgaNode = nextRgaNode else {
+        guard let nextRgaNode else {
             let log = "failed to find the given index: \(index)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)

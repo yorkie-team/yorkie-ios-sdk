@@ -296,7 +296,7 @@ class SplayTree<V> {
      * `splayNode` moves the given node to the root.
      */
     func splayNode(_ node: SplayNode<V>?) {
-        guard let node = node else {
+        guard let node else {
             return
         }
 
@@ -379,7 +379,7 @@ class SplayTree<V> {
      * Refer to the design document in https://github.com/yorkie-team/yorkie/tree/main/design
      */
     func removeRange(leftBoundary: SplayNode<V>, rightBoundary: SplayNode<V>? = nil) {
-        guard let rightBoundary = rightBoundary else {
+        guard let rightBoundary else {
             self.splayNode(leftBoundary)
             self.cutOffRight(root: leftBoundary)
             return
@@ -439,7 +439,7 @@ class SplayTree<V> {
     }
 
     private func traverseInorder(_ node: SplayNode<V>?, stack: inout [SplayNode<V>]) {
-        guard let node = node else {
+        guard let node else {
             return
         }
 
@@ -449,7 +449,7 @@ class SplayTree<V> {
     }
 
     private func traversePostorder(_ node: SplayNode<V>?, stack: inout [SplayNode<V>]) {
-        guard let node = node else {
+        guard let node else {
             return
         }
 

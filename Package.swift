@@ -1,4 +1,4 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.7
 
 import PackageDescription
 
@@ -12,8 +12,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/grpc/grpc-swift.git", .exact("1.9.0")),
-        .package(url: "https://github.com/apple/swift-protobuf.git", .exact("1.19.0"))
+        .package(url: "https://github.com/grpc/grpc-swift.git", exact: "1.9.0"),
+        .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.19.0")
     ],
     targets: [
         .target(
