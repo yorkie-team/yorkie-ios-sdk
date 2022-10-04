@@ -21,25 +21,15 @@ import Foundation
  *
  */
 class CRDTArray: CRDTContainer {
+    var createdAt: TimeTicket
+    var movedAt: TimeTicket?
+    var removedAt: TimeTicket?
+
     private var elements: RGATreeList
 
     init(createdAt: TimeTicket, elements: RGATreeList = RGATreeList()) {
+        self.createdAt = createdAt
         self.elements = elements
-        super.init(createdAt: createdAt)
-    }
-
-    /**
-     * `subPath` returns subPath of JSONPath of the given `createdAt` element.
-     */
-    override func subPath(createdAt: TimeTicket) throws -> String {
-        return try self.elements.subPath(createdAt: createdAt)
-    }
-
-    /**
-     * `purge` physically purge child element.
-     */
-    override func purge(element: CRDTElement) throws {
-        try self.elements.purge(element)
     }
 
     /**
@@ -100,14 +90,6 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `remove` removes the element of the given index.
-     */
-    @discardableResult
-    override func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(createdAt: createdAt, executedAt: executedAt)
-    }
-
-    /**
      * `remove` removes the element of given index and executedAt.
      */
     func remove(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
@@ -129,9 +111,68 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
+     * `getElements` returns an array of elements contained in this RGATreeList.
+     */
+    func getElements() -> RGATreeList {
+        return self.elements
+    }
+}
+
+extension CRDTArray {
+    /**
+     * `toJSON` returns the JSON encoding of this array.
+     */
+    func toJSON() -> String {
+        let json = self.elements.map { $0.getValue().toJSON() }
+
+        return "[\(json.joined(separator: ","))]"
+    }
+
+    /**
+     * `toSortedJSON` returns the sorted JSON encoding of this array.
+     */
+    func toSortedJSON() -> String {
+        return self.toJSON()
+    }
+
+    /**
+     * `deepcopy` copies itself deeply.
+     */
+    func deepcopy() -> CRDTElement {
+        let result = CRDTArray(createdAt: self.getCreatedAt())
+        for node in self.elements {
+            try? result.elements.insert(node.getValue().deepcopy(), afterCreatedAt: result.getLastCreatedAt())
+        }
+        result.remove(self.getRemovedAt())
+        return result
+    }
+
+    /**
+     * `subPath` returns subPath of JSONPath of the given `createdAt` element.
+     */
+    func subPath(createdAt: TimeTicket) throws -> String {
+        return try self.elements.subPath(createdAt: createdAt)
+    }
+
+    /**
+     * `purge` physically purge child element.
+     */
+    func purge(element: CRDTElement) throws {
+        try self.elements.purge(element)
+    }
+
+    /**
+     * `remove` removes the element of the given index.
+     */
+    @discardableResult
+    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.remove(createdAt: createdAt, executedAt: executedAt)
+    }
+
+    /**
      * `getDescendants` traverse the descendants of this array.
      */
-    override func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
         for node in self.elements {
             let element = node.getValue()
             if callback(element, self) {
@@ -142,41 +183,6 @@ class CRDTArray: CRDTContainer {
                 element.getDescendants(callback: callback)
             }
         }
-    }
-
-    /**
-     * `toJSON` returns the JSON encoding of this array.
-     */
-    override func toJSON() -> String {
-        let json = self.elements.map { $0.getValue().toJSON() }
-
-        return "[\(json.joined(separator: ","))]"
-    }
-
-    /**
-     * `toSortedJSON` returns the sorted JSON encoding of this array.
-     */
-    override func toSortedJSON() -> String {
-        return self.toJSON()
-    }
-
-    /**
-     * `getElements` returns an array of elements contained in this RGATreeList.
-     */
-    func getElements() -> RGATreeList {
-        return self.elements
-    }
-
-    /**
-     * `deepcopy` copies itself deeply.
-     */
-    override func deepcopy() -> CRDTArray {
-        let result = CRDTArray(createdAt: self.getCreatedAt())
-        for node in self.elements {
-            try? result.elements.insert(node.getValue().deepcopy(), afterCreatedAt: result.getLastCreatedAt())
-        }
-        result.remove(self.getRemovedAt())
-        return result
     }
 }
 

@@ -44,7 +44,7 @@ struct RHTPQMapNode: Equatable {
     }
 
     static func == (lhs: RHTPQMapNode, rhs: RHTPQMapNode) -> Bool {
-        return lhs.rhtKey == rhs.rhtKey && lhs.rhtValue == rhs.rhtValue
+        return lhs.rhtKey == rhs.rhtKey && lhs.rhtValue.equal(rhs.rhtValue)
     }
 }
 

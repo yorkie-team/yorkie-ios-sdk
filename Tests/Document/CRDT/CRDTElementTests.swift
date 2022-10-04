@@ -17,12 +17,28 @@
 import XCTest
 @testable import Yorkie
 
-class CRDTElementTests: XCTestCase {
+class TestCRDTElement: CRDTElement {
+    var createdAt: TimeTicket
+    var movedAt: TimeTicket?
+    var removedAt: TimeTicket?
+
+    init(createdAt: TimeTicket) {
+        self.createdAt = createdAt
+    }
+
+    func toJSON() -> String { "" }
+
+    func toSortedJSON() -> String { "" }
+
+    func deepcopy() -> CRDTElement { self }
+}
+
+class TestCRDTElementTests: XCTestCase {
     func test_can_set_smaller_movedAt() {
         let small = TimeTicket.initialTimeTicket
         let big = TimeTicket.maxTimeTicket
 
-        let target = CRDTElement(createdAt: big)
+        let target = TestCRDTElement(createdAt: big)
         let movedResult = target.setMovedAt(small)
 
         XCTAssertEqual(movedResult, true)
@@ -33,7 +49,7 @@ class CRDTElementTests: XCTestCase {
         let small = TimeTicket.initialTimeTicket
         let big = TimeTicket.maxTimeTicket
 
-        let target = CRDTElement(createdAt: small)
+        let target = TestCRDTElement(createdAt: small)
         let movedResult = target.setMovedAt(big)
 
         XCTAssertEqual(movedResult, true)
@@ -44,7 +60,7 @@ class CRDTElementTests: XCTestCase {
         let small = TimeTicket.initialTimeTicket
         let big = TimeTicket.maxTimeTicket
 
-        let target = CRDTElement(createdAt: small)
+        let target = TestCRDTElement(createdAt: small)
         target.setMovedAt(big)
 
         let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)
@@ -56,32 +72,32 @@ class CRDTElementTests: XCTestCase {
     }
 
     func test_can_not_remove_when_nil() {
-        let target = CRDTElement(createdAt: TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
 
         XCTAssertEqual(target.remove(nil), false)
     }
 
     func test_can_not_remove_when_removeAt_is_before_createdAt() {
-        let target = CRDTElement(createdAt: TimeTicket.maxTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.maxTimeTicket)
 
         XCTAssertEqual(target.remove(TimeTicket.initialTimeTicket), false)
     }
 
     func test_can_remove_when_current_removeAt_is_nil() {
-        let target = CRDTElement(createdAt: TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
 
         XCTAssertEqual(target.remove(TimeTicket.maxTimeTicket), true)
     }
 
     func test_can_remove_when_current_removeAt_is_not_nil_and_samll() {
-        let target = CRDTElement(createdAt: TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
         target.setRemovedAt(TimeTicket.initialTimeTicket)
 
         XCTAssertEqual(target.remove(TimeTicket.maxTimeTicket), true)
     }
 
     func test_can_not_remove_when_current_removeAt_is_not_nil_and_big() {
-        let target = CRDTElement(createdAt: TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
         target.setRemovedAt(TimeTicket.maxTimeTicket)
 
         let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)

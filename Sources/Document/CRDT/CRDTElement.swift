@@ -19,13 +19,24 @@ import Foundation
 /**
  * `CRDTElement` represents element type containing logical clock.
  */
-class CRDTElement {
-    private var createdAt: TimeTicket
-    private var movedAt: TimeTicket?
-    private var removedAt: TimeTicket?
+protocol CRDTElement: AnyObject {
+    var createdAt: TimeTicket { get set }
+    var movedAt: TimeTicket? { get set }
+    var removedAt: TimeTicket? { get set }
 
-    init(createdAt: TimeTicket) {
-        self.createdAt = createdAt
+    func toJSON() -> String
+
+    func toSortedJSON() -> String
+
+    func deepcopy() -> CRDTElement
+}
+
+extension CRDTElement {
+    /**
+     * `isRemoved` check if this element was removed.
+     */
+    func isRemoved() -> Bool {
+        return self.removedAt != nil
     }
 
     /**
@@ -103,29 +114,8 @@ class CRDTElement {
         return false
     }
 
-    /**
-     * `isRemoved` check if this element was removed.
-     */
-    func isRemoved() -> Bool {
-        return self.removedAt != nil
-    }
-
-    func toJSON() -> String {
-        fatalError("Must be implemented.")
-    }
-
-    func toSortedJSON() -> String {
-        fatalError("Must be implemented.")
-    }
-
-    func deepcopy() -> CRDTElement {
-        fatalError("Must be implemented.")
-    }
-}
-
-extension CRDTElement: Equatable {
-    static func == (lhs: CRDTElement, rhs: CRDTElement) -> Bool {
-        return lhs.createdAt == rhs.createdAt && lhs.movedAt == rhs.movedAt && lhs.removedAt == rhs.removedAt
+    func equal(_ target: CRDTElement) -> Bool {
+        return self.createdAt == target.createdAt && self.movedAt == target.movedAt && self.removedAt == target.removedAt
     }
 }
 
@@ -133,33 +123,21 @@ extension CRDTElement: Equatable {
  *
  * `CRDTContainer` represents CRDTArray or CRDtObject.
  */
-class CRDTContainer: CRDTElement {
-    func subPath(createdAt: TimeTicket) throws -> String {
-        fatalError("Must be implemented.")
-    }
+protocol CRDTContainer: CRDTElement {
+    func subPath(createdAt: TimeTicket) throws -> String
 
-    func purge(element: CRDTElement) throws {
-        fatalError("Must be implemented.")
-    }
+    func purge(element: CRDTElement) throws
 
-    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
-        fatalError("Must be implemented.")
-    }
+    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
 
-    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
-        fatalError("Must be implemented.")
-    }
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool)
 }
 
 /**
  * `CRDTTextElement` represents CRDTText or CRDTRichText.
  */
-class CRDTTextElement: CRDTElement {
-    func getRemovedNodesLen() -> Int {
-        fatalError("Must be implemented.")
-    }
+protocol CRDTTextElement: CRDTElement {
+    func getRemovedNodesLen() -> Int
 
-    func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int {
-        fatalError("Must be implemented.")
-    }
+    func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int
 }
