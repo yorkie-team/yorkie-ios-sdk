@@ -244,10 +244,10 @@ class RGATreeListTests: XCTestCase {
         let e3 = Primitive(value: .string("C123"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         try target.insert(e3)
 
-        XCTAssertEqual(try target.getPreviousCreatedAt(ofCreatedAt: e1.getCreatedAt()).toIDString(),
+        XCTAssertEqual("\(try target.getPreviousCreatedAt(ofCreatedAt: e1.getCreatedAt()))",
                        "0:000000000000000000000000:0")
 
-        XCTAssertEqual(try target.getPreviousCreatedAt(ofCreatedAt: e2.getCreatedAt()).toIDString(),
+        XCTAssertEqual("\(try target.getPreviousCreatedAt(ofCreatedAt: e2.getCreatedAt()))",
                        "1:999:0")
     }
 
@@ -332,7 +332,7 @@ class RGATreeListTests: XCTestCase {
         let e3 = Primitive(value: .string("C123"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         try target.insert(e3)
 
-        XCTAssertEqual(target.getLastCreatedAt().toIDString(), "3:999:0")
+        XCTAssertEqual("\(target.getLastCreatedAt())", "3:999:0")
     }
 
     func test_getNode() throws {

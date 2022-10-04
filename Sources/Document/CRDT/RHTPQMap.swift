@@ -19,27 +19,32 @@ import Foundation
 /**
  * `RHTPQMapNode` is a node of RHTPQMap.
  */
-class RHTPQMapNode: HeapNode<TimeTicket, CRDTElement> {
-    let rhtPqMapKey: String
+struct RHTPQMapNode: Equatable {
+    let rhtKey: String
+    let rhtValue: CRDTElement
 
-    init(key: String, value: CRDTElement) {
-        self.rhtPqMapKey = key
-        super.init(key: value.getCreatedAt(), value: value)
+    fileprivate init(key: String, value: CRDTElement) {
+        self.rhtKey = key
+        self.rhtValue = value
     }
 
     /**
      * `isRemoved` checks whether this value was removed.
      */
     func isRemoved() -> Bool {
-        return self.value.isRemoved()
+        return self.rhtValue.isRemoved()
     }
 
     /**
      * `remove` removes a value base on removing time.
      */
     @discardableResult
-    func remove(removedAt: TimeTicket) -> Bool {
-        return self.value.remove(removedAt)
+    fileprivate func remove(removedAt: TimeTicket) -> Bool {
+        return self.rhtValue.remove(removedAt)
+    }
+
+    static func == (lhs: RHTPQMapNode, rhs: RHTPQMapNode) -> Bool {
+        return lhs.rhtKey == rhs.rhtKey && lhs.rhtValue == rhs.rhtValue
     }
 }
 
@@ -47,7 +52,7 @@ class RHTPQMapNode: HeapNode<TimeTicket, CRDTElement> {
  * RHTPQMap is replicated hash table with priority queue by creation time.
  */
 class RHTPQMap {
-    private var elementQueueMapByKey: [String: Heap<TimeTicket, CRDTElement>] = [:]
+    private var elementQueueMapByKey: [String: Heap<TimeTicket, RHTPQMapNode>] = [:]
     private var nodeMapByCreatedAt: [TimeTicket: RHTPQMapNode] = [:]
 
     /**
@@ -59,10 +64,10 @@ class RHTPQMap {
 
         if let queue = self.elementQueueMapByKey[key],
            queue.length() >= 1,
-           let node = queue.peek() as? RHTPQMapNode
+           let node = queue.peek()
         {
-            if node.isRemoved() == false, node.remove(removedAt: value.getCreatedAt()) {
-                removed = node.value
+            if node.value.isRemoved() == false, node.value.remove(removedAt: value.getCreatedAt()) {
+                removed = node.value.rhtValue
             }
         }
 
@@ -78,9 +83,10 @@ class RHTPQMap {
             self.elementQueueMapByKey[key] = Heap()
         }
 
-        let node = RHTPQMapNode(key: key, value: value)
+        let pqMapNode = RHTPQMapNode(key: key, value: value)
+        let node = HeapNode(key: value.getCreatedAt(), value: pqMapNode)
         self.elementQueueMapByKey[key]?.push(node)
-        self.nodeMapByCreatedAt[value.getCreatedAt()] = node
+        self.nodeMapByCreatedAt[value.getCreatedAt()] = pqMapNode
     }
 
     /**
@@ -95,7 +101,7 @@ class RHTPQMap {
         }
 
         node.remove(removedAt: executedAt)
-        return node.value
+        return node.rhtValue
     }
 
     /**
@@ -108,43 +114,44 @@ class RHTPQMap {
             throw YorkieError.unexpected(message: log)
         }
 
-        return node.rhtPqMapKey
+        return node.rhtKey
     }
 
     /**
-     * `delete` physically purge child element.
+     * `delete` physically deletes child element.
      */
-    func delete(element: CRDTElement) throws {
-        guard let node = self.nodeMapByCreatedAt[element.getCreatedAt()] else {
-            let log = "can't find the given node: \(element.getCreatedAt())"
+    func delete(value: CRDTElement) throws {
+        guard let node = self.nodeMapByCreatedAt[value.getCreatedAt()] else {
+            let log = "can't find the given node: \(value.getCreatedAt())"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        guard let queue = self.elementQueueMapByKey[node.rhtPqMapKey] else {
-            let log = "can't find the given node: \(node.rhtPqMapKey)"
+        guard let queue = self.elementQueueMapByKey[node.rhtKey] else {
+            let log = "can't find the given node: \(node.rhtKey)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        queue.delete(node)
-        self.nodeMapByCreatedAt[node.value.getCreatedAt()] = nil
+        let heapNode = HeapNode(key: node.rhtValue.getCreatedAt(), value: node)
+        queue.delete(heapNode)
+        self.nodeMapByCreatedAt[node.rhtValue.getCreatedAt()] = nil
     }
 
     /**
-     * `remove` deletes the Element of the given key and removed time.
+     * `remove` removes the Element of the given key and removed time.
      */
     func remove(key: String, executedAt: TimeTicket) throws -> CRDTElement {
         guard let heap = self.elementQueueMapByKey[key],
-              let node = heap.peek() as? RHTPQMapNode
+              let node = heap.peek()
         else {
             let log = "can't find the given node: \(key)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        node.remove(removedAt: executedAt)
-        return node.value
+        node.value.remove(removedAt: executedAt)
+        return node.value.rhtValue
     }
 
     /**
@@ -152,12 +159,12 @@ class RHTPQMap {
      */
     func has(key: String) -> Bool {
         guard let heap = self.elementQueueMapByKey[key],
-              let node = heap.peek() as? RHTPQMapNode
+              let node = heap.peek()
         else {
             return false
         }
 
-        return node.isRemoved() == false
+        return node.value.isRemoved() == false
     }
 
     /**
@@ -170,7 +177,7 @@ class RHTPQMap {
             throw YorkieError.unexpected(message: log)
         }
 
-        return node.value
+        return node.value.rhtValue
     }
 }
 
@@ -183,10 +190,10 @@ extension RHTPQMap: Sequence {
 }
 
 class RHTPQMapIterator: IteratorProtocol {
-    private var target: [Heap<TimeTicket, CRDTElement>]
+    private var target: [Heap<TimeTicket, RHTPQMapNode>]
     private var currentNodes: [RHTPQMapNode] = []
 
-    init(_ target: [String: Heap<TimeTicket, CRDTElement>]) {
+    init(_ target: [String: Heap<TimeTicket, RHTPQMapNode>]) {
         self.target = Array(target.values)
     }
 
@@ -195,7 +202,7 @@ class RHTPQMapIterator: IteratorProtocol {
             guard self.currentNodes.isEmpty else {
                 break
             }
-            
+
             guard self.target.isEmpty == false else {
                 return nil
             }
@@ -203,9 +210,7 @@ class RHTPQMapIterator: IteratorProtocol {
             let queue = self.target.removeFirst()
 
             for node in queue {
-                if let node = node as? RHTPQMapNode {
-                    self.currentNodes.append(node)
-                }
+                self.currentNodes.append(node.value)
             }
         }
 

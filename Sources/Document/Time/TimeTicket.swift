@@ -43,7 +43,7 @@ struct TimeTicket: Comparable {
     /**
      * `toIDString` returns the lamport string for this Ticket.
      */
-    func toIDString() -> String {
+    private func toIDString() -> String {
         guard let actorID = self.actorID else {
             return "\(self.lamport):nil:\(self.delimiter)"
         }
@@ -62,10 +62,10 @@ struct TimeTicket: Comparable {
     }
 
     /**
-     * `setActor` creates a new instance of Ticket with the given actorID.
+     * `setActor` changes actorID
      */
-    func setActor(actorID: ActorID) -> TimeTicket {
-        return TimeTicket(lamport: self.lamport, delimiter: self.delimiter, actorID: actorID)
+    mutating func setActor(actorID: ActorID) {
+        self.actorID = actorID
     }
 
     /**

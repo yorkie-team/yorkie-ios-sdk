@@ -22,7 +22,7 @@ import Foundation
 /**
  * `HeapNode` is a node of `Heap`.
  */
-class HeapNode<K, V> {
+struct HeapNode<K, V> {
     fileprivate let key: K
     let value: V
 
