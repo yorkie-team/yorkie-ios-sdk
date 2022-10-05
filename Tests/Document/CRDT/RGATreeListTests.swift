@@ -190,7 +190,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        try target.purge(e1)
+        try target.delete(e1)
         XCTAssertEqual(target.getStructureAsString(),
                        "[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
     }
@@ -209,7 +209,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        try target.purge(e2)
+        try target.delete(e2)
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[3:999:0:\"C123\"]")
     }
@@ -228,7 +228,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        try target.purge(e3)
+        try target.delete(e3)
         XCTAssertEqual(target.getStructureAsString(),
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]")
     }

@@ -155,10 +155,10 @@ extension CRDTArray {
     }
 
     /**
-     * `purge` physically purge child element.
+     * `delete` physically deletes child element.
      */
-    func purge(element: CRDTElement) throws {
-        try self.elements.purge(element)
+    func delete(element: CRDTElement) throws {
+        try self.elements.delete(element)
     }
 
     /**

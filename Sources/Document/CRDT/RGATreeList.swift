@@ -76,9 +76,9 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     }
 
     /**
-     * `release` releases prev and next node.
+     * `delete` deletes prev and next node.
      */
-    fileprivate func release() {
+    fileprivate func delete() {
         if let previous = self.previous {
             previous.next = self.next
         }
@@ -165,12 +165,12 @@ class RGATreeList {
         return node
     }
 
-    private func release(node: RGATreeListNode) {
+    private func delete(node: RGATreeListNode) {
         if self.last === node, let previousNode = node.getPrevious() {
             self.last = previousNode
         }
 
-        node.release()
+        node.delete()
         self.nodeMapByIndex.delete(node)
         self.nodeMapByCreatedAt.removeValue(forKey: node.getValue().getCreatedAt())
     }
@@ -223,7 +223,7 @@ class RGATreeList {
             return
         }
 
-        self.release(node: movingNode)
+        self.delete(node: movingNode)
         try self.insert(movingNode.getValue(), afterCreatedAt: previsousNode.getCreatedAt(), executedAt: executedAt)
         movingNode.getValue().setMovedAt(executedAt)
     }
@@ -262,16 +262,16 @@ class RGATreeList {
     }
 
     /**
-     * `purge` physically purges child element.
+     * `delete` physically purges child element.
      */
-    func purge(_ value: CRDTElement) throws {
+    func delete(_ value: CRDTElement) throws {
         guard let node = self.nodeMapByCreatedAt[value.getCreatedAt()] else {
             let log = "failed to find the given createdAt: \(value.getCreatedAt())"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        self.release(node: node)
+        self.delete(node: node)
     }
 
     /**

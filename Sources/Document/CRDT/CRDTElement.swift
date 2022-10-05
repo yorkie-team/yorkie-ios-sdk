@@ -126,7 +126,7 @@ extension CRDTElement {
 protocol CRDTContainer: CRDTElement {
     func subPath(createdAt: TimeTicket) throws -> String
 
-    func purge(element: CRDTElement) throws
+    func delete(element: CRDTElement) throws
 
     func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
 
