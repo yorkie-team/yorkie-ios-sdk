@@ -56,6 +56,10 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
         return self.nodes.count
     }
 
+    var isEmpty: Bool {
+        return self.nodes.count == 0
+    }
+
     /**
      * `delete` deletes the given value from this Heap.
      */
@@ -89,7 +93,10 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
     @discardableResult
     func pop() -> HeapNode<K, V>? {
         let count = self.nodes.count
-        let head = self.nodes[0]
+        guard let head = self.nodes[safe: 0] else {
+            return nil
+        }
+
         if count <= 0 {
             return nil
         } else if count == 1 {

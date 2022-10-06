@@ -200,7 +200,7 @@ class RHTPQMapIterator: IteratorProtocol {
     func next() -> RHTPQMapNode? {
         while true {
             guard self.currentNodes.isEmpty else {
-                break
+                return self.currentNodes.removeFirst()
             }
 
             guard self.target.isEmpty == false else {
@@ -213,7 +213,5 @@ class RHTPQMapIterator: IteratorProtocol {
                 self.currentNodes.append(node.value)
             }
         }
-
-        return self.currentNodes.removeFirst()
     }
 }
