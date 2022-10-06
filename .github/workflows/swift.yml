@@ -20,4 +20,10 @@ jobs:
     - uses: docker-practice/actions-setup-docker@master
     - run: docker-compose -f docker/docker-compose-ci.yml up --build -d
     - name: Run tests
-      run: swift test -v
+      run: swift test --enable-code-coverage -v
+    - name: Prepare Code Coverage
+      run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: lcov.info
