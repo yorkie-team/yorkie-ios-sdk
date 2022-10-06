@@ -98,12 +98,12 @@ class PrimitiveTests: XCTestCase {
 
     func test_value_is_date() throws {
         let testDate = Date()
-        print(testDate.timeIntervalSince1970)
         let primitiveValue = Primitive(value: .date(testDate), createdAt: TimeTicket.initialTimeTicket)
         let valueFromData = try Converter.valueFrom(valueType: .date, data: primitiveValue.toBytes())
+
         switch valueFromData {
-        case .date(let value):
-            XCTAssertEqual(value.timeIntervalSince1970, testDate.timeIntervalSince1970)
+        case .date:
+            XCTAssertEqual(primitiveValue.value, valueFromData)
         default:
             XCTFail("Type error.")
         }

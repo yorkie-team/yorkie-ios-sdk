@@ -28,21 +28,21 @@ enum Converter {
         case .boolean:
             return .boolean(data[0] == 1)
         case .integer:
-            let result = data.withUnsafeBytes { $0.load(as: Int32.self) }
+            let result = Int32(bigEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
             return .integer(result)
         case .double:
-            let result = data.withUnsafeBytes { $0.load(as: Double.self) }
+            let result = Double(bitPattern: UInt64(bigEndian: data.withUnsafeBytes { $0.load(as: UInt64.self) }))
             return .double(result)
         case .string:
             return .string(String(decoding: data, as: UTF8.self))
         case .long:
-            let result = data.withUnsafeBytes { $0.load(as: Int64.self) }
+            let result = Int64(bigEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
             return .long(result)
         case .bytes:
             return .bytes(data)
         case .date:
-            let milliseconds = data.withUnsafeBytes { $0.load(as: Double.self) }
-            return .date(Date(timeIntervalSince1970: TimeInterval(milliseconds) / 1000))
+            let milliseconds = Int(bigEndian: data.withUnsafeBytes { $0.load(as: Int.self) })
+            return .date(Date(timeIntervalSince1970: TimeInterval(Double(milliseconds) / 1000)))
         default:
             throw YorkieError.unimplemented(message: String(describing: valueType))
         }
