@@ -24,6 +24,6 @@ jobs:
     - name: Prepare Code Coverage
       run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
       with:
         file: lcov.info
