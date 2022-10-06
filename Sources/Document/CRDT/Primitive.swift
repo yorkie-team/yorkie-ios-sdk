@@ -118,8 +118,8 @@ class Primitive: CRDTElement {
         case .bytes(let value):
             return value
         case .date(let value):
-            let milliseconds = value.millisecondTimeIntervalSince1970.bigEndian
-            return withUnsafeBytes(of: milliseconds) { Data($0) }
+            let milliseconds = value.millisecondTimeIntervalSince1970
+            return withUnsafeBytes(of: milliseconds.bigEndian) { Data($0) }
         }
     }
 }
