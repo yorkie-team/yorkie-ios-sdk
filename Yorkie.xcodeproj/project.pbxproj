@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
+		CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE370E5B28EEBFA6008FCABD /* RHTTests.swift */; };
 		CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94B28D1887B009471BC /* HeapTests.swift */; };
 		CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94E28D1922E009471BC /* RedBlackTree.swift */; };
 		CE3EC95228D195E4009471BC /* RedBlackTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */; };
@@ -23,6 +24,7 @@
 		CE6BD03C28E6BA9C00E97B8C /* RHTPQMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6BD03B28E6BA9C00E97B8C /* RHTPQMap.swift */; };
 		CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6BD03D28E6E0BA00E97B8C /* CRDTObject.swift */; };
 		CE72E85228EE531C00D1331C /* Collection+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE72E85128EE531C00D1331C /* Collection+Extensions.swift */; };
+		CE72E85628EE6D1600D1331C /* RHT.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE72E85528EE6D1600D1331C /* RHT.swift */; };
 		CE7B996E28E142A300D56198 /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B996D28E142A300D56198 /* Errors.swift */; };
 		CE7B997028E1453E00D56198 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B996F28E1453E00D56198 /* Strings.swift */; };
 		CE7B997428E1766F00D56198 /* Converter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997328E1766F00D56198 /* Converter.swift */; };
@@ -66,6 +68,7 @@
 		96DA808B28C5B7B400E2C1DA /* YorkieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YorkieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		CE370E5B28EEBFA6008FCABD /* RHTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHTTests.swift; sourceTree = "<group>"; };
 		CE3EC94B28D1887B009471BC /* HeapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeapTests.swift; sourceTree = "<group>"; };
 		CE3EC94E28D1922E009471BC /* RedBlackTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedBlackTree.swift; sourceTree = "<group>"; };
 		CE3EC95028D195E0009471BC /* RedBlackTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RedBlackTreeTests.swift; sourceTree = "<group>"; };
@@ -80,6 +83,7 @@
 		CE6BD03B28E6BA9C00E97B8C /* RHTPQMap.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RHTPQMap.swift; sourceTree = "<group>"; };
 		CE6BD03D28E6E0BA00E97B8C /* CRDTObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObject.swift; sourceTree = "<group>"; };
 		CE72E85128EE531C00D1331C /* Collection+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Collection+Extensions.swift"; sourceTree = "<group>"; };
+		CE72E85528EE6D1600D1331C /* RHT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHT.swift; sourceTree = "<group>"; };
 		CE7B996D28E142A300D56198 /* Errors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Errors.swift; sourceTree = "<group>"; };
 		CE7B996F28E1453E00D56198 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		CE7B997128E1750000D56198 /* PrimitiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimitiveTests.swift; sourceTree = "<group>"; };
@@ -209,6 +213,7 @@
 				CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */,
 				CE7B998528E520D600D56198 /* CRDTArrayTests.swift */,
 				CE7B998A28E694FC00D56198 /* RHTPQMapTests.swift */,
+				CE370E5B28EEBFA6008FCABD /* RHTTests.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -295,6 +300,7 @@
 				CE7B997928E2820200D56198 /* RGATreeList.swift */,
 				CE6BD03D28E6E0BA00E97B8C /* CRDTObject.swift */,
 				CE7B997D28E2FD7000D56198 /* CRDTArray.swift */,
+				CE72E85528EE6D1600D1331C /* RHT.swift */,
 				CE6BD03B28E6BA9C00E97B8C /* RHTPQMap.swift */,
 			);
 			path = CRDT;
@@ -548,6 +554,7 @@
 				CE72E85428EE563D00D1331C /* Collection+Extensions.swift in Sources */,
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
+				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
 				CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
 				CE8C22F328C9E87800432DE5 /* Object.swift in Sources */,
@@ -563,6 +570,7 @@
 				CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
+				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
