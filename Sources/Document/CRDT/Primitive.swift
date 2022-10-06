@@ -16,7 +16,7 @@
 
 import Foundation
 
-enum PrimitiveValue {
+enum PrimitiveValue: Equatable {
     case null
     case boolean(Bool)
     case integer(Int32)
@@ -40,7 +40,14 @@ class Primitive: CRDTElement {
 
     init(value: PrimitiveValue, createdAt: TimeTicket) {
         self.createdAt = createdAt
-        self.value = value
+
+        switch value {
+        case .date(let dateValue):
+            // Trim the less than a millisecond
+            self.value = .date(Date(timeIntervalSince1970: Double(dateValue.millisecondTimeIntervalSince1970) / 1000))
+        default:
+            self.value = value
+        }
     }
 
     /**
@@ -101,18 +108,18 @@ class Primitive: CRDTElement {
             var valueInInt = Int(exactly: NSNumber(value: value))
             return Data(bytes: &valueInInt, count: MemoryLayout.size(ofValue: valueInInt))
         case .integer(let value):
-            return withUnsafeBytes(of: value) { Data($0) }
+            return withUnsafeBytes(of: value.bigEndian) { Data($0) }
         case .double(let value):
-            return withUnsafeBytes(of: value) { Data($0) }
+            return withUnsafeBytes(of: value.bitPattern.bigEndian) { Data($0) }
         case .string(let value):
             return value.data(using: .utf8) ?? Data()
         case .long(let value):
-            return withUnsafeBytes(of: value) { Data($0) }
+            return withUnsafeBytes(of: value.bigEndian) { Data($0) }
         case .bytes(let value):
             return value
         case .date(let value):
-            let milliseconds = value.timeIntervalSince1970 * 1000
-            return withUnsafeBytes(of: milliseconds) { Data($0) }
+            let milliseconds = value.millisecondTimeIntervalSince1970
+            return withUnsafeBytes(of: milliseconds.bigEndian) { Data($0) }
         }
     }
 }
@@ -141,7 +148,7 @@ extension Primitive {
         case .bytes(let value):
             return "\(value)"
         case .date(let value):
-            return "\(value.timeIntervalSince1970 * 1000)"
+            return "\(value.millisecondTimeIntervalSince1970)"
         }
     }
 
@@ -159,5 +166,15 @@ extension Primitive {
         let primitive = Primitive(value: self.value, createdAt: self.getCreatedAt())
         primitive.setMovedAt(self.getMovedAt())
         return primitive
+    }
+}
+
+private extension Date {
+    /**
+     * `millisecondTimeIntervalSince1970` returns the number representing the milliseconds elapsed between 1 January 1970 00:00:00 UTC and the given date.
+     *  It's simmilar getTime() in javascript
+     */
+    var millisecondTimeIntervalSince1970: Int {
+        Int(floor(self.timeIntervalSince1970 * 1000))
     }
 }
