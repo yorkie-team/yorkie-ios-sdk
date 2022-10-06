@@ -57,7 +57,7 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
     }
 
     var isEmpty: Bool {
-        return self.nodes.count == 0
+        return self.nodes.isEmpty
     }
 
     /**
@@ -70,7 +70,7 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
             return
         }
 
-        if targetIndex < 0 || self.length() == 0 {
+        if targetIndex < 0 || self.isEmpty {
             return
         }
 
@@ -92,14 +92,11 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
      */
     @discardableResult
     func pop() -> HeapNode<K, V>? {
-        let count = self.nodes.count
         guard let head = self.nodes[safe: 0] else {
             return nil
         }
 
-        if count <= 0 {
-            return nil
-        } else if count == 1 {
+        if self.nodes.count == 1 {
             // clear array
             self.nodes.removeAll()
         } else {
