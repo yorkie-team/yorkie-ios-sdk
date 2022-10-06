@@ -42,7 +42,7 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
      * `peek` returns the maximum element from this Heap.
      */
     func peek() -> HeapNode<K, V>? {
-        guard self.nodes.count >= 1 else {
+        guard self.nodes.isEmpty == false else {
             return nil
         }
 

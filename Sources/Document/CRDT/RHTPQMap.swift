@@ -63,7 +63,7 @@ class RHTPQMap {
         var removed: CRDTElement?
 
         if let queue = self.elementQueueMapByKey[key],
-           queue.length() >= 1,
+           queue.isEmpty == false,
            let node = queue.peek()
         {
             if node.value.isRemoved() == false, node.value.remove(removedAt: value.getCreatedAt()) {
