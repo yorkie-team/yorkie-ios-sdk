@@ -22,9 +22,9 @@ import Foundation
 class SplayNode<V> {
     private(set) var value: V
 
-    var left: SplayNode<V>?
-    var right: SplayNode<V>?
-    var parent: SplayNode<V>?
+    fileprivate private(set) var left: SplayNode<V>?
+    private var right: SplayNode<V>?
+    private var parent: SplayNode<V>?
     private(set) var weight: Int = 0
 
     init(_ value: V) {
@@ -36,17 +36,25 @@ class SplayNode<V> {
         fatalError("Must be implemented.")
     }
 
+    func getWeight() -> Int {
+        return self.weight
+    }
+
+    func getValue() -> V {
+        return self.value
+    }
+
     /**
      * `getNodeString` returns a string of weight and value of this node.
      */
-    var nodeString: String {
+    private var nodeString: String {
         return "\(self.weight)\(self.value)"
     }
 
     /**
      * `getLeftWeight` returns left weight of this node.
      */
-    func getLeftWeight() -> Int {
+    fileprivate func getLeftWeight() -> Int {
         if let left = self.left {
             return left.weight
         } else {
@@ -57,7 +65,7 @@ class SplayNode<V> {
     /**
      * `getRightWeight` returns right weight of this node.
      */
-    func getRightWeight() -> Int {
+    fileprivate func getRightWeight() -> Int {
         if let right = self.right {
             return right.weight
         } else {
@@ -65,63 +73,55 @@ class SplayNode<V> {
         }
     }
 
-    func getWeight() -> Int {
-        return self.weight
-    }
-
-    func getValue() -> V {
-        return self.value
-    }
-
-    func setLeft(_ node: SplayNode<V>?) {
+    fileprivate func setLeft(_ node: SplayNode<V>?) {
         self.left = node
     }
 
-    func setRight(_ node: SplayNode<V>?) {
+    fileprivate func setRight(_ node: SplayNode<V>?) {
         self.right = node
     }
 
-    func setParent(_ node: SplayNode<V>?) {
+    fileprivate func setParent(_ node: SplayNode<V>?) {
         self.parent = node
     }
 
-    func getLeft() -> SplayNode<V>? {
+    fileprivate func getLeft() -> SplayNode<V>? {
         return self.left
     }
 
-    func getRight() -> SplayNode<V>? {
+    fileprivate func getRight() -> SplayNode<V>? {
         return self.right
     }
 
-    func getParent() -> SplayNode<V>? {
+    fileprivate func getParent() -> SplayNode<V>? {
         return self.parent
     }
 
     /**
      * `hasLeft` check if the left node exists
      */
-    func hasLeft() -> Bool {
+    fileprivate func hasLeft() -> Bool {
         return self.left != nil
     }
 
     /**
      * `hasRight` check if the right node exists
      */
-    func hasRight() -> Bool {
+    fileprivate func hasRight() -> Bool {
         return self.right != nil
     }
 
     /**
      * `hasParent` check if the parent node exists
      */
-    func hasParent() -> Bool {
+    fileprivate func hasParent() -> Bool {
         return self.parent != nil
     }
 
     /**
      * `unlink` unlink parent, right and left node.
      */
-    func unlink() {
+    fileprivate func unlink() {
         self.parent = nil
         self.right = nil
         self.left = nil
@@ -130,21 +130,21 @@ class SplayNode<V> {
     /**
      * `hasLinks` checks if parent, right and left node exists.
      */
-    var hasLinks: Bool {
+    fileprivate var hasLinks: Bool {
         return self.hasParent() || self.hasLeft() || self.hasRight()
     }
 
     /**
      * `increaseWeight` increases weight.
      */
-    func increaseWeight(_ weight: Int) {
+    fileprivate func increaseWeight(_ weight: Int) {
         self.weight += weight
     }
 
     /**
      * `initWeight` sets initial weight of this node.
      */
-    func initWeight() {
+    fileprivate func initWeight() {
         self.weight = self.getLength()
     }
 }
@@ -296,7 +296,7 @@ class SplayTree<V> {
      * `splayNode` moves the given node to the root.
      */
     func splayNode(_ node: SplayNode<V>?) {
-        guard let node = node else {
+        guard let node else {
             return
         }
 
@@ -379,7 +379,7 @@ class SplayTree<V> {
      * Refer to the design document in https://github.com/yorkie-team/yorkie/tree/main/design
      */
     func removeRange(leftBoundary: SplayNode<V>, rightBoundary: SplayNode<V>? = nil) {
-        guard let rightBoundary = rightBoundary else {
+        guard let rightBoundary else {
             self.splayNode(leftBoundary)
             self.cutOffRight(root: leftBoundary)
             return
@@ -439,7 +439,7 @@ class SplayTree<V> {
     }
 
     private func traverseInorder(_ node: SplayNode<V>?, stack: inout [SplayNode<V>]) {
-        guard let node = node else {
+        guard let node else {
             return
         }
 
@@ -449,7 +449,7 @@ class SplayTree<V> {
     }
 
     private func traversePostorder(_ node: SplayNode<V>?, stack: inout [SplayNode<V>]) {
-        guard let node = node else {
+        guard let node else {
             return
         }
 

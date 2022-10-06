@@ -32,61 +32,22 @@ enum PrimitiveValue {
  * It has a type and a value.
  */
 class Primitive: CRDTElement {
+    var createdAt: TimeTicket
+    var movedAt: TimeTicket?
+    var removedAt: TimeTicket?
+
     let value: PrimitiveValue
 
     init(value: PrimitiveValue, createdAt: TimeTicket) {
+        self.createdAt = createdAt
         self.value = value
-        super.init(createdAt: createdAt)
-    }
-
-    /**
-     * `toJSON` returns the JSON encoding of the value.
-     *
-     * TODOs: We need to consider the case where the value is
-     * a byte array and a date.
-     */
-    override func toJSON() -> String {
-        switch self.value {
-        case .null:
-            return "null"
-        case .boolean(let value):
-            return "\"\(value)\""
-        case .integer(let value):
-            return "\(value)"
-        case .double(let value):
-            return "\(value)"
-        case .string(let value):
-            return "\"\(value.escaped())\""
-        case .long(let value):
-            return "\(value)"
-        case .bytes(let value):
-            return "\(value)"
-        case .date(let value):
-            return "\(value.timeIntervalSince1970 * 1000)"
-        }
-    }
-
-    /**
-     * `toSortedJSON` returns the sorted JSON encoding of the value.
-     */
-    override func toSortedJSON() -> String {
-        return self.toJSON()
-    }
-
-    /**
-     * `deepcopy` copies itself deeply.
-     */
-    override func deepcopy() -> CRDTElement {
-        let primitive = Primitive(value: self.value, createdAt: self.getCreatedAt())
-        primitive.setMovedAt(self.getMovedAt())
-        return primitive
     }
 
     /**
      * `getPrimitiveType` returns the primitive type of the value.
      */
     static func type(of value: Any?) -> PrimitiveValue? {
-        guard let value = value else {
+        guard let value else {
             return .null
         }
 
@@ -153,5 +114,50 @@ class Primitive: CRDTElement {
             let milliseconds = value.timeIntervalSince1970 * 1000
             return withUnsafeBytes(of: milliseconds) { Data($0) }
         }
+    }
+}
+
+extension Primitive {
+    /**
+     * `toJSON` returns the JSON encoding of the value.
+     *
+     * TODOs: We need to consider the case where the value is
+     * a byte array and a date.
+     */
+    func toJSON() -> String {
+        switch self.value {
+        case .null:
+            return "null"
+        case .boolean(let value):
+            return "\"\(value)\""
+        case .integer(let value):
+            return "\(value)"
+        case .double(let value):
+            return "\(value)"
+        case .string(let value):
+            return "\"\(value.escaped())\""
+        case .long(let value):
+            return "\(value)"
+        case .bytes(let value):
+            return "\(value)"
+        case .date(let value):
+            return "\(value.timeIntervalSince1970 * 1000)"
+        }
+    }
+
+    /**
+     * `toSortedJSON` returns the sorted JSON encoding of the value.
+     */
+    func toSortedJSON() -> String {
+        return self.toJSON()
+    }
+
+    /**
+     * `deepcopy` copies itself deeply.
+     */
+    func deepcopy() -> CRDTElement {
+        let primitive = Primitive(value: self.value, createdAt: self.getCreatedAt())
+        primitive.setMovedAt(self.getMovedAt())
+        return primitive
     }
 }

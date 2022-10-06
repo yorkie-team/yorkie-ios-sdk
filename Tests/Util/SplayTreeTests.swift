@@ -158,7 +158,6 @@ class SplayTreeTests: XCTestCase {
         self.removeNodes(testTree.nodes, from: 3, to: 6)
         testTree.tree.removeRange(leftBoundary: testTree.nodes[2], rightBoundary: testTree.nodes[7])
         XCTAssertTrue(testTree.nodes[7] === testTree.tree.getRoot())
-        XCTAssertTrue(testTree.nodes[2] === testTree.tree.getRoot()?.getLeft())
         XCTAssertEqual(testTree.nodes[7].getWeight(), 9)
         XCTAssertEqual(testTree.nodes[2].getWeight(), 6)
         XCTAssertEqual(self.sumOfWeight(testTree.nodes, from: 3, to: 6), 0)
@@ -172,7 +171,6 @@ class SplayTreeTests: XCTestCase {
         self.removeNodes(testTree.nodes, from: 3, to: 7)
         testTree.tree.removeRange(leftBoundary: testTree.nodes[2], rightBoundary: testTree.nodes[8])
         XCTAssertTrue(testTree.nodes[8] === testTree.tree.getRoot())
-        XCTAssertTrue(testTree.nodes[2] === testTree.tree.getRoot()?.getLeft())
         XCTAssertEqual(testTree.nodes[8].getWeight(), 7)
         XCTAssertEqual(testTree.nodes[2].getWeight(), 6)
         XCTAssertEqual(self.sumOfWeight(testTree.nodes, from: 3, to: 7), 0)
@@ -181,23 +179,23 @@ class SplayTreeTests: XCTestCase {
     func test_splay() {
         let tree = SplayTree<String>()
 
-        let nodeA = tree.insert(StringNode.create("A2"))
+        tree.insert(StringNode.create("A2"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2")
         XCTAssertEqual(tree.getRoot()?.value, "A2")
         let nodeB = tree.insert(StringNode.create("B23"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23")
         XCTAssertEqual(tree.getRoot()?.value, "B23")
-        let nodeC = tree.insert(StringNode.create("C234"))
+        tree.insert(StringNode.create("C234"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23[9,4]C234")
         XCTAssertEqual(tree.getRoot()?.value, "C234")
-        let nodeD = tree.insert(StringNode.create("D2345"))
+        tree.insert(StringNode.create("D2345"))
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[5,3]B23[9,4]C234[14,5]D2345")
         XCTAssertEqual(tree.getRoot()?.value, "D2345")
 
         tree.splayNode(nodeB)
         XCTAssertEqual(tree.getStructureAsString(), "[2,2]A2[14,3]B23[9,4]C234[5,5]D2345")
 
-        let (node, offet) = tree.find(position: 6)
+        let (node, _) = tree.find(position: 6)
         XCTAssertEqual(node?.getValue(), "C234")
     }
 }

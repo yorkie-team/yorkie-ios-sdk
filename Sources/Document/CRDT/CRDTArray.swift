@@ -21,25 +21,15 @@ import Foundation
  *
  */
 class CRDTArray: CRDTContainer {
+    var createdAt: TimeTicket
+    var movedAt: TimeTicket?
+    var removedAt: TimeTicket?
+
     private var elements: RGATreeList
 
     init(createdAt: TimeTicket, elements: RGATreeList = RGATreeList()) {
+        self.createdAt = createdAt
         self.elements = elements
-        super.init(createdAt: createdAt)
-    }
-
-    /**
-     * `subPath` returns subPath of JSONPath of the given `createdAt` element.
-     */
-    override func subPath(createdAt: TimeTicket) throws -> String {
-        return try self.elements.subPath(createdAt: createdAt)
-    }
-
-    /**
-     * `purge` physically purge child element.
-     */
-    override func purge(element: CRDTElement) throws {
-        try self.elements.purge(element)
     }
 
     /**
@@ -100,18 +90,10 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `remove` removes the element of the given index.
+     * `remove` removes the element of given index and executedAt.
      */
-    @discardableResult
-    func remove(createdAt: TimeTicket, editedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(createdAt: createdAt, editedAt: editedAt)
-    }
-
-    /**
-     * `remove` removes the element of given index and editedAt.
-     */
-    func remove(index: Int, editedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(index: index, editedAt: editedAt)
+    func remove(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.remove(index: index, executedAt: executedAt)
     }
 
     /**
@@ -129,9 +111,68 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
+     * `getElements` returns an array of elements contained in this RGATreeList.
+     */
+    func getElements() -> RGATreeList {
+        return self.elements
+    }
+}
+
+extension CRDTArray {
+    /**
+     * `toJSON` returns the JSON encoding of this array.
+     */
+    func toJSON() -> String {
+        let json = self.elements.map { $0.getValue().toJSON() }
+
+        return "[\(json.joined(separator: ","))]"
+    }
+
+    /**
+     * `toSortedJSON` returns the sorted JSON encoding of this array.
+     */
+    func toSortedJSON() -> String {
+        return self.toJSON()
+    }
+
+    /**
+     * `deepcopy` copies itself deeply.
+     */
+    func deepcopy() -> CRDTElement {
+        let result = CRDTArray(createdAt: self.getCreatedAt())
+        for node in self.elements {
+            try? result.elements.insert(node.getValue().deepcopy(), afterCreatedAt: result.getLastCreatedAt())
+        }
+        result.remove(self.getRemovedAt())
+        return result
+    }
+
+    /**
+     * `subPath` returns subPath of JSONPath of the given `createdAt` element.
+     */
+    func subPath(createdAt: TimeTicket) throws -> String {
+        return try self.elements.subPath(createdAt: createdAt)
+    }
+
+    /**
+     * `delete` physically deletes child element.
+     */
+    func delete(element: CRDTElement) throws {
+        try self.elements.delete(element)
+    }
+
+    /**
+     * `remove` removes the element of the given index.
+     */
+    @discardableResult
+    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.remove(createdAt: createdAt, executedAt: executedAt)
+    }
+
+    /**
      * `getDescendants` traverse the descendants of this array.
      */
-    override func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
         for node in self.elements {
             let element = node.getValue()
             if callback(element, self) {
@@ -143,76 +184,35 @@ class CRDTArray: CRDTContainer {
             }
         }
     }
-
-    /**
-     * `toJSON` returns the JSON encoding of this array.
-     */
-    override func toJSON() -> String {
-        let json = self.elements.map { $0.getValue().toJSON() }
-
-        return "[\(json.joined(separator: ","))]"
-    }
-
-    /**
-     * `toSortedJSON` returns the sorted JSON encoding of this array.
-     */
-    override func toSortedJSON() -> String {
-        return self.toJSON()
-    }
-
-    /**
-     * `getElements` returns an array of elements contained in this RGATreeList.
-     */
-    func getElements() -> RGATreeList {
-        return self.elements
-    }
-
-    /**
-     * `deepcopy` copies itself deeply.
-     */
-    override func deepcopy() -> CRDTArray {
-        let result = CRDTArray(createdAt: self.getCreatedAt())
-        for node in self.elements {
-            try? result.elements.insert(node.getValue().deepcopy(), afterCreatedAt: result.getLastCreatedAt())
-        }
-        result.remove(self.getRemovedAt())
-        return result
-    }
 }
 
 extension CRDTArray: Sequence {
     typealias Element = CRDTElement
 
     func makeIterator() -> CRDTArrayIterator {
-        return CRDTArrayIterator(self.elements.makeIterator().next())
+        return CRDTArrayIterator(self.elements)
     }
 }
 
 class CRDTArrayIterator: IteratorProtocol {
-    private weak var iteratorNext: RGATreeListNode?
+    private var values: [CRDTElement]
+    private var iteratorNext: Int = 0
 
-    init(_ firstNode: RGATreeListNode?) {
-        self.iteratorNext = firstNode
+    init(_ rgaTreeList: RGATreeList) {
+        self.values = rgaTreeList
+            .map { $0.getValue() }
+            .filter { $0.isRemoved() == false }
     }
 
     func next() -> CRDTElement? {
         defer {
-            self.iteratorNext = self.iteratorNext?.getNext()
+            self.iteratorNext += 1
         }
 
-        repeat {
-            guard self.iteratorNext != nil else {
-                break
-            }
+        guard self.iteratorNext < self.values.count else {
+            return nil
+        }
 
-            if let result = self.iteratorNext, result.isRemoved() == false {
-                return result.getValue()
-            }
-
-            self.iteratorNext = self.iteratorNext?.getNext()
-
-        } while true
-
-        return nil
+        return self.values[self.iteratorNext]
     }
 }

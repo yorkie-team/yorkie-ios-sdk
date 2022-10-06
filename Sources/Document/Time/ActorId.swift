@@ -25,12 +25,12 @@ typealias ActorID = String
 
 enum ActorIds {
     /**
-     * `InitialActorID` is the initial value of ActorID.
+     * `initialActorID` is the initial value of ActorID.
      */
     static let initialActorID = "000000000000000000000000"
 
     /**
-     * `MaxActorID` is the maximum value of ActorID.
+     * `maxActorID` is the maximum value of ActorID.
      */
     static let maxActorID = "FFFFFFFFFFFFFFFFFFFFFFFF"
 }
