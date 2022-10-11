@@ -20,7 +20,7 @@ import XCTest
 class CRDTObjectTests: XCTestCase {
     private let actorId = "actor-1"
     func test_can_set_and_get() throws {
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -42,7 +42,7 @@ class CRDTObjectTests: XCTestCase {
     }
 
     func test_can_get_subPath() throws {
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -60,7 +60,7 @@ class CRDTObjectTests: XCTestCase {
 
     func test_can_delete() throws {
         let targetKey = "K2"
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -79,7 +79,7 @@ class CRDTObjectTests: XCTestCase {
 
     func test_remove() throws {
         let targetKey = "K2"
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -101,7 +101,7 @@ class CRDTObjectTests: XCTestCase {
     }
 
     func test_toSortedJSON() throws {
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -120,7 +120,7 @@ class CRDTObjectTests: XCTestCase {
     }
 
     func test_getKeys() throws {
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -137,7 +137,7 @@ class CRDTObjectTests: XCTestCase {
     }
 
     func test_getDescendants_tarveling_one_element() throws {
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)
@@ -163,7 +163,7 @@ class CRDTObjectTests: XCTestCase {
     }
 
     func test_getDescendants_tarveling_all_element() throws {
-        let target = CRDTObject(createdAt: TimeTicket.initialTimeTicket)
+        let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "K1", value: a1)

@@ -35,14 +35,13 @@ class CRDTRootTests: XCTestCase {
 
         // when
         let target = CRDTRoot(rootObject: crdtObject)
+        let result = target.find(createdAt: a1.createdAt)
 
         // then
-        let result = target.find(createdAt: a1.createdAt)
         XCTAssertEqual(result?.toJSON(), "\"A1\"")
     }
 
     func test_can_create_sub_paths() throws {
-        // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         rootObject.set(key: "K-a1", value: a1)
@@ -57,14 +56,12 @@ class CRDTRootTests: XCTestCase {
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
         object3.set(key: "K-c1", value: c1)
 
-        rootObject.set(key: "K-a3", value: object2)
+        rootObject.set(key: "K-$a3", value: object2)
 
-        object2.set(key: "K-B2", value: object3)
+        object2.set(key: "K-.B2", value: object3)
 
-        // when
         let target = CRDTRoot(rootObject: rootObject)
 
-        // then
         let findedC1 = target.find(createdAt: c1.createdAt)
         XCTAssertEqual(findedC1?.toJSON(), "\"c1\"")
 
@@ -72,10 +69,10 @@ class CRDTRootTests: XCTestCase {
         XCTAssertEqual(resultA1, ["$", "K-a1"])
 
         let resultC1 = try target.createSubPaths(createdAt: c1.createdAt)
-        XCTAssertEqual(resultC1, ["$", "K-a3", "K-B2", "K-c1"])
+        XCTAssertEqual(resultC1, ["$", "K-\\$a3", "K-\\.B2", "K-c1"])
 
         let result = try target.createPath(createdAt: c1.createdAt)
-        XCTAssertEqual(result, "$.K-a3.K-B2.K-c1")
+        XCTAssertEqual(result, "$.K-\\$a3.K-\\.B2.K-c1")
     }
 
     func test_can_resturn_elements_count() throws {
@@ -106,7 +103,6 @@ class CRDTRootTests: XCTestCase {
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
         object2.set(key: "K-B1", value: b1)
 
-        // when
         let target = CRDTRoot(rootObject: rootObject)
 
         b1.setRemovedAt(TimeTicket(lamport: 6, delimiter: 0, actorID: self.actorId))
@@ -115,8 +111,10 @@ class CRDTRootTests: XCTestCase {
         a2.setRemovedAt(TimeTicket(lamport: 7, delimiter: 0, actorID: self.actorId))
         target.registerRemovedElement(element: a2)
 
-        // then
+        // when
         let result = target.getRemovedElementSetSize()
+
+        // then
         XCTAssertEqual(result, 2)
     }
 
@@ -143,10 +141,9 @@ class CRDTRootTests: XCTestCase {
 
         object2ToRemove.setRemovedAt(TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId))
         target.registerRemovedElement(element: object2ToRemove)
-
-        // then
         let result = target.getGarbageLength()
 
+        // then
         XCTAssertEqual(result, 4)
     }
 
@@ -178,12 +175,11 @@ class CRDTRootTests: XCTestCase {
 
         a1.setRemovedAt(TimeTicket(lamport: 9, delimiter: 0, actorID: self.actorId))
         target.registerRemovedElement(element: a1)
-
-        // then
         let garbageLength = target.getGarbageLength()
         XCTAssertEqual(garbageLength, 5)
+        let result = target.garbageCollect(lessThanOrEqualTo: removedAtForGarbage)
 
-        let result = target.garbageCollect(ticket: removedAtForGarbage)
+        // then
         XCTAssertEqual(result, 4)
 
         XCTAssertNil(target.find(createdAt: object2ToGarbage.createdAt))
@@ -212,9 +208,40 @@ class CRDTRootTests: XCTestCase {
 
         // when
         let target = CRDTRoot(rootObject: rootObject)
+        let result = target.toSortedJSON()
 
         // then
-        let result = target.toSortedJSON()
         XCTAssertEqual(result, "{\"K-a1\":\"A1\",\"K-a3\":{\"K-B1\":\"B1\",\"K-B2\":{\"K-c1\":\"c1\"}}}")
+    }
+
+    func test_can_deepCopy() {
+        // given
+        let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
+        let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
+        rootObject.set(key: "K-a1", value: a1)
+
+        let object2 = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
+        let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
+        object2.set(key: "K-B1", value: b1)
+
+        let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
+        let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
+        object3.set(key: "K-c1", value: c1)
+
+        rootObject.set(key: "K-a3", value: object2)
+
+        object2.set(key: "K-B2", value: object3)
+
+        let target = CRDTRoot(rootObject: rootObject)
+
+        let expectedJson = "{\"K-a1\":\"A1\",\"K-a3\":{\"K-B1\":\"B1\",\"K-B2\":{\"K-c1\":\"c1\"}}}"
+        XCTAssertEqual(rootObject.toSortedJSON(), expectedJson)
+
+        // when
+        let deepCopied = target.deepcopy()
+        let result = deepCopied.find(createdAt: rootObject.createdAt)
+
+        // then
+        XCTAssertEqual(result?.toSortedJSON(), expectedJson)
     }
 }

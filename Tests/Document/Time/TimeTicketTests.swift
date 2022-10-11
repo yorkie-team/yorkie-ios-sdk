@@ -19,22 +19,22 @@ import XCTest
 
 class TimeTicketTests: XCTestCase {
     func test_compare_with_a_big_thing() {
-        let small = TimeTicket.initialTimeTicket
-        let big = TimeTicket.maxTimeTicket
+        let small = TimeTicket.initial
+        let big = TimeTicket.max
 
         XCTAssertTrue(small < big)
     }
 
     func test_compare_with_a_small_thing() {
-        let big = TimeTicket.maxTimeTicket
-        let small = TimeTicket.initialTimeTicket
+        let big = TimeTicket.max
+        let small = TimeTicket.initial
 
         XCTAssertTrue(big > small)
     }
 
     func test_compare_with_a_same_thing() {
-        let big = TimeTicket.maxTimeTicket
-        let big2 = TimeTicket.maxTimeTicket
+        let big = TimeTicket.max
+        let big2 = TimeTicket.max
 
         XCTAssertTrue(big == big2)
     }

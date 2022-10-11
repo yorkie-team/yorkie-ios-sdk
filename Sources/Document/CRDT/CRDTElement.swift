@@ -130,7 +130,7 @@ protocol CRDTContainer: CRDTElement {
 
     func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
 
-    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool)
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool)
 }
 
 /**

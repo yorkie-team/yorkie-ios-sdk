@@ -47,6 +47,9 @@ class CRDTRoot {
         return self.elementPairMapByCreatedAt[createdAt]?.element
     }
 
+    private let subPathPrefix = "$"
+    private let subPathSeparator = "."
+
     /**
      * `createSubPaths` creates an array of the sub paths for the given element.
      */
@@ -61,7 +64,7 @@ class CRDTRoot {
             let createdAt = pairForLoop.element.getCreatedAt()
             var subPath = try parent.subPath(createdAt: createdAt)
             subPath = self.escapeSubpath(subPath)
-            result.insert(subPath, at: 0)
+            result.append(subPath)
             guard let parentPair = self.elementPairMapByCreatedAt[parent.getCreatedAt()] else {
                 break
             }
@@ -69,12 +72,12 @@ class CRDTRoot {
             pairForLoop = parentPair
         }
 
-        result.insert("$", at: 0)
-        return result
+        result.append(self.subPathPrefix)
+        return result.reversed()
     }
 
     private func escapeSubpath(_ target: String) -> String {
-        return ["$", "."].reduce(target) { partialResult, seq in
+        return [self.subPathPrefix, self.subPathSeparator].reduce(target) { partialResult, seq in
             partialResult.replacingOccurrences(of: seq, with: "\\\(seq)")
         }
     }
@@ -83,13 +86,13 @@ class CRDTRoot {
      * `createPath` creates path of the given element.
      */
     func createPath(createdAt: TimeTicket) throws -> String {
-        return try self.createSubPaths(createdAt: createdAt).joined(separator: ".")
+        return try self.createSubPaths(createdAt: createdAt).joined(separator: self.subPathSeparator)
     }
 
     /**
      * `registerElement` registers the given element to hash table.
      */
-    func registerElement(element: CRDTElement, parent: CRDTContainer) {
+    func registerElement(element: CRDTElement, parent: CRDTContainer?) {
         self.elementPairMapByCreatedAt[element.getCreatedAt()] = (element, parent)
     }
 
@@ -142,25 +145,25 @@ class CRDTRoot {
     func getGarbageLength() -> Int {
         var count = 0
 
-        for createdAt in self.removedElementSetByCreatedAt {
+        self.removedElementSetByCreatedAt.forEach {
             count += 1
-            guard let pair = self.elementPairMapByCreatedAt[createdAt] else {
-                continue
+            guard let pair = self.elementPairMapByCreatedAt[$0],
+                  let element = pair.element as? CRDTContainer
+            else {
+                return
             }
 
-            if let element = pair.element as? CRDTContainer {
-                element.getDescendants { _, _ in
-                    count += 1
-                    return false
-                }
+            element.getDescendants { _, _ in
+                count += 1
+                return false
             }
         }
 
-        for createdAt in self.textWithGarbageSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[createdAt],
+        self.textWithGarbageSetByCreatedAt.forEach {
+            guard let pair = self.elementPairMapByCreatedAt[$0],
                   let text = pair.element as? CRDTTextElement
             else {
-                continue
+                return
             }
 
             count += text.getRemovedNodesLength()
@@ -183,32 +186,34 @@ class CRDTRoot {
     /**
      * `garbageCollect` purges elements that were removed before the given time.
      */
-    func garbageCollect(ticket: TimeTicket) -> Int {
+    func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
         var count = 0
 
-        for createdAt in self.removedElementSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[createdAt] else {
-                continue
+        self.removedElementSetByCreatedAt.forEach {
+            guard let pair = self.elementPairMapByCreatedAt[$0],
+                  let removedAt = pair.element.getRemovedAt(), removedAt <= ticket
+            else {
+                return
             }
 
-            if let removedAt = pair.element.getRemovedAt(), removedAt <= ticket {
-                try? pair.parent?.delete(element: pair.element)
-                count += self.garbageCollectInternal(element: pair.element)
-            }
+            try? pair.parent?.delete(element: pair.element)
+            count += self.garbageCollectInternal(element: pair.element)
         }
 
-        for createdAt in self.textWithGarbageSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[createdAt],
+        self.textWithGarbageSetByCreatedAt.forEach {
+            guard let pair = self.elementPairMapByCreatedAt[$0],
                   let text = pair.element as? CRDTTextElement
             else {
-                continue
+                return
             }
 
             let removedNodeCount = text.purgeTextNodesWithGarbage(ticket: ticket)
-            if removedNodeCount > 0 {
-                self.textWithGarbageSetByCreatedAt.remove(text.getCreatedAt())
-                count += removedNodeCount
+            guard removedNodeCount > 0 else {
+                return
             }
+
+            self.textWithGarbageSetByCreatedAt.remove(text.getCreatedAt())
+            count += removedNodeCount
         }
 
         return count
