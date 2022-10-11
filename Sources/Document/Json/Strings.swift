@@ -15,24 +15,41 @@
  */
 import Foundation
 
-/**
- * `EscapeString` escapes string.
- */
-extension String {
+/// Escapes string.
+private enum JsonEscape {
+    static let tempPlaceHolder = UUID().uuidString
+    static let backSlash = "\\"
+    static let escapedBackSlash = "\\\\"
+
+    /// Escaping based on JS-SDK
     static let escapeSequences = [
-        (original: "\\", escaped: "\\\\"),
+        (original: JsonEscape.backSlash, escaped: JsonEscape.escapedBackSlash),
         (original: "\"", escaped: "\\\""),
         (original: "'", escaped: "\\'"),
         (original: "\n", escaped: "\\n"),
         (original: "\r", escaped: "\\r"),
         (original: "\t", escaped: "\\t"),
-        (original: "\u{2028}", escaped: "\\u{2028}"),
-        (original: "\u{2029}", escaped: "\\u{2029}")
+        (original: "\u{0008}", escaped: "\\b"),
+        (original: "\u{000C}", escaped: "\\f"),
+        (original: "\u{2028}", escaped: "\\u2028"),
+        (original: "\u{2029}", escaped: "\\u2029")
     ]
+}
 
+extension String {
     func escaped() -> String {
-        return String.escapeSequences.reduce(self) { string, seq in
+        return JsonEscape.escapeSequences.reduce(self) { string, seq in
             string.replacingOccurrences(of: seq.original, with: seq.escaped)
         }
+    }
+
+    func unescaped() -> String {
+        let target = self.replacingOccurrences(of: JsonEscape.escapedBackSlash, with: JsonEscape.tempPlaceHolder)
+
+        let temp = JsonEscape.escapeSequences.reduce(target) { string, seq in
+            string.replacingOccurrences(of: seq.escaped, with: seq.original)
+        }
+
+        return temp.replacingOccurrences(of: JsonEscape.tempPlaceHolder, with: JsonEscape.backSlash)
     }
 }
