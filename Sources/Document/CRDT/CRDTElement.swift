@@ -137,7 +137,7 @@ protocol CRDTContainer: CRDTElement {
  * `CRDTTextElement` represents CRDTText or CRDTRichText.
  */
 protocol CRDTTextElement: CRDTElement {
-    func getRemovedNodesLen() -> Int
+    func getRemovedNodesLength() -> Int
 
     func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int
 }

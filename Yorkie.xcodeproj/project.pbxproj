@@ -43,6 +43,8 @@
 		CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230428C9F1BD00432DE5 /* Client.swift */; };
 		CE8C230728D1514900432DE5 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230628D1514900432DE5 /* Logger.swift */; };
 		CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
+		CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */; };
+		CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D828F02B1200915A85 /* CRDTRootTests.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */; };
 		CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E028C84D26004988DD /* yorkie.pb.swift */; };
@@ -102,6 +104,8 @@
 		CE8C230428C9F1BD00432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
 		CE8C230628D1514900432DE5 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Logger.swift; path = Sources/Core/Logger.swift; sourceTree = SOURCE_ROOT; };
 		CE8C230928D15F5A00432DE5 /* ClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientTests.swift; sourceTree = "<group>"; };
+		CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRoot.swift; sourceTree = "<group>"; };
+		CEC631D828F02B1200915A85 /* CRDTRootTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRootTests.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObjectTests.swift; sourceTree = "<group>"; };
 		CEEB17DC28C84CC3004988DD /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
@@ -213,6 +217,7 @@
 				CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */,
 				CE7B998528E520D600D56198 /* CRDTArrayTests.swift */,
 				CE7B998A28E694FC00D56198 /* RHTPQMapTests.swift */,
+				CEC631D828F02B1200915A85 /* CRDTRootTests.swift */,
 				CE370E5B28EEBFA6008FCABD /* RHTTests.swift */,
 			);
 			path = CRDT;
@@ -302,6 +307,7 @@
 				CE7B997D28E2FD7000D56198 /* CRDTArray.swift */,
 				CE72E85528EE6D1600D1331C /* RHT.swift */,
 				CE6BD03B28E6BA9C00E97B8C /* RHTPQMap.swift */,
+				CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -551,7 +557,7 @@
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */,
-				CE72E85428EE563D00D1331C /* Collection+Extensions.swift in Sources */,
+				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
 				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
@@ -567,6 +573,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,

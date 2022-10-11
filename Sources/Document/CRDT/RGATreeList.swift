@@ -122,8 +122,8 @@ class RGATreeList {
     private var nodeMapByCreatedAt: [TimeTicket: RGATreeListNode]
 
     init() {
-        let dummyValue = Primitive(value: .null, createdAt: .initialTimeTicket)
-        dummyValue.setRemovedAt(.initialTimeTicket)
+        let dummyValue = Primitive(value: .null, createdAt: .initial)
+        dummyValue.setRemovedAt(.initial)
         self.dummyHead = RGATreeListNode(dummyValue)
         self.last = self.dummyHead
         self.nodeMapByIndex = SplayTree()
