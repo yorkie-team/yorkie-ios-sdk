@@ -64,7 +64,7 @@ struct TimeTicket: Comparable {
     /**
      * `setActor` changes actorID
      */
-    mutating func setActor(actorID: ActorID) {
+    mutating func setActor(_ actorID: ActorID) {
         self.actorID = actorID
     }
 

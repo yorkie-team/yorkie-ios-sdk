@@ -20,7 +20,7 @@ import Foundation
  * `CRDTElement` represents element type containing logical clock.
  */
 protocol CRDTElement: AnyObject {
-    var createdAt: TimeTicket { get set }
+    var createdAt: TimeTicket { get }
     var movedAt: TimeTicket? { get set }
     var removedAt: TimeTicket? { get set }
 
