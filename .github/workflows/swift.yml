@@ -17,8 +17,6 @@ jobs:
       run: swiftformat --lint .
     - name: Build
       run: swift build -v
-    - uses: docker-practice/actions-setup-docker@master
-    - run: docker-compose -f docker/docker-compose-ci.yml up --build -d
     - name: Run tests
       run: swift test --enable-code-coverage -v
     - name: Prepare Code Coverage
