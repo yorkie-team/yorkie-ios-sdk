@@ -18,7 +18,7 @@ import XCTest
 @testable import Yorkie
 
 class ClientTests: XCTestCase {
-    func test_activate_and_deactivate_client_with_key() async throws {
+    func skip_test_activate_and_deactivate_client_with_key() async throws {
         let clientId = UUID().uuidString
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
@@ -48,7 +48,7 @@ class ClientTests: XCTestCase {
         XCTAssertFalse(target.isActive)
     }
 
-    func test_activate_and_deactivate_client_without_key() async throws {
+    func skip_test_activate_and_deactivate_client_without_key() async throws {
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
         let options = ClientOptions()

@@ -19,7 +19,7 @@ import XCTest
 @testable import Yorkie
 
 class GRPCTests: XCTestCase {
-    func test_connect_yorkie() {
+    func skip_test_connect_yorkie() {
         let testClientKey = UUID().uuidString
         let group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
 
@@ -56,7 +56,7 @@ class GRPCTests: XCTestCase {
         XCTAssertEqual(deactivatedResponse.clientID, activateResponse.clientID)
     }
 
-    func test_connect_yorkie_with_async() async throws {
+    func skip_test_connect_yorkie_with_async() async throws {
         let testClientKey = UUID().uuidString
         let group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
         defer {
