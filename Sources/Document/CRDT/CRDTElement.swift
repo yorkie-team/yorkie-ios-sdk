@@ -20,7 +20,7 @@ import Foundation
  * `CRDTElement` represents element type containing logical clock.
  */
 protocol CRDTElement: AnyObject {
-    var createdAt: TimeTicket { get set }
+    var createdAt: TimeTicket { get }
     var movedAt: TimeTicket? { get set }
     var removedAt: TimeTicket? { get set }
 
@@ -130,14 +130,14 @@ protocol CRDTContainer: CRDTElement {
 
     func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
 
-    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool)
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool)
 }
 
 /**
  * `CRDTTextElement` represents CRDTText or CRDTRichText.
  */
 protocol CRDTTextElement: CRDTElement {
-    func getRemovedNodesLen() -> Int
+    func getRemovedNodesLength() -> Int
 
     func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int
 }

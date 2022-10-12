@@ -143,7 +143,7 @@ extension CRDTObject {
     /**
      * `getDescendants` returns the descendants of this object by traversing.
      */
-    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool) {
         for node in self.memberNodes {
             let element = node.rhtValue
             if callback(element, self) {

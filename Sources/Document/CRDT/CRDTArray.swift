@@ -172,7 +172,7 @@ extension CRDTArray {
     /**
      * `getDescendants` traverse the descendants of this array.
      */
-    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer) -> Bool) {
+    func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool) {
         for node in self.elements {
             let element = node.getValue()
             if callback(element, self) {

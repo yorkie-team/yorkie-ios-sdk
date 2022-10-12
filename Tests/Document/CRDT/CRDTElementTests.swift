@@ -35,8 +35,8 @@ class TestCRDTElement: CRDTElement {
 
 class TestCRDTElementTests: XCTestCase {
     func test_can_set_smaller_movedAt() {
-        let small = TimeTicket.initialTimeTicket
-        let big = TimeTicket.maxTimeTicket
+        let small = TimeTicket.initial
+        let big = TimeTicket.max
 
         let target = TestCRDTElement(createdAt: big)
         let movedResult = target.setMovedAt(small)
@@ -46,8 +46,8 @@ class TestCRDTElementTests: XCTestCase {
     }
 
     func test_can_set_bigger_movedAt_when_movedAt_is_nil() {
-        let small = TimeTicket.initialTimeTicket
-        let big = TimeTicket.maxTimeTicket
+        let small = TimeTicket.initial
+        let big = TimeTicket.max
 
         let target = TestCRDTElement(createdAt: small)
         let movedResult = target.setMovedAt(big)
@@ -57,8 +57,8 @@ class TestCRDTElementTests: XCTestCase {
     }
 
     func test_can_not_set_bigger_movedAt_when_movedAt_is_non_nil() {
-        let small = TimeTicket.initialTimeTicket
-        let big = TimeTicket.maxTimeTicket
+        let small = TimeTicket.initial
+        let big = TimeTicket.max
 
         let target = TestCRDTElement(createdAt: small)
         target.setMovedAt(big)
@@ -72,33 +72,33 @@ class TestCRDTElementTests: XCTestCase {
     }
 
     func test_can_not_remove_when_nil() {
-        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initial)
 
         XCTAssertEqual(target.remove(nil), false)
     }
 
     func test_can_not_remove_when_removeAt_is_before_createdAt() {
-        let target = TestCRDTElement(createdAt: TimeTicket.maxTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.max)
 
-        XCTAssertEqual(target.remove(TimeTicket.initialTimeTicket), false)
+        XCTAssertEqual(target.remove(TimeTicket.initial), false)
     }
 
     func test_can_remove_when_current_removeAt_is_nil() {
-        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initial)
 
-        XCTAssertEqual(target.remove(TimeTicket.maxTimeTicket), true)
+        XCTAssertEqual(target.remove(TimeTicket.max), true)
     }
 
     func test_can_remove_when_current_removeAt_is_not_nil_and_samll() {
-        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
-        target.setRemovedAt(TimeTicket.initialTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initial)
+        target.setRemovedAt(TimeTicket.initial)
 
-        XCTAssertEqual(target.remove(TimeTicket.maxTimeTicket), true)
+        XCTAssertEqual(target.remove(TimeTicket.max), true)
     }
 
     func test_can_not_remove_when_current_removeAt_is_not_nil_and_big() {
-        let target = TestCRDTElement(createdAt: TimeTicket.initialTimeTicket)
-        target.setRemovedAt(TimeTicket.maxTimeTicket)
+        let target = TestCRDTElement(createdAt: TimeTicket.initial)
+        target.setRemovedAt(TimeTicket.max)
 
         let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)
         XCTAssertEqual(target.remove(timeTicket), false)

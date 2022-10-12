@@ -25,7 +25,7 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initialTimeTicket)
+        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         try target.insert(value: e2, afterCreatedAt: e1.getCreatedAt())
@@ -50,7 +50,7 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initialTimeTicket)
+        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         try target.insert(value: e2, afterCreatedAt: e1.getCreatedAt())
@@ -72,7 +72,7 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initialTimeTicket)
+        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         try target.insert(value: e2, afterCreatedAt: e1.getCreatedAt())
@@ -94,7 +94,7 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initialTimeTicket)
+        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         try target.insert(value: e2, afterCreatedAt: e1.getCreatedAt())
@@ -110,7 +110,7 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initialTimeTicket)
+        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         try target.insert(value: e2, afterCreatedAt: e1.getCreatedAt())
