@@ -58,7 +58,7 @@ extension Operation {
     /**
      * `setActor` sets the given actor to this operation.
      */
-    func setActor(actorID: ActorID) {
+    func setActor(_ actorID: ActorID) {
         self.executedAt.setActor(actorID)
     }
 }

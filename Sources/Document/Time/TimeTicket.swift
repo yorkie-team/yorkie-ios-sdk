@@ -21,14 +21,14 @@ import Foundation
  * It is created by `ChangeID`.
  */
 struct TimeTicket: Comparable {
-    private enum InitialValue {
+    enum Values {
         static let initialDelimiter: UInt32 = 0
         static let maxDelemiter: UInt32 = .max
         static let maxLamport: Int64 = .max
     }
 
-    static let initial = TimeTicket(lamport: 0, delimiter: InitialValue.initialDelimiter, actorID: ActorIDs.initial)
-    static let max = TimeTicket(lamport: InitialValue.maxLamport, delimiter: InitialValue.maxDelemiter, actorID: ActorIDs.max)
+    static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
+    static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
 
     private var lamport: Int64
     private var delimiter: UInt32
