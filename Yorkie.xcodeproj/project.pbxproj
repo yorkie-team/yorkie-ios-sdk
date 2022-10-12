@@ -55,6 +55,7 @@
 		CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4528F68D0A00431B61 /* ChangeID.swift */; };
 		CEA2DA4A28F6938700431B61 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4928F6938700431B61 /* String+Extensions.swift */; };
 		CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4B28F693F500431B61 /* StringExtensionsTests.swift */; };
+		CEA2DA4F28F6967500431B61 /* Checkpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4E28F6967500431B61 /* Checkpoint.swift */; };
 		CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */; };
 		CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D828F02B1200915A85 /* CRDTRootTests.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
@@ -128,6 +129,7 @@
 		CEA2DA4528F68D0A00431B61 /* ChangeID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeID.swift; sourceTree = "<group>"; };
 		CEA2DA4928F6938700431B61 /* String+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extensions.swift"; sourceTree = "<group>"; };
 		CEA2DA4B28F693F500431B61 /* StringExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringExtensionsTests.swift; sourceTree = "<group>"; };
+		CEA2DA4E28F6967500431B61 /* Checkpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Checkpoint.swift; sourceTree = "<group>"; };
 		CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRoot.swift; sourceTree = "<group>"; };
 		CEC631D828F02B1200915A85 /* CRDTRootTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRootTests.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
@@ -322,6 +324,7 @@
 			children = (
 				CE8C22EE28C9E85900432DE5 /* Change.swift */,
 				CEA2DA4528F68D0A00431B61 /* ChangeID.swift */,
+				CEA2DA4E28F6967500431B61 /* Checkpoint.swift */,
 			);
 			path = Change;
 			sourceTree = "<group>";
@@ -609,6 +612,7 @@
 				CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */,
 				CE7B997028E1453E00D56198 /* Strings.swift in Sources */,
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
+				CEA2DA4F28F6967500431B61 /* Checkpoint.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */,
 				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,
