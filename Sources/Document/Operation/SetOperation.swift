@@ -41,7 +41,7 @@ class SetOperation: Operation {
         if let parent = parent as? CRDTObject {
             let value = self.value.deepcopy()
             parent.set(key: self.key, value: value)
-            root.registerElement(element: value, parent: parent)
+            root.registerElement(value, parent: parent)
         } else {
             let log: String
             if parent == nil {

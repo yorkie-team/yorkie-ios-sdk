@@ -35,7 +35,7 @@ class CRDTRoot {
         self.elementPairMapByCreatedAt[self.rootObject.getCreatedAt()] = (element: self.rootObject, parent: nil)
 
         self.rootObject.getDescendants(callback: { element, parent in
-            self.registerElement(element: element, parent: parent)
+            self.registerElement(element, parent: parent)
             return false
         })
     }
@@ -92,14 +92,14 @@ class CRDTRoot {
     /**
      * `registerElement` registers the given element to hash table.
      */
-    func registerElement(element: CRDTElement, parent: CRDTContainer?) {
+    func registerElement(_ element: CRDTElement, parent: CRDTContainer?) {
         self.elementPairMapByCreatedAt[element.getCreatedAt()] = (element, parent)
     }
 
     /**
      * `deregisterElement` deregister the given element from hash table.
      */
-    func deregisterElement(element: CRDTElement) {
+    func deregisterElement(_ element: CRDTElement) {
         self.elementPairMapByCreatedAt[element.getCreatedAt()] = nil
         self.removedElementSetByCreatedAt.remove(element.getCreatedAt())
     }
@@ -107,7 +107,7 @@ class CRDTRoot {
     /**
      * `registerRemovedElement` registers the given element to hash table.
      */
-    func registerRemovedElement(element: CRDTElement) {
+    func registerRemovedElement(_ element: CRDTElement) {
         self.removedElementSetByCreatedAt.insert(element.getCreatedAt())
     }
 
@@ -223,7 +223,7 @@ class CRDTRoot {
         var count = 0
 
         let callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool = { element, _ in
-            self.deregisterElement(element: element)
+            self.deregisterElement(element)
             count += 1
             return false
         }

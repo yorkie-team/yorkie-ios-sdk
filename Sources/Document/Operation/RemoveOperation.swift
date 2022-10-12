@@ -36,8 +36,8 @@ class RemoveOperation: Operation {
     func execute(root: CRDTRoot) throws {
         let parentObject = root.find(createdAt: getParentCreatedAt())
         if let obj = parentObject as? CRDTContainer {
-            let elem = try obj.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
-            root.registerRemovedElement(element: elem)
+            let element = try obj.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
+            root.registerRemovedElement(element)
         } else {
             let log: String
             if let parentObject {

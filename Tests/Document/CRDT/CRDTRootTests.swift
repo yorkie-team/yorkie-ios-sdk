@@ -106,10 +106,10 @@ class CRDTRootTests: XCTestCase {
         let target = CRDTRoot(rootObject: rootObject)
 
         b1.setRemovedAt(TimeTicket(lamport: 6, delimiter: 0, actorID: self.actorId))
-        target.registerRemovedElement(element: b1)
+        target.registerRemovedElement(b1)
 
         a2.setRemovedAt(TimeTicket(lamport: 7, delimiter: 0, actorID: self.actorId))
-        target.registerRemovedElement(element: a2)
+        target.registerRemovedElement(a2)
 
         // when
         let result = target.getRemovedElementSetSize()
@@ -140,7 +140,7 @@ class CRDTRootTests: XCTestCase {
         let target = CRDTRoot(rootObject: rootObject)
 
         object2ToRemove.setRemovedAt(TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId))
-        target.registerRemovedElement(element: object2ToRemove)
+        target.registerRemovedElement(object2ToRemove)
         let result = target.getGarbageLength()
 
         // then
@@ -171,10 +171,10 @@ class CRDTRootTests: XCTestCase {
         let removedAtForGarbage = TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId)
 
         object2ToGarbage.setRemovedAt(removedAtForGarbage)
-        target.registerRemovedElement(element: object2ToGarbage)
+        target.registerRemovedElement(object2ToGarbage)
 
         a1.setRemovedAt(TimeTicket(lamport: 9, delimiter: 0, actorID: self.actorId))
-        target.registerRemovedElement(element: a1)
+        target.registerRemovedElement(a1)
         let garbageLength = target.getGarbageLength()
         XCTAssertEqual(garbageLength, 5)
         let result = target.garbageCollect(lessThanOrEqualTo: removedAtForGarbage)
