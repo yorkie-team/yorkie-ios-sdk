@@ -38,11 +38,7 @@ class SetOperation: Operation {
      */
     func execute(root: CRDTRoot) throws {
         let parent = root.find(createdAt: self.getParentCreatedAt())
-        if let parent = parent as? CRDTObject {
-            let value = self.value.deepcopy()
-            parent.set(key: self.key, value: value)
-            root.registerElement(value, parent: parent)
-        } else {
+        guard let parent = parent as? CRDTObject else {
             let log: String
             if parent == nil {
                 log = "failed to find \(self.getParentCreatedAt())"
@@ -54,6 +50,10 @@ class SetOperation: Operation {
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
+
+        let value = self.value.deepcopy()
+        parent.set(key: self.key, value: value)
+        root.registerElement(value, parent: parent)
     }
 
     /**
