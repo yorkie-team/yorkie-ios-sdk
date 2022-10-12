@@ -63,7 +63,7 @@ class TestCRDTElementTests: XCTestCase {
         let target = TestCRDTElement(createdAt: small)
         target.setMovedAt(big)
 
-        let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)
+        let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIDs.initial)
         let movedResult = target.setMovedAt(timeTicket)
 
         XCTAssertEqual(movedResult, false)
@@ -100,7 +100,7 @@ class TestCRDTElementTests: XCTestCase {
         let target = TestCRDTElement(createdAt: TimeTicket.initial)
         target.setRemovedAt(TimeTicket.max)
 
-        let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIds.initialActorID)
+        let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIDs.initial)
         XCTAssertEqual(target.remove(timeTicket), false)
     }
 }
