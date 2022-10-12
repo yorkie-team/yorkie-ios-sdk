@@ -17,52 +17,59 @@
 import Foundation
 
 /**
- * `RemoveOperation` is an operation representing removes an element from Container.
+ * `MoveOperation` is an operation representing moving an element to an Array.
  */
-class RemoveOperation: Operation {
+class MoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
+    private var previousCreatedAt: TimeTicket
     private var createdAt: TimeTicket
 
-    init(parentCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, previousCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
-        self.createdAt = createdAt
         self.executedAt = executedAt
+        self.previousCreatedAt = previousCreatedAt
+        self.createdAt = createdAt
     }
 
     /**
      * `execute` executes this operation on the given document(`root`).
      */
     func execute(root: CRDTRoot) throws {
-        let parent = root.find(createdAt: getParentCreatedAt())
-        guard let obj = parent as? CRDTContainer else {
+        let parent = root.find(createdAt: self.getParentCreatedAt())
+        guard let array = parent as? CRDTArray else {
             let log: String
-            if let parent {
-                log = "only object and array can execute remove: \(parent)"
+            if parent == nil {
+                log = "fail to find \(self.getParentCreatedAt())"
             } else {
-                log = "fail to find \(getParentCreatedAt())"
+                log = "fail to execute, only array can execute add"
             }
-
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        let element = try obj.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
-        root.registerRemovedElement(element)
+        try array.move(createdAt: self.createdAt, afterCreatedAt: self.previousCreatedAt, executedAt: self.getExecutedAt())
     }
 
     /**
      * `getEffectedCreatedAt` returns the time of the effected element.
      */
     func getEffectedCreatedAt() -> TimeTicket {
-        return getParentCreatedAt()
+        return self.createdAt
     }
 
     /**
      * `getStructureAsString` returns a string containing the meta data.
      */
     func getStructureAsString() -> String {
-        return "\(getParentCreatedAt().getStructureAsString()).REMOVE"
+        return "\(self.getParentCreatedAt().getStructureAsString()).MOV"
+    }
+
+    /**
+     * `getPrevCreatedAt` returns the creation time of previous element.
+     */
+    func getPrevCreatedAt() -> TimeTicket {
+        return self.previousCreatedAt
     }
 
     /**
