@@ -17,58 +17,67 @@
 import Foundation
 
 /**
- * `RemoveOperation` is an operation representing removes an element from Container.
+ * `AddOperation` is an operation representing adding an element to an Array.
  */
-class RemoveOperation: Operation {
+class AddOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
-    private var createdAt: TimeTicket
+    private var previousCreatedAt: TimeTicket
+    private var value: CRDTElement
 
-    init(parentCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, previousCreatedAt: TimeTicket, value: CRDTElement, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
-        self.createdAt = createdAt
         self.executedAt = executedAt
+        self.previousCreatedAt = previousCreatedAt
+        self.value = value
     }
 
     /**
      * `execute` executes this operation on the given document(`root`).
      */
     func execute(root: CRDTRoot) throws {
-        let parent = root.find(createdAt: getParentCreatedAt())
-        guard let obj = parent as? CRDTContainer else {
+        let parent = root.find(createdAt: self.getParentCreatedAt())
+        guard let array = parent as? CRDTArray else {
             let log: String
-            if let parent {
-                log = "only object and array can execute remove: \(parent)"
+            if parent == nil {
+                log = "fail to find \(self.getParentCreatedAt())"
             } else {
-                log = "fail to find \(getParentCreatedAt())"
+                log = "fail to execute, only array can execute add"
             }
-
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        let element = try obj.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
-        root.registerRemovedElement(element)
+        let value = self.value.deepcopy()
+        try array.insert(value: value, afterCreatedAt: self.previousCreatedAt)
+        root.registerElement(value, parent: array)
     }
 
     /**
      * `getEffectedCreatedAt` returns the time of the effected element.
      */
     func getEffectedCreatedAt() -> TimeTicket {
-        return getParentCreatedAt()
+        return self.value.getCreatedAt()
     }
 
     /**
      * `getStructureAsString` returns a string containing the meta data.
      */
     func getStructureAsString() -> String {
-        return "\(getParentCreatedAt().getStructureAsString()).REMOVE"
+        return "\(self.getParentCreatedAt().getStructureAsString()).ADD"
     }
 
     /**
-     * `getCreatedAt` returns the creation time of the target element.
+     * `getPrevCreatedAt` returns the creation time of previous element.
      */
-    func getCreatedAt() -> TimeTicket {
-        return self.createdAt
+    func getPrevCreatedAt() -> TimeTicket {
+        return self.previousCreatedAt
+    }
+
+    /**
+     * `getValue` returns the value of this operation.
+     */
+    func getValue() -> CRDTElement {
+        return self.value
     }
 }

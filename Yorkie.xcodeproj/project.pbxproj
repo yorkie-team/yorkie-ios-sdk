@@ -47,6 +47,10 @@
 		CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED31828F55F3E009A5419 /* SetOperationTests.swift */; };
 		CE8ED31C28F56506009A5419 /* RemoveOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED31B28F56506009A5419 /* RemoveOperation.swift */; };
 		CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED31D28F566DB009A5419 /* RemoveOperationTests.swift */; };
+		CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED32028F646EA009A5419 /* AddOperation.swift */; };
+		CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED32628F6470D009A5419 /* MoveOperation.swift */; };
+		CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4128F672AD00431B61 /* MoveOperationTests.swift */; };
+		CEA2DA4428F672AD00431B61 /* AddOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4228F672AD00431B61 /* AddOperationTests.swift */; };
 		CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */; };
 		CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D828F02B1200915A85 /* CRDTRootTests.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
@@ -112,6 +116,10 @@
 		CE8ED31828F55F3E009A5419 /* SetOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetOperationTests.swift; sourceTree = "<group>"; };
 		CE8ED31B28F56506009A5419 /* RemoveOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveOperation.swift; sourceTree = "<group>"; };
 		CE8ED31D28F566DB009A5419 /* RemoveOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveOperationTests.swift; sourceTree = "<group>"; };
+		CE8ED32028F646EA009A5419 /* AddOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddOperation.swift; sourceTree = "<group>"; };
+		CE8ED32628F6470D009A5419 /* MoveOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveOperation.swift; sourceTree = "<group>"; };
+		CEA2DA4128F672AD00431B61 /* MoveOperationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MoveOperationTests.swift; sourceTree = "<group>"; };
+		CEA2DA4228F672AD00431B61 /* AddOperationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AddOperationTests.swift; sourceTree = "<group>"; };
 		CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRoot.swift; sourceTree = "<group>"; };
 		CEC631D828F02B1200915A85 /* CRDTRootTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRootTests.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
@@ -336,6 +344,8 @@
 				CE8C22F428C9E88500432DE5 /* Operation.swift */,
 				CE8ED31528F55BF7009A5419 /* SetOperation.swift */,
 				CE8ED31B28F56506009A5419 /* RemoveOperation.swift */,
+				CE8ED32028F646EA009A5419 /* AddOperation.swift */,
+				CE8ED32628F6470D009A5419 /* MoveOperation.swift */,
 			);
 			path = Operation;
 			sourceTree = "<group>";
@@ -362,6 +372,8 @@
 			children = (
 				CE8ED31828F55F3E009A5419 /* SetOperationTests.swift */,
 				CE8ED31D28F566DB009A5419 /* RemoveOperationTests.swift */,
+				CEA2DA4228F672AD00431B61 /* AddOperationTests.swift */,
+				CEA2DA4128F672AD00431B61 /* MoveOperationTests.swift */,
 			);
 			path = Operation;
 			sourceTree = "<group>";
@@ -581,6 +593,8 @@
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
 				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
+				CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */,
+				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
 				CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
 				CE8C22F328C9E87800432DE5 /* Object.swift in Sources */,
@@ -595,6 +609,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CEA2DA4428F672AD00431B61 /* AddOperationTests.swift in Sources */,
 				CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */,
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */,
@@ -609,6 +624,7 @@
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,
 				CE3EC96E28D3FFF0009471BC /* TimeTicketTests.swift in Sources */,
 				CE7B998628E520D600D56198 /* CRDTArrayTests.swift in Sources */,
+				CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,
 				CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */,
 				CE3EC95228D195E4009471BC /* RedBlackTreeTests.swift in Sources */,
