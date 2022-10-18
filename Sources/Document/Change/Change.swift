@@ -28,7 +28,7 @@ class Change {
     // `message` is used to save a description of the change.
     private let message: String?
 
-    init(id: ChangeID, operations: [Operation], message: String?) {
+    init(id: ChangeID, operations: [Operation], message: String? = nil) {
         self.id = id
         self.operations = operations
         self.message = message

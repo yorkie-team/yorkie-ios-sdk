@@ -38,12 +38,12 @@ struct Checkpoint: Equatable {
     /**
      * `increaseClientSeq` creates a new instance with increased client sequence.
      */
-    func increaseClientSeq(_ value: Int) -> Checkpoint {
+    mutating func increaseClientSeq(_ value: Int) {
         if value == 0 {
-            return self
+            return
         }
 
-        return Checkpoint(serverSeq: self.serverSeq, clientSeq: self.clientSeq + value)
+        self.clientSeq += value
     }
 
     /**

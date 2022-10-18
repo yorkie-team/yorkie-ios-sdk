@@ -30,10 +30,10 @@ struct ChangeID {
     private var serverSeq: Int64?
 
     private let clientSeq: Int
-    private let lamport: Int64
+    private var lamport: Int64
     private var actor: ActorID?
 
-    init(clientSeq: Int, lamport: Int64, actor: ActorID?) {
+    init(clientSeq: Int, lamport: Int64, actor: ActorID? = nil) {
         self.clientSeq = clientSeq
         self.lamport = lamport
         self.actor = actor
@@ -51,9 +51,9 @@ struct ChangeID {
      *
      * {@link https://en.wikipedia.org/wiki/Lamport_timestamps#Algorithm}
      */
-    func syncLamport(otherLamport: Int64) -> ChangeID {
+    mutating func syncLamport(otherLamport: Int64) {
         let lamport = otherLamport > self.lamport ? otherLamport : self.lamport + 1
-        return ChangeID(clientSeq: self.clientSeq, lamport: lamport, actor: self.actor)
+        self.lamport = lamport
     }
 
     /**

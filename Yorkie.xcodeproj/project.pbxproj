@@ -35,6 +35,10 @@
 		CE7B997E28E2FD7000D56198 /* CRDTArray.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997D28E2FD7000D56198 /* CRDTArray.swift */; };
 		CE7B998628E520D600D56198 /* CRDTArrayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B998528E520D600D56198 /* CRDTArrayTests.swift */; };
 		CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B998A28E694FC00D56198 /* RHTPQMapTests.swift */; };
+		CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB73628FE283D0020F62A /* ChangeTests.swift */; };
+		CE8BB73B28FE2BE90020F62A /* ChangeIDTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB73928FE2BCE0020F62A /* ChangeIDTests.swift */; };
+		CE8BB74028FE2F000020F62A /* ChangeContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB73E28FE2EFE0020F62A /* ChangeContextTests.swift */; };
+		CE8BB74128FE2F030020F62A /* CheckpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB73C28FE2EEF0020F62A /* CheckpointTests.swift */; };
 		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
 		CE8C22F328C9E87800432DE5 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F228C9E87800432DE5 /* Object.swift */; };
 		CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F428C9E88500432DE5 /* Operation.swift */; };
@@ -110,6 +114,10 @@
 		CE7B997D28E2FD7000D56198 /* CRDTArray.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTArray.swift; sourceTree = "<group>"; };
 		CE7B998528E520D600D56198 /* CRDTArrayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTArrayTests.swift; sourceTree = "<group>"; };
 		CE7B998A28E694FC00D56198 /* RHTPQMapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHTPQMapTests.swift; sourceTree = "<group>"; };
+		CE8BB73628FE283D0020F62A /* ChangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeTests.swift; sourceTree = "<group>"; };
+		CE8BB73928FE2BCE0020F62A /* ChangeIDTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeIDTests.swift; sourceTree = "<group>"; };
+		CE8BB73C28FE2EEF0020F62A /* CheckpointTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckpointTests.swift; sourceTree = "<group>"; };
+		CE8BB73E28FE2EFE0020F62A /* ChangeContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeContextTests.swift; sourceTree = "<group>"; };
 		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
 		CE8C22F228C9E87800432DE5 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
 		CE8C22F428C9E88500432DE5 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
@@ -255,6 +263,7 @@
 		CE3EC97028D40421009471BC /* Document */ = {
 			isa = PBXGroup;
 			children = (
+				CE8BB73528FE28350020F62A /* Change */,
 				CE3EC96F28D40415009471BC /* CRDT */,
 				CE8ED31728F55F25009A5419 /* Operation */,
 				CEC631DB28F4F14100915A85 /* Json */,
@@ -279,6 +288,17 @@
 				CECCCB8028C96BB500544204 /* V1 */,
 			);
 			path = API;
+			sourceTree = "<group>";
+		};
+		CE8BB73528FE28350020F62A /* Change */ = {
+			isa = PBXGroup;
+			children = (
+				CE8BB73628FE283D0020F62A /* ChangeTests.swift */,
+				CE8BB73928FE2BCE0020F62A /* ChangeIDTests.swift */,
+				CE8BB73C28FE2EEF0020F62A /* CheckpointTests.swift */,
+				CE8BB73E28FE2EFE0020F62A /* ChangeContextTests.swift */,
+			);
+			path = Change;
 			sourceTree = "<group>";
 		};
 		CE8C22E228C9E4FD00432DE5 /* Documentation */ = {
@@ -640,13 +660,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				CEA2DA4428F672AD00431B61 /* AddOperationTests.swift in Sources */,
+				CE8BB74028FE2F000020F62A /* ChangeContextTests.swift in Sources */,
 				CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */,
+				CE8BB74128FE2F030020F62A /* CheckpointTests.swift in Sources */,
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */,
+				CE8BB73B28FE2BE90020F62A /* ChangeIDTests.swift in Sources */,
 				CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
 				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,
+				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
 				CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */,
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
