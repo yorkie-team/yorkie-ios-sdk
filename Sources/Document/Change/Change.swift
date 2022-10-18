@@ -58,7 +58,7 @@ class Change {
     /**
      * `setActor` sets the given actor.
      */
-    func setActor(actorID: ActorID) {
+    func setActor(_ actorID: ActorID) {
         self.operations.forEach {
             $0.setActor(actorID)
         }

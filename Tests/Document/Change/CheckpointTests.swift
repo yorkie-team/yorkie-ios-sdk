@@ -20,8 +20,8 @@ import XCTest
 class CheckpointTests: XCTestCase {
     func test_can_increase_client_seq() {
         var target = Checkpoint(serverSeq: 1, clientSeq: 10)
-        target.increaseClientSeq(100)
-        XCTAssertEqual(target.getStructureAsString(), "serverSeq=1, clientSeq=110")
+        let result = target.increasedClientSeq(by: 100)
+        XCTAssertEqual(result.getStructureAsString(), "serverSeq=1, clientSeq=110")
     }
 
     func test_can_forward() {

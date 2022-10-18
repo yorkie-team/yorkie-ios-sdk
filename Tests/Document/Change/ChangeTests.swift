@@ -46,7 +46,7 @@ class ChangeTests: XCTestCase {
 
         XCTAssertEqual(target.getOperations()[0].executedAt.getStructureAsString(), "8:actor-1:0")
 
-        target.setActor(actorID: "actor-2")
+        target.setActor("actor-2")
 
         XCTAssertEqual(target.getOperations()[0].executedAt.getStructureAsString(), "8:actor-2:0")
     }

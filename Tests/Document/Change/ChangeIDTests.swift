@@ -33,13 +33,13 @@ class Tests: XCTestCase {
 
     func test_change_lmport_to_bigger_than_current_lamport() {
         var target = ChangeID(clientSeq: 1, lamport: 2)
-        target.syncLamport(otherLamport: 10)
+        target.syncLamport(with: 10)
         XCTAssertEqual(target.getLamport(), 10)
     }
 
     func test_change_lmport_to_smaller_than_current_lamport() {
         var target = ChangeID(clientSeq: 1, lamport: 10)
-        target.syncLamport(otherLamport: 5)
+        target.syncLamport(with: 5)
         XCTAssertEqual(target.getLamport(), 11)
     }
 
