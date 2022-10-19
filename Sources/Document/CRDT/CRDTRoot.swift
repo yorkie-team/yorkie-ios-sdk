@@ -186,6 +186,7 @@ class CRDTRoot {
     /**
      * `garbageCollect` purges elements that were removed before the given time.
      */
+    @discardableResult
     func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
         var count = 0
 
