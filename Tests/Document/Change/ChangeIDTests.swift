@@ -28,7 +28,7 @@ class Tests: XCTestCase {
         let actorID = "abcdefghijklmnopqrstuvwxyz"
         let target = ChangeID(clientSeq: 1, lamport: 2, actor: actorID)
 
-        XCTAssertEqual(target.getStructureAsString(), "2:wxy:1")
+        XCTAssertEqual(target.getStructureAsString(), "2:yz:1")
     }
 
     func test_change_lmport_to_bigger_than_current_lamport() {

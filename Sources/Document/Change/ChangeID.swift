@@ -104,7 +104,7 @@ struct ChangeID {
     func getStructureAsString() -> String {
         var actor: String
         if let value = self.actor {
-            actor = String(value.substring(from: 22, to: 24))
+            actor = String(value.suffix(2))
         } else {
             actor = "nil"
         }
