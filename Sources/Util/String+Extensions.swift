@@ -22,7 +22,7 @@ extension String {
             return ""
         }
 
-        let adaptedTo = to >= self.count ? self.count - 1 : to
+        let adaptedTo = min(to, self.count - 1)
 
         let start = index(self.startIndex, offsetBy: from)
         let end = index(self.startIndex, offsetBy: adaptedTo)
