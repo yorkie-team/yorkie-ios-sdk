@@ -77,10 +77,16 @@ class ChangeTests: XCTestCase {
 
         let target = Change(id: changeID, operations: [setOperation])
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\"}}")
+        XCTAssertEqual(root.toSortedJSON(),
+                       """
+                       {"k-a1":"a1","k-a3":{"k-b1":"b1"}}
+                       """)
 
         try target.execute(root: root)
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-d2\":{\"k-c1\":\"c1\"}}}")
+        XCTAssertEqual(root.toSortedJSON(),
+                       """
+                       {"k-a1":"a1","k-a3":{"k-b1":"b1","k-d2":{"k-c1":"c1"}}}
+                       """)
     }
 }

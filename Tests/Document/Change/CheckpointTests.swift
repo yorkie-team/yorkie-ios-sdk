@@ -19,7 +19,7 @@ import XCTest
 
 class CheckpointTests: XCTestCase {
     func test_can_increase_client_seq() {
-        var target = Checkpoint(serverSeq: 1, clientSeq: 10)
+        let target = Checkpoint(serverSeq: 1, clientSeq: 10)
         let result = target.increasedClientSeq(by: 100)
         XCTAssertEqual(result.getStructureAsString(), "serverSeq=1, clientSeq=110")
     }
