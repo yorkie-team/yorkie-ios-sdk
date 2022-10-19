@@ -55,7 +55,7 @@ struct Checkpoint: Equatable {
             return
         }
 
-        self.serverSeq = self.serverSeq > other.serverSeq ? self.serverSeq : other.serverSeq
+        self.serverSeq = max(self.serverSeq, other.serverSeq)
         self.clientSeq = max(self.clientSeq, other.clientSeq)
     }
 
