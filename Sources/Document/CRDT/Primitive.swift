@@ -100,7 +100,7 @@ class Primitive: CRDTElement {
     /**
      * `toBytes` creates an array representing the value.
      */
-    func toBytes() throws -> Data {
+    func toBytes() -> Data {
         switch self.value {
         case .null:
             return Data()

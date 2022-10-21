@@ -20,7 +20,7 @@ import XCTest
 class PrimitiveTests: XCTestCase {
     func test_value_is_null() throws {
         let primitiveValue = Primitive(value: .null, createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .null, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.null, data: primitiveValue.toBytes())
         switch valueFromData {
         case .null:
             ()
@@ -31,7 +31,7 @@ class PrimitiveTests: XCTestCase {
 
     func test_value_is_bool() throws {
         let primitiveValue = Primitive(value: .boolean(true), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .boolean, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.boolean, data: primitiveValue.toBytes())
         switch valueFromData {
         case .boolean(let value):
             XCTAssertEqual(value, true)
@@ -42,7 +42,7 @@ class PrimitiveTests: XCTestCase {
 
     func test_value_is_integer() throws {
         let primitiveValue = Primitive(value: .integer(12345), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .integer, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.integer, data: primitiveValue.toBytes())
         switch valueFromData {
         case .integer(let value):
             XCTAssertEqual(value, 12345)
@@ -53,7 +53,7 @@ class PrimitiveTests: XCTestCase {
 
     func test_value_is_long() throws {
         let primitiveValue = Primitive(value: .long(1_234_567_890), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .long, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.long, data: primitiveValue.toBytes())
         switch valueFromData {
         case .long(let value):
             XCTAssertEqual(value, 1_234_567_890)
@@ -64,7 +64,7 @@ class PrimitiveTests: XCTestCase {
 
     func test_value_is_double() throws {
         let primitiveValue = Primitive(value: .double(-123_456_789), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .double, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.double, data: primitiveValue.toBytes())
         switch valueFromData {
         case .double(let value):
             XCTAssertEqual(value, -123_456_789)
@@ -75,7 +75,7 @@ class PrimitiveTests: XCTestCase {
 
     func test_value_is_string() throws {
         let primitiveValue = Primitive(value: .string("ABCDEFG"), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .string, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.string, data: primitiveValue.toBytes())
         switch valueFromData {
         case .string(let value):
             XCTAssertEqual(value, "ABCDEFG")
@@ -87,7 +87,7 @@ class PrimitiveTests: XCTestCase {
     func test_value_is_bytes() throws {
         let testData = "abcdefg".data(using: .utf8)!
         let primitiveValue = Primitive(value: .bytes(testData), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .bytes, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.bytes, data: primitiveValue.toBytes())
         switch valueFromData {
         case .bytes(let value):
             XCTAssertEqual(String(decoding: value, as: UTF8.self), "abcdefg")
@@ -99,7 +99,7 @@ class PrimitiveTests: XCTestCase {
     func test_value_is_date() throws {
         let testDate = Date()
         let primitiveValue = Primitive(value: .date(testDate), createdAt: TimeTicket.initial)
-        let valueFromData = try Converter.valueFrom(valueType: .date, data: primitiveValue.toBytes())
+        let valueFromData = try Converter.valueFrom(.date, data: primitiveValue.toBytes())
 
         switch valueFromData {
         case .date:
