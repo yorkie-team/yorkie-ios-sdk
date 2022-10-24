@@ -19,37 +19,37 @@ import XCTest
 
 class ConverterTests: XCTestCase {
     func test_data_to_hexString() {
-        let array: [UInt8]  = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]
+        let array: [UInt8] = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
         let data = Data(bytes: array, count: array.count)
-        
+
         XCTAssertEqual(data.toHexString, "000102030405aabbccddeeff")
-        
+
         let data2 = Data("Hello world".utf8)
-        
+
         XCTAssertEqual(data2.toHexString, "48656c6c6f20776f726c64")
     }
 
     func test_hexString_to_Data() {
-        let array: [UInt8]  = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]
+        let array: [UInt8] = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
         let data = Data(bytes: array, count: array.count)
 
         let str = "000102030405aabbccddeeff"
-        
+
         XCTAssertEqual(str.toData, data)
-        
+
         // Odd length string.
         let strOddLength = "00010"
 
         XCTAssertTrue(strOddLength.toData == nil)
-        
+
         // Invalid string.
         let strInvalid = "Hello!"
 
         XCTAssertTrue(strInvalid.toData == nil)
     }
-    
+
     func test_hexString() {
-        let array: [UInt8]  = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff]
+        let array: [UInt8] = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
         let data = Data(bytes: array, count: array.count)
 
         XCTAssertEqual(data, data.toHexString.toData)
@@ -57,5 +57,302 @@ class ConverterTests: XCTestCase {
         let str = "000102030405aabbccddeeff"
 
         XCTAssertEqual(str.toData?.toHexString, str)
+    }
+
+    func test_checkpoint() {
+        let checkpoint = Checkpoint.initial
+
+        let converted = Converter.fromCheckpoint(Converter.toCheckpoint(checkpoint))
+        XCTAssertEqual(checkpoint, converted)
+    }
+
+    func test_changeID() {
+        let changeID = ChangeID.initial
+
+        let converted = Converter.fromChangeID(Converter.toChangeID(changeID))
+
+        XCTAssertEqual(changeID.getClientSeq(), converted.getClientSeq())
+        XCTAssertEqual(changeID.getLamport(), converted.getLamport())
+        XCTAssertEqual(changeID.getActorID(), converted.getActorID())
+        XCTAssertEqual(changeID.getStructureAsString(), converted.getStructureAsString())
+        XCTAssertEqual(changeID.getLamportAsString(), converted.getLamportAsString())
+    }
+
+    func test_timeTicket() {
+        let timeTicket = TimeTicket.initial
+
+        let converted = Converter.fromTimeTicket(Converter.toTimeTicket(timeTicket))
+
+        XCTAssertEqual(timeTicket, converted)
+    }
+
+    func test_chage() {
+        let addOperation = AddOperation(parentCreatedAt: TimeTicket.initial,
+                                        previousCreatedAt: TimeTicket.initial,
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        executedAt: TimeTicket.initial)
+        let change = Change(id: ChangeID.initial, operations: [addOperation], message: "AddOperation")
+        do {
+            let converted = try Converter.fromChanges([Converter.toChange(change)]).first
+            XCTAssertEqual(change.getStructureAsString(), converted?.getStructureAsString())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+    }
+
+    func test_chages() {
+        let setOperation = SetOperation(key: "key",
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        parentCreatedAt: TimeTicket.initial,
+                                        executedAt: TimeTicket.initial)
+
+        let addOperation = AddOperation(parentCreatedAt: TimeTicket.initial,
+                                        previousCreatedAt: TimeTicket.initial,
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        executedAt: TimeTicket.initial)
+        let setChange = Change(id: ChangeID.initial, operations: [setOperation], message: "SetOperation")
+        let addChange = Change(id: setChange.getID().next(), operations: [addOperation], message: "AddOperation")
+        do {
+            let convertedArray = try Converter.fromChanges(Converter.toChanges([setChange, addChange]))
+            XCTAssertEqual(setChange.getStructureAsString(), convertedArray[0].getStructureAsString())
+            XCTAssertEqual(addChange.getStructureAsString(), convertedArray[1].getStructureAsString())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+    }
+
+    func test_chnagePack() {
+        let addOperation = AddOperation(parentCreatedAt: TimeTicket.initial,
+                                        previousCreatedAt: TimeTicket.initial,
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        executedAt: TimeTicket.initial)
+        let change = Change(id: ChangeID.initial, operations: [addOperation], message: "AddOperation")
+        let changePack = ChangePack(key: "sample", checkpoint: Checkpoint.initial, changes: [change])
+
+        do {
+            let converted = try Converter.fromChangePack(Converter.toChangePack(pack: changePack))
+            XCTAssertEqual(changePack.getChangeSize(), converted.getChangeSize())
+            XCTAssertEqual(changePack.getChanges().first?.getStructureAsString(), converted.getChanges().first?.getStructureAsString())
+            XCTAssertEqual(changePack.getCheckpoint(), converted.getCheckpoint())
+            XCTAssertEqual(changePack.getDocumentKey(), converted.getDocumentKey())
+            XCTAssertEqual(changePack.getMinSyncedTicket(), converted.getMinSyncedTicket())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+    }
+
+    func test_operations() {
+        let setOperation = SetOperation(key: "key",
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        parentCreatedAt: TimeTicket.initial,
+                                        executedAt: TimeTicket.initial)
+
+        do {
+            let converted = try Converter.fromOperations([Converter.toOperation(setOperation)]).first as? SetOperation
+            XCTAssertEqual(setOperation.getStructureAsString(), converted?.getStructureAsString())
+            XCTAssertEqual(setOperation.getValue().toJSON(), converted?.getValue().toJSON())
+            XCTAssertEqual(setOperation.getKey(), converted?.getKey())
+            XCTAssertEqual(setOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
+            XCTAssertEqual(setOperation.getExecutedAt(), converted?.getExecutedAt())
+            XCTAssertEqual(setOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+
+        let addOperation = AddOperation(parentCreatedAt: TimeTicket.initial,
+                                        previousCreatedAt: TimeTicket.initial,
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        executedAt: TimeTicket.initial)
+
+        do {
+            let converted = try Converter.fromOperations([Converter.toOperation(addOperation)]).first as? AddOperation
+            XCTAssertEqual(addOperation.getStructureAsString(), converted?.getStructureAsString())
+            XCTAssertEqual(addOperation.getValue().toJSON(), converted?.getValue().toJSON())
+            XCTAssertEqual(addOperation.getPrevCreatedAt(), converted?.getPrevCreatedAt())
+            XCTAssertEqual(addOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
+            XCTAssertEqual(addOperation.getExecutedAt(), converted?.getExecutedAt())
+            XCTAssertEqual(addOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+
+        let moveOperation = MoveOperation(parentCreatedAt: TimeTicket.initial,
+                                          previousCreatedAt: TimeTicket.initial,
+                                          createdAt: TimeTicket.initial,
+                                          executedAt: TimeTicket.initial)
+
+        do {
+            let converted = try Converter.fromOperations([Converter.toOperation(moveOperation)]).first as? MoveOperation
+            XCTAssertEqual(moveOperation.getStructureAsString(), converted?.getStructureAsString())
+            XCTAssertEqual(moveOperation.getPrevCreatedAt(), converted?.getPrevCreatedAt())
+            XCTAssertEqual(moveOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
+            XCTAssertEqual(moveOperation.getCreatedAt(), converted?.getCreatedAt())
+            XCTAssertEqual(moveOperation.getExecutedAt(), converted?.getExecutedAt())
+            XCTAssertEqual(moveOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+
+        let removeOperation = RemoveOperation(parentCreatedAt: TimeTicket.initial,
+                                              createdAt: TimeTicket.initial,
+                                              executedAt: TimeTicket.initial)
+
+        do {
+            let converted = try Converter.fromOperations([Converter.toOperation(removeOperation)]).first as? RemoveOperation
+            XCTAssertEqual(removeOperation.getStructureAsString(), converted?.getStructureAsString())
+            XCTAssertEqual(removeOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
+            XCTAssertEqual(removeOperation.getCreatedAt(), converted?.getCreatedAt())
+            XCTAssertEqual(removeOperation.getExecutedAt(), converted?.getExecutedAt())
+            XCTAssertEqual(removeOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+    }
+
+    func test_operations_array() {
+        let setOperation = SetOperation(key: "key",
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        parentCreatedAt: TimeTicket.initial,
+                                        executedAt: TimeTicket.initial)
+
+        let addOperation = AddOperation(parentCreatedAt: TimeTicket.initial,
+                                        previousCreatedAt: TimeTicket.initial,
+                                        value: Primitive(value: .null, createdAt: TimeTicket.initial),
+                                        executedAt: TimeTicket.initial)
+
+        let moveOperation = MoveOperation(parentCreatedAt: TimeTicket.initial,
+                                          previousCreatedAt: TimeTicket.initial,
+                                          createdAt: TimeTicket.initial,
+                                          executedAt: TimeTicket.initial)
+
+        let removeOperation = RemoveOperation(parentCreatedAt: TimeTicket.initial,
+                                              createdAt: TimeTicket.initial,
+                                              executedAt: TimeTicket.initial)
+
+        do {
+            let convertedArray = try Converter.fromOperations(Converter.toOperations([setOperation, addOperation, moveOperation, removeOperation]))
+
+            if let converted = convertedArray[0] as? SetOperation {
+                XCTAssertEqual(setOperation.getStructureAsString(), converted.getStructureAsString())
+                XCTAssertEqual(setOperation.getValue().toJSON(), converted.getValue().toJSON())
+                XCTAssertEqual(setOperation.getKey(), converted.getKey())
+                XCTAssertEqual(setOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
+                XCTAssertEqual(setOperation.getExecutedAt(), converted.getExecutedAt())
+                XCTAssertEqual(setOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+            } else {
+                XCTAssert(false, "Operation Type mismatch!")
+            }
+
+            if let converted = convertedArray[1] as? AddOperation {
+                XCTAssertEqual(addOperation.getStructureAsString(), converted.getStructureAsString())
+                XCTAssertEqual(addOperation.getValue().toJSON(), converted.getValue().toJSON())
+                XCTAssertEqual(addOperation.getPrevCreatedAt(), converted.getPrevCreatedAt())
+                XCTAssertEqual(addOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
+                XCTAssertEqual(addOperation.getExecutedAt(), converted.getExecutedAt())
+                XCTAssertEqual(addOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+            } else {
+                XCTAssert(false, "Operation Type mismatch!")
+            }
+
+            if let converted = convertedArray[2] as? MoveOperation {
+                XCTAssertEqual(moveOperation.getStructureAsString(), converted.getStructureAsString())
+                XCTAssertEqual(moveOperation.getPrevCreatedAt(), converted.getPrevCreatedAt())
+                XCTAssertEqual(moveOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
+                XCTAssertEqual(moveOperation.getCreatedAt(), converted.getCreatedAt())
+                XCTAssertEqual(moveOperation.getExecutedAt(), converted.getExecutedAt())
+                XCTAssertEqual(moveOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+            } else {
+                XCTAssert(false, "Operation Type mismatch!")
+            }
+
+            if let converted = convertedArray[3] as? RemoveOperation {
+                XCTAssertEqual(removeOperation.getStructureAsString(), converted.getStructureAsString())
+                XCTAssertEqual(removeOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
+                XCTAssertEqual(removeOperation.getCreatedAt(), converted.getCreatedAt())
+                XCTAssertEqual(removeOperation.getExecutedAt(), converted.getExecutedAt())
+                XCTAssertEqual(removeOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+            } else {
+                XCTAssert(false, "Operation Type mismatch!")
+            }
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+    }
+
+    func test_element() {
+        // Object Test
+        let object = CRDTObject(createdAt: TimeTicket.initial)
+
+        // Primitive test
+        object.set(key: "Boolean", value: Primitive(value: PrimitiveValue.boolean(true), createdAt: TimeTicket.initial))
+        object.set(key: "null", value: Primitive(value: PrimitiveValue.null, createdAt: TimeTicket.initial))
+        object.set(key: "bytes", value: Primitive(value: PrimitiveValue.bytes(Data("Data String".utf8)), createdAt: TimeTicket.initial))
+        object.set(key: "int", value: Primitive(value: PrimitiveValue.integer(Int32.max), createdAt: TimeTicket.initial))
+        object.set(key: "long", value: Primitive(value: PrimitiveValue.long(Int64.max), createdAt: TimeTicket.initial))
+        object.set(key: "double", value: Primitive(value: PrimitiveValue.double(Double.pi), createdAt: TimeTicket.initial))
+        object.set(key: "string", value: Primitive(value: PrimitiveValue.string("Hello"), createdAt: TimeTicket.initial))
+        object.set(key: "date", value: Primitive(value: PrimitiveValue.date(Date()), createdAt: TimeTicket.initial))
+
+        // Array Test
+        let array = CRDTArray(createdAt: TimeTicket.initial)
+
+        do {
+            try array.insert(value: object, afterCreatedAt: TimeTicket.initial)
+            let converted = try Converter.fromElement(pbElement: Converter.toElement(array)) as? CRDTArray
+            XCTAssertEqual(try array.get(index: 0).toSortedJSON(), try converted?.get(index: 0).toSortedJSON())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
+    }
+
+    func test_element_simple() {
+        // Primitive test
+        let boolean = Primitive(value: PrimitiveValue.boolean(true), createdAt: TimeTicket.initial)
+        let null = Primitive(value: PrimitiveValue.null, createdAt: TimeTicket.initial)
+        let bytes = Primitive(value: PrimitiveValue.bytes(Data("Data String".utf8)), createdAt: TimeTicket.initial)
+        let intValue = Primitive(value: PrimitiveValue.integer(Int32.max), createdAt: TimeTicket.initial)
+        let longValue = Primitive(value: PrimitiveValue.long(Int64.max), createdAt: TimeTicket.initial)
+        let doubleValue = Primitive(value: PrimitiveValue.double(Double.pi), createdAt: TimeTicket.initial)
+        let stringValue = Primitive(value: PrimitiveValue.string("Hello"), createdAt: TimeTicket.initial)
+        let dateValue = Primitive(value: PrimitiveValue.date(Date()), createdAt: TimeTicket.initial)
+
+        do {
+            var converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(boolean))
+            XCTAssertEqual(boolean.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(null))
+            XCTAssertEqual(null.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(bytes))
+            XCTAssertEqual(bytes.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(intValue))
+            XCTAssertEqual(intValue.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(longValue))
+            XCTAssertEqual(longValue.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(doubleValue))
+            XCTAssertEqual(doubleValue.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(stringValue))
+            XCTAssertEqual(stringValue.toJSON(), converted.toJSON())
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(dateValue))
+            XCTAssertEqual(dateValue.toJSON(), converted.toJSON())
+
+            // Object
+            let object = CRDTObject(createdAt: TimeTicket.initial)
+
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(object))
+            XCTAssertEqual(object.toJSON(), converted.toJSON())
+
+            object.set(key: "boolean", value: boolean)
+
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(object))
+            XCTAssertEqual(CRDTObject(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
+
+            // Array
+            let array = CRDTArray(createdAt: TimeTicket.initial)
+
+            try array.insert(value: object, afterCreatedAt: TimeTicket.initial)
+            converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(array))
+            XCTAssertEqual(CRDTArray(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
+        } catch {
+            XCTAssert(false, "\(error)")
+        }
     }
 }

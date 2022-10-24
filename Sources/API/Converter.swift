@@ -195,6 +195,20 @@ extension Converter {
         pbTimeTicket.actorID = ticket.getActorID()?.toData ?? Data()
         return pbTimeTicket
     }
+    
+    /**
+     * `fromTimeTicket` converts the given Protobuf format to model format.
+     */
+    // TODO: Is optional return is necessary?
+    static func fromTimeTicket(_ pbTimeTicket: PbTimeTicket?) -> TimeTicket? {
+        guard let pbTimeTicket else {
+            return nil
+        }
+        
+        return TimeTicket(lamport: pbTimeTicket.lamport,
+                          delimiter: pbTimeTicket.delimiter,
+                          actorID: pbTimeTicket.actorID.toHexString)
+    }
 }
 
 // MARK: CounterType
@@ -588,7 +602,7 @@ extension Converter {
     }
 }
 
-// MARK: RGNNode
+// MARK: RGNNodes
 extension Converter {
     /**
      * `toRGANodes` converts the given model to Protobuf format.
@@ -616,9 +630,16 @@ extension Converter {
         var pbObject = PbJSONElement.JSONObject()
         pbObject.nodes = toRHTNodes(rht: obj.getRHT())
         pbObject.createdAt = toTimeTicket(obj.getCreatedAt())
-        // TODO: movedAt, removedAt can be nil!
-        pbObject.movedAt = toTimeTicket(obj.getMovedAt() ?? TimeTicket.initial)
-        pbObject.removedAt = toTimeTicket(obj.getRemovedAt() ?? TimeTicket.initial)
+        if let ticket = obj.getMovedAt() {
+            pbObject.movedAt = toTimeTicket(ticket)
+        } else {
+            pbObject.clearMovedAt()
+        }
+        if let ticket = obj.getRemovedAt() {
+            pbObject.removedAt = toTimeTicket(ticket)
+        } else {
+            pbObject.clearRemovedAt()
+        }
         
         var pbElement = PbJSONElement()
         pbElement.jsonObject = pbObject
@@ -629,14 +650,14 @@ extension Converter {
      * `fromObject` converts the given Protobuf format to model format.
      */
     static func fromObject(_ pbObject: PbJSONElement.JSONObject) throws -> CRDTObject {
-        var rht = RHTPQMap()
+        let rht = RHTPQMap()
         try pbObject.nodes.forEach { pbRHTNode in
             rht.set(key: pbRHTNode.key, value: try fromElement(pbElement: pbRHTNode.element))
         }
         
-        var obj = CRDTObject(createdAt: fromTimeTicket(pbObject.createdAt) ?? TimeTicket.initial, memberNodes: rht)
-        obj.movedAt = fromTimeTicket(pbObject.movedAt) ?? TimeTicket.initial
-        obj.removedAt = fromTimeTicket(pbObject.removedAt) ?? TimeTicket.initial
+        let obj = CRDTObject(createdAt: fromTimeTicket(pbObject.createdAt) ?? TimeTicket.initial, memberNodes: rht)
+        obj.movedAt = pbObject.hasMovedAt ? fromTimeTicket(pbObject.movedAt) : nil
+        obj.removedAt = pbObject.hasRemovedAt ? fromTimeTicket(pbObject.removedAt) : nil
         return obj;
     }
 
@@ -647,9 +668,16 @@ extension Converter {
         var pbArray = PbJSONElement.JSONArray()
         pbArray.nodes = toRGANodes(arr.getElements())
         pbArray.createdAt = toTimeTicket(arr.getCreatedAt())
-        // TODO: movedAt, removedAt can be nil!
-        pbArray.movedAt = toTimeTicket(arr.getMovedAt() ?? TimeTicket.initial)
-        pbArray.removedAt = toTimeTicket(arr.getRemovedAt() ?? TimeTicket.initial)
+        if let ticket = arr.getMovedAt() {
+            pbArray.movedAt = toTimeTicket(ticket)
+        } else {
+            pbArray.clearMovedAt()
+        }
+        if let ticket = arr.getRemovedAt() {
+            pbArray.removedAt = toTimeTicket(ticket)
+        } else {
+            pbArray.clearRemovedAt()
+        }
         
         var pbElement = PbJSONElement()
         pbElement.jsonArray = pbArray
@@ -666,8 +694,8 @@ extension Converter {
         }
         
         let arr = CRDTArray(createdAt: fromTimeTicket(pbArray.createdAt) ?? TimeTicket.initial, elements: rgaTreeList)
-        arr.movedAt = fromTimeTicket(pbArray.movedAt) ?? TimeTicket.initial
-        arr.removedAt = fromTimeTicket(pbArray.removedAt) ?? TimeTicket.initial
+        arr.movedAt = pbArray.hasMovedAt ? fromTimeTicket(pbArray.movedAt) : nil
+        arr.removedAt = pbArray.hasRemovedAt ? fromTimeTicket(pbArray.removedAt) : nil
         return arr;
     }
     
@@ -679,8 +707,16 @@ extension Converter {
         pbPrimitive.type = toValueType(primitive.value)
         pbPrimitive.value = primitive.toBytes()
         pbPrimitive.createdAt = toTimeTicket(primitive.getCreatedAt())
-        pbPrimitive.movedAt = toTimeTicket(primitive.getMovedAt() ?? TimeTicket.initial)
-        pbPrimitive.removedAt = toTimeTicket(primitive.getRemovedAt() ?? TimeTicket.initial)
+        if let ticket = primitive.getMovedAt() {
+            pbPrimitive.movedAt = toTimeTicket(ticket)
+        } else {
+            pbPrimitive.clearMovedAt()
+        }
+        if let ticket = primitive.getRemovedAt() {
+            pbPrimitive.removedAt = toTimeTicket(ticket)
+        } else {
+            pbPrimitive.clearRemovedAt()
+        }
         
         var pbElement = PbJSONElement()
         pbElement.primitive = pbPrimitive
@@ -692,8 +728,8 @@ extension Converter {
      */
     static func fromPrimitive(_ pbPrimitive: PbJSONElement.Primitive) throws -> Primitive {
         let primitive = Primitive(value: try valueFrom(pbPrimitive.type, data: pbPrimitive.value), createdAt: fromTimeTicket(pbPrimitive.createdAt) ?? TimeTicket.initial)
-        primitive.movedAt = fromTimeTicket(pbPrimitive.movedAt) ?? TimeTicket.initial
-        primitive.removedAt = fromTimeTicket(pbPrimitive.removedAt) ?? TimeTicket.initial
+        primitive.movedAt = pbPrimitive.hasMovedAt ? fromTimeTicket(pbPrimitive.movedAt) : nil
+        primitive.removedAt = pbPrimitive.hasRemovedAt ? fromTimeTicket(pbPrimitive.removedAt) : nil
         return primitive;
     }
 
@@ -916,7 +952,11 @@ extension Converter {
         // TODO: snapshot can be nil!
         pbChangePack.snapshot = pack.getSnapshot() ?? Data()
         // TODO: minSyncedTicket can be nil!
-        pbChangePack.minSyncedTicket = toTimeTicket(pack.getMinSyncedTicket() ?? TimeTicket.initial)
+        if let minSyncedTicket = pack.getMinSyncedTicket() {
+            pbChangePack.minSyncedTicket = toTimeTicket(minSyncedTicket)
+        } else {
+            pbChangePack.clearMinSyncedTicket()
+        }
         return pbChangePack;
     }
     
@@ -928,7 +968,7 @@ extension Converter {
                    checkpoint: fromCheckpoint(pbPack.checkpoint),
                    changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot,
-                   minSyncedTicket: fromTimeTicket(pbPack.minSyncedTicket))
+                   minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil)
     }
 
 }
@@ -968,22 +1008,7 @@ extension Converter {
     }
 }
 
-// MARK: TimeTicket
-extension Converter {
-    /**
-     * `fromTimeTicket` converts the given Protobuf format to model format.
-     */
-    static func fromTimeTicket(_ pbTimeTicket: PbTimeTicket?) -> TimeTicket? {
-        guard let pbTimeTicket else {
-            return nil
-        }
-        
-        return TimeTicket(lamport: pbTimeTicket.lamport,
-                          delimiter: pbTimeTicket.delimiter,
-                          actorID: pbTimeTicket.actorID.toHexString)
-    }
-}
-
+// MARK: Hex
 extension Data {
     var toHexString: String {
         self.map { String(format: "%02x", $0) }.joined()
