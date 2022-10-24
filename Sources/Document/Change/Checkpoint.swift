@@ -20,7 +20,6 @@ import Foundation
  * `Checkpoint` is used to determine the changes sent and received by the
  * client. This is immutable.
  *
- * @internal
  **/
 struct Checkpoint: Equatable {
     /**

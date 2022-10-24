@@ -17,6 +17,7 @@
 import Foundation
 
 enum LogLevel: String {
+    case trivial = "TRIVIAL"
     case debug = "DEBUG"
     case info = "INFO"
     case warn = "WARN"
@@ -25,6 +26,10 @@ enum LogLevel: String {
 }
 
 enum Logger {
+    static func trivial(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
+        self.log(level: .trivial, message, error: error, filename: filename, function: function, line: line)
+    }
+
     static func debug(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
         self.log(level: .debug, message, error: error, filename: filename, function: function, line: line)
     }

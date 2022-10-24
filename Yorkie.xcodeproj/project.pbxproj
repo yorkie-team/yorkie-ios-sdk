@@ -41,8 +41,9 @@
 		CE8BB74128FE2F030020F62A /* CheckpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB73C28FE2EEF0020F62A /* CheckpointTests.swift */; };
 		CE8BB74328FE59240020F62A /* ChangePack.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB74228FE59240020F62A /* ChangePack.swift */; };
 		CE8BB74628FE5AC40020F62A /* ChangePackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB74428FE5ABA0020F62A /* ChangePackTests.swift */; };
+		CE8BB74B28FE71550020F62A /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB74A28FE71550020F62A /* Document.swift */; };
+		CE8BB74D28FE86020020F62A /* ObjectDataHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8BB74C28FE86020020F62A /* ObjectDataHandler.swift */; };
 		CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22EE28C9E85900432DE5 /* Change.swift */; };
-		CE8C22F328C9E87800432DE5 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F228C9E87800432DE5 /* Object.swift */; };
 		CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F428C9E88500432DE5 /* Operation.swift */; };
 		CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F628C9E89100432DE5 /* TimeTicket.swift */; };
 		CE8C22F928C9E8CA00432DE5 /* Heap.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C22F828C9E8CA00432DE5 /* Heap.swift */; };
@@ -55,8 +56,10 @@
 		CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED31D28F566DB009A5419 /* RemoveOperationTests.swift */; };
 		CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED32028F646EA009A5419 /* AddOperation.swift */; };
 		CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED32628F6470D009A5419 /* MoveOperation.swift */; };
+		CE9557C02902025600DF4DFA /* JsonObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557BE2902024700DF4DFA /* JsonObjectTests.swift */; };
 		CE9557C8290666CE00DF4DFA /* Trie.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557C7290666CE00DF4DFA /* Trie.swift */; };
 		CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557C929066D8700DF4DFA /* TrieTests.swift */; };
+		CE9557CD2907523A00DF4DFA /* JsonArray.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557CC2907523A00DF4DFA /* JsonArray.swift */; };
 		CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4128F672AD00431B61 /* MoveOperationTests.swift */; };
 		CEA2DA4428F672AD00431B61 /* AddOperationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4228F672AD00431B61 /* AddOperationTests.swift */; };
 		CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4528F68D0A00431B61 /* ChangeID.swift */; };
@@ -74,6 +77,7 @@
 		CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E228C84D26004988DD /* yorkie.grpc.swift */; };
 		CEEB17E828C84D6A004988DD /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17E728C84D6A004988DD /* GRPC */; };
 		CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17EA28C84D7B004988DD /* SwiftProtobuf */; };
+		CEFF0015290120000020561A /* JsonObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEFF0014290120000020561A /* JsonObject.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -124,8 +128,9 @@
 		CE8BB73E28FE2EFE0020F62A /* ChangeContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeContextTests.swift; sourceTree = "<group>"; };
 		CE8BB74228FE59240020F62A /* ChangePack.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePack.swift; sourceTree = "<group>"; };
 		CE8BB74428FE5ABA0020F62A /* ChangePackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangePackTests.swift; sourceTree = "<group>"; };
+		CE8BB74A28FE71550020F62A /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		CE8BB74C28FE86020020F62A /* ObjectDataHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectDataHandler.swift; sourceTree = "<group>"; };
 		CE8C22EE28C9E85900432DE5 /* Change.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Change.swift; sourceTree = "<group>"; };
-		CE8C22F228C9E87800432DE5 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
 		CE8C22F428C9E88500432DE5 /* Operation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Operation.swift; sourceTree = "<group>"; };
 		CE8C22F628C9E89100432DE5 /* TimeTicket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTicket.swift; sourceTree = "<group>"; };
 		CE8C22F828C9E8CA00432DE5 /* Heap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Heap.swift; sourceTree = "<group>"; };
@@ -138,8 +143,10 @@
 		CE8ED31D28F566DB009A5419 /* RemoveOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveOperationTests.swift; sourceTree = "<group>"; };
 		CE8ED32028F646EA009A5419 /* AddOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddOperation.swift; sourceTree = "<group>"; };
 		CE8ED32628F6470D009A5419 /* MoveOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveOperation.swift; sourceTree = "<group>"; };
+		CE9557BE2902024700DF4DFA /* JsonObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JsonObjectTests.swift; sourceTree = "<group>"; };
 		CE9557C7290666CE00DF4DFA /* Trie.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trie.swift; sourceTree = "<group>"; };
 		CE9557C929066D8700DF4DFA /* TrieTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrieTests.swift; sourceTree = "<group>"; };
+		CE9557CC2907523A00DF4DFA /* JsonArray.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = JsonArray.swift; sourceTree = "<group>"; };
 		CEA2DA4128F672AD00431B61 /* MoveOperationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MoveOperationTests.swift; sourceTree = "<group>"; };
 		CEA2DA4228F672AD00431B61 /* AddOperationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AddOperationTests.swift; sourceTree = "<group>"; };
 		CEA2DA4528F68D0A00431B61 /* ChangeID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeID.swift; sourceTree = "<group>"; };
@@ -157,6 +164,7 @@
 		CEEB17E028C84D26004988DD /* yorkie.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.pb.swift; sourceTree = "<group>"; };
 		CEEB17E128C84D26004988DD /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
 		CEEB17E228C84D26004988DD /* yorkie.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.grpc.swift; sourceTree = "<group>"; };
+		CEFF0014290120000020561A /* JsonObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JsonObject.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -277,6 +285,7 @@
 				CE8ED31728F55F25009A5419 /* Operation */,
 				CEC631DB28F4F14100915A85 /* Json */,
 				CE3EC96B28D3FFDB009471BC /* Time */,
+				CE9557BE2902024700DF4DFA /* JsonObjectTests.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -334,6 +343,7 @@
 				CE8C22E828C9E55E00432DE5 /* Json */,
 				CE8C22E928C9E56400432DE5 /* Operation */,
 				CE8C22EA28C9E56B00432DE5 /* Time */,
+				CE8BB74A28FE71550020F62A /* Document.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -382,7 +392,9 @@
 		CE8C22E828C9E55E00432DE5 /* Json */ = {
 			isa = PBXGroup;
 			children = (
-				CE8C22F228C9E87800432DE5 /* Object.swift */,
+				CE8BB74C28FE86020020F62A /* ObjectDataHandler.swift */,
+				CEFF0014290120000020561A /* JsonObject.swift */,
+				CE9557CC2907523A00DF4DFA /* JsonArray.swift */,
 				CE7B996F28E1453E00D56198 /* Strings.swift */,
 			);
 			path = Json;
@@ -631,6 +643,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CEA2DA4A28F6938700431B61 /* String+Extensions.swift in Sources */,
+				CE9557CD2907523A00DF4DFA /* JsonArray.swift in Sources */,
 				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
 				CE3EC96928D30FEF009471BC /* ActorID.swift in Sources */,
 				CE6BD03C28E6BA9C00E97B8C /* RHTPQMap.swift in Sources */,
@@ -652,6 +665,7 @@
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8BB74328FE59240020F62A /* ChangePack.swift in Sources */,
 				CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */,
+				CEFF0015290120000020561A /* JsonObject.swift in Sources */,
 				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,
 				CE9557C8290666CE00DF4DFA /* Trie.swift in Sources */,
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
@@ -661,8 +675,9 @@
 				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
 				CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
-				CE8C22F328C9E87800432DE5 /* Object.swift in Sources */,
 				CE3EC96728D30E74009471BC /* CRDTElement.swift in Sources */,
+				CE8BB74B28FE71550020F62A /* Document.swift in Sources */,
+				CE8BB74D28FE86020020F62A /* ObjectDataHandler.swift in Sources */,
 				CE8ED31628F55BF7009A5419 /* SetOperation.swift in Sources */,
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
 				CE8ED31C28F56506009A5419 /* RemoveOperation.swift in Sources */,
@@ -693,6 +708,7 @@
 				CE8BB74628FE5AC40020F62A /* ChangePackTests.swift in Sources */,
 				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,
+				CE9557C02902025600DF4DFA /* JsonObjectTests.swift in Sources */,
 				CE3EC96E28D3FFF0009471BC /* TimeTicketTests.swift in Sources */,
 				CE7B998628E520D600D56198 /* CRDTArrayTests.swift in Sources */,
 				CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */,
