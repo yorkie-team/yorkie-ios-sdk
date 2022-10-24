@@ -951,7 +951,6 @@ extension Converter {
         pbChangePack.changes = toChanges(pack.getChanges())
         // TODO: snapshot can be nil!
         pbChangePack.snapshot = pack.getSnapshot() ?? Data()
-        // TODO: minSyncedTicket can be nil!
         if let minSyncedTicket = pack.getMinSyncedTicket() {
             pbChangePack.minSyncedTicket = toTimeTicket(minSyncedTicket)
         } else {
