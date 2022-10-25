@@ -17,12 +17,12 @@
 import Foundation
 
 // It will be implemented soon.
-protocol JsonArrayable: AnyObject {
+protocol JSONArrayable: AnyObject {
     var target: CRDTArray { get set }
     var context: ChangeContext { get set }
 }
 
-class JsonArray<T>: JsonArrayable {
+class JSONArray<T>: JSONArrayable {
     var target: CRDTArray
     var context: ChangeContext
 

@@ -17,7 +17,7 @@
 import XCTest
 @testable import Yorkie
 
-class JsonProxyTests: XCTestCase {
+class JSONProxyTests: XCTestCase {
     func test_can_set() {
         let target = TestDocument<DocComponentA>()
         target.update { root in
@@ -27,12 +27,12 @@ class JsonProxyTests: XCTestCase {
             root.double = 1.2222222
             root.string = "abc"
 
-            root.compB = JsonObject<DocComponentB>()
-            root.compB?.compC = JsonObject<DocComponentC>()
+            root.compB = JSONObject<DocComponentB>()
+            root.compB?.compC = JSONObject<DocComponentC>()
             root.compB?.id = "b"
 
             root.compB?.compC?.id = "c"
-            root.compB?.compC?.compD = JsonObject<DocComponentD>()
+            root.compB?.compC?.compD = JSONObject<DocComponentD>()
 
             root.compB?.compC?.compD?.id = "d-1"
 
@@ -59,11 +59,11 @@ class JsonProxyTests: XCTestCase {
             root.double = 1.2222222
             root.string = "abc"
 
-            root.compB = JsonObject()
-            root.compB?.compC = JsonObject()
+            root.compB = JSONObject()
+            root.compB?.compC = JSONObject()
             root.compB?.id = "b"
             root.compB?.compC?.id = "c"
-            root.compB?.compC?.compD = JsonObject()
+            root.compB?.compC?.compD = JSONObject()
             root.compB?.compC?.compD?.id = "d-1"
 
             XCTAssertEqual(root.toSortedJSON(),
@@ -83,15 +83,15 @@ class JsonProxyTests: XCTestCase {
     }
 }
 
-class TestDocument<T: JsonSpec> {
-    func update(_ callback: (_ root: JsonObject<T>) -> Void) {
-        let root = JsonObject<T>(target: CRDTObject(createdAt: TimeTicket.initial), context: ChangeContext(id: ChangeID.initial, root: CRDTRoot()))
+class TestDocument<T: JSONSpec> {
+    func update(_ callback: (_ root: JSONObject<T>) -> Void) {
+        let root = JSONObject<T>(target: CRDTObject(createdAt: TimeTicket.initial), context: ChangeContext(id: ChangeID.initial, root: CRDTRoot()))
         callback(root)
     }
 }
 
-class DocComponentA: JsonSpec {
-    var compB: JsonObject<DocComponentB>?
+class DocComponentA: JSONSpec {
+    var compB: JSONObject<DocComponentB>?
     var boolean: Bool?
     var integer: Int32?
     var long: Int64?
@@ -112,9 +112,9 @@ class DocComponentA: JsonSpec {
     }
 }
 
-class DocComponentB: JsonSpec {
+class DocComponentB: JSONSpec {
     var id: String?
-    var compC: JsonObject<DocComponentC>?
+    var compC: JSONObject<DocComponentC>?
 
     required init() {}
 
@@ -124,9 +124,9 @@ class DocComponentB: JsonSpec {
     }
 }
 
-class DocComponentC: JsonSpec {
+class DocComponentC: JSONSpec {
     var id: String?
-    var compD: JsonObject<DocComponentD>?
+    var compD: JSONObject<DocComponentD>?
 
     required init() {}
 
@@ -136,7 +136,7 @@ class DocComponentC: JsonSpec {
     }
 }
 
-class DocComponentD: JsonSpec {
+class DocComponentD: JSONSpec {
     var id: String?
 
     required init() {}

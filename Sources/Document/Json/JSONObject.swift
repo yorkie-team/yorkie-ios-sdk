@@ -16,12 +16,12 @@
 
 import Foundation
 
-protocol JsonSpec {
+protocol JSONSpec {
     init()
     static var keyMap: [AnyKeyPath: String] { get }
 }
 
-protocol JsonObjectable: AnyObject {
+protocol JSONObjectable: AnyObject {
     var dataHandler: ObjectDataHandler? { get set }
 }
 
@@ -30,7 +30,7 @@ protocol JsonObjectable: AnyObject {
  * tickets created by a logical clock to resolve conflicts.
  */
 @dynamicMemberLookup
-class JsonObject<T: JsonSpec>: JsonObjectable {
+class JSONObject<T: JSONSpec>: JSONObjectable {
     var dataHandler: ObjectDataHandler?
     private var jsonSpec: T
     private let keyMap: [AnyKeyPath: String]
@@ -63,12 +63,12 @@ class JsonObject<T: JsonSpec>: JsonObjectable {
             }
 
             let value = try? dataHandler.get(key: key)
-            if let jsonObject = defaultValue as? JsonObjectable,
+            if let jsonObject = defaultValue as? JSONObjectable,
                let crdtObject = value as? CRDTObject
             {
                 jsonObject.dataHandler = ObjectDataHandler(target: crdtObject, context: dataHandler.context)
                 return jsonObject as? V ?? defaultValue
-            } else if let crdtArray = value as? CRDTArray, let jsonArray = defaultValue as? JsonArrayable {
+            } else if let crdtArray = value as? CRDTArray, let jsonArray = defaultValue as? JSONArrayable {
                 jsonArray.target = crdtArray
                 jsonArray.context = dataHandler.context
                 return jsonArray as? V ?? defaultValue
@@ -90,7 +90,7 @@ class JsonObject<T: JsonSpec>: JsonObjectable {
                 return
             }
 
-            if let value = newValue as? JsonObjectable {
+            if let value = newValue as? JSONObjectable {
                 let crdtObject: CRDTObject
                 if let value = try? dataHandler.get(key: key) as? CRDTObject {
                     crdtObject = value
@@ -103,7 +103,7 @@ class JsonObject<T: JsonSpec>: JsonObjectable {
 
                 dataHandler.set(key: key, value: valueObject.target)
                 self.jsonSpec[keyPath: member] = newValue
-            } else if let value = newValue as? JsonArrayable {
+            } else if let value = newValue as? JSONArrayable {
                 let crdtArray: CRDTArray
                 if let value = try? dataHandler.get(key: key) as? CRDTArray {
                     crdtArray = value
@@ -153,7 +153,7 @@ class JsonObject<T: JsonSpec>: JsonObjectable {
     func setWithDictionary(values: [AnyKeyPath: Any]) {}
 }
 
-extension JsonObject: CustomStringConvertible {
+extension JSONObject: CustomStringConvertible {
     var description: String {
         self.toJson()
     }

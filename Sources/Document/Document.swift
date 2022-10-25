@@ -16,7 +16,7 @@
 
 import Foundation
 
-class Document<T: JsonSpec> {
+class Document<T: JSONSpec> {
     private var key: String
     private var root: CRDTRoot
     private var clone: CRDTRoot?
@@ -35,11 +35,11 @@ class Document<T: JsonSpec> {
     /**
      * `update` executes the given updater to update this document.
      */
-    func update(updater: (_ root: JsonObject<T>) -> Void, message: String? = nil) throws {
+    func update(updater: (_ root: JSONObject<T>) -> Void, message: String? = nil) throws {
         let clone = self.cloned()
         let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
 
-        let proxy = JsonObject<T>(target: clone.getObject(), context: context)
+        let proxy = JSONObject<T>(target: clone.getObject(), context: context)
         updater(proxy)
 
         if context.hasOperations() {
@@ -127,11 +127,11 @@ class Document<T: JsonSpec> {
     /**
      * `getRoot` returns a new proxy of cloned root.
      */
-    func getRoot() -> JsonObject<T> {
+    func getRoot() -> JSONObject<T> {
         let clone = self.cloned()
         let context = ChangeContext(id: self.changeID.next(), root: clone)
 
-        return JsonObject<T>(target: clone.getObject(), context: context)
+        return JSONObject<T>(target: clone.getObject(), context: context)
     }
 
     /**
