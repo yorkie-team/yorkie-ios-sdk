@@ -96,7 +96,7 @@ class ConverterTests: XCTestCase {
             let converted = try Converter.fromChanges([Converter.toChange(change)]).first
             XCTAssertEqual(change.getStructureAsString(), converted?.getStructureAsString())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -117,7 +117,7 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(setChange.getStructureAsString(), convertedArray[0].getStructureAsString())
             XCTAssertEqual(addChange.getStructureAsString(), convertedArray[1].getStructureAsString())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -137,7 +137,7 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(changePack.getDocumentKey(), converted.getDocumentKey())
             XCTAssertEqual(changePack.getMinSyncedTicket(), converted.getMinSyncedTicket())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -156,7 +156,7 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(setOperation.getExecutedAt(), converted?.getExecutedAt())
             XCTAssertEqual(setOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
 
         let addOperation = AddOperation(parentCreatedAt: TimeTicket.initial,
@@ -173,7 +173,7 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(addOperation.getExecutedAt(), converted?.getExecutedAt())
             XCTAssertEqual(addOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
 
         let moveOperation = MoveOperation(parentCreatedAt: TimeTicket.initial,
@@ -190,7 +190,7 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(moveOperation.getExecutedAt(), converted?.getExecutedAt())
             XCTAssertEqual(moveOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
 
         let removeOperation = RemoveOperation(parentCreatedAt: TimeTicket.initial,
@@ -205,7 +205,7 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(removeOperation.getExecutedAt(), converted?.getExecutedAt())
             XCTAssertEqual(removeOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -240,7 +240,7 @@ class ConverterTests: XCTestCase {
                 XCTAssertEqual(setOperation.getExecutedAt(), converted.getExecutedAt())
                 XCTAssertEqual(setOperation.getParentCreatedAt(), converted.getParentCreatedAt())
             } else {
-                XCTAssert(false, "Operation Type mismatch!")
+                XCTFail("Operation Type mismatch!")
             }
 
             if let converted = convertedArray[1] as? AddOperation {
@@ -251,7 +251,7 @@ class ConverterTests: XCTestCase {
                 XCTAssertEqual(addOperation.getExecutedAt(), converted.getExecutedAt())
                 XCTAssertEqual(addOperation.getParentCreatedAt(), converted.getParentCreatedAt())
             } else {
-                XCTAssert(false, "Operation Type mismatch!")
+                XCTFail("Operation Type mismatch!")
             }
 
             if let converted = convertedArray[2] as? MoveOperation {
@@ -262,7 +262,7 @@ class ConverterTests: XCTestCase {
                 XCTAssertEqual(moveOperation.getExecutedAt(), converted.getExecutedAt())
                 XCTAssertEqual(moveOperation.getParentCreatedAt(), converted.getParentCreatedAt())
             } else {
-                XCTAssert(false, "Operation Type mismatch!")
+                XCTFail("Operation Type mismatch!")
             }
 
             if let converted = convertedArray[3] as? RemoveOperation {
@@ -272,10 +272,10 @@ class ConverterTests: XCTestCase {
                 XCTAssertEqual(removeOperation.getExecutedAt(), converted.getExecutedAt())
                 XCTAssertEqual(removeOperation.getParentCreatedAt(), converted.getParentCreatedAt())
             } else {
-                XCTAssert(false, "Operation Type mismatch!")
+                XCTFail("Operation Type mismatch!")
             }
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -301,7 +301,7 @@ class ConverterTests: XCTestCase {
             let converted = try Converter.fromElement(pbElement: Converter.toElement(array)) as? CRDTArray
             XCTAssertEqual(try array.get(index: 0).toSortedJSON(), try converted?.get(index: 0).toSortedJSON())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 
@@ -352,7 +352,7 @@ class ConverterTests: XCTestCase {
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(array))
             XCTAssertEqual(CRDTArray(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("\(error)")
         }
     }
 }
