@@ -25,10 +25,10 @@ class ChangeContext {
     private let id: ChangeID
     private let root: CRDTRoot
     private var operations: [Operation]
-    private let message: String
+    private let message: String?
     private var delimiter: UInt32
 
-    init(id: ChangeID, root: CRDTRoot, message: String = "") {
+    init(id: ChangeID, root: CRDTRoot, message: String? = nil) {
         self.id = id
         self.root = root
         self.message = message

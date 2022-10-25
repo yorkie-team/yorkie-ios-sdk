@@ -202,7 +202,7 @@ extension Converter {
     static func fromTimeTicket(_ pbTimeTicket: PbTimeTicket) -> TimeTicket {
         TimeTicket(lamport: pbTimeTicket.lamport,
                    delimiter: pbTimeTicket.delimiter,
-                   actorID: pbTimeTicket.actorID.toHexString)
+                   actorID: pbTimeTicket.actorID.isEmpty ? nil : pbTimeTicket.actorID.toHexString)
     }
 }
 
@@ -944,7 +944,6 @@ extension Converter {
         pbChangePack.documentKey = pack.getDocumentKey()
         pbChangePack.checkpoint = toCheckpoint(pack.getCheckpoint())
         pbChangePack.changes = toChanges(pack.getChanges())
-        // TODO: snapshot can be nil!
         pbChangePack.snapshot = pack.getSnapshot() ?? Data()
         if let minSyncedTicket = pack.getMinSyncedTicket() {
             pbChangePack.minSyncedTicket = toTimeTicket(minSyncedTicket)
@@ -961,7 +960,7 @@ extension Converter {
         ChangePack(key: pbPack.documentKey,
                    checkpoint: fromCheckpoint(pbPack.checkpoint),
                    changes: try fromChanges(pbPack.changes),
-                   snapshot: pbPack.snapshot,
+                   snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
                    minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil)
     }
 
@@ -975,7 +974,6 @@ extension Converter {
     static func toChange(_ change: Change) -> PbChange {
         var pbChange = PbChange();
         pbChange.id = toChangeID(change.getID())
-        // TODO: message can be nil!
         pbChange.message = change.getMessage() ?? ""
         pbChange.operations = toOperations(change.getOperations())
         return pbChange;
@@ -997,7 +995,7 @@ extension Converter {
         try pbChanges.compactMap {
             Change(id: fromChangeID($0.id),
                    operations: try fromOperations($0.operations),
-                   message: $0.message)
+                   message: $0.message.isEmpty ? nil : $0.message)
         }
     }
 }
