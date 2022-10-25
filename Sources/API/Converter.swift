@@ -199,15 +199,10 @@ extension Converter {
     /**
      * `fromTimeTicket` converts the given Protobuf format to model format.
      */
-    // TODO: Is optional return is necessary?
-    static func fromTimeTicket(_ pbTimeTicket: PbTimeTicket?) -> TimeTicket? {
-        guard let pbTimeTicket else {
-            return nil
-        }
-        
-        return TimeTicket(lamport: pbTimeTicket.lamport,
-                          delimiter: pbTimeTicket.delimiter,
-                          actorID: pbTimeTicket.actorID.toHexString)
+    static func fromTimeTicket(_ pbTimeTicket: PbTimeTicket) -> TimeTicket {
+        TimeTicket(lamport: pbTimeTicket.lamport,
+                   delimiter: pbTimeTicket.delimiter,
+                   actorID: pbTimeTicket.actorID.toHexString)
     }
 }
 
@@ -273,9 +268,9 @@ extension Converter {
     static func fromElementSimple(pbElementSimple: PbJSONElementSimple) throws -> CRDTElement {
         switch pbElementSimple.type {
         case .jsonObject:
-            return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt) ?? TimeTicket.initial)
+            return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .jsonArray:
-            return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt) ?? TimeTicket.initial)
+            return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .text:
             // TODO: CRDTText is not implemented!
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
@@ -291,7 +286,7 @@ extension Converter {
 //                fromTimeTicket(pbElementSimple.getCreatedAt())!,
 //            );
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
-            return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt) ?? TimeTicket.initial)
+            return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .integerCnt, .doubleCnt, .longCnt:
             // TODO: CRDTCounter is not implemented!
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
@@ -494,22 +489,22 @@ extension Converter {
             if case let .set(pbSetOperation) = pbOperation.body {
                 return SetOperation(key: pbSetOperation.key,
                                     value: try fromElementSimple(pbElementSimple: pbSetOperation.value),
-                                    parentCreatedAt: fromTimeTicket(pbSetOperation.parentCreatedAt) ?? TimeTicket.initial,
-                                    executedAt: fromTimeTicket(pbSetOperation.executedAt) ?? TimeTicket.initial)
+                                    parentCreatedAt: fromTimeTicket(pbSetOperation.parentCreatedAt),
+                                    executedAt: fromTimeTicket(pbSetOperation.executedAt))
             } else if case let .add(pbAddOperation) = pbOperation.body {
-                return AddOperation(parentCreatedAt: fromTimeTicket(pbAddOperation.parentCreatedAt) ?? TimeTicket.initial,
-                                    previousCreatedAt: fromTimeTicket(pbAddOperation.prevCreatedAt) ?? TimeTicket.initial,
+                return AddOperation(parentCreatedAt: fromTimeTicket(pbAddOperation.parentCreatedAt),
+                                    previousCreatedAt: fromTimeTicket(pbAddOperation.prevCreatedAt),
                                     value: try fromElementSimple(pbElementSimple: pbAddOperation.value),
-                                    executedAt: fromTimeTicket(pbAddOperation.executedAt) ?? TimeTicket.initial)
+                                    executedAt: fromTimeTicket(pbAddOperation.executedAt))
             } else if case let .move(pbMoveOperation) = pbOperation.body {
-                return MoveOperation(parentCreatedAt: fromTimeTicket(pbMoveOperation.parentCreatedAt) ?? TimeTicket.initial,
-                                     previousCreatedAt: fromTimeTicket(pbMoveOperation.prevCreatedAt) ?? TimeTicket.initial,
-                                     createdAt: fromTimeTicket(pbMoveOperation.createdAt) ?? TimeTicket.initial,
-                                     executedAt: fromTimeTicket(pbMoveOperation.executedAt) ?? TimeTicket.initial)
+                return MoveOperation(parentCreatedAt: fromTimeTicket(pbMoveOperation.parentCreatedAt),
+                                     previousCreatedAt: fromTimeTicket(pbMoveOperation.prevCreatedAt),
+                                     createdAt: fromTimeTicket(pbMoveOperation.createdAt),
+                                     executedAt: fromTimeTicket(pbMoveOperation.executedAt))
             } else if case let .remove(pbRemoveOperation) = pbOperation.body {
-                return RemoveOperation(parentCreatedAt: fromTimeTicket(pbRemoveOperation.parentCreatedAt) ?? TimeTicket.initial,
-                                       createdAt: fromTimeTicket(pbRemoveOperation.createdAt) ?? TimeTicket.initial,
-                                       executedAt: fromTimeTicket(pbRemoveOperation.executedAt) ?? TimeTicket.initial)
+                return RemoveOperation(parentCreatedAt: fromTimeTicket(pbRemoveOperation.parentCreatedAt),
+                                       createdAt: fromTimeTicket(pbRemoveOperation.createdAt),
+                                       executedAt: fromTimeTicket(pbRemoveOperation.executedAt))
             } else if case let .edit(pbEditOperation) = pbOperation.body {
                 // TODO: EditOperation is not implemented!
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
@@ -655,7 +650,7 @@ extension Converter {
             rht.set(key: pbRHTNode.key, value: try fromElement(pbElement: pbRHTNode.element))
         }
         
-        let obj = CRDTObject(createdAt: fromTimeTicket(pbObject.createdAt) ?? TimeTicket.initial, memberNodes: rht)
+        let obj = CRDTObject(createdAt: fromTimeTicket(pbObject.createdAt), memberNodes: rht)
         obj.movedAt = pbObject.hasMovedAt ? fromTimeTicket(pbObject.movedAt) : nil
         obj.removedAt = pbObject.hasRemovedAt ? fromTimeTicket(pbObject.removedAt) : nil
         return obj;
@@ -693,7 +688,7 @@ extension Converter {
             try rgaTreeList.insert(fromElement(pbElement: pbRGANode.element))
         }
         
-        let arr = CRDTArray(createdAt: fromTimeTicket(pbArray.createdAt) ?? TimeTicket.initial, elements: rgaTreeList)
+        let arr = CRDTArray(createdAt: fromTimeTicket(pbArray.createdAt), elements: rgaTreeList)
         arr.movedAt = pbArray.hasMovedAt ? fromTimeTicket(pbArray.movedAt) : nil
         arr.removedAt = pbArray.hasRemovedAt ? fromTimeTicket(pbArray.removedAt) : nil
         return arr;
@@ -727,7 +722,7 @@ extension Converter {
      * `fromPrimitive` converts the given Protobuf format to model format.
      */
     static func fromPrimitive(_ pbPrimitive: PbJSONElement.Primitive) throws -> Primitive {
-        let primitive = Primitive(value: try valueFrom(pbPrimitive.type, data: pbPrimitive.value), createdAt: fromTimeTicket(pbPrimitive.createdAt) ?? TimeTicket.initial)
+        let primitive = Primitive(value: try valueFrom(pbPrimitive.type, data: pbPrimitive.value), createdAt: fromTimeTicket(pbPrimitive.createdAt))
         primitive.movedAt = pbPrimitive.hasMovedAt ? fromTimeTicket(pbPrimitive.movedAt) : nil
         primitive.removedAt = pbPrimitive.hasRemovedAt ? fromTimeTicket(pbPrimitive.removedAt) : nil
         return primitive;
