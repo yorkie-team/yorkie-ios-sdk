@@ -18,9 +18,25 @@
 // Swift Protobuf Guide: https://github.com/apple/swift-protobuf/blob/main/Documentation/API.md#generated-struct-name
 import Foundation
 
-typealias ValueType = Yorkie_V1_ValueType
 typealias YorkieServiceNIOClient = Yorkie_V1_YorkieServiceNIOClient
 typealias ActivateClientRequest = Yorkie_V1_ActivateClientRequest
 typealias DeactivateClientRequest = Yorkie_V1_DeactivateClientRequest
 typealias YorkieServiceAsyncClient = Yorkie_V1_YorkieServiceAsyncClient
+typealias AttachDocumentRequest = Yorkie_V1_AttachDocumentRequest
 
+typealias PbChange = Yorkie_V1_Change
+typealias PbChangeID = Yorkie_V1_ChangeID
+typealias PbChangePack = Yorkie_V1_ChangePack
+typealias PbCheckpoint = Yorkie_V1_Checkpoint
+typealias PbClient = Yorkie_V1_Client
+typealias PbPresence = Yorkie_V1_Presence
+typealias PbJSONElement = Yorkie_V1_JSONElement
+typealias PbJSONElementSimple = Yorkie_V1_JSONElementSimple
+typealias PbOperation = Yorkie_V1_Operation
+typealias PbRGANode = Yorkie_V1_RGANode
+typealias PbRHTNode = Yorkie_V1_RHTNode
+typealias PbRichTextNode = Yorkie_V1_RichTextNode
+typealias PbTextNode = Yorkie_V1_TextNode
+typealias PbTextNodeID = Yorkie_V1_TextNodeID
+typealias PbTimeTicket = Yorkie_V1_TimeTicket
+typealias PbValueType = Yorkie_V1_ValueType

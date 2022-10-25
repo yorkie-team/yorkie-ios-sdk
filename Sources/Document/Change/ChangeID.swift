@@ -29,11 +29,11 @@ struct ChangeID {
     // `serverSeq` is optional and only present for changes stored on the server.
     private var serverSeq: Int64?
 
-    private let clientSeq: Int
+    private let clientSeq: UInt32
     private var lamport: Int64
     private var actor: ActorID?
 
-    init(clientSeq: Int, lamport: Int64, actor: ActorID? = nil) {
+    init(clientSeq: UInt32, lamport: Int64, actor: ActorID? = nil) {
         self.clientSeq = clientSeq
         self.lamport = lamport
         self.actor = actor
@@ -73,7 +73,7 @@ struct ChangeID {
     /**
      * `getClientSeq` returns the client sequence of this ID.
      */
-    func getClientSeq() -> Int {
+    func getClientSeq() -> UInt32 {
         return self.clientSeq
     }
 

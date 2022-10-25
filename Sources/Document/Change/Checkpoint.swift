@@ -27,9 +27,9 @@ struct Checkpoint: Equatable {
      */
     static let initial = Checkpoint(serverSeq: 0, clientSeq: 0)
     private var serverSeq: Int64
-    private var clientSeq: Int
+    private var clientSeq: UInt32
 
-    init(serverSeq: Int64, clientSeq: Int) {
+    init(serverSeq: Int64, clientSeq: UInt32) {
         self.serverSeq = serverSeq
         self.clientSeq = clientSeq
     }
@@ -37,7 +37,7 @@ struct Checkpoint: Equatable {
     /**
      * `increaseClientSeq` creates a new instance with increased client sequence.
      */
-    func increasedClientSeq(by value: Int) -> Checkpoint {
+    func increasedClientSeq(by value: UInt32) -> Checkpoint {
         if value == 0 {
             return self
         } else {
@@ -69,7 +69,7 @@ struct Checkpoint: Equatable {
     /**
      * `getClientSeq` returns the client seq of this checkpoint.
      */
-    func getClientSeq() -> Int {
+    func getClientSeq() -> UInt32 {
         return self.clientSeq
     }
 

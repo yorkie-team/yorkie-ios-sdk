@@ -69,6 +69,13 @@ struct TimeTicket: Comparable {
     }
 
     /**
+     * `getLamport` returns the lamport int64.
+     */
+    func getLamport() -> Int64 {
+        return self.lamport
+    }
+
+    /**
      * `getLamportAsString` returns the lamport string.
      */
     func getLamportAsString() -> String {
