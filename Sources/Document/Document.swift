@@ -90,7 +90,7 @@ class Document<T: JSONSpec> {
      */
     func createChangePack() -> ChangePack {
         let changes = self.localChanges
-        let checkpoint = self.checkpoint.increasedClientSeq(by: changes.count)
+        let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
         return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes)
     }
 
