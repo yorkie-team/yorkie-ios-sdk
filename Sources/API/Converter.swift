@@ -1017,8 +1017,8 @@ extension String {
         }
                 
         var data = Data()
-        for i in stride(from: 0, to: self.count, by: 2) {
-            let pair = self.substring(from: i, to: i + 1)
+        for index in stride(from: 0, to: self.count, by: 2) {
+            let pair = self.substring(from: index, to: index + 1)
             
             guard let value = UInt8(pair, radix: 16) else {
                 return nil
