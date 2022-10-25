@@ -19,129 +19,109 @@ import XCTest
 
 class JSONProxyTests: XCTestCase {
     func test_can_set() {
-        let target = TestDocument<DocComponentA>()
+        let target = TestDocument()
         target.update { root in
-            root.boolean = true
-            root.integer = 111
-            root.long = 9_999_999
-            root.double = 1.2222222
-            root.string = "abc"
+            root.set(key: "boolean", value: true)
+            root.set(key: "integer", value: Int32(111))
+            root.set(key: "long", value: Int64(9_999_999))
+            root.set(key: "double", value: Double(1.2222222))
+            root.set(key: "string", value: "abc")
 
-            root.compB = JSONObject<DocComponentB>()
-            root.compB?.compC = JSONObject<DocComponentC>()
-            root.compB?.id = "b"
+            root.set(key: "compB", value: JSONObject())
+            let compB = root.get(key: "compB") as? JSONObject
+            compB?.set(key: "id", value: "b")
+            compB?.set(key: "compC", value: JSONObject())
 
-            root.compB?.compC?.id = "c"
-            root.compB?.compC?.compD = JSONObject<DocComponentD>()
+            let compC = compB?.get(key: "compC") as? JSONObject
+            compC?.set(key: "id", value: "c")
+            compC?.set(key: "compD", value: JSONObject())
+            let compD = compC?.get(key: "compD") as? JSONObject
+            compD?.set(key: "id", value: "d-1")
 
-            root.compB?.compC?.compD?.id = "d-1"
-
-            XCTAssertEqual(root.toSortedJSON(),
+            XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","double":1.2222222,"integer":111,"long":9999999,"nested":{"id":"b","nested":{"id":"c","nested":{"id":"d-1"}}},"string":"abc"}
+                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
-            root.compB?.compC?.compD?.id = "d-2"
+            compD?.set(key: "id", value: "d-2")
 
-            XCTAssertEqual(root.toSortedJSON(),
+            XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","double":1.2222222,"integer":111,"long":9999999,"nested":{"id":"b","nested":{"id":"c","nested":{"id":"d-2"}}},"string":"abc"}
+                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
         }
     }
 
     func test_can_remove() throws {
-        let target = TestDocument<DocComponentA>()
+        let target = TestDocument()
         target.update { root in
-            root.boolean = true
-            root.integer = 111
-            root.long = 9_999_999
-            root.double = 1.2222222
-            root.string = "abc"
+            root.set(key: "boolean", value: true)
+            root.set(key: "integer", value: Int32(111))
+            root.set(key: "long", value: Int64(9_999_999))
+            root.set(key: "double", value: Double(1.2222222))
+            root.set(key: "string", value: "abc")
 
-            root.compB = JSONObject()
-            root.compB?.compC = JSONObject()
-            root.compB?.id = "b"
-            root.compB?.compC?.id = "c"
-            root.compB?.compC?.compD = JSONObject()
-            root.compB?.compC?.compD?.id = "d-1"
+            root.set(key: "compB", value: JSONObject())
+            let compB = root.get(key: "compB") as? JSONObject
+            compB?.set(key: "id", value: "b")
+            compB?.set(key: "compC", value: JSONObject())
+            let compC = compB?.get(key: "compC") as? JSONObject
+            compC?.set(key: "id", value: "c")
+            compC?.set(key: "compD", value: JSONObject())
+            let compD = compC?.get(key: "compD") as? JSONObject
+            compD?.set(key: "id", value: "d-1")
 
-            XCTAssertEqual(root.toSortedJSON(),
+            XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","double":1.2222222,"integer":111,"long":9999999,"nested":{"id":"b","nested":{"id":"c","nested":{"id":"d-1"}}},"string":"abc"}
+                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
-            _ = try? root.remove(member: \DocComponentA.string)
-            _ = try? root.remove(member: \DocComponentA.integer)
-            _ = try? root.remove(member: \DocComponentA.compB)
+            root.remove(key: "string")
+            root.remove(key: "integer")
+            root.remove(key: "compB")
 
-            XCTAssertEqual(root.toSortedJSON(),
+            XCTAssertEqual(root.debugDescription,
                            """
                            {"boolean":"true","double":1.2222222,"long":9999999}
                            """)
         }
     }
+
+    func test_can_set_with_dictionary() {
+        let target = TestDocument()
+        target.update { root in
+            root.set([
+                "boolean": true,
+                "integer": Int32(111),
+                "long": Int64(9_999_999),
+                "double": Double(1.2222222),
+                "string": "abc",
+                "compB": ["id": "b",
+                          "compC": ["id": "c",
+                                    "compD": ["id": "d-1"]]]
+            ])
+
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           """)
+            let compD = root.get(keyPath: "compB.compC.compD") as? JSONObject
+            compD?.set(key: "id", value: "d-2")
+
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           """)
+
+            let idOfCompD = root.get(keyPath: "compB.compC.compD.id") as? String
+            XCTAssertEqual(idOfCompD, "d-2")
+        }
+    }
 }
 
-class TestDocument<T: JSONSpec> {
-    func update(_ callback: (_ root: JSONObject<T>) -> Void) {
-        let root = JSONObject<T>(target: CRDTObject(createdAt: TimeTicket.initial), context: ChangeContext(id: ChangeID.initial, root: CRDTRoot()))
+class TestDocument {
+    func update(_ callback: (_ root: JSONObject) -> Void) {
+        let root = JSONObject(target: CRDTObject(createdAt: TimeTicket.initial), context: ChangeContext(id: ChangeID.initial, root: CRDTRoot()))
         callback(root)
-    }
-}
-
-class DocComponentA: JSONSpec {
-    var compB: JSONObject<DocComponentB>?
-    var boolean: Bool?
-    var integer: Int32?
-    var long: Int64?
-    var double: Double?
-    var string: String?
-
-    required init() {}
-
-    static var keyMap: [AnyKeyPath: String] {
-        [
-            \DocComponentA.compB: "nested",
-            \DocComponentA.boolean: "boolean",
-            \DocComponentA.integer: "integer",
-            \DocComponentA.long: "long",
-            \DocComponentA.double: "double",
-            \DocComponentA.string: "string"
-        ]
-    }
-}
-
-class DocComponentB: JSONSpec {
-    var id: String?
-    var compC: JSONObject<DocComponentC>?
-
-    required init() {}
-
-    static var keyMap: [AnyKeyPath: String] {
-        [\DocComponentB.id: "id",
-         \DocComponentB.compC: "nested"]
-    }
-}
-
-class DocComponentC: JSONSpec {
-    var id: String?
-    var compD: JSONObject<DocComponentD>?
-
-    required init() {}
-
-    static var keyMap: [AnyKeyPath: String] {
-        [\DocComponentC.id: "id",
-         \DocComponentC.compD: "nested"]
-    }
-}
-
-class DocComponentD: JSONSpec {
-    var id: String?
-
-    required init() {}
-
-    static var keyMap: [AnyKeyPath: String] {
-        [\DocComponentD.id: "id"]
     }
 }
