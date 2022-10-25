@@ -15,3 +15,23 @@
  */
 
 import Foundation
+
+// It will be implemented soon.
+protocol JSONArrayable: AnyObject {
+    var target: CRDTArray { get set }
+    var context: ChangeContext { get set }
+}
+
+class JSONArray<T>: JSONArrayable {
+    var target: CRDTArray
+    var context: ChangeContext
+
+    init(target: CRDTArray, changeContext: ChangeContext) {
+        self.target = target
+        self.context = changeContext
+    }
+
+    func getID() -> TimeTicket {
+        return self.target.getCreatedAt()
+    }
+}
