@@ -209,7 +209,7 @@ class JSONObject {
         self.get(keyPath: keyPath)
     }
 
-    subscript(key key: String) -> Any? {
+    subscript(key: String) -> Any? {
         get {
             self.get(key: key)
         }

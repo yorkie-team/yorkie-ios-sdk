@@ -55,21 +55,21 @@ class JSONProxyTests: XCTestCase {
     func test_can_remove() throws {
         let target = TestDocument()
         target.update { root in
-            root[key: "boolean"] = true
-            root[key: "integer"] = Int32(111)
-            root[key: "long"] = Int64(9_999_999)
-            root[key: "double"] = Double(1.2222222)
-            root[key: "string"] = "abc"
+            root["boolean"] = true
+            root["integer"] = Int32(111)
+            root["long"] = Int64(9_999_999)
+            root["double"] = Double(1.2222222)
+            root["string"] = "abc"
 
-            root[key: "compB"] = JSONObject()
-            let compB = root[key: "compB"] as? JSONObject
-            compB?[key: "id"] = "b"
-            compB?[key: "compC"] = JSONObject()
-            let compC = compB?[key: "compC"] as? JSONObject
-            compC?[key: "id"] = "c"
-            compC?[key: "compD"] = JSONObject()
-            let compD = compC?[key: "compD"] as? JSONObject
-            compD?[key: "id"] = "d-1"
+            root["compB"] = JSONObject()
+            let compB = root["compB"] as? JSONObject
+            compB?["id"] = "b"
+            compB?["compC"] = JSONObject()
+            let compC = compB?["compC"] as? JSONObject
+            compC?["id"] = "c"
+            compC?["compD"] = JSONObject()
+            let compD = compC?["compD"] as? JSONObject
+            compD?["id"] = "d-1"
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -144,7 +144,7 @@ class JSONProxyTests: XCTestCase {
                            {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
                            """)
 
-            let idOfCompD = root.get(keyPath: "top.compB.compC.compD.id") as? String
+            let idOfCompD = root[keyPath: "top.compB.compC.compD.id"] as? String
             XCTAssertEqual(idOfCompD, "d-2")
         }
     }
