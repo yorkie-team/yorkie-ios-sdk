@@ -43,8 +43,10 @@ class JSONObject {
                 set(key: key, value: JSONObject())
                 let jsonObject = get(key: key) as? JSONObject
                 jsonObject?.set(value)
-//            } else if let value = value as? [Any] {
-                // It will be implemented soon.
+            } else if let value = value as? [Any] {
+                set(key: key, value: JSONArray())
+                let jsonArray = get(key: key) as? JSONArray
+                jsonArray?.push(value)
             } else {
                 set(key: key, value: value)
             }
@@ -81,6 +83,11 @@ class JSONObject {
         } else if value is JSONArray {
             let array = CRDTArray(createdAt: self.context.issueTimeTicket())
             self.setValue(key: key, value: array)
+        } else if let value = value as? [Any] {
+            let array = CRDTArray(createdAt: self.context.issueTimeTicket())
+            self.setValue(key: key, value: array)
+            let jsonArray = self.get(key: key) as? JSONArray
+            jsonArray?.append(values: value)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
         }
@@ -170,34 +177,12 @@ class JSONObject {
     }
 
     func get(key: String) -> Any? {
-        let value = try? self.target.get(key: key)
-        if let value = value as? Primitive {
-            switch value.value {
-            case .null:
-                return nil
-            case .boolean(let result):
-                return result
-            case .integer(let result):
-                return result
-            case .long(let result):
-                return result
-            case .double(let result):
-                return result
-            case .string(let result):
-                return result
-            case .bytes(let result):
-                return result
-            case .date(let result):
-                return result
-            }
-        } else if let object = value as? CRDTObject {
-            return JSONObject(target: object, context: self.context)
-        } else if let array = value as? CRDTArray {
-            return JSONArray(target: array, changeContext: self.context)
-        } else {
+        guard let value = try? self.target.get(key: key) else {
             Logger.error("The value does not exist. - key: \(key)")
             return nil
         }
+
+        return toJSONElement(from: value)
     }
 
     func remove(key: String) {
@@ -256,5 +241,47 @@ extension JSONObject: CustomStringConvertible {
 extension JSONObject: CustomDebugStringConvertible {
     var debugDescription: String {
         self.toSortedJSON()
+    }
+}
+
+extension JSONObject: JSONDatable {
+    var changeContext: ChangeContext {
+        self.context
+    }
+
+    var crdtElement: CRDTElement {
+        self.target
+    }
+}
+
+extension JSONObject: Sequence {
+    typealias Element = (key: String, value: CRDTElement)
+
+    func makeIterator() -> JSONObjectIterator {
+        return JSONObjectIterator(self.target)
+    }
+}
+
+class JSONObjectIterator: IteratorProtocol {
+    private var values: [(key: String, value: CRDTElement)]
+    private var iteratorNext: Int = 0
+
+    init(_ crdtObject: CRDTObject) {
+        self.values = []
+        crdtObject.forEach { (key: String, value: CRDTElement) in
+            values.append((key, value))
+        }
+    }
+
+    func next() -> (key: String, value: CRDTElement)? {
+        defer {
+            self.iteratorNext += 1
+        }
+
+        guard self.iteratorNext < self.values.count else {
+            return nil
+        }
+
+        return self.values[self.iteratorNext]
     }
 }

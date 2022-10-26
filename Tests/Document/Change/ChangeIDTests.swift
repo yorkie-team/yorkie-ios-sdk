@@ -17,7 +17,7 @@
 import XCTest
 @testable import Yorkie
 
-class Tests: XCTestCase {
+class ChangeIDTests: XCTestCase {
     func test_no_actor() {
         let target = ChangeID(clientSeq: 1, lamport: 2)
 
