@@ -117,6 +117,37 @@ class JSONProxyTests: XCTestCase {
             XCTAssertEqual(idOfCompD, "d-2")
         }
     }
+
+    func test_can_set_with_key_and_dictionary() {
+        let target = TestDocument()
+        target.update { root in
+            root.set(key: "top", values: [
+                "boolean": true,
+                "integer": Int32(111),
+                "long": Int64(9_999_999),
+                "double": Double(1.2222222),
+                "string": "abc",
+                "compB": ["id": "b",
+                          "compC": ["id": "c",
+                                    "compD": ["id": "d-1"]]]
+            ])
+
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
+                           """)
+            let compD = root.get(keyPath: "top.compB.compC.compD") as? JSONObject
+            compD?.set(key: "id", value: "d-2")
+
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
+                           """)
+
+            let idOfCompD = root.get(keyPath: "top.compB.compC.compD.id") as? String
+            XCTAssertEqual(idOfCompD, "d-2")
+        }
+    }
 }
 
 class TestDocument {

@@ -45,6 +45,12 @@ class JSONObject {
         }
     }
 
+    func set(key: String, values: [String: Any]) {
+        self.set(key: key, value: JSONObject())
+        let jsonObject = self.get(key: key) as? JSONObject
+        jsonObject?.set(values)
+    }
+
     func set<T>(key: String, value: T) {
         if let value = value as? Bool {
             self.setValue(key: key, value: value)
