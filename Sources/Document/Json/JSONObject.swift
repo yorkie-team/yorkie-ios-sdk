@@ -16,15 +16,6 @@
 
 import Foundation
 
-protocol JSONSpec {
-    init()
-    static var keyMap: [AnyKeyPath: String] { get }
-}
-
-protocol JSONObjectable: AnyObject {
-    var dataHandler: ObjectDataHandler? { get set }
-}
-
 /**
  * `JSONObject` represents a JSON object, but unlike regular JSON, it has time
  * tickets created by a logical clock to resolve conflicts.
