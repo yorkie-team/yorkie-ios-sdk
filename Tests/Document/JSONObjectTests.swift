@@ -17,9 +17,9 @@
 import XCTest
 @testable import Yorkie
 
-class JSONProxyTests: XCTestCase {
-    func test_can_set() {
-        let target = TestDocument()
+class JSONObjectTests: XCTestCase {
+    func test_can_set() throws {
+        let target = Document(key: "doc1")
         target.update { root in
             root.set(key: "boolean", value: true)
             root.set(key: "integer", value: Int32(111))
@@ -52,8 +52,8 @@ class JSONProxyTests: XCTestCase {
         }
     }
 
-    func test_can_remove() throws {
-        let target = TestDocument()
+    func test_can_remove() {
+        let target = Document(key: "doc1")
         target.update { root in
             root["boolean"] = true
             root["integer"] = Int32(111)
@@ -88,7 +88,7 @@ class JSONProxyTests: XCTestCase {
     }
 
     func test_can_set_with_dictionary() {
-        let target = TestDocument()
+        let target = Document(key: "doc1")
         target.update { root in
             root.set([
                 "boolean": true,
@@ -119,7 +119,7 @@ class JSONProxyTests: XCTestCase {
     }
 
     func test_can_set_with_key_and_dictionary() {
-        let target = TestDocument()
+        let target = Document(key: "doc1")
         target.update { root in
             root.set(key: "top", values: [
                 "boolean": true,
@@ -147,12 +147,5 @@ class JSONProxyTests: XCTestCase {
             let idOfCompD = root[keyPath: "top.compB.compC.compD.id"] as? String
             XCTAssertEqual(idOfCompD, "d-2")
         }
-    }
-}
-
-class TestDocument {
-    func update(_ callback: (_ root: JSONObject) -> Void) {
-        let root = JSONObject(target: CRDTObject(createdAt: TimeTicket.initial), context: ChangeContext(id: ChangeID.initial, root: CRDTRoot()))
-        callback(root)
     }
 }

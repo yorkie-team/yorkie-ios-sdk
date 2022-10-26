@@ -35,7 +35,7 @@ class Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    func update(updater: (_ root: JSONObject) -> Void, message: String? = nil) throws {
+    func update(updater: (_ root: JSONObject) -> Void, message: String? = nil) {
         let clone = self.cloned()
         let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
 
@@ -46,7 +46,7 @@ class Document {
             Logger.trivial("trying to update a local change: \(self.toJSON())")
 
             let change = context.getChange()
-            try change.execute(root: self.root)
+            try? change.execute(root: self.root)
             self.localChanges.append(change)
             self.changeID = change.getID()
 
