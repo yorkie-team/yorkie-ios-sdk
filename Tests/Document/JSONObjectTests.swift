@@ -55,21 +55,21 @@ class JSONProxyTests: XCTestCase {
     func test_can_remove() throws {
         let target = TestDocument()
         target.update { root in
-            root.set(key: "boolean", value: true)
-            root.set(key: "integer", value: Int32(111))
-            root.set(key: "long", value: Int64(9_999_999))
-            root.set(key: "double", value: Double(1.2222222))
-            root.set(key: "string", value: "abc")
+            root[key: "boolean"] = true
+            root[key: "integer"] = Int32(111)
+            root[key: "long"] = Int64(9_999_999)
+            root[key: "double"] = Double(1.2222222)
+            root[key: "string"] = "abc"
 
-            root.set(key: "compB", value: JSONObject())
-            let compB = root.get(key: "compB") as? JSONObject
-            compB?.set(key: "id", value: "b")
-            compB?.set(key: "compC", value: JSONObject())
-            let compC = compB?.get(key: "compC") as? JSONObject
-            compC?.set(key: "id", value: "c")
-            compC?.set(key: "compD", value: JSONObject())
-            let compD = compC?.get(key: "compD") as? JSONObject
-            compD?.set(key: "id", value: "d-1")
+            root[key: "compB"] = JSONObject()
+            let compB = root[key: "compB"] as? JSONObject
+            compB?[key: "id"] = "b"
+            compB?[key: "compC"] = JSONObject()
+            let compC = compB?[key: "compC"] as? JSONObject
+            compC?[key: "id"] = "c"
+            compC?[key: "compD"] = JSONObject()
+            let compD = compC?[key: "compD"] as? JSONObject
+            compD?[key: "id"] = "d-1"
 
             XCTAssertEqual(root.debugDescription,
                            """

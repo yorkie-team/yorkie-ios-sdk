@@ -205,6 +205,19 @@ class JSONObject {
         self.context.registerRemovedElement(removed)
     }
 
+    subscript(keyPath keyPath: String) -> Any? {
+        self.get(keyPath: keyPath)
+    }
+
+    subscript(key key: String) -> Any? {
+        get {
+            self.get(key: key)
+        }
+        set {
+            self.set(key: key, value: newValue)
+        }
+    }
+
     /**
      * `getID` returns the ID(time ticket) of this Object.
      */
