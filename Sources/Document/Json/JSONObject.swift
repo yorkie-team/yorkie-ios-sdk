@@ -36,7 +36,7 @@ class JSONObject {
     private func isValidKey(_ key: String) -> Bool {
         return key.contains(self.reservedCharacterForKey) == false
     }
-    
+
     func set(_ values: [String: Any]) {
         values.forEach { (key: String, value: Any) in
             if let value = value as? [String: Any] {
@@ -152,7 +152,7 @@ class JSONObject {
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
-    
+
     /// Search the value by separating the key with dot and return it.
     func get(keyPath: String) -> Any? {
         let keys = keyPath.components(separatedBy: JSONObject.keySeparator)
