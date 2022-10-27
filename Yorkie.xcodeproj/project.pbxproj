@@ -81,6 +81,7 @@
 		CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E228C84D26004988DD /* yorkie.grpc.swift */; };
 		CEEB17E828C84D6A004988DD /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17E728C84D6A004988DD /* GRPC */; };
 		CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17EA28C84D7B004988DD /* SwiftProtobuf */; };
+		CEF64375290A349F00C32B99 /* DocEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64374290A349F00C32B99 /* DocEvent.swift */; };
 		CEFF0015290120000020561A /* JSONObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEFF0014290120000020561A /* JSONObject.swift */; };
 /* End PBXBuildFile section */
 
@@ -172,6 +173,7 @@
 		CEEB17E028C84D26004988DD /* yorkie.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.pb.swift; sourceTree = "<group>"; };
 		CEEB17E128C84D26004988DD /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
 		CEEB17E228C84D26004988DD /* yorkie.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.grpc.swift; sourceTree = "<group>"; };
+		CEF64374290A349F00C32B99 /* DocEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocEvent.swift; sourceTree = "<group>"; };
 		CEFF0014290120000020561A /* JSONObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONObject.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -353,6 +355,7 @@
 				CE8C22E928C9E56400432DE5 /* Operation */,
 				CE8C22EA28C9E56B00432DE5 /* Time */,
 				CE8BB74A28FE71550020F62A /* Document.swift */,
+				CEF64374290A349F00C32B99 /* DocEvent.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -655,6 +658,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CEA2DA4A28F6938700431B61 /* String+Extensions.swift in Sources */,
+				CEF64375290A349F00C32B99 /* DocEvent.swift in Sources */,
 				CE9557CD2907523A00DF4DFA /* JSONArray.swift in Sources */,
 				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
 				CE9557CF2908B6BA00DF4DFA /* JSONDatable.swift in Sources */,

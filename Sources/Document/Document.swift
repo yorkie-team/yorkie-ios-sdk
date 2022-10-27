@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import Combine
 import Foundation
 
 class Document {
@@ -24,12 +25,15 @@ class Document {
     private var checkpoint: Checkpoint
     private var localChanges: [Change]
 
+    let eventStream: PassthroughSubject<DocEvent, YorkieError>
+
     init(key: String) {
         self.key = key
         self.root = CRDTRoot()
         self.changeID = ChangeID.initial
         self.checkpoint = Checkpoint.initial
         self.localChanges = []
+        self.eventStream = PassthroughSubject()
     }
 
     /**
@@ -50,8 +54,46 @@ class Document {
             self.localChanges.append(change)
             self.changeID = change.getID()
 
+            let changeInfo = ChangeInfo(change: change, paths: self.createPaths(change: change))
+            let changeEvent = LocalChangeEvent(value: [changeInfo])
+            self.eventStream.send(changeEvent)
+
             Logger.trivial("after update a local change: \(self.toJSON())")
         }
+    }
+
+    /**
+     * `applyChangePack` applies the given change pack into this document.
+     * 1. Remove local changes applied to server.
+     * 2. Update the checkpoint.
+     * 3. Do Garbage collection.
+     *
+     * - Parameter pack: change pack
+     */
+    func applyChangePack(pack: ChangePack) throws {
+        if pack.hasSnapshot() {
+            self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: pack.getSnapshot())
+        } else if pack.hasChanges() {
+            try self.applyChanges(changes: pack.getChanges())
+        }
+
+        // 01. Remove local changes applied to server.
+        while self.localChanges.isEmpty == false {
+            let change = self.localChanges.removeFirst()
+            if change.getID().getClientSeq() > pack.getCheckpoint().getClientSeq() {
+                break
+            }
+        }
+
+        // 02. Update the checkpoint.
+        self.checkpoint.forward(other: pack.getCheckpoint())
+
+        // 03. Do Garbage collection.
+        if let ticket = pack.getMinSyncedTicket() {
+            self.garbageCollect(lessThanOrEqualTo: ticket)
+        }
+
+        Logger.trivial("\(self.root.toJSON())")
     }
 
     /**
@@ -170,10 +212,28 @@ class Document {
     }
 
     /**
-     * `toJSON` returns the sorted JSON encoding of this array.
+     * `toSortedJSON` returns the sorted JSON encoding of this array.
      */
-    func toSortedJSON() -> String {
-        return self.root.toSortedJSON()
+    private func toSortedJSON() -> String {
+        return self.root.debugDescription
+    }
+
+    /**
+     * `applySnapshot` applies the given snapshot into this document.
+     */
+    func applySnapshot(serverSeq: Int64, snapshot: Data?) {
+        // TODOs Converter.bytesToObject is not implemented yet.
+//      let obj = Converter.bytesToObject(snapshot)
+//      self.root = new CRDTRoot(obj)
+        self.changeID.syncLamport(with: serverSeq)
+
+        // drop clone because it is contaminated.
+        self.clone = nil
+
+        if let snapshot {
+            let snapshotEvent = SnapshotEvent(value: snapshot)
+            self.eventStream.send(snapshotEvent)
+        }
     }
 
     /**
@@ -215,5 +275,11 @@ class Document {
             }
         }
         return pathTrie.findPrefixes().map { $0.joined(separator: ".") }
+    }
+}
+
+extension Document: CustomDebugStringConvertible {
+    var debugDescription: String {
+        self.toSortedJSON()
     }
 }
