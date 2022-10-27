@@ -16,13 +16,7 @@
 
 import Foundation
 
-// It will be implemented soon.
-protocol JSONArrayable: AnyObject {
-    var target: CRDTArray { get set }
-    var context: ChangeContext { get set }
-}
-
-class JSONArray<T>: JSONArrayable {
+class JSONArray {
     var target: CRDTArray
     var context: ChangeContext
 
