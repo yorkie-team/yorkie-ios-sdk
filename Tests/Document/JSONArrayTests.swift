@@ -18,7 +18,7 @@ import XCTest
 @testable import Yorkie
 
 class JSONArrayTests: XCTestCase {
-    func test_append() {
+    func test_can_append() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = JSONArray()
@@ -45,7 +45,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_append_with_array() {
+    func test_can_append_with_array() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -58,7 +58,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_getElement_byID_and_byIndex() {
+    func test_can_get_element_by_id_and_index() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -71,7 +71,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_getLast() {
+    func test_can_get_last() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -89,7 +89,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_insertAfter() {
+    func test_can_insert_into_after() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -102,11 +102,11 @@ class JSONArrayTests: XCTestCase {
             let insertedElement = try? array?.insertAfter(previousID: firstElement.getCreatedAt(), value: [Int32(11), Int32(12), Int32(13)])
             XCTAssertNotNil(insertedElement)
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[1,[11,12,13],2,3]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[1,[11,12,13],2,3]}")
         }
     }
 
-    func test_insertBefore() {
+    func test_can_insert_into_before() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -119,11 +119,11 @@ class JSONArrayTests: XCTestCase {
             let insertedElement = try? array?.insertBefore(nextID: thirdElement.getCreatedAt(), value: [Int32(11), Int32(12), Int32(13)])
             XCTAssertNotNil(insertedElement)
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[1,2,[11,12,13],3]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[1,2,[11,12,13],3]}")
         }
     }
 
-    func test_moveBefore() {
+    func test_can_move_to_before() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -140,11 +140,11 @@ class JSONArrayTests: XCTestCase {
 
             try? array?.moveBefore(nextID: lastElement.getCreatedAt(), id: firstElement.getCreatedAt())
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[2,1,3]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[2,1,3]}")
         }
     }
 
-    func test_moveAfter() {
+    func test_can_move_to_after() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -161,11 +161,11 @@ class JSONArrayTests: XCTestCase {
 
             try? array?.moveAfter(previousID: lastElement.getCreatedAt(), id: firstElement.getCreatedAt())
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[2,3,1]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[2,3,1]}")
         }
     }
 
-    func test_moveFront() {
+    func test_can_move_to_front() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -178,11 +178,11 @@ class JSONArrayTests: XCTestCase {
 
             try? array?.moveFront(id: lastElement.getCreatedAt())
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[3,1,2]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[3,1,2]}")
         }
     }
 
-    func test_moveLast() {
+    func test_can_move_to_last() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -194,7 +194,7 @@ class JSONArrayTests: XCTestCase {
 
             try? array?.moveLast(id: firstElement.getCreatedAt())
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[2,3,1]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[2,3,1]}")
         }
     }
 
@@ -211,17 +211,17 @@ class JSONArrayTests: XCTestCase {
             let removedByID = try? array?.remove(byID: firstElement.getCreatedAt())
             XCTAssertNotNil(removedByID)
 
-            let result = root.toJson()
+            let result = root.debugDescription
             XCTAssertEqual(result, "{\"array\":[2,3]}")
 
             let removedByIndex = array?.remove(index: 0)
             XCTAssertNotNil(removedByIndex)
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[3]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[3]}")
         }
     }
 
-    func test_length() {
+    func test_can_get_length() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3)]
@@ -231,7 +231,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_splice() {
+    func test_can_remove_partial_elements() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
@@ -241,11 +241,11 @@ class JSONArrayTests: XCTestCase {
             XCTAssertEqual(removed?.count, 3)
 
             XCTAssertEqual(removed, [Int32(2), Int32(3), Int32(4)])
-            XCTAssertEqual(root.toJson(), "{\"array\":[1,5]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[1,5]}")
         }
     }
 
-    func test_splice_with_elements() {
+    func test_can_replace_partial_elements() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
@@ -254,11 +254,11 @@ class JSONArrayTests: XCTestCase {
             let removed = try? array?.splice(start: 1, deleteCount: 3, items: Int32(12), Int32(13), Int32(14)) as? [Int32]
             XCTAssertEqual(removed?.count, 3)
 
-            XCTAssertEqual(root.toJson(), "{\"array\":[1,12,13,14,5]}")
+            XCTAssertEqual(root.debugDescription, "{\"array\":[1,12,13,14,5]}")
         }
     }
 
-    func test_includes() {
+    func test_can_check_to_include() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
@@ -271,7 +271,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_indexOf() {
+    func test_can_get_index() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
@@ -284,7 +284,7 @@ class JSONArrayTests: XCTestCase {
         }
     }
 
-    func test_lastIndexOf() {
+    func test_can_get_last_index() {
         let target = Document(key: "doc1")
         target.update { root in
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
@@ -294,6 +294,30 @@ class JSONArrayTests: XCTestCase {
             XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(2), fromIndex: 0), JSONArray.notFound)
             XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(2), fromIndex: 2), 1)
             XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(100), fromIndex: 2), JSONArray.notFound)
+        }
+    }
+
+    func test_can_insert_jsonObject() {
+        let target = Document(key: "doc1")
+        target.update { root in
+            root["top"] = JSONObject()
+            let object = root["top"] as? JSONObject
+
+            object?["a"] = "a"
+
+            XCTAssertEqual(root.debugDescription, "{\"top\":{\"a\":\"a\"}}")
+        }
+    }
+
+    func test_can_insert_jsonArray() {
+        let target = Document(key: "doc1")
+        target.update { root in
+            root["array"] = JSONArray()
+            let array = root["array"] as? JSONArray
+
+            array?.append(Int32(1))
+
+            XCTAssertEqual(root.debugDescription, "{\"array\":[1]}")
         }
     }
 }

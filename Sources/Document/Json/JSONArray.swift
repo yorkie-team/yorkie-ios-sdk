@@ -380,18 +380,18 @@ class JSONArray {
         } else {
             result = 0
         }
-        
+
         return result
     }
-    
+
     /**
      * `includes` returns true if the given element is in the array.
      */
     func includes(searchElement: Any, fromIndex: Int? = nil) -> Bool {
         let length = self.target.length
 
-        let from = adaptedFromIndex(length: length, fromIndex: fromIndex)
-        
+        let from = self.adaptedFromIndex(length: length, fromIndex: fromIndex)
+
         if from >= length {
             return false
         }
@@ -429,7 +429,7 @@ class JSONArray {
      */
     func indexOf(searchElement: Any, fromIndex: Int? = nil) -> Int {
         let length = self.target.length
-        let from = adaptedFromIndex(length: length, fromIndex: fromIndex)
+        let from = self.adaptedFromIndex(length: length, fromIndex: fromIndex)
 
         if from >= length {
             return Self.notFound
