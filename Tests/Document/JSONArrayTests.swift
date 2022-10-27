@@ -39,9 +39,10 @@ class JSONArrayTests: XCTestCase {
             let arrayValue = array?[arrayValueIndex!] as? JSONArray
             arrayValue?.append(values: [Int32(21), Int32(22), Int32(23)])
 
-            XCTAssertEqual(root.debugDescription, """
-            {"array":[1,2,"a",1.2345,"true",[11,12,13,21,22,23]]}
-            """)
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"array":[1,2,"a",1.2345,"true",[11,12,13,21,22,23]]}
+                           """)
         }
     }
 
@@ -52,9 +53,10 @@ class JSONArrayTests: XCTestCase {
             let array = root["array"] as? JSONArray
             array?.append(Int32(4))
             array?.append(values: [Int32(5), Int32(6)])
-            XCTAssertEqual(root.debugDescription, """
-            {"array":[1,2,3,4,5,6]}
-            """)
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"array":[1,2,3,4,5,6]}
+                           """)
         }
     }
 

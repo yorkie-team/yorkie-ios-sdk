@@ -166,6 +166,7 @@ class JSONArray {
         return self.target.length
     }
 
+    @discardableResult
     func remove(index: Int) -> CRDTElement? {
         Logger.trivial("array[\(index)]")
         return self.removeInternal(byIndex: index)
@@ -257,7 +258,7 @@ class JSONArray {
             try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
-            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtArray, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             let child = JSONArray(target: clone, changeContext: self.context)
@@ -271,13 +272,8 @@ class JSONArray {
             try self.target.insert(value: crdtObject, afterCreatedAt: previousCreatedAt)
             self.context.registerElement(crdtObject, parent: self.target)
 
-            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtObject, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
-
-            let child = JSONObject(target: crdtObject, context: self.context)
-            for (key, value) in jsonObject {
-                child.set(key: key, value: value)
-            }
             return crdtObject
         }
 
@@ -327,6 +323,7 @@ class JSONArray {
     /**
      * `splice` is a method to remove elements from the array.
      */
+    @discardableResult
     func splice(start: Int, deleteCount: Int? = nil, items: Any...) throws -> [Any] {
         let length = self.target.length
         let from = start >= 0 ? Swift.min(start, length) : Swift.max(length + start, 0)
@@ -556,5 +553,19 @@ class JSONArrayIterator: IteratorProtocol {
 
         let value = self.values[self.iteratorNext]
         return ElementConverter.toWrappedElement(from: value, context: self.context)
+    }
+}
+
+extension JSONArray: CustomDebugStringConvertible {
+    var debugDescription: String {
+        self.target.debugDescription
+    }
+}
+
+extension JSONArray {
+    var toArray: [Any] {
+        self.target.compactMap {
+            toJSONElement(from: $0)
+        }
     }
 }

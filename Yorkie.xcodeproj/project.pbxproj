@@ -82,6 +82,7 @@
 		CEEB17E828C84D6A004988DD /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17E728C84D6A004988DD /* GRPC */; };
 		CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17EA28C84D7B004988DD /* SwiftProtobuf */; };
 		CEF64375290A349F00C32B99 /* DocEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64374290A349F00C32B99 /* DocEvent.swift */; };
+		CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */; };
 		CEFF0015290120000020561A /* JSONObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEFF0014290120000020561A /* JSONObject.swift */; };
 /* End PBXBuildFile section */
 
@@ -174,6 +175,7 @@
 		CEEB17E128C84D26004988DD /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
 		CEEB17E228C84D26004988DD /* yorkie.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.grpc.swift; sourceTree = "<group>"; };
 		CEF64374290A349F00C32B99 /* DocEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocEvent.swift; sourceTree = "<group>"; };
+		CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Optional+Extensions.swift"; sourceTree = "<group>"; };
 		CEFF0014290120000020561A /* JSONObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONObject.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -370,6 +372,7 @@
 				CE72E85128EE531C00D1331C /* Collection+Extensions.swift */,
 				CEA2DA4928F6938700431B61 /* String+Extensions.swift */,
 				CE9557C7290666CE00DF4DFA /* Trie.swift */,
+				CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -681,6 +684,7 @@
 				CEA2DA4F28F6967500431B61 /* Checkpoint.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8BB74328FE59240020F62A /* ChangePack.swift in Sources */,
+				CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */,
 				CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */,
 				CEFF0015290120000020561A /* JSONObject.swift in Sources */,
 				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,

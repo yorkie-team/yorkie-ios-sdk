@@ -218,3 +218,9 @@ class CRDTArrayIterator: IteratorProtocol {
         return self.values[self.iteratorNext]
     }
 }
+
+extension CRDTArray: CustomDebugStringConvertible {
+    var debugDescription: String {
+        self.toSortedJSON()
+    }
+}

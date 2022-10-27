@@ -60,7 +60,9 @@ class JSONObject {
             return
         }
 
-        if let value = value as? Bool {
+        if let optionalValue = value as? OptionalValue, optionalValue.isNil {
+            self.setValueNull(key: key)
+        } else if let value = value as? Bool {
             self.setValue(key: key, value: value)
         } else if let value = value as? Int32 {
             self.setValue(key: key, value: value)
@@ -113,6 +115,10 @@ class JSONObject {
         self.context.push(operation: operation)
     }
 
+    private func setValueNull(key: String) {
+        self.setPrimitive(key: key, value: .null)
+    }
+
     private func setValue(key: String, value: Bool) {
         self.setPrimitive(key: key, value: .boolean(value))
     }
@@ -155,7 +161,7 @@ class JSONObject {
         self.setAndRegister(key: key, value: value)
 
         let operation = SetOperation(key: key,
-                                     value: value,
+                                     value: value.deepcopy(),
                                      parentCreatedAt: self.target.getCreatedAt(),
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
