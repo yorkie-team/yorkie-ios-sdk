@@ -31,6 +31,12 @@ class JSONObject {
         self.context = context
     }
 
+    private static let keySeparator = "."
+    private let reservedCharacterForKey = JSONObject.keySeparator
+    private func isValidKey(_ key: String) -> Bool {
+        return key.contains(self.reservedCharacterForKey) == false
+    }
+    
     func set(_ values: [String: Any]) {
         values.forEach { (key: String, value: Any) in
             if let value = value as? [String: Any] {
@@ -45,13 +51,12 @@ class JSONObject {
         }
     }
 
-    func set(key: String, values: [String: Any]) {
-        self.set(key: key, value: JSONObject())
-        let jsonObject = self.get(key: key) as? JSONObject
-        jsonObject?.set(values)
-    }
-
     func set<T>(key: String, value: T) {
+        guard self.isValidKey(key) else {
+            Logger.error("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
+            return
+        }
+
         if let value = value as? Bool {
             self.setValue(key: key, value: value)
         } else if let value = value as? Int32 {
@@ -69,6 +74,10 @@ class JSONObject {
         } else if value is JSONObject {
             let object = CRDTObject(createdAt: self.context.issueTimeTicket())
             self.setValue(key: key, value: object)
+        } else if let value = value as? [String: Any] {
+            self.set(key: key, value: JSONObject())
+            let jsonObject = self.get(key: key) as? JSONObject
+            jsonObject?.set(value)
         } else if value is JSONArray {
             let array = CRDTArray(createdAt: self.context.issueTimeTicket())
             self.setValue(key: key, value: array)
@@ -143,9 +152,10 @@ class JSONObject {
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
-
+    
+    /// Search the value by separating the key with dot and return it.
     func get(keyPath: String) -> Any? {
-        let keys = keyPath.components(separatedBy: ".")
+        let keys = keyPath.components(separatedBy: JSONObject.keySeparator)
         var nested: JSONObject = self
         for key in keys {
             let value = nested.get(key: key)

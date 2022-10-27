@@ -121,7 +121,7 @@ class JSONObjectTests: XCTestCase {
     func test_can_set_with_key_and_dictionary() {
         let target = Document(key: "doc1")
         target.update { root in
-            root.set(key: "top", values: [
+            root.set(key: "top", value: [
                 "boolean": true,
                 "integer": Int32(111),
                 "long": Int64(9_999_999),
