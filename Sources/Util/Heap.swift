@@ -64,13 +64,14 @@ class Heap<K: Comparable, V: Equatable>: Sequence, IteratorProtocol {
      * `delete` deletes the given value from this Heap.
      */
     func delete(_ node: HeapNode<K, V>) {
+        let lastIndexBeforeDeleted = self.nodes.count - 1
         guard let targetIndex = self.nodes.firstIndex(where: { $0.value == node.value }),
               let lastNode = self.nodes.popLast()
         else {
             return
         }
 
-        if targetIndex < 0 || self.isEmpty {
+        if targetIndex < 0 || self.isEmpty || targetIndex == lastIndexBeforeDeleted {
             return
         }
 

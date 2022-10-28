@@ -19,7 +19,6 @@ import XCTest
 @testable import Yorkie
 
 class DocumentTests: XCTestCase {
-    // TODO: 에러를 반환해야할지 검토, 에러를 반환하면 remove 사용 시 try를 해야한다.
     func test_doesnt_return_error_when_trying_to_delete_a_missing_key() {
         let target = Document(key: "doc-1")
         target.update { root in
