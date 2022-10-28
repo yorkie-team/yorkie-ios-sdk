@@ -32,12 +32,6 @@ class JSONObject {
         self.context = context
     }
 
-    private static let keySeparator = "."
-    private let reservedCharacterForKey = JSONObject.keySeparator
-    private func isValidKey(_ key: String) -> Bool {
-        return key.contains(self.reservedCharacterForKey) == false
-    }
-
     func set(_ values: [String: Any]) {
         values.forEach { (key: String, value: Any) in
             if let value = value as? [String: Any] {
@@ -55,11 +49,6 @@ class JSONObject {
     }
 
     func set<T>(key: String, value: T) {
-        guard self.isValidKey(key) else {
-            Logger.error("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
-            return
-        }
-
         if let optionalValue = value as? OptionalValue, optionalValue.isNil {
             self.setValueNull(key: key)
         } else if let value = value as? Bool {
@@ -167,22 +156,6 @@ class JSONObject {
         self.context.push(operation: operation)
     }
 
-    /// Search the value by separating the key with dot and return it.
-    func get(keyPath: String) -> Any? {
-        let keys = keyPath.components(separatedBy: JSONObject.keySeparator)
-        var nested: JSONObject = self
-        for key in keys {
-            let value = nested.get(key: key)
-            if let jsonObject = value as? JSONObject {
-                nested = jsonObject
-            } else {
-                return value
-            }
-        }
-
-        return nested
-    }
-
     func get(key: String) -> Any? {
         guard let value = try? self.target.get(key: key) else {
             Logger.error("The value does not exist. - key: \(key)")
@@ -205,10 +178,6 @@ class JSONObject {
                                               executedAt: self.context.issueTimeTicket())
         self.context.push(operation: removeOperation)
         self.context.registerRemovedElement(removed)
-    }
-
-    subscript(keyPath keyPath: String) -> Any? {
-        self.get(keyPath: keyPath)
     }
 
     subscript(key: String) -> Any? {
