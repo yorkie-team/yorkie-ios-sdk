@@ -279,10 +279,10 @@ class JSONArrayTests: XCTestCase {
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
             let array = root["array"] as? JSONArray
 
-            XCTAssertEqual(array?.indexOf(searchElement: Int32(2)), 1)
-            XCTAssertEqual(array?.indexOf(searchElement: Int32(2), fromIndex: 0), 1)
-            XCTAssertEqual(array?.indexOf(searchElement: Int32(2), fromIndex: 2), JSONArray.notFound)
-            XCTAssertEqual(array?.indexOf(searchElement: Int32(100), fromIndex: 2), JSONArray.notFound)
+            XCTAssertEqual(array?.indexOf(Int32(2)), 1)
+            XCTAssertEqual(array?.indexOf(Int32(2), fromIndex: 0), 1)
+            XCTAssertEqual(array?.indexOf(Int32(2), fromIndex: 2), JSONArray.notFound)
+            XCTAssertEqual(array?.indexOf(Int32(100), fromIndex: 2), JSONArray.notFound)
         }
     }
 
@@ -292,10 +292,10 @@ class JSONArrayTests: XCTestCase {
             root["array"] = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
             let array = root["array"] as? JSONArray
 
-            XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(2)), 1)
-            XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(2), fromIndex: 0), JSONArray.notFound)
-            XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(2), fromIndex: 2), 1)
-            XCTAssertEqual(array?.lastIndexOf(searchElement: Int32(100), fromIndex: 2), JSONArray.notFound)
+            XCTAssertEqual(array?.lastIndexOf(Int32(2)), 1)
+            XCTAssertEqual(array?.lastIndexOf(Int32(2), fromIndex: 0), JSONArray.notFound)
+            XCTAssertEqual(array?.lastIndexOf(Int32(2), fromIndex: 2), 1)
+            XCTAssertEqual(array?.lastIndexOf(Int32(100), fromIndex: 2), JSONArray.notFound)
         }
     }
 

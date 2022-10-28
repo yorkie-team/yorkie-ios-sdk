@@ -76,6 +76,7 @@ class JSONArray {
     /**
      * `remove` removes the element of the given ID.
      */
+    @discardableResult
     func remove(byID createdAt: TimeTicket) throws -> Any? {
         let removed = try removeInternal(byID: createdAt)
         return toWrappedElement(from: removed)
@@ -92,6 +93,7 @@ class JSONArray {
     /**
      * `insertBefore` inserts a value before the given next element.
      */
+    @discardableResult
     func insertBefore(nextID: TimeTicket, value: Any) throws -> Any? {
         let inserted = try insertBeforeInternal(nextCreatedAt: nextID, value: value)
         return toWrappedElement(from: inserted)
@@ -424,7 +426,7 @@ class JSONArray {
     /**
      * `indexOf` returns the index of the given element.
      */
-    func indexOf(searchElement: Any, fromIndex: Int? = nil) -> Int {
+    func indexOf(_ searchElement: Any, fromIndex: Int? = nil) -> Int {
         let length = self.target.length
         let from = self.adaptedFromIndex(length: length, fromIndex: fromIndex)
 
@@ -463,7 +465,7 @@ class JSONArray {
     /**
      * `lastIndexOf` returns the last index of the given element.
      */
-    func lastIndexOf(searchElement: Any, fromIndex: Int? = nil) -> Int {
+    func lastIndexOf(_ searchElement: Any, fromIndex: Int? = nil) -> Int {
         let length = self.target.length
 
         let from: Int
@@ -498,7 +500,7 @@ class JSONArray {
             return Self.notFound
         }
 
-        for index in stride(from: from, to: 1, by: -1) {
+        for index in stride(from: from, to: 0, by: -1) {
             guard let id = try? self.target.get(index: index).getID() else {
                 continue
             }

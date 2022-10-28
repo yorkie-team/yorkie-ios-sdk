@@ -134,3 +134,13 @@ class Trie<V: Hashable> {
         return prefixes
     }
 }
+
+extension Trie: CustomDebugStringConvertible {
+    var debugDescription: String {
+        var result: [[V]] = []
+        for (_, value) in self.root.children {
+            self.traverse(node: value, isTerminalIncluded: true, output: &result)
+        }
+        return result.map { $0.description }.joined(separator: ".")
+    }
+}

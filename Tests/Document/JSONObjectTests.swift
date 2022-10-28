@@ -105,7 +105,10 @@ class JSONObjectTests: XCTestCase {
                            """
                            {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
-            let compD = root.get(keyPath: "compB.compC.compD") as? JSONObject
+
+            let compB = root.compB as? JSONObject
+            let compC = compB?.compC as? JSONObject
+            let compD = compC?.compD as? JSONObject
             compD?.set(key: "id", value: "d-2")
 
             XCTAssertEqual(root.debugDescription,
@@ -113,7 +116,7 @@ class JSONObjectTests: XCTestCase {
                            {"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
-            let idOfCompD = root.get(keyPath: "compB.compC.compD.id") as? String
+            let idOfCompD = compD?.id as? String
             XCTAssertEqual(idOfCompD, "d-2")
         }
     }
@@ -136,7 +139,11 @@ class JSONObjectTests: XCTestCase {
                            """
                            {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
                            """)
-            let compD = root.get(keyPath: "top.compB.compC.compD") as? JSONObject
+
+            let top = root.top as? JSONObject
+            let compB = top?.compB as? JSONObject
+            let compC = compB?.compC as? JSONObject
+            let compD = compC?.compD as? JSONObject
             compD?.set(key: "id", value: "d-2")
 
             XCTAssertEqual(root.debugDescription,
@@ -144,7 +151,7 @@ class JSONObjectTests: XCTestCase {
                            {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
                            """)
 
-            let idOfCompD = root[keyPath: "top.compB.compC.compD.id"] as? String
+            let idOfCompD = compD?.id as? String
             XCTAssertEqual(idOfCompD, "d-2")
         }
     }

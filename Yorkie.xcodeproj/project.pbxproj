@@ -83,6 +83,7 @@
 		CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17EA28C84D7B004988DD /* SwiftProtobuf */; };
 		CEF64375290A349F00C32B99 /* DocEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64374290A349F00C32B99 /* DocEvent.swift */; };
 		CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */; };
+		CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64376290A37BB00C32B99 /* DocumentTests.swift */; };
 		CEFF0015290120000020561A /* JSONObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEFF0014290120000020561A /* JSONObject.swift */; };
 /* End PBXBuildFile section */
 
@@ -176,6 +177,7 @@
 		CEEB17E228C84D26004988DD /* yorkie.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.grpc.swift; sourceTree = "<group>"; };
 		CEF64374290A349F00C32B99 /* DocEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocEvent.swift; sourceTree = "<group>"; };
 		CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Optional+Extensions.swift"; sourceTree = "<group>"; };
+		CEF64376290A37BB00C32B99 /* DocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentTests.swift; sourceTree = "<group>"; };
 		CEFF0014290120000020561A /* JSONObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONObject.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -299,6 +301,7 @@
 				CE3EC96B28D3FFDB009471BC /* Time */,
 				CE9557BE2902024700DF4DFA /* JSONObjectTests.swift */,
 				CEBC84062909130900781AE9 /* JSONArrayTests.swift */,
+				CEF64376290A37BB00C32B99 /* DocumentTests.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -728,6 +731,7 @@
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
 				CE8BB74628FE5AC40020F62A /* ChangePackTests.swift in Sources */,
+				CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */,
 				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */,
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,

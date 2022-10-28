@@ -272,6 +272,7 @@ class Document {
             if var subPaths = try? self.root.createSubPaths(createdAt: createdAt) {
                 subPaths.removeFirst()
                 pathTrie.insert(values: subPaths)
+                print("## subPaths", subPaths)
             }
         }
         return pathTrie.findPrefixes().map { $0.joined(separator: ".") }
@@ -283,3 +284,7 @@ extension Document: CustomDebugStringConvertible {
         self.toSortedJSON()
     }
 }
+
+// ERROR: 'YORKIE E:', AssertionError{message: 'expected [ '$.', '$.obj' ] to deeply equal []', showDiff: true, actual: ['$.', '$.obj'], expected: [], operator: 'deepStrictEqual'}
+
+// ERROR: 'YORKIE E:', AssertionError{message: 'expected [ '$.', '$.obj' ] to deeply equal [ Array(7) ]', showDiff: true, actual: ['$.', '$.obj'], expected: ['$.', '$.obj', '$.obj.a', '$.obj', '$.obj.\$\.hello', '$.obj', '$'], operator: 'deepStrictEqual'}
