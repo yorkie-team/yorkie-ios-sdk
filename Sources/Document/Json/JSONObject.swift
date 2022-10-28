@@ -20,6 +20,7 @@ import Foundation
  * `JSONObject` represents a JSON object, but unlike regular JSON, it has time
  * tickets created by a logical clock to resolve conflicts.
  */
+@dynamicMemberLookup
 class JSONObject {
     var target: CRDTObject!
     var context: ChangeContext!
@@ -283,5 +284,16 @@ class JSONObjectIterator: IteratorProtocol {
         }
 
         return self.values[self.iteratorNext]
+    }
+}
+
+extension JSONObject {
+    subscript(dynamicMember member: String) -> Any? {
+        get {
+            self.get(key: member)
+        }
+        set {
+            self.set(key: member, value: newValue)
+        }
     }
 }

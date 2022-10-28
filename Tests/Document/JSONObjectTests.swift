@@ -55,21 +55,21 @@ class JSONObjectTests: XCTestCase {
     func test_can_remove() {
         let target = Document(key: "doc1")
         target.update { root in
-            root["boolean"] = true
-            root["integer"] = Int32(111)
-            root["long"] = Int64(9_999_999)
-            root["double"] = Double(1.2222222)
-            root["string"] = "abc"
+            root.boolean = true
+            root.integer = Int32(111)
+            root.long = Int64(9_999_999)
+            root.double = Double(1.2222222)
+            root.string = "abc"
 
-            root["compB"] = JSONObject()
-            let compB = root["compB"] as? JSONObject
-            compB?["id"] = "b"
-            compB?["compC"] = JSONObject()
-            let compC = compB?["compC"] as? JSONObject
-            compC?["id"] = "c"
-            compC?["compD"] = JSONObject()
-            let compD = compC?["compD"] as? JSONObject
-            compD?["id"] = "d-1"
+            root.compB = JSONObject()
+            let compB = root.compB as? JSONObject
+            compB?.id = "b"
+            compB?.compC = JSONObject()
+            let compC = compB?.compC as? JSONObject
+            compC?.id = "c"
+            compC?.compD = JSONObject()
+            let compD = compC?.compD as? JSONObject
+            compD?.id = "d-1"
 
             XCTAssertEqual(root.debugDescription,
                            """
