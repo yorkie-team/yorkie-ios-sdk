@@ -268,7 +268,7 @@ class JSONArray {
                 child.pushInternal(element)
             }
             return crdtArray
-        } else if let jsonObject = value as? JSONObject {
+        } else if value is JSONObject {
             let crdtObject = CRDTObject(createdAt: ticket)
 
             try self.target.insert(value: crdtObject, afterCreatedAt: previousCreatedAt)
