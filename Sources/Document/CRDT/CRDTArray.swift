@@ -123,9 +123,8 @@ extension CRDTArray {
      * `toJSON` returns the JSON encoding of this array.
      */
     func toJSON() -> String {
-        let json = self.elements
-            .filter { $0.getValue().isRemoved() == false }
-            .map { $0.getValue().toJSON() }
+        let json = self
+            .map { $0.toJSON() }
 
         return "[\(json.joined(separator: ","))]"
     }
