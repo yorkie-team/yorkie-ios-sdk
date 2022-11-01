@@ -20,6 +20,7 @@ import Foundation
  * `JSONObject` represents a JSON object, but unlike regular JSON, it has time
  * tickets created by a logical clock to resolve conflicts.
  */
+@dynamicMemberLookup
 class JSONObject {
     var target: CRDTObject!
     var context: ChangeContext!
@@ -31,20 +32,16 @@ class JSONObject {
         self.context = context
     }
 
-    private static let keySeparator = "."
-    private let reservedCharacterForKey = JSONObject.keySeparator
-    private func isValidKey(_ key: String) -> Bool {
-        return key.contains(self.reservedCharacterForKey) == false
-    }
-
     func set(_ values: [String: Any]) {
         values.forEach { (key: String, value: Any) in
             if let value = value as? [String: Any] {
                 set(key: key, value: JSONObject())
                 let jsonObject = get(key: key) as? JSONObject
                 jsonObject?.set(value)
-//            } else if let value = value as? [Any] {
-                // It will be implemented soon.
+            } else if let value = value as? [Any] {
+                set(key: key, value: JSONArray())
+                let jsonArray = get(key: key) as? JSONArray
+                jsonArray?.push(value)
             } else {
                 set(key: key, value: value)
             }
@@ -52,12 +49,9 @@ class JSONObject {
     }
 
     func set<T>(key: String, value: T) {
-        guard self.isValidKey(key) else {
-            Logger.error("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
-            return
-        }
-
-        if let value = value as? Bool {
+        if let optionalValue = value as? OptionalValue, optionalValue.isNil {
+            self.setValueNull(key: key)
+        } else if let value = value as? Bool {
             self.setValue(key: key, value: value)
         } else if let value = value as? Int32 {
             self.setValue(key: key, value: value)
@@ -81,6 +75,11 @@ class JSONObject {
         } else if value is JSONArray {
             let array = CRDTArray(createdAt: self.context.issueTimeTicket())
             self.setValue(key: key, value: array)
+        } else if let value = value as? [Any] {
+            let array = CRDTArray(createdAt: self.context.issueTimeTicket())
+            self.setValue(key: key, value: array)
+            let jsonArray = self.get(key: key) as? JSONArray
+            jsonArray?.append(values: value)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
         }
@@ -103,6 +102,10 @@ class JSONObject {
                                      parentCreatedAt: self.target.getCreatedAt(),
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
+    }
+
+    private func setValueNull(key: String) {
+        self.setPrimitive(key: key, value: .null)
     }
 
     private func setValue(key: String, value: Bool) {
@@ -147,57 +150,19 @@ class JSONObject {
         self.setAndRegister(key: key, value: value)
 
         let operation = SetOperation(key: key,
-                                     value: value,
+                                     value: value.deepcopy(),
                                      parentCreatedAt: self.target.getCreatedAt(),
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
 
-    /// Search the value by separating the key with dot and return it.
-    func get(keyPath: String) -> Any? {
-        let keys = keyPath.components(separatedBy: JSONObject.keySeparator)
-        var nested: JSONObject = self
-        for key in keys {
-            let value = nested.get(key: key)
-            if let jsonObject = value as? JSONObject {
-                nested = jsonObject
-            } else {
-                return value
-            }
-        }
-
-        return nested
-    }
-
     func get(key: String) -> Any? {
-        let value = try? self.target.get(key: key)
-        if let value = value as? Primitive {
-            switch value.value {
-            case .null:
-                return nil
-            case .boolean(let result):
-                return result
-            case .integer(let result):
-                return result
-            case .long(let result):
-                return result
-            case .double(let result):
-                return result
-            case .string(let result):
-                return result
-            case .bytes(let result):
-                return result
-            case .date(let result):
-                return result
-            }
-        } else if let object = value as? CRDTObject {
-            return JSONObject(target: object, context: self.context)
-        } else if let array = value as? CRDTArray {
-            return JSONArray(target: array, changeContext: self.context)
-        } else {
+        guard let value = try? self.target.get(key: key) else {
             Logger.error("The value does not exist. - key: \(key)")
             return nil
         }
+
+        return toJSONElement(from: value)
     }
 
     func remove(key: String) {
@@ -213,10 +178,6 @@ class JSONObject {
                                               executedAt: self.context.issueTimeTicket())
         self.context.push(operation: removeOperation)
         self.context.registerRemovedElement(removed)
-    }
-
-    subscript(keyPath keyPath: String) -> Any? {
-        self.get(keyPath: keyPath)
     }
 
     subscript(key: String) -> Any? {
@@ -256,5 +217,58 @@ extension JSONObject: CustomStringConvertible {
 extension JSONObject: CustomDebugStringConvertible {
     var debugDescription: String {
         self.toSortedJSON()
+    }
+}
+
+extension JSONObject: JSONDatable {
+    var changeContext: ChangeContext {
+        self.context
+    }
+
+    var crdtElement: CRDTElement {
+        self.target
+    }
+}
+
+extension JSONObject: Sequence {
+    typealias Element = (key: String, value: CRDTElement)
+
+    func makeIterator() -> JSONObjectIterator {
+        return JSONObjectIterator(self.target)
+    }
+}
+
+class JSONObjectIterator: IteratorProtocol {
+    private var values: [(key: String, value: CRDTElement)]
+    private var iteratorNext: Int = 0
+
+    init(_ crdtObject: CRDTObject) {
+        self.values = []
+        crdtObject.forEach { (key: String, value: CRDTElement) in
+            values.append((key, value))
+        }
+    }
+
+    func next() -> (key: String, value: CRDTElement)? {
+        defer {
+            self.iteratorNext += 1
+        }
+
+        guard self.iteratorNext < self.values.count else {
+            return nil
+        }
+
+        return self.values[self.iteratorNext]
+    }
+}
+
+extension JSONObject {
+    subscript(dynamicMember member: String) -> Any? {
+        get {
+            self.get(key: member)
+        }
+        set {
+            self.set(key: member, value: newValue)
+        }
     }
 }

@@ -208,7 +208,7 @@ class CRDTRootTests: XCTestCase {
 
         // when
         let target = CRDTRoot(rootObject: rootObject)
-        let result = target.toSortedJSON()
+        let result = target.debugDescription
 
         // then
         XCTAssertEqual(result, "{\"K-a1\":\"A1\",\"K-a3\":{\"K-B1\":\"B1\",\"K-B2\":{\"K-c1\":\"c1\"}}}")

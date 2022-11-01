@@ -46,13 +46,13 @@ class RemoveOperationTests: XCTestCase {
                                      createdAt: objectForTest.createdAt,
                                      executedAt: TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId))
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-b2\":{\"k-c1\":\"c1\"}}}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-b2\":{\"k-c1\":\"c1\"}}}")
 
         try target.execute(root: root)
 
         // then
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\"}}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\"}}")
         XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.REMOVE")
         XCTAssertEqual(target.getEffectedCreatedAt(), object2.createdAt)
     }

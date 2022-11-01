@@ -83,7 +83,7 @@ class MoveOperationTests: XCTestCase {
         let root = CRDTRoot(rootObject: rootObject)
 
         // when
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"value-to-move\"]}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"value-to-move\"]}")
 
         let target = MoveOperation(parentCreatedAt: object2.createdAt,
                                    previousCreatedAt: b1.createdAt,
@@ -92,7 +92,7 @@ class MoveOperationTests: XCTestCase {
 
         try target.execute(root: root)
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",\"value-to-move\",{\"k-c1\":\"c1\"}]}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",\"value-to-move\",{\"k-c1\":\"c1\"}]}")
         XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.MOV")
         XCTAssertEqual(target.getEffectedCreatedAt(), target.getCreatedAt())
     }

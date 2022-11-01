@@ -46,7 +46,7 @@ class AddOperationTests: XCTestCase {
         // when
         let valueToAdd = Primitive(value: .string("new-value"), createdAt: TimeTicket(lamport: 9, delimiter: 0, actorID: actorId))
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-b2\":{\"k-c1\":\"c1\"},\"k-b3\":\"d1\"}}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-b2\":{\"k-c1\":\"c1\"},\"k-b3\":\"d1\"}}")
 
         let target = AddOperation(parentCreatedAt: object2.createdAt,
                                   previousCreatedAt: object3.createdAt,
@@ -90,7 +90,7 @@ class AddOperationTests: XCTestCase {
         // when
         let valueToAdd = Primitive(value: .string("new-value"), createdAt: TimeTicket(lamport: 9, delimiter: 0, actorID: actorId))
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"d1\"]}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"d1\"]}")
 
         let target = AddOperation(parentCreatedAt: object2.createdAt,
                                   previousCreatedAt: object3.createdAt,
@@ -107,7 +107,7 @@ class AddOperationTests: XCTestCase {
         // then
         XCTAssertFalse(isFailed)
 
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"new-value\",\"d1\"]}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"new-value\",\"d1\"]}")
         XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.ADD")
         XCTAssertEqual(target.getEffectedCreatedAt(), valueToAdd.createdAt)
     }

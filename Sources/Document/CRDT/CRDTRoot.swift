@@ -246,7 +246,13 @@ class CRDTRoot {
     /**
      * `toSortedJSON` returns the sorted JSON encoding of this root object.
      */
-    func toSortedJSON() -> String {
+    private func toSortedJSON() -> String {
         return self.rootObject.toSortedJSON()
+    }
+}
+
+extension CRDTRoot: CustomDebugStringConvertible {
+    var debugDescription: String {
+        self.toSortedJSON()
     }
 }

@@ -47,7 +47,7 @@ class SetOperationTests: XCTestCase {
         try target.execute(root: root)
 
         // then
-        XCTAssertEqual(root.toSortedJSON(), "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-d2\":{\"k-c1\":\"c1\"}}}")
+        XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\",\"k-d2\":{\"k-c1\":\"c1\"}}}")
         XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.SET")
         XCTAssertEqual(target.getEffectedCreatedAt(), objectForTest.createdAt)
     }
