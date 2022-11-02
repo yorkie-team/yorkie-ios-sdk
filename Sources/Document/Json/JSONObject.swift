@@ -21,7 +21,7 @@ import Foundation
  * tickets created by a logical clock to resolve conflicts.
  */
 @dynamicMemberLookup
-class JSONObject {
+public class JSONObject {
     var target: CRDTObject!
     var context: ChangeContext!
 
@@ -156,7 +156,7 @@ class JSONObject {
         self.context.push(operation: operation)
     }
 
-    func get(key: String) -> Any? {
+    public func get(key: String) -> Any? {
         guard let value = try? self.target.get(key: key) else {
             Logger.error("The value does not exist. - key: \(key)")
             return nil
@@ -165,7 +165,7 @@ class JSONObject {
         return toJSONElement(from: value)
     }
 
-    func remove(key: String) {
+    public func remove(key: String) {
         Logger.trivial("obj[\(key)]")
 
         let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket())
@@ -180,7 +180,7 @@ class JSONObject {
         self.context.registerRemovedElement(removed)
     }
 
-    subscript(key: String) -> Any? {
+    public subscript(key: String) -> Any? {
         get {
             self.get(key: key)
         }
@@ -206,16 +206,22 @@ class JSONObject {
     private func toSortedJSON() -> String {
         self.target.toSortedJSON()
     }
+
+    var iterator: [(key: String, value: CRDTElement)] {
+        return self.target.map { (key: String, value: CRDTElement) in
+            (key, value)
+        }
+    }
 }
 
 extension JSONObject: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         self.toJson()
     }
 }
 
 extension JSONObject: CustomDebugStringConvertible {
-    var debugDescription: String {
+    public var debugDescription: String {
         self.toSortedJSON()
     }
 }
@@ -230,39 +236,7 @@ extension JSONObject: JSONDatable {
     }
 }
 
-extension JSONObject: Sequence {
-    typealias Element = (key: String, value: CRDTElement)
-
-    func makeIterator() -> JSONObjectIterator {
-        return JSONObjectIterator(self.target)
-    }
-}
-
-class JSONObjectIterator: IteratorProtocol {
-    private var values: [(key: String, value: CRDTElement)]
-    private var iteratorNext: Int = 0
-
-    init(_ crdtObject: CRDTObject) {
-        self.values = []
-        crdtObject.forEach { (key: String, value: CRDTElement) in
-            values.append((key, value))
-        }
-    }
-
-    func next() -> (key: String, value: CRDTElement)? {
-        defer {
-            self.iteratorNext += 1
-        }
-
-        guard self.iteratorNext < self.values.count else {
-            return nil
-        }
-
-        return self.values[self.iteratorNext]
-    }
-}
-
-extension JSONObject {
+public extension JSONObject {
     subscript(dynamicMember member: String) -> Any? {
         get {
             self.get(key: member)

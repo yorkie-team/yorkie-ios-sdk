@@ -20,14 +20,14 @@ import Foundation
  * `JSONArray` represents JSON array, but unlike regular JSON, it has time
  * tickets created by a logical clock to resolve conflicts.
  */
-class JSONArray {
+public class JSONArray {
     static let notAppend = -1
     static let notFound = -1
 
     var target: CRDTArray!
     var context: ChangeContext!
 
-    init() {}
+    public init() {}
 
     init(target: CRDTArray, changeContext: ChangeContext) {
         self.target = target
@@ -139,7 +139,7 @@ class JSONArray {
         self.push(value)
     }
 
-    func append(values: [Any]) {
+    public func append(values: [Any]) {
         self.push(values: values)
     }
 
@@ -511,6 +511,10 @@ class JSONArray {
         }
         return Self.notFound
     }
+
+    var debugDescription: String {
+        self.target.debugDescription
+    }
 }
 
 extension JSONArray: JSONDatable {
@@ -523,15 +527,23 @@ extension JSONArray: JSONDatable {
     }
 }
 
-extension JSONArray: Sequence {
-    typealias Element = Any
+extension JSONArray {
+    var toArray: [Any] {
+        self.target.compactMap {
+            toJSONElement(from: $0)
+        }
+    }
+}
 
-    func makeIterator() -> JSONArrayIterator {
+extension JSONArray: Sequence {
+    public typealias Element = Any
+
+    public func makeIterator() -> JSONArrayIterator {
         return JSONArrayIterator(self.target, self.context)
     }
 }
 
-class JSONArrayIterator: IteratorProtocol {
+public class JSONArrayIterator: IteratorProtocol {
     private var values: [CRDTElement]
     private var iteratorNext: Int = 0
     private let context: ChangeContext
@@ -544,7 +556,7 @@ class JSONArrayIterator: IteratorProtocol {
         }
     }
 
-    func next() -> Any? {
+    public func next() -> Any? {
         defer {
             self.iteratorNext += 1
         }
@@ -555,19 +567,5 @@ class JSONArrayIterator: IteratorProtocol {
 
         let value = self.values[self.iteratorNext]
         return ElementConverter.toWrappedElement(from: value, context: self.context)
-    }
-}
-
-extension JSONArray: CustomDebugStringConvertible {
-    var debugDescription: String {
-        self.target.debugDescription
-    }
-}
-
-extension JSONArray {
-    var toArray: [Any] {
-        self.target.compactMap {
-            toJSONElement(from: $0)
-        }
     }
 }
