@@ -118,7 +118,7 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
 class RGATreeList {
     private let dummyHead: RGATreeListNode
     private var last: RGATreeListNode
-    private var nodeMapByIndex: SplayTree<CRDTElement>
+    private let nodeMapByIndex: SplayTree<CRDTElement>
     private var nodeMapByCreatedAt: [TimeTicket: RGATreeListNode]
 
     init() {

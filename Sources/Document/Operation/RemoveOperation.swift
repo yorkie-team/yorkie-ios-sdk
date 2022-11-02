@@ -35,7 +35,7 @@ class RemoveOperation: Operation {
      */
     func execute(root: CRDTRoot) throws {
         let parent = root.find(createdAt: getParentCreatedAt())
-        guard let obj = parent as? CRDTContainer else {
+        guard let object = parent as? CRDTContainer else {
             let log: String
             if let parent {
                 log = "only object and array can execute remove: \(parent)"
@@ -47,7 +47,7 @@ class RemoveOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        let element = try obj.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
+        let element = try object.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
         root.registerRemovedElement(element)
     }
 

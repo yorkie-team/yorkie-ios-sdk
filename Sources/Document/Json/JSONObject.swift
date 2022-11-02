@@ -22,8 +22,8 @@ import Foundation
  */
 @dynamicMemberLookup
 public class JSONObject {
-    var target: CRDTObject!
-    var context: ChangeContext!
+    private var target: CRDTObject!
+    private var context: ChangeContext!
 
     init() {}
 

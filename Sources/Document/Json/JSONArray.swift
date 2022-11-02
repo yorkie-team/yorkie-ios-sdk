@@ -24,8 +24,8 @@ public class JSONArray {
     static let notAppend = -1
     static let notFound = -1
 
-    var target: CRDTArray!
-    var context: ChangeContext!
+    private var target: CRDTArray!
+    private var context: ChangeContext!
 
     public init() {}
 

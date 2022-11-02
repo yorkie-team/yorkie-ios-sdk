@@ -23,19 +23,19 @@ class ChangePack {
     /**
      * `documentKey` is the key of the document.
      */
-    private var documentKey: String
+    private let documentKey: String
 
     /**
      * `Checkpoint` is used to determine the client received changes.
      */
-    private var checkpoint: Checkpoint
+    private let checkpoint: Checkpoint
 
-    private var changes: [Change]
+    private let changes: [Change]
 
     /**
      * `snapshot` is a byte array that encode the document.
      */
-    private var snapshot: Data?
+    private let snapshot: Data?
 
     /**
      * `minSyncedTicket` is the minimum logical time taken by clients who attach
