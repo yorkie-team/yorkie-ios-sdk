@@ -17,7 +17,7 @@
 import Combine
 import Foundation
 
-class Document {
+public actor Document {
     private var key: String
     private var root: CRDTRoot
     private var clone: CRDTRoot?
@@ -27,7 +27,7 @@ class Document {
 
     let eventStream: PassthroughSubject<DocEvent, YorkieError>
 
-    init(key: String) {
+    public init(key: String) {
         self.key = key
         self.root = CRDTRoot()
         self.changeID = ChangeID.initial
@@ -39,7 +39,7 @@ class Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    func update(updater: (_ root: JSONObject) -> Void, message: String? = nil) {
+    public func update(updater: (_ root: JSONObject) -> Void, message: String? = nil) {
         let clone = self.cloned()
         let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
 
@@ -214,7 +214,7 @@ class Document {
     /**
      * `toSortedJSON` returns the sorted JSON encoding of this array.
      */
-    private func toSortedJSON() -> String {
+    func toSortedJSON() -> String {
         return self.root.debugDescription
     }
 
@@ -240,11 +240,12 @@ class Document {
      * `applyChanges` applies the given changes into this document.
      */
     func applyChanges(changes: [Change]) throws {
-        Logger.debug("""
-        trying to apply \(changes.count) remote changes.
-        elements:\(self.root.getElementMapSize()),
-        removeds:\(self.root.getRemovedElementSetSize())
-        """)
+        Logger.debug(
+            """
+            trying to apply \(changes.count) remote changes.
+            elements:\(self.root.getElementMapSize()),
+            removeds:\(self.root.getRemovedElementSetSize())
+            """)
 
         Logger.trivial(changes.map { "\($0.getID().getStructureAsString())\t\($0.getStructureAsString())" }.joined(separator: "\n"))
 
@@ -259,9 +260,11 @@ class Document {
         }
 
         Logger.debug(
-            "after appling \(changes.count) remote changes.\n" +
-                "elements:\(self.root.getElementMapSize()), \n" +
-                "removeds:\(self.root.getRemovedElementSetSize())"
+            """
+            after appling \(changes.count) remote changes.
+            elements:\(self.root.getElementMapSize()),
+            removeds:\(self.root.getRemovedElementSetSize())
+            """
         )
     }
 
@@ -275,11 +278,5 @@ class Document {
             }
         }
         return pathTrie.findPrefixes().map { $0.joined(separator: ".") }
-    }
-}
-
-extension Document: CustomDebugStringConvertible {
-    var debugDescription: String {
-        self.toSortedJSON()
     }
 }

@@ -23,7 +23,7 @@ class Change {
     private var id: ChangeID
 
     // `operations` represent a series of user edits.
-    private var operations: [Operation]
+    private let operations: [Operation]
 
     // `message` is used to save a description of the change.
     private let message: String?

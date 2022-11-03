@@ -18,9 +18,9 @@ import XCTest
 @testable import Yorkie
 
 class JSONObjectTests: XCTestCase {
-    func test_can_set() throws {
+    func test_can_set() async throws {
         let target = Document(key: "doc1")
-        target.update { root in
+        await target.update { root in
             root.set(key: "boolean", value: true)
             root.set(key: "integer", value: Int32(111))
             root.set(key: "long", value: Int64(9_999_999))
@@ -52,9 +52,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_remove() {
+    func test_can_remove() async {
         let target = Document(key: "doc1")
-        target.update { root in
+        await target.update { root in
             root.boolean = true
             root.integer = Int32(111)
             root.long = Int64(9_999_999)
@@ -87,9 +87,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_set_with_dictionary() {
+    func test_can_set_with_dictionary() async {
         let target = Document(key: "doc1")
-        target.update { root in
+        await target.update { root in
             root.set([
                 "boolean": true,
                 "integer": Int32(111),
@@ -121,9 +121,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_set_with_key_and_dictionary() {
+    func test_can_set_with_key_and_dictionary() async {
         let target = Document(key: "doc1")
-        target.update { root in
+        await target.update { root in
             root.set(key: "top", value: [
                 "boolean": true,
                 "integer": Int32(111),
