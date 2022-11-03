@@ -135,6 +135,7 @@ class JSONArray {
     }
 
     @discardableResult
+    /// - Returns: The number of elements.
     func append(_ value: Any) -> Int {
         self.push(value)
     }
@@ -146,11 +147,11 @@ class JSONArray {
     func push(values: [Any]) {
         values.forEach { value in
             if let value = value as? [String: Any] {
-                let appendedIndex = push(JSONObject())
+                let appendedIndex = push(JSONObject()) - 1
                 let jsonObject = self[appendedIndex] as? JSONObject
                 jsonObject?.set(value)
             } else if let value = value as? [Any] {
-                let appendedIndex = push(JSONArray())
+                let appendedIndex = push(JSONArray()) - 1
                 let jsonArray = self[appendedIndex] as? JSONArray
                 jsonArray?.push(value)
             } else {
@@ -160,6 +161,7 @@ class JSONArray {
     }
 
     @discardableResult
+    /// - Returns: The number of elements.
     func push(_ value: Any) -> Int {
         self.pushInternal(value)
     }
@@ -178,12 +180,13 @@ class JSONArray {
      * `pushInternal` pushes the value to the target array.
      */
     @discardableResult
+    /// - Returns: The number of elements.
     private func pushInternal(_ value: Any) -> Int {
         let appendedElement = try? self.insertAfterInternal(previousCreatedAt: self.target.getLastCreatedAt(), value: value)
         guard appendedElement != nil else {
             return Self.notAppend
         }
-        return self.target.length - 1
+        return self.target.length
     }
 
     /**
@@ -268,7 +271,7 @@ class JSONArray {
                 child.pushInternal(element)
             }
             return crdtArray
-        } else if let jsonObject = value as? JSONObject {
+        } else if value is JSONObject {
             let crdtObject = CRDTObject(createdAt: ticket)
 
             try self.target.insert(value: crdtObject, afterCreatedAt: previousCreatedAt)

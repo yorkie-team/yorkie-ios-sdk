@@ -26,17 +26,17 @@ class JSONArrayTests: XCTestCase {
 
             XCTAssertNotNil(array?.getID())
 
-            let int64Index = array?.append(Int64(1))
+            let int64Index = (array?.append(Int64(1)) ?? 0) - 1
 
-            let value = array?[int64Index!] as? Int64
+            let value = array?[int64Index] as? Int64
             XCTAssertEqual(value, 1)
 
             array?.append(Int32(2))
             array?.append("a")
             array?.append(Double(1.2345))
             array?.append(true)
-            let arrayValueIndex = array?.append([Int32(11), Int32(12), Int32(13)])
-            let arrayValue = array?[arrayValueIndex!] as? JSONArray
+            let arrayValueIndex = (array?.append([Int32(11), Int32(12), Int32(13)]) ?? 0) - 1
+            let arrayValue = array?[arrayValueIndex] as? JSONArray
             arrayValue?.append(values: [Int32(21), Int32(22), Int32(23)])
 
             XCTAssertEqual(root.debugDescription,
