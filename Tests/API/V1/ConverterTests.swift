@@ -357,7 +357,7 @@ class ConverterTests: XCTestCase {
     }
 
     func test_presence() {
-        let samplePresence: Indexable = ["a": "str", "b": 10, "c": 0.5, "d": false, "e": ["a", "b", "c"], "f": ""]
+        let samplePresence: Presence = ["a": "str", "b": 10, "c": 0.5, "d": false, "e": ["a", "b", "c"], "f": ""]
 
         let presence = PresenceInfo(clock: Int32.random(in: 0 ... Int32.max), data: samplePresence)
         let converted = Converter.fromPresence(pbPresence: Converter.toClient(id: ActorIDs.initial, presence: presence).presence)

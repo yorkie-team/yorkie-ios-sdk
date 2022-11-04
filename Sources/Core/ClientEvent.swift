@@ -88,7 +88,7 @@ struct PeerChangedEvent: BaseClientEvent {
     /**
      * `PeersChangedEvent` value
      */
-    var value: [String: [String: Indexable]]
+    var value: [String: [String: Presence]]
 }
 
 /**

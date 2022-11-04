@@ -18,9 +18,10 @@ import Combine
 import Foundation
 
 /**
- * Indexable key, value
+ * Presence key, value dictionary
+ * Similar to an Indexable in JS SDK
  */
-typealias Indexable = [String: Any]
+typealias Presence = [String: Any]
 
 public actor Document {
     private let key: String

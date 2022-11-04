@@ -60,7 +60,7 @@ struct Attachment {
  */
 struct PresenceInfo {
     var clock: Int32
-    var data: Indexable
+    var data: Presence
 }
 
 /**
@@ -83,7 +83,7 @@ struct ClientOptions {
      * attaches a document, the presence information is sent to the other peers
      * attached to the document.
      */
-    var presence: Indexable?
+    var presence: Presence?
 
     /**
      * `apiKey` is the API key of the project. It is used to identify the project.
@@ -147,7 +147,7 @@ final class Client {
     public let key: String
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus
-    public var presence: Indexable { self.presenceInfo.data }
+    public var presence: Presence { self.presenceInfo.data }
     public let eventStream: PassthroughSubject<BaseClientEvent, YorkieError>
 
     /**
@@ -359,7 +359,7 @@ final class Client {
     /**
      * `updatePresence` updates the presence of this client.
      */
-    public func updatePresence(_ key: Indexable.Key, _ value: Indexable) async throws {
+    public func updatePresence(_ key: Presence.Key, _ value: Presence) async throws {
         guard self.isActive, let id = self.id else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -386,7 +386,7 @@ final class Client {
         updatePresenceRequest.client = Converter.toClient(id: id, presence: self.presenceInfo)
         updatePresenceRequest.documentKeys = keys
 
-        let event = PeerChangedEvent(value: keys.reduce([String: [String: Indexable]](), self.getPeersWithDocKey(peersMap:key:)))
+        let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
         self.eventStream.send(event)
 
         do {
@@ -400,8 +400,8 @@ final class Client {
     /**
      * `getPeers` returns the peers of the given document.
      */
-    public func getPeers(key: String) -> [String: Indexable] {
-        var peers = [String: Indexable]()
+    public func getPeers(key: String) -> [String: Presence] {
+        var peers = [String: Presence]()
         self.attachmentMap[key]?.peerPresenceMap?.forEach {
             peers[$0.key] = $0.value.data
         }
@@ -411,9 +411,9 @@ final class Client {
     /**
      * `getPeersWithDocKey` returns the peers of the given document wrapped in an object.
      */
-    private func getPeersWithDocKey(peersMap: [String: [String: Indexable]], key: String) -> [String: [String: Indexable]] {
+    private func getPeersWithDocKey(peersMap: [String: [String: Presence]], key: String) -> [String: [String: Presence]] {
         var newPeerMap = peersMap
-        var peers = [String: Indexable]()
+        var peers = [String: Presence]()
         self.attachmentMap[key]?.peerPresenceMap?.forEach {
             peers[$0.key] = $0.value.data
         }
@@ -531,7 +531,7 @@ final class Client {
                 }
             }
 
-            let event = PeerChangedEvent(value: keys.reduce([String: [String: Indexable]](), self.getPeersWithDocKey(peersMap:key:)))
+            let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
             self.eventStream.send(event)
         case .event(let pbWatchEvent):
             let responseKeys = pbWatchEvent.documentKeys
@@ -562,7 +562,7 @@ final class Client {
                 let event = DocumentsChangedEvent(value: responseKeys)
                 self.eventStream.send(event)
             case .documentsWatched, .documentsUnwatched, .presenceChanged:
-                let event = PeerChangedEvent(value: keys.reduce([String: [String: Indexable]](), self.getPeersWithDocKey(peersMap:key:)))
+                let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
                 self.eventStream.send(event)
             case .UNRECOGNIZED:
                 break
