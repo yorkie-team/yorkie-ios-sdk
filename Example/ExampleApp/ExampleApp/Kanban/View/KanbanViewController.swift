@@ -17,6 +17,7 @@
 import Combine
 import UIKit
 
+@MainActor
 class KanbanViewController: UIViewController {
     private var cancellables = Set<AnyCancellable>()
     private let itemHeight: CGFloat = CommonConstant.labelHeight
@@ -111,11 +112,11 @@ class KanbanViewController: UIViewController {
 
 extension KanbanViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        self.viewModel.items[section].cards.count
+        self.viewModel.columns[section].cards.count
     }
 
     func numberOfSections(in collectionView: UICollectionView) -> Int {
-        self.viewModel.items.count
+        self.viewModel.columns.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -125,7 +126,7 @@ extension KanbanViewController: UICollectionViewDataSource {
             return cell
         }
 
-        let column = self.viewModel.items[indexPath.section]
+        let column = self.viewModel.columns[indexPath.section]
         result.configure(with: column.cards[indexPath.item])
         result.deleteCard = { [weak self] card in
             guard let self else { return }
@@ -142,7 +143,7 @@ extension KanbanViewController: UICollectionViewDataSource {
                                                                      withReuseIdentifier: KanbanViewCardHeader.identifier,
                                                                      for: indexPath)
             if let view = result as? KanbanViewCardHeader {
-                view.configure(with: self.viewModel.items[indexPath.section])
+                view.configure(with: self.viewModel.columns[indexPath.section])
                 view.deleteColumn = { [weak self] column in
                     guard let self else { return }
                     self.viewModel.deleteColumn(column)
@@ -154,7 +155,7 @@ extension KanbanViewController: UICollectionViewDataSource {
                                                                      withReuseIdentifier: KanbanViewCardFooter.identifier,
                                                                      for: indexPath)
             if let view = result as? KanbanViewCardFooter {
-                view.configure(with: self.viewModel.items[indexPath.section])
+                view.configure(with: self.viewModel.columns[indexPath.section])
                 view.showAddCardView = { [weak self] column in
                     guard let self else { return }
                     self.showAddCardAlert(column: column)

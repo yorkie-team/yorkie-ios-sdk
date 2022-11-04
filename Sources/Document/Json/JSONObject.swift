@@ -41,7 +41,7 @@ public class JSONObject {
             } else if let value = value as? [Any] {
                 set(key: key, value: JSONArray())
                 let jsonArray = get(key: key) as? JSONArray
-                jsonArray?.push(value)
+                jsonArray?.push(values: value)
             } else {
                 set(key: key, value: value)
             }
@@ -192,7 +192,7 @@ public class JSONObject {
     /**
      * `getID` returns the ID(time ticket) of this Object.
      */
-    func getID() -> TimeTicket {
+    public func getID() -> TimeTicket {
         self.target.getCreatedAt()
     }
 

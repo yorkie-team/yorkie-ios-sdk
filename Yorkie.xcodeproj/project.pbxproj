@@ -77,6 +77,8 @@
 		CEC631DE28F4F36100915A85 /* StringEscapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */; };
+		CEDDE26E2914EAD00032B16A /* YorkieObjectable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE26D2914EAD00032B16A /* YorkieObjectable.swift */; };
+		CEDDE2722914EB5C0032B16A /* YorkieObjectableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2702914EB260032B16A /* YorkieObjectableTests.swift */; };
 		CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E028C84D26004988DD /* yorkie.pb.swift */; };
 		CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E128C84D26004988DD /* resources.pb.swift */; };
 		CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E228C84D26004988DD /* yorkie.grpc.swift */; };
@@ -172,6 +174,8 @@
 		CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringEscapingTests.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObjectTests.swift; sourceTree = "<group>"; };
+		CEDDE26D2914EAD00032B16A /* YorkieObjectable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieObjectable.swift; sourceTree = "<group>"; };
+		CEDDE2702914EB260032B16A /* YorkieObjectableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieObjectableTests.swift; sourceTree = "<group>"; };
 		CEEB17DC28C84CC3004988DD /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
 		CEEB17DD28C84CC3004988DD /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
 		CEEB17E028C84D26004988DD /* yorkie.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.pb.swift; sourceTree = "<group>"; };
@@ -296,6 +300,7 @@
 		CE3EC97028D40421009471BC /* Document */ = {
 			isa = PBXGroup;
 			children = (
+				CEDDE26F2914EB060032B16A /* Util */,
 				CE8BB73528FE28350020F62A /* Change */,
 				CE3EC96F28D40415009471BC /* CRDT */,
 				CE8ED31728F55F25009A5419 /* Operation */,
@@ -357,6 +362,7 @@
 		CE8C22E428C9E53E00432DE5 /* Document */ = {
 			isa = PBXGroup;
 			children = (
+				CEDDE26C2914EABA0032B16A /* Util */,
 				CE8C22E628C9E55300432DE5 /* Change */,
 				CE8C22E728C9E55800432DE5 /* CRDT */,
 				CE8C22E828C9E55E00432DE5 /* Json */,
@@ -486,6 +492,22 @@
 				CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */,
 			);
 			path = TestUtils;
+			sourceTree = "<group>";
+		};
+		CEDDE26C2914EABA0032B16A /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				CEDDE26D2914EAD00032B16A /* YorkieObjectable.swift */,
+			);
+			path = Util;
+			sourceTree = "<group>";
+		};
+		CEDDE26F2914EB060032B16A /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				CEDDE2702914EB260032B16A /* YorkieObjectableTests.swift */,
+			);
+			path = Util;
 			sourceTree = "<group>";
 		};
 		CEEB17CF28C8493F004988DD /* V1 */ = {
@@ -709,6 +731,7 @@
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
 				CEBC840A2909252000781AE9 /* ElementConverter.swift in Sources */,
 				CE8ED31C28F56506009A5419 /* RemoveOperation.swift in Sources */,
+				CEDDE26E2914EAD00032B16A /* YorkieObjectable.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -731,6 +754,7 @@
 				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
 				CE9F6FAE2910FBBA002F776D /* DocumentConcurrentAccessTests.swift in Sources */,
 				CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */,
+				CEDDE2722914EB5C0032B16A /* YorkieObjectableTests.swift in Sources */,
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,

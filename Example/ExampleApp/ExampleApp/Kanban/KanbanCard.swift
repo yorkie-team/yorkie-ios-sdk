@@ -15,9 +15,10 @@
  */
 
 import Foundation
+import Yorkie
 
-struct KanbanCard {
-    let id: String = UUID().uuidString
-    let columnId: String
+struct KanbanCard: YorkieObjectable {
+    var id: TimeTicket = .initial
+    var columnId: TimeTicket = .initial
     let title: String
 }

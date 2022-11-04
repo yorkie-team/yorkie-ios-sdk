@@ -19,7 +19,7 @@ import Foundation
 /**
  * `DocEventType` is document event types
  */
-enum DocEventType: String {
+public enum DocEventType: String {
     /**
      * snapshot event type
      */
@@ -34,7 +34,7 @@ enum DocEventType: String {
     case remoteChange = "remote-change"
 }
 
-protocol DocEvent {
+public protocol DocEvent {
     var type: DocEventType { get }
 }
 

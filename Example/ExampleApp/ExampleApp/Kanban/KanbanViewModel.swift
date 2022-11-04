@@ -14,38 +14,111 @@
  * limitations under the License.
  */
 
+import Combine
 import Foundation
+import Yorkie
 
 class KanbanViewModel: ObservableObject {
+    private var cancellables = Set<AnyCancellable>()
+
+    private(set) var defaultColumns: [KanbanColumn] = [
+        KanbanColumn(title: "todo", cards: [
+            KanbanCard(title: "walking"),
+            KanbanCard(title: "running")
+        ]),
+        KanbanColumn(title: "mart", cards: [
+            KanbanCard(title: "snaks")
+        ])
+    ]
+
     @Published
-    private(set) var items: [KanbanColumn] = []
+    private(set) var columns: [KanbanColumn] = []
 
-    func addColumn(title: String) {
-        let column = KanbanColumn(title: title, cards: [])
-        self.items.append(column)
-    }
+    private let document: Document
 
-    func deleteColumn(_ column: KanbanColumn) {
-        self.items.removeAll {
-            $0.id == column.id
+    init() {
+        self.document = Document(key: "kanban-1")
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            await self.document.eventStream.sink { _ in
+                Task { @MainActor [weak self] in
+                    guard let self, let jsonArray = await self.document.getRoot().lists as? JSONArray else { return }
+
+                    self.columns = jsonArray.compactMap { each -> KanbanColumn? in
+                        guard let column = each as? JSONObject, let cardArray = column.cards as? JSONArray else { return nil }
+
+                        let cards = cardArray.compactMap { each -> KanbanCard? in
+                            guard let cardObject = each as? JSONObject else { return nil }
+                            return KanbanCard(id: cardObject.getID(), columnId: column.getID(), title: cardObject.title as! String)
+                        }
+                        return KanbanColumn(id: column.getID(), title: column.title as! String, cards: cards)
+                    }
+
+                    print("##", await self.document.getRoot())
+                }
+            }.store(in: &self.cancellables)
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            await self.document.update { root in
+                if root.lists == nil {
+                    root.lists = self.defaultColumns.toYorkieArray
+                }
+            }
         }
     }
 
-    func addCard(title: String, columnId: String) {
-        guard let index = self.items.firstIndex(where: { $0.id == columnId }) else { return }
+    func addColumn(title: String) {
+        Task {
+            await self.document.update { root in
+                guard let lists = root.lists as? JSONArray else { return }
+                let column = KanbanColumn(title: title).toYorkieObject
+                lists.append(column)
+            }
+        }
+    }
 
-        let card = KanbanCard(columnId: columnId, title: title)
-        var cards = self.items[index].cards
-        cards.append(card)
-        self.items[index].cards = cards
+    func deleteColumn(_ column: KanbanColumn) {
+        Task {
+            await self.document.update { root in
+                guard let lists = root.lists as? JSONArray else { return }
+                lists.remove(byID: column.id)
+            }
+        }
+    }
+
+    func addCard(title: String, columnId: TimeTicket) {
+        Task {
+            await self.document.update { root in
+                guard let lists = root.lists as? JSONArray,
+                      let column = lists.getElement(byID: columnId) as? JSONObject,
+                      let cards = column.cards as? JSONArray
+                else {
+                    return
+                }
+
+                let card = KanbanCard(columnId: columnId, title: title).toYorkieObject
+                cards.append(card)
+            }
+        }
     }
 
     func deleteCard(_ card: KanbanCard) {
-        guard let columnIndex = self.items.firstIndex(where: { $0.id == card.columnId }) else { return }
+        Task {
+            await self.document.update { root in
+                guard let lists = root.lists as? JSONArray,
+                      let column = lists.getElement(byID: card.columnId) as? JSONObject,
+                      let cards = column.cards as? JSONArray
+                else {
+                    return
+                }
 
-        var cards = self.items[columnIndex].cards
-        guard let index = cards.firstIndex(where: { $0.id == card.id }) else { return }
-        cards.remove(at: index)
-        self.items[columnIndex].cards = cards
+                cards.remove(byID: card.id)
+            }
+        }
     }
 }

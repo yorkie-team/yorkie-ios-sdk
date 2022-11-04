@@ -37,14 +37,14 @@ public class JSONArray {
     /**
      * `getID` returns the ID, `TimeTicket` of this Object.
      */
-    func getID() -> TimeTicket {
+    public func getID() -> TimeTicket {
         return self.target.getCreatedAt()
     }
 
     /**
      * `getElementByID` returns the element for the given ID.
      */
-    func getElement(byID createdAt: TimeTicket) -> Any? {
+    public func getElement(byID createdAt: TimeTicket) -> Any? {
         guard let value = try? target.get(createdAt: createdAt) else {
             Logger.error("The value does not exist. - createdAt: \(createdAt)")
             return nil
@@ -77,8 +77,10 @@ public class JSONArray {
      * `remove` removes the element of the given ID.
      */
     @discardableResult
-    func remove(byID createdAt: TimeTicket) throws -> Any? {
-        let removed = try removeInternal(byID: createdAt)
+    public func remove(byID createdAt: TimeTicket) -> Any? {
+        guard let removed = try? removeInternal(byID: createdAt) else {
+            return nil
+        }
         return toWrappedElement(from: removed)
     }
 
@@ -136,7 +138,7 @@ public class JSONArray {
 
     @discardableResult
     /// - Returns: The number of elements.
-    func append(_ value: Any) -> Int {
+    public func append(_ value: Any) -> Int {
         self.push(value)
     }
 
@@ -146,24 +148,28 @@ public class JSONArray {
 
     func push(values: [Any]) {
         values.forEach { value in
-            if let value = value as? [String: Any] {
-                let appendedIndex = push(JSONObject()) - 1
-                let jsonObject = self[appendedIndex] as? JSONObject
-                jsonObject?.set(value)
-            } else if let value = value as? [Any] {
-                let appendedIndex = push(JSONArray()) - 1
-                let jsonArray = self[appendedIndex] as? JSONArray
-                jsonArray?.push(value)
-            } else {
-                push(value)
-            }
+            push(value)
         }
     }
 
     @discardableResult
     /// - Returns: The number of elements.
     func push(_ value: Any) -> Int {
-        self.pushInternal(value)
+        if let value = value as? [String: Any] {
+            let length = self.push(JSONObject())
+            let appendedIndex = length - 1
+            let jsonObject = self[appendedIndex] as? JSONObject
+            jsonObject?.set(value)
+            return length
+        } else if let value = value as? [Any] {
+            let length = self.push(JSONArray())
+            let appendedIndex = length - 1
+            let jsonArray = self[appendedIndex] as? JSONArray
+            jsonArray?.push(value)
+            return length
+        } else {
+            return self.pushInternal(value)
+        }
     }
 
     func length() -> Int {
@@ -569,6 +575,7 @@ public class JSONArrayIterator: IteratorProtocol {
         }
 
         let value = self.values[self.iteratorNext]
-        return ElementConverter.toWrappedElement(from: value, context: self.context)
+        return ElementConverter.toJSONElement(from: value, context: self.context)
+//        return ElementConverter.toWrappedElement(from: value, context: self.context)
     }
 }

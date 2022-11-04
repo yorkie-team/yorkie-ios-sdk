@@ -25,7 +25,7 @@ public actor Document {
     private var checkpoint: Checkpoint
     private var localChanges: [Change]
 
-    let eventStream: PassthroughSubject<DocEvent, YorkieError>
+    public let eventStream: PassthroughSubject<DocEvent, Never>
 
     public init(key: String) {
         self.key = key
@@ -169,7 +169,7 @@ public actor Document {
     /**
      * `getRoot` returns a new proxy of cloned root.
      */
-    func getRoot() -> JSONObject {
+    public func getRoot() -> JSONObject {
         let clone = self.cloned()
         let context = ChangeContext(id: self.changeID.next(), root: clone)
 
