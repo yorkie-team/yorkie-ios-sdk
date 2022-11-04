@@ -447,6 +447,14 @@ final class Client {
 
                 for try await _ in group {}
             }
+            
+            let syncLoopDuration = self.watchLoopTask != nil ? self.syncLoopDuration : self.reconnectStreamDelay
+
+            Timer.scheduledTimer(withTimeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
+                Task {
+                    await self.doSyncLoop()
+                }
+            }
         } catch {
             Logger.error("[SL] c:\"\(self.key)\" sync failed: \(error)")
 
