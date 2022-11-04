@@ -106,38 +106,58 @@ enum Converter {
 
 // MARK: Presence
 extension Converter {
-    /*
     /**
      * `fromPresence` converts the given Protobuf format to model format.
      */
-    static func fromPresence<T>(pbPresence: PbPresence) -> PresenceInfo<T> {
-        let data = [String: String]()
-        
+    static func fromPresence(pbPresence: PbPresence) -> PresenceInfo {
+        var data = [String: Any]()
+                
         pbPresence.data.forEach { (key, value) in
-            // TODO: decode data to JSON.
-//            data[key] = JSONDecoder().decode(, from: <#T##ByteBuffer#>)
+            if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) {
+                data[key] = jsonValue
+            } else {
+                if value.first == "\"" && value.last == "\"" {
+                    data[key] = value.substring(from: 1, to: value.count - 2)
+                } else {
+                    if let intValue = Int(value) {
+                        data[key] = intValue
+                    } else if let doubleValue = Double(value) {
+                        data[key] = doubleValue
+                    } else if "\(true)" == value.lowercased() {
+                        data[key] = true
+                    } else if "\(false)" == value.lowercased() {
+                        data[key] = false
+                    } else {
+                        assertionFailure("Invalid Presence Value [\(key)]:[\(value)")
+                    }
+                }
+            }
         }
-        
-        return PresenceInfo<T>(clock: Int(pbPresence.clock), data: data)
+                
+        return PresenceInfo(clock: pbPresence.clock, data: data)
     }
     
     /**
      * `toClient` converts the given model to Protobuf format.
      */
-    function toClient<M>(id: string, presence: PresenceInfo<M>): PbClient {
-      const pbPresence = new PbPresence();
-      pbPresence.setClock(presence.clock);
-      const pbDataMap = pbPresence.getDataMap();
-      for (const [key, value] of Object.entries(presence.data)) {
-        pbDataMap.set(key, JSON.stringify(value));
-      }
+    static func toClient(id: String, presence: PresenceInfo) -> PbClient {
+        var pbPresence = PbPresence()
+        pbPresence.clock = presence.clock
+        
+       presence.data.forEach { (key, value) in
+            if JSONSerialization.isValidJSONObject(value), let jsonData = try? JSONSerialization.data(withJSONObject: value) {
+                pbPresence.data[key] = String(bytes: jsonData, encoding: .utf8)
+            } else {
+                // emulate JSON.stringfy() in JavaScript.
+                pbPresence.data[key] = value is String ? "\"\(value)\"" : "\(value)"
+            }
+        }
 
-      const pbClient = new PbClient();
-      pbClient.setId(toUint8Array(id));
-      pbClient.setPresence(pbPresence);
-      return pbClient;
+        var pbClient = PbClient()
+        pbClient.id = id.toData ?? Data()
+        pbClient.presence = pbPresence
+        return pbClient;
     }
-     */
 }
 
 // MARK: Checkpoint
@@ -997,6 +1017,28 @@ extension Converter {
                    operations: try fromOperations($0.operations),
                    message: $0.message.isEmpty ? nil : $0.message)
         }
+    }
+}
+
+// MARK: Bytes.
+extension Converter {
+    /**
+     * `bytesToObject` creates an JSONObject from the given byte array.
+     */
+    static func bytesToObject(bytes: Data) throws -> CRDTObject {
+        guard bytes.isEmpty == false else {
+            return CRDTObject(createdAt: TimeTicket.initial)
+        }
+        
+        let pbElement = try PbJSONElement(serializedData: bytes)
+        return try fromObject(pbElement.jsonObject)
+    }
+    
+    /**
+     * `objectToBytes` converts the given JSONObject to byte array.
+     */
+    static func objectToBytes(obj: CRDTObject) throws -> Data {
+        try toElement(obj).serializedData()
     }
 }
 

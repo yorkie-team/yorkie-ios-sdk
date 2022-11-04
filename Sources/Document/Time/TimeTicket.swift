@@ -92,7 +92,7 @@ struct TimeTicket: Comparable {
     /**
      * `getActorID` returns actorID.
      */
-    func getActorID() -> String? {
+    func getActorID() -> ActorID? {
         return self.actorID
     }
 

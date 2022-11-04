@@ -19,10 +19,17 @@
 import Foundation
 
 typealias YorkieServiceNIOClient = Yorkie_V1_YorkieServiceNIOClient
+typealias YorkieServiceAsyncClient = Yorkie_V1_YorkieServiceAsyncClient
+
 typealias ActivateClientRequest = Yorkie_V1_ActivateClientRequest
 typealias DeactivateClientRequest = Yorkie_V1_DeactivateClientRequest
-typealias YorkieServiceAsyncClient = Yorkie_V1_YorkieServiceAsyncClient
 typealias AttachDocumentRequest = Yorkie_V1_AttachDocumentRequest
+typealias DetachDocumentRequest = Yorkie_V1_DetachDocumentRequest
+typealias PushPullRequest = Yorkie_V1_PushPullRequest
+typealias WatchDocumentsRequest = Yorkie_V1_WatchDocumentsRequest
+typealias UpdatePresenceRequest = Yorkie_V1_UpdatePresenceRequest
+
+typealias WatchDocumentsResponse = Yorkie_V1_WatchDocumentsResponse
 
 typealias PbChange = Yorkie_V1_Change
 typealias PbChangeID = Yorkie_V1_ChangeID

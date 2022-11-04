@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import Combine
 import Foundation
 import GRPC
 import NIO
@@ -47,128 +48,42 @@ enum StreamConnectionStatus {
     case disconnected
 }
 
-/**
- * `DocumentSyncResultType` is document sync result types
- */
-enum DocumentSyncResultType: String {
-    /**
-     * type when Document synced.
-     */
-    case synced
-    /**
-     * type when Document sync failed.
-     */
-    case syncFailed = "sync-failed"
-}
-
-/**
- * `ClientEventType` is client event types
- */
-enum ClientEventType: String {
-    /**
-     * client event type when status changed.
-     */
-    case statusChanged = "status-changed"
-    /**
-     * client event type when documents changed.
-     */
-    case documentsChanged = "documents-changed"
-    /**
-     * client event type when peers changed.
-     */
-    case peersChanged = "peers-changed"
-    /**
-     * client event type when stream connection changed.
-     */
-    case streamConnectionStatusChanged = "stream-connection-status-changed"
-    /**
-     * client event type when document synced.
-     */
-    case documentSynced = "document-synced"
-}
-
-protocol BaseClientEvent {
-    var type: ClientEventType { get }
-}
-
-/**
- * `StatusChangedEvent` is an event that occurs when the Client's state changes.
- */
-struct StatusChangedEvent: BaseClientEvent {
-    /**
-     * enum {@link ClientEventType}.StatusChanged
-     */
-    var type: ClientEventType = .statusChanged
-    /**
-     * `DocumentsChangedEvent` value
-     */
-    var value: ClientStatus
-}
-
-/**
- * `DocumentsChangedEvent` is an event that occurs when documents attached to
- * the client changes.
- */
-struct DocumentsChangedEvent: BaseClientEvent {
-    /**
-     * enum {@link ClientEventType}.DocumentsChangedEvent
-     */
-    var type: ClientEventType = .documentsChanged
-    /**
-     * `DocumentsChangedEvent` value
-     */
-    var value: [String]
-}
-
-/**
- * `StreamConnectionStatusChangedEvent` is an event that occurs when
- * the client's stream connection state changes.
- */
-struct StreamConnectionStatusChangedEvent: BaseClientEvent {
-    /**
-     * `StreamConnectionStatusChangedEvent` type
-     * enum {@link ClientEventType}.StreamConnectionStatusChangedEvent
-     */
-    var type: ClientEventType = .streamConnectionStatusChanged
-    /**
-     * `StreamConnectionStatusChangedEvent` value
-     */
-    var value: StreamConnectionStatus
-}
-
-/**
- * `DocumentSyncedEvent` is an event that occurs when documents
- * attached to the client are synced.
- */
-struct DocumentSyncedEvent: BaseClientEvent {
-    /**
-     * `DocumentSyncedEvent` type
-     * enum {@link ClientEventType}.DocumentSyncedEvent
-     */
-    var type: ClientEventType = .documentSynced
-    /**
-     * `DocumentSyncedEvent` value
-     */
-    var value: DocumentSyncResultType
+struct Attachment {
+    var doc: Document
+    var isRealtimeSync: Bool
+    var peerPresenceMap: [String: PresenceInfo]?
+    var remoteChangeEventReceived: Bool?
 }
 
 /**
  * `PresenceInfo` is presence information of this client.
  */
-struct PresenceInfo<P> {
-    var clock: Int
-    var data: P
+struct PresenceInfo {
+    var clock: Int32
+    var data: Indexable
 }
 
 /**
  * `ClientOptions` are user-settable options used when defining clients.
  */
 struct ClientOptions {
+    private enum DefaultClientOptions {
+        static let syncLoopDuration = 50
+        static let reconnectStreamDelay = 1000 // 1000 millisecond
+    }
+
     /**
      * `key` is the client key. It is used to identify the client.
      * If not set, a random key is generated.
      */
     var key: String?
+
+    /**
+     * `presence` is the presence information of this client. If the client
+     * attaches a document, the presence information is sent to the other peers
+     * attached to the document.
+     */
+    var presence: Indexable?
 
     /**
      * `apiKey` is the API key of the project. It is used to identify the project.
@@ -196,7 +111,7 @@ struct ClientOptions {
      */
     var reconnectStreamDelay: Int
 
-    init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int = 50, reconnectStreamDelay: Int = 1000) {
+    init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int = DefaultClientOptions.syncLoopDuration, reconnectStreamDelay: Int = DefaultClientOptions.reconnectStreamDelay) {
         self.key = key
         self.apiKey = apiKey
         self.token = token
@@ -216,18 +131,24 @@ struct RPCAddress {
  * to the server to synchronize with other replicas in remote.
  */
 final class Client {
-    private(set) var id: Data? // To be ActorID
-    let key: String
-    private(set) var status: ClientStatus
-
-    var isActive: Bool {
-        self.status == .activated
-    }
-
+    private var presenceInfo: PresenceInfo
+    private var attachmentMap: [String: Attachment]
     private let syncLoopDuration: Int
     private let reconnectStreamDelay: Int
-    private let rpcClient: Yorkie_V1_YorkieServiceAsyncClient
+
+    private let rpcClient: YorkieServiceAsyncClient
+    private var watchLoopReconnectTimer: Timer?
+    private var watchLoopTask: Task<Void, Never>?
+
     private let group: EventLoopGroup
+
+    // Public variables.
+    public private(set) var id: ActorID?
+    public let key: String
+    public var isActive: Bool { self.status == .activated }
+    public private(set) var status: ClientStatus
+    public var presence: Indexable { self.presenceInfo.data }
+    public let eventStream: PassthroughSubject<BaseClientEvent, YorkieError>
 
     /**
      * @param rpcAddr - the address of the RPC server.
@@ -235,7 +156,10 @@ final class Client {
      */
     init(rpcAddress: RPCAddress, options: ClientOptions) throws {
         self.key = options.key ?? UUID().uuidString
+        self.presenceInfo = PresenceInfo(clock: 0, data: options.presence ?? [String: Any]())
+
         self.status = .deactivated
+        self.attachmentMap = [String: Attachment]()
         self.syncLoopDuration = options.syncLoopDuration
         self.reconnectStreamDelay = options.reconnectStreamDelay
 
@@ -251,7 +175,8 @@ final class Client {
             throw error
         }
 
-        self.rpcClient = Yorkie_V1_YorkieServiceAsyncClient(channel: channel)
+        self.rpcClient = YorkieServiceAsyncClient(channel: channel)
+        self.eventStream = PassthroughSubject()
     }
 
     deinit {
@@ -268,34 +193,45 @@ final class Client {
             return
         }
 
-        var activateRequest = Yorkie_V1_ActivateClientRequest()
+        var activateRequest = ActivateClientRequest()
         activateRequest.clientKey = self.key
 
-        let activateResponse: Yorkie_V1_ActivateClientResponse
         do {
-            activateResponse = try await self.rpcClient.activateClient(activateRequest, callOptions: nil)
+            let activateResponse = try await self.rpcClient.activateClient(activateRequest, callOptions: nil)
+
+            self.id = activateResponse.clientID.toHexString
+
+            self.status = .activated
+            await self.runSyncLoop()
+            self.runWatchLoop()
+
+            let changeEvent = StatusChangedEvent(value: self.status)
+            self.eventStream.send(changeEvent)
+
+            Logger.debug("Client(\(self.key)) activated")
         } catch {
             Logger.error("Failed to request activate client(\(self.key)).", error: error)
             throw error
         }
-
-        self.id = activateResponse.clientID
-
-        self.status = .activated
-
-        Logger.debug("Client(\(self.key)) activated")
     }
 
     /**
      * `deactivate` deactivates this client.
      */
     func deactivate() async throws {
-        guard self.status == .activated, let clientId = self.id else {
+        guard self.status == .activated, let clientID = self.id else {
             return
         }
 
-        var deactivateRequest = Yorkie_V1_DeactivateClientRequest()
-        deactivateRequest.clientID = clientId
+        self.watchLoopTask?.cancel()
+        self.watchLoopTask = nil
+
+        var deactivateRequest = DeactivateClientRequest()
+
+        guard let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "ClientID is not Hex String!")
+        }
+        deactivateRequest.clientID = clientIDData
 
         do {
             _ = try await self.rpcClient.deactivateClient(deactivateRequest)
@@ -305,6 +241,379 @@ final class Client {
         }
 
         self.status = .deactivated
+
+        let changeEvent = StatusChangedEvent(value: self.status)
+        self.eventStream.send(changeEvent)
+
         Logger.info("Client(\(self.key) deactivated.")
+    }
+
+    /**
+     *   `attach` attaches the given document to this client. It tells the server that
+     *   the client will synchronize the given document.
+     */
+    @discardableResult
+    func attach(_ doc: Document, _ isManualSync: Bool = false) async throws -> Document {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id, let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        await doc.setActor(clientID)
+
+        var attachDocumentRequest = AttachDocumentRequest()
+        attachDocumentRequest.clientID = clientIDData
+        attachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
+
+        do {
+            let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
+
+            let pack = try Converter.fromChangePack(result.changePack)
+            try await doc.applyChangePack(pack: pack)
+
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, isRealtimeSync: !isManualSync, peerPresenceMap: [String: PresenceInfo]())
+            self.runWatchLoop()
+
+            Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
+
+            return doc
+        } catch {
+            Logger.error("Failed to request attach document(\(self.key)).", error: error)
+            throw error
+        }
+    }
+
+    /**
+     * `detach` detaches the given document from this client. It tells the
+     * server that this client will no longer synchronize the given document.
+     *
+     * To collect garbage things like CRDT tombstones left on the document, all
+     * the changes should be applied to other replicas before GC time. For this,
+     * if the document is no longer used by this client, it should be detached.
+     */
+    @discardableResult
+    public func detach(_ doc: Document) async throws -> Document {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id, let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        var detachDocumentRequest = DetachDocumentRequest()
+        detachDocumentRequest.clientID = clientIDData
+        detachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
+
+        do {
+            let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
+
+            let pack = try Converter.fromChangePack(result.changePack)
+            try await doc.applyChangePack(pack: pack)
+
+            self.attachmentMap.removeValue(forKey: doc.getKey())
+
+            self.runWatchLoop()
+
+            Logger.info("[DD] c:\"\(self.key)\" detaches d:\"\(doc.getKey())\"")
+
+            return doc
+        } catch {
+            Logger.error("Failed to request detach document(\(self.key)).", error: error)
+            throw error
+        }
+    }
+
+    /**
+     * `sync` pushes local changes of the attached documents to the server and
+     * receives changes of the remote replica from the server then apply them to
+     * local documents.
+     */
+    @discardableResult
+    public func sync() async throws -> [Document] {
+        let documents = self.attachmentMap.values.compactMap { $0.doc }
+
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                documents.forEach { document in
+                    group.addTask {
+                        try await self.syncInternal(document)
+                    }
+                }
+
+                for try await _ in group {}
+            }
+
+            return documents
+        } catch {
+            let event = DocumentSyncedEvent(value: .syncFailed)
+            self.eventStream.send(event)
+
+            throw error
+        }
+    }
+
+    /**
+     * `updatePresence` updates the presence of this client.
+     */
+    public func updatePresence(_ key: Indexable.Key, _ value: Indexable) async throws {
+        guard self.isActive, let id = self.id else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        self.presenceInfo.clock += 1
+        self.presenceInfo.data[key] = value
+
+        if self.attachmentMap.isEmpty {
+            return
+        }
+
+        var keys = [String]()
+
+        for var attachment in self.attachmentMap.values {
+            if attachment.isRealtimeSync == false {
+                continue
+            }
+
+            attachment.peerPresenceMap?[id] = self.presenceInfo
+            keys.append(attachment.doc.getKey())
+        }
+
+        var updatePresenceRequest = UpdatePresenceRequest()
+        updatePresenceRequest.client = Converter.toClient(id: id, presence: self.presenceInfo)
+        updatePresenceRequest.documentKeys = keys
+
+        let event = PeerChangedEvent(value: keys.reduce([String: [String: Indexable]](), self.getPeersWithDocKey(peersMap:key:)))
+        self.eventStream.send(event)
+
+        do {
+            _ = try await self.rpcClient.updatePresence(updatePresenceRequest)
+            Logger.info("[UM] c\"\(self.key)\" updated")
+        } catch {
+            Logger.error("[UM] c\"\(self.key)\" err : \(error)")
+        }
+    }
+
+    /**
+     * `getPeers` returns the peers of the given document.
+     */
+    public func getPeers(key: String) -> [String: Indexable] {
+        var peers = [String: Indexable]()
+        self.attachmentMap[key]?.peerPresenceMap?.forEach {
+            peers[$0.key] = $0.value.data
+        }
+        return peers
+    }
+
+    /**
+     * `getPeersWithDocKey` returns the peers of the given document wrapped in an object.
+     */
+    private func getPeersWithDocKey(peersMap: [String: [String: Indexable]], key: String) -> [String: [String: Indexable]] {
+        var newPeerMap = peersMap
+        var peers = [String: Indexable]()
+        self.attachmentMap[key]?.peerPresenceMap?.forEach {
+            peers[$0.key] = $0.value.data
+        }
+        newPeerMap[key] = peers
+        return newPeerMap
+    }
+
+    private func doSyncLoop() async {
+        guard self.isActive else {
+            Logger.debug("[SL] c:\"\(self.key)\" exit sync loop")
+            return
+        }
+
+        var attachementsToSyncCandidate = [Attachment]()
+
+        for var attachment in self.attachmentMap.values.filter({ $0.isRealtimeSync }) {
+            attachment.remoteChangeEventReceived = false
+            attachementsToSyncCandidate.append(attachment)
+        }
+
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                attachementsToSyncCandidate.forEach { attachment in
+                    group.addTask {
+                        let docChanged = await attachment.doc.hasLocalChanges()
+                        if docChanged || attachment.remoteChangeEventReceived ?? false {
+                            try await self.syncInternal(attachment.doc)
+                        }
+                    }
+                }
+
+                for try await _ in group {}
+            }
+        } catch {
+            Logger.error("[SL] c:\"\(self.key)\" sync failed: \(error)")
+
+            let event = DocumentSyncedEvent(value: .syncFailed)
+            self.eventStream.send(event)
+
+            Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+                Task {
+                    await self.doSyncLoop()
+                }
+            }
+        }
+    }
+
+    private func runSyncLoop() async {
+        Logger.debug("[SL] c:\"\(self.key)\" run sync loop")
+        await self.doSyncLoop()
+    }
+
+    private func doWatchLoop() {
+        self.watchLoopTask?.cancel()
+        self.watchLoopTask = nil
+
+        self.watchLoopReconnectTimer?.invalidate()
+        self.watchLoopReconnectTimer = nil
+
+        guard self.isActive, let id = self.id else {
+            Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
+            return
+        }
+
+        self.watchLoopTask = Task {
+            let realtimeSyncDocKeys = self.attachmentMap.values
+                .filter { $0.isRealtimeSync }
+                .compactMap { $0.doc.getKey() }
+
+            if realtimeSyncDocKeys.isEmpty {
+                Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
+                return
+            }
+
+            var request = WatchDocumentsRequest()
+            request.client = Converter.toClient(id: id, presence: self.presenceInfo)
+            request.documentKeys = realtimeSyncDocKeys
+
+            let stream = self.rpcClient.watchDocuments(request)
+
+            do {
+                for try await response in stream {
+                    self.handleWatchDocumentsResponse(keys: realtimeSyncDocKeys, response: response)
+                }
+            } catch {
+                switch error {
+                case is CancellationError:
+                    break
+                default:
+                    print("#### \(error) Reconnect Watch!!")
+
+                    self.onStreamDisconnect()
+                }
+            }
+
+            print("#### end Watch!!")
+        }
+    }
+
+    private func runWatchLoop() {
+        Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
+        self.doWatchLoop()
+    }
+
+    private func handleWatchDocumentsResponse(keys: [String], response: WatchDocumentsResponse) {
+        guard let body = response.body else {
+            return
+        }
+
+        switch body {
+        case .initialization(let initialization):
+            initialization.peersMapByDoc.forEach { docID, pbPeers in
+                for pbClient in pbPeers.clients {
+                    self.attachmentMap[docID]?.peerPresenceMap?[pbClient.id.toHexString] = Converter.fromPresence(pbPresence: pbClient.presence)
+                }
+            }
+
+            let event = PeerChangedEvent(value: keys.reduce([String: [String: Indexable]](), self.getPeersWithDocKey(peersMap:key:)))
+            self.eventStream.send(event)
+        case .event(let pbWatchEvent):
+            let responseKeys = pbWatchEvent.documentKeys
+            let publisher = pbWatchEvent.publisher.id.toHexString
+            let presence = Converter.fromPresence(pbPresence: pbWatchEvent.publisher.presence)
+
+            for key in responseKeys {
+                switch pbWatchEvent.type {
+                case .documentsWatched:
+                    self.attachmentMap[key]?.peerPresenceMap?[publisher] = presence
+                case .documentsUnwatched:
+                    self.attachmentMap[key]?.peerPresenceMap?.removeValue(forKey: publisher)
+                case .documentsChanged:
+                    self.attachmentMap[key]?.remoteChangeEventReceived = true
+                case .presenceChanged:
+                    if let peerPresence = self.attachmentMap[key]?.peerPresenceMap?[publisher], peerPresence.clock > presence.clock {
+                        break
+                    }
+
+                    self.attachmentMap[key]?.peerPresenceMap?[publisher] = presence
+                case .UNRECOGNIZED:
+                    break
+                }
+            }
+
+            switch pbWatchEvent.type {
+            case .documentsChanged:
+                let event = DocumentsChangedEvent(value: responseKeys)
+                self.eventStream.send(event)
+            case .documentsWatched, .documentsUnwatched, .presenceChanged:
+                let event = PeerChangedEvent(value: keys.reduce([String: [String: Indexable]](), self.getPeersWithDocKey(peersMap:key:)))
+                self.eventStream.send(event)
+            case .UNRECOGNIZED:
+                break
+            }
+        }
+    }
+
+    private func onStreamDisconnect() {
+        self.watchLoopTask?.cancel()
+        self.watchLoopTask = nil
+
+        self.watchLoopReconnectTimer = Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+            self.doWatchLoop()
+        }
+
+        let event = StreamConnectionStatusChangedEvent(value: .disconnected)
+        self.eventStream.send(event)
+    }
+
+    @discardableResult
+    private func syncInternal(_ doc: Document) async throws -> Document {
+        guard let clientID = self.id, let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "Invalid Client ID!")
+        }
+
+        var pushPullRequest = PushPullRequest()
+        pushPullRequest.clientID = clientIDData
+
+        let requestPack = await doc.createChangePack()
+        let localSize = requestPack.getChangeSize()
+
+        pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
+
+        do {
+            let response = try await self.rpcClient.pushPull(pushPullRequest)
+
+            let responsePack = try Converter.fromChangePack(response.changePack)
+            try await doc.applyChangePack(pack: responsePack)
+
+            let event = DocumentSyncedEvent(value: .synced)
+            self.eventStream.send(event)
+
+            let docKey = doc.getKey()
+            let remoteSize = responsePack.getChangeSize()
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().getStructureAsString())")
+
+            return doc
+        } catch {
+            Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
+
+            throw error
+        }
     }
 }
