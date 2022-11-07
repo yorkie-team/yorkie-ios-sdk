@@ -210,7 +210,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            let removedByID = try? array?.remove(byID: firstElement.getCreatedAt())
+            let removedByID = array?.remove(byID: firstElement.getCreatedAt())
             XCTAssertNotNil(removedByID)
 
             let result = root.debugDescription

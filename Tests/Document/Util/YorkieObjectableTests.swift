@@ -18,12 +18,12 @@ import Combine
 import XCTest
 @testable import Yorkie
 
-struct KanbanColumn: YorkieObjectable {
+struct KanbanColumn: YorkieJSONObjectable {
     let title: String
     var cards: [KanbanCard] = []
 }
 
-struct KanbanCard: YorkieObjectable {
+struct KanbanCard: YorkieJSONObjectable {
     let title: String
 }
 
@@ -42,11 +42,11 @@ class YorkieObjectableTests: XCTestCase {
 
         let doc = Document(key: "test")
         await doc.update { root in
-            root.lists = lists.toYorkieArray
+            root.lists = lists.toJsonArray
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"lists":[{"title":"a","cards":[{"title":"a-1"},{"title":"a-2"}]},{"cards":[{"title":"b-1"},{"title":"b-2"}],"title":"b"}]}
+                           {"lists":[{"cards":[{"title":"a-1"},{"title":"a-2"}],"title":"a"},{"cards":[{"title":"b-1"},{"title":"b-2"}],"title":"b"}]}
                            """)
         }
     }

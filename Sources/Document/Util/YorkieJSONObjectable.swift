@@ -16,25 +16,27 @@
 
 import Foundation
 
-/// ``YorkieObjectable`` provide a way to make a dictionary including members of a type confirming ``YorkieObjectable``.
-public protocol YorkieObjectable {
-    /// Make a dictionary including members of a type confirming ``YorkieObjectable``.
-    var toYorkieObject: [String: Any] { get }
-
+/// ``YorkieJSONObjectable`` provide a way to make a dictionary including members of a type confirming ``YorkieJSONObjectable``.
+public protocol YorkieJSONObjectable {
     /// The members of ``excludedLabels`` is not included in a dictionary made by ``toYorkieObject``.
     var excludedLabels: [String] { get }
 }
 
-public extension YorkieObjectable {
-    var toYorkieObject: [String: Any] {
+public extension YorkieJSONObjectable {
+    /// ``toJsonObject`` make a dictionary including members of a type confirming ``YorkieObjectable``.
+    internal var toJsonObject: [String: Any] {
         var result = [String: Any]()
         Mirror(reflecting: self).children.forEach { child in
-            guard let label = child.label else { return } // self.excludedLabels.contains(label) == false
+            guard let label = child.label,
+                  excludedLabels.contains(label) == false
+            else {
+                return
+            }
 
-            if let value = child.value as? YorkieObjectable {
-                result[label] = value.toYorkieObject
+            if let value = child.value as? YorkieJSONObjectable {
+                result[label] = value.toJsonObject
             } else if let value = child.value as? [Any] {
-                result[label] = value.toYorkieArray
+                result[label] = value.toJsonArray
             } else {
                 result[label] = child.value
             }
@@ -48,14 +50,14 @@ public extension YorkieObjectable {
     }
 }
 
-/// ``toYorkieArray`` provide a way to make a array including types confiming``YorkieObjectable``, arrys, and values.
-public extension Array {
-    var toYorkieArray: [Any] {
+/// ``toJsonArray`` provide a way to make a array including types confiming``YorkieJSONObjectable``, arrys, and values.
+internal extension Array {
+    var toJsonArray: [Any] {
         self.map {
-            if let value = $0 as? YorkieObjectable {
-                return value.toYorkieObject
+            if let value = $0 as? YorkieJSONObjectable {
+                return value.toJsonObject
             } else if let value = $0 as? Array {
-                return value.toYorkieArray
+                return value.toJsonArray
             } else {
                 return $0
             }

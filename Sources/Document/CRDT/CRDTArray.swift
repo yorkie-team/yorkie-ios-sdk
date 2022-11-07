@@ -133,7 +133,10 @@ extension CRDTArray {
      * `toSortedJSON` returns the sorted JSON encoding of this array.
      */
     func toSortedJSON() -> String {
-        return self.toJSON()
+        let json = self
+            .map { $0.toSortedJSON() }
+
+        return "[\(json.joined(separator: ","))]"
     }
 
     /**

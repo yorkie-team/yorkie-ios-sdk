@@ -17,8 +17,12 @@
 import Foundation
 import Yorkie
 
-struct KanbanCard: YorkieObjectable {
+struct KanbanCard: YorkieJSONObjectable {
     var id: TimeTicket = .initial
     var columnId: TimeTicket = .initial
     let title: String
+
+    var excludedLabels: [String] {
+        ["id", "columnId"]
+    }
 }

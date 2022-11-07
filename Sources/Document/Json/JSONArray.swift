@@ -155,7 +155,13 @@ public class JSONArray {
     @discardableResult
     /// - Returns: The number of elements.
     func push(_ value: Any) -> Int {
-        if let value = value as? [String: Any] {
+        if let value = value as? YorkieJSONObjectable {
+            let length = self.push(JSONObject())
+            let appendedIndex = length - 1
+            let jsonObject = self[appendedIndex] as? JSONObject
+            jsonObject?.set(value.toJsonObject)
+            return length
+        } else if let value = value as? [String: Any] {
             let length = self.push(JSONObject())
             let appendedIndex = length - 1
             let jsonObject = self[appendedIndex] as? JSONObject
@@ -165,7 +171,10 @@ public class JSONArray {
             let length = self.push(JSONArray())
             let appendedIndex = length - 1
             let jsonArray = self[appendedIndex] as? JSONArray
-            jsonArray?.push(value)
+            value.toJsonArray.forEach {
+                jsonArray?.push($0)
+            }
+
             return length
         } else {
             return self.pushInternal(value)
@@ -276,6 +285,19 @@ public class JSONArray {
             for element in array {
                 child.pushInternal(element)
             }
+            return crdtArray
+        } else if value is JSONArray {
+            let crdtArray = CRDTArray(createdAt: ticket)
+            guard let clone = crdtArray.deepcopy() as? CRDTArray else {
+                throw YorkieError.unexpected(message: "Failed to cast array.deepcopy() to CRDTArray")
+            }
+
+            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
+            self.context.push(operation: operation)
+
             return crdtArray
         } else if value is JSONObject {
             let crdtObject = CRDTObject(createdAt: ticket)
@@ -576,6 +598,5 @@ public class JSONArrayIterator: IteratorProtocol {
 
         let value = self.values[self.iteratorNext]
         return ElementConverter.toJSONElement(from: value, context: self.context)
-//        return ElementConverter.toWrappedElement(from: value, context: self.context)
     }
 }

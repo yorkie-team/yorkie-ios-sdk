@@ -66,7 +66,7 @@ class KanbanViewModel: ObservableObject {
 
             await self.document.update { root in
                 if root.lists == nil {
-                    root.lists = self.defaultColumns.toYorkieArray
+                    root.lists = self.defaultColumns
                 }
             }
         }
@@ -76,7 +76,7 @@ class KanbanViewModel: ObservableObject {
         Task {
             await self.document.update { root in
                 guard let lists = root.lists as? JSONArray else { return }
-                let column = KanbanColumn(title: title).toYorkieObject
+                let column = KanbanColumn(title: title)
                 lists.append(column)
             }
         }
@@ -101,7 +101,7 @@ class KanbanViewModel: ObservableObject {
                     return
                 }
 
-                let card = KanbanCard(columnId: columnId, title: title).toYorkieObject
+                let card = KanbanCard(columnId: columnId, title: title)
                 cards.append(card)
             }
         }
