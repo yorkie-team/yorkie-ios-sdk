@@ -680,7 +680,7 @@ extension RedBlackTree {
      */
     func verify() -> Bool {
         if self.root.isNullLeaf {
-            print("The tree is empty")
+            Logger.trivial("The tree is empty")
             return true
         }
         return self.property2() && self.property4() && self.property5()
@@ -692,7 +692,7 @@ extension RedBlackTree {
     // Property 2: The root is black
     private func property2() -> Bool {
         if self.root.color == .red {
-            print("Property-Error: Root is red")
+            Logger.trivial("Property-Error: Root is red")
             return false
         }
         return true
@@ -712,11 +712,11 @@ extension RedBlackTree {
         if let leftChild = node.leftChild, let rightChild = node.rightChild {
             if node.color == .red {
                 if !leftChild.isNullLeaf, leftChild.color == .red {
-                    print("Property-Error: Red node with key \(String(describing: node.key)) has red left child")
+                    Logger.trivial("Property-Error: Red node with key \(String(describing: node.key)) has red left child")
                     return false
                 }
                 if !rightChild.isNullLeaf, rightChild.color == .red {
-                    print("Property-Error: Red node with key \(String(describing: node.key)) has red right child")
+                    Logger.trivial("Property-Error: Red node with key \(String(describing: node.key)) has red right child")
                     return false
                 }
             }
@@ -751,7 +751,7 @@ extension RedBlackTree {
             let addedHeight = node.color == .black ? 1 : 0
             return left + addedHeight
         } else {
-            print("Property-Error: Black height violated at node with key \(String(describing: node.key))")
+            Logger.trivial("Property-Error: Black height violated at node with key \(String(describing: node.key))")
             return -1
         }
     }

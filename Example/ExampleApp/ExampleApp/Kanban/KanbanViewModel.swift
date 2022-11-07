@@ -55,8 +55,6 @@ class KanbanViewModel: ObservableObject {
                         }
                         return KanbanColumn(id: column.getID(), title: column.title as! String, cards: cards)
                     }
-
-                    print("##", await self.document.getRoot())
                 }
             }.store(in: &self.cancellables)
         }
