@@ -39,7 +39,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
                 await target.update { root in
                     root.k1 = "\(index)"
                 }
-                
+
                 expect.fulfill()
             }
 
@@ -47,7 +47,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
                 await target.update { root in
                     root.k1 = "\(index)"
                 }
-                
+
                 expect.fulfill()
             }
 
@@ -55,7 +55,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
                 await target.update { root in
                     root.k1 = "\(index)"
                 }
-                
+
                 expect.fulfill()
             }
 
@@ -63,7 +63,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
                 await target.update { root in
                     root.k1 = "\(index)"
                 }
-                
+
                 expect.fulfill()
             }
         }
