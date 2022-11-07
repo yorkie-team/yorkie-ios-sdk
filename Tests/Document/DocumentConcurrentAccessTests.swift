@@ -32,49 +32,38 @@ class DocumentConcurrentAccessTests: XCTestCase {
                     root.k1 = "\(index)"
                 }
 
-                let root = await target.getRoot()
-                print("## root.k1, \(Thread.current)", root.k1)
-                root.k1 = "\(index)"
                 expect.fulfill()
             }
 
-//            Task.detached(priority: .userInitiated) {
-//                await target.update { root in
-//                    root.k1 = "\(index)"
-//                }
-//                let root = await target.getRoot()
-//                print("## root.k1, \(Thread.current)", root.k1)
-//                root.k1 = "\(index)"
-//                expect.fulfill()
-//            }
+            Task.detached(priority: .userInitiated) {
+                await target.update { root in
+                    root.k1 = "\(index)"
+                }
+                
+                expect.fulfill()
+            }
 
             Task.detached(priority: .low) {
                 await target.update { root in
                     root.k1 = "\(index)"
                 }
-                let root = await target.getRoot()
-                print("## root.k1, \(Thread.current)", root.k1)
-                root.k1 = "\(index)"
+                
                 expect.fulfill()
             }
 
-//            Task.detached(priority: .high) {
-//                await target.update { root in
-//                    root.k1 = "\(index)"
-//                }
-//                let root = await target.getRoot()
-//                print("## root.k1, \(Thread.current)", root.k1)
-//                root.k1 = "\(index)"
-//                expect.fulfill()
-//            }
+            Task.detached(priority: .high) {
+                await target.update { root in
+                    root.k1 = "\(index)"
+                }
+                
+                expect.fulfill()
+            }
 
             Task.detached(priority: .background) {
                 await target.update { root in
                     root.k1 = "\(index)"
                 }
-                let root = await target.getRoot()
-                print("## root.k1, \(Thread.current)", root.k1)
-                root.k1 = "\(index)"
+                
                 expect.fulfill()
             }
         }

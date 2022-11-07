@@ -44,14 +44,14 @@ class KanbanViewModel: ObservableObject {
 
             await self.document.eventStream.sink { _ in
                 Task { @MainActor [weak self] in
-                    guard let self, let jsonArray = await self.document.getRoot().lists as? JSONArray else { return }
+                    guard let self, let lists = await self.document.getRoot().lists as? JSONArray else { return }
 
-                    self.columns = jsonArray.compactMap { each -> KanbanColumn? in
+                    self.columns = lists.compactMap { each -> KanbanColumn? in
                         guard let column = each as? JSONObject, let cardArray = column.cards as? JSONArray else { return nil }
 
                         let cards = cardArray.compactMap { each -> KanbanCard? in
-                            guard let cardObject = each as? JSONObject else { return nil }
-                            return KanbanCard(id: cardObject.getID(), columnId: column.getID(), title: cardObject.title as! String)
+                            guard let card = each as? JSONObject else { return nil }
+                            return KanbanCard(id: card.getID(), columnId: column.getID(), title: card.title as! String)
                         }
                         return KanbanColumn(id: column.getID(), title: column.title as! String, cards: cards)
                     }
