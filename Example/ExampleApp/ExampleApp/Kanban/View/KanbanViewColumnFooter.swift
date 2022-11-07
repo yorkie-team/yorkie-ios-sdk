@@ -30,7 +30,7 @@ class KanbanViewCardFooter: UICollectionReusableView {
         result.setTitleColor(UIColor.lightGray, for: .highlighted)
         result.contentHorizontalAlignment = .left
         result.contentVerticalAlignment = .center
-        result.titleLabel?.font = CommonConstant.labelFont
+        result.titleLabel?.font = KanbanLayoutProperty.labelFont
         return result
     }()
 
@@ -41,13 +41,13 @@ class KanbanViewCardFooter: UICollectionReusableView {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        self.backgroundColor = CommonConstant.columnBackground
+        self.backgroundColor = KanbanLayoutProperty.columnBackground
 
         self.addSubview(self.showAddCardButton)
-        self.showAddCardButton.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: CommonConstant.cellSidePadding + CommonConstant.labelPadding).isActive = true
-        self.showAddCardButton.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -CommonConstant.cellSidePadding + CommonConstant.labelPadding).isActive = true
+        self.showAddCardButton.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: KanbanLayoutProperty.cellSidePadding + KanbanLayoutProperty.labelPadding).isActive = true
+        self.showAddCardButton.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -KanbanLayoutProperty.cellSidePadding + KanbanLayoutProperty.labelPadding).isActive = true
         self.showAddCardButton.topAnchor.constraint(equalTo: self.topAnchor).isActive = true
-        self.showAddCardButton.heightAnchor.constraint(equalToConstant: CommonConstant.labelHeight).isActive = true
+        self.showAddCardButton.heightAnchor.constraint(equalToConstant: KanbanLayoutProperty.labelHeight).isActive = true
         self.showAddCardButton.addTarget(self, action: #selector(self.didClickShowAddCardButton), for: .touchUpInside)
     }
 

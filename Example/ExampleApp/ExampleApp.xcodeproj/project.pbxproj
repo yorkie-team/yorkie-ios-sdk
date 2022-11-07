@@ -21,7 +21,7 @@
 		CE79C5342913742500D5DE3F /* KanbanViewColumnFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C5332913742500D5DE3F /* KanbanViewColumnFooter.swift */; };
 		CE95E41A291135E0005076C8 /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE95E419291135E0005076C8 /* Yorkie.framework */; };
 		CEDDE2612914A2C00032B16A /* KanbanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2602914A2C00032B16A /* KanbanViewModel.swift */; };
-		CEDDE2632914AA280032B16A /* CommonConstant.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2622914AA280032B16A /* CommonConstant.swift */; };
+		CEDDE2632914AA280032B16A /* KanbanLayoutProperty.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2622914AA280032B16A /* KanbanLayoutProperty.swift */; };
 		CEDDE2662914B94D0032B16A /* UILabelWithPadding.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2652914B94D0032B16A /* UILabelWithPadding.swift */; };
 		CEDDE2682914BA620032B16A /* UIColor+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2672914BA620032B16A /* UIColor+Extensions.swift */; };
 /* End PBXBuildFile section */
@@ -45,7 +45,7 @@
 		CE95E417291135C6005076C8 /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CE95E419291135E0005076C8 /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CEDDE2602914A2C00032B16A /* KanbanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanViewModel.swift; sourceTree = "<group>"; };
-		CEDDE2622914AA280032B16A /* CommonConstant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonConstant.swift; sourceTree = "<group>"; };
+		CEDDE2622914AA280032B16A /* KanbanLayoutProperty.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanLayoutProperty.swift; sourceTree = "<group>"; };
 		CEDDE2652914B94D0032B16A /* UILabelWithPadding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UILabelWithPadding.swift; sourceTree = "<group>"; };
 		CEDDE2672914BA620032B16A /* UIColor+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIColor+Extensions.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -113,7 +113,7 @@
 				CE79C5312913741E00D5DE3F /* KanbanViewColumnHeader.swift */,
 				CE79C52F29136B5F00D5DE3F /* KanbanViewCardCell.swift */,
 				CE79C52529135EB400D5DE3F /* KanbanViewController.swift */,
-				CEDDE2622914AA280032B16A /* CommonConstant.swift */,
+				CEDDE2622914AA280032B16A /* KanbanLayoutProperty.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -214,7 +214,7 @@
 			files = (
 				CE79C5322913741E00D5DE3F /* KanbanViewColumnHeader.swift in Sources */,
 				CEDDE2682914BA620032B16A /* UIColor+Extensions.swift in Sources */,
-				CEDDE2632914AA280032B16A /* CommonConstant.swift in Sources */,
+				CEDDE2632914AA280032B16A /* KanbanLayoutProperty.swift in Sources */,
 				CE79C52929135F7B00D5DE3F /* KanbanColumn.swift in Sources */,
 				9603ABBA291114DF00696E1A /* ViewController.swift in Sources */,
 				9603ABB6291114DF00696E1A /* AppDelegate.swift in Sources */,

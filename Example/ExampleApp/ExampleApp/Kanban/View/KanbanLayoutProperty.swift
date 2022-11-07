@@ -16,7 +16,7 @@
 
 import UIKit
 
-enum CommonConstant {
+enum KanbanLayoutProperty {
     static let background: UIColor = .init(hex: "#3b5998")
     static let columnBackground: UIColor = .init(hex: "#f7f7f7")
     static let cellSidePadding: CGFloat = 10

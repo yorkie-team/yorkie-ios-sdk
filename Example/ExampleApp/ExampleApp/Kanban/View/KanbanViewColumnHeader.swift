@@ -29,7 +29,7 @@ class KanbanViewCardHeader: UICollectionReusableView {
     private let titleLabel: UILabel = {
         let result = Label()
         result.translatesAutoresizingMaskIntoConstraints = false
-        result.font = CommonConstant.columnTitleFont
+        result.font = KanbanLayoutProperty.columnTitleFont
         return result
     }()
 
@@ -47,25 +47,25 @@ class KanbanViewCardHeader: UICollectionReusableView {
     override init(frame: CGRect) {
         super.init(frame: frame)
 
-        self.backgroundColor = CommonConstant.columnBackground
+        self.backgroundColor = KanbanLayoutProperty.columnBackground
 
         self.addSubview(self.spaceView)
         self.spaceView.topAnchor.constraint(equalTo: self.topAnchor).isActive = true
         self.spaceView.leadingAnchor.constraint(equalTo: self.leadingAnchor).isActive = true
         self.spaceView.trailingAnchor.constraint(equalTo: self.trailingAnchor).isActive = true
-        self.spaceView.heightAnchor.constraint(equalToConstant: CommonConstant.sectionSpacing).isActive = true
-        self.spaceView.backgroundColor = CommonConstant.background
+        self.spaceView.heightAnchor.constraint(equalToConstant: KanbanLayoutProperty.sectionSpacing).isActive = true
+        self.spaceView.backgroundColor = KanbanLayoutProperty.background
 
         self.addSubview(self.deleteButton)
-        self.deleteButton.widthAnchor.constraint(equalToConstant: CommonConstant.trashButtonWidth).isActive = true
-        self.deleteButton.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -CommonConstant.cellSidePadding * 2).isActive = true
+        self.deleteButton.widthAnchor.constraint(equalToConstant: KanbanLayoutProperty.trashButtonWidth).isActive = true
+        self.deleteButton.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -KanbanLayoutProperty.cellSidePadding * 2).isActive = true
         self.deleteButton.topAnchor.constraint(equalTo: self.spaceView.bottomAnchor).isActive = true
         self.deleteButton.bottomAnchor.constraint(equalTo: self.bottomAnchor).isActive = true
         self.deleteButton.addTarget(self, action: #selector(self.didClickDeleteButton), for: .touchUpInside)
 
         self.addSubview(self.titleLabel)
-        self.titleLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: CommonConstant.cellSidePadding * 2).isActive = true
-        self.titleLabel.trailingAnchor.constraint(equalTo: self.deleteButton.leadingAnchor, constant: -CommonConstant.cellSidePadding).isActive = true
+        self.titleLabel.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: KanbanLayoutProperty.cellSidePadding * 2).isActive = true
+        self.titleLabel.trailingAnchor.constraint(equalTo: self.deleteButton.leadingAnchor, constant: -KanbanLayoutProperty.cellSidePadding).isActive = true
         self.titleLabel.topAnchor.constraint(equalTo: self.spaceView.bottomAnchor).isActive = true
         self.titleLabel.bottomAnchor.constraint(equalTo: self.bottomAnchor).isActive = true
     }

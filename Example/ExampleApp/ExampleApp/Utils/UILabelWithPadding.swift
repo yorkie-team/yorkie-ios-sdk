@@ -18,7 +18,7 @@ import UIKit
 
 class Label: UILabel {
     @objc override func drawText(in rect: CGRect) {
-        let insets = UIEdgeInsets(top: 0, left: CommonConstant.labelPadding, bottom: 0, right: CommonConstant.labelPadding)
+        let insets = UIEdgeInsets(top: 0, left: KanbanLayoutProperty.labelPadding, bottom: 0, right: KanbanLayoutProperty.labelPadding)
         super.drawText(in: rect.inset(by: insets))
     }
 }

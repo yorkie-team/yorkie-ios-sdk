@@ -20,7 +20,7 @@ import UIKit
 @MainActor
 class KanbanViewController: UIViewController {
     private var cancellables = Set<AnyCancellable>()
-    private let itemHeight: CGFloat = CommonConstant.labelHeight
+    private let itemHeight: CGFloat = KanbanLayoutProperty.labelHeight
     private var width: CGFloat {
         UIScreen.main.bounds.width
     }
@@ -35,7 +35,7 @@ class KanbanViewController: UIViewController {
 
         let result = UICollectionView(frame: CGRect.zero, collectionViewLayout: layout)
         result.translatesAutoresizingMaskIntoConstraints = false
-        result.backgroundColor = CommonConstant.background
+        result.backgroundColor = KanbanLayoutProperty.background
         return result
     }()
 
