@@ -42,7 +42,7 @@ class YorkieObjectableTests: XCTestCase {
 
         let doc = Document(key: "test")
         await doc.update { root in
-            root.lists = lists.toJsonArray
+            root.lists = lists
 
             XCTAssertEqual(root.debugDescription,
                            """
