@@ -17,7 +17,7 @@
 import Foundation
 
 enum Converter {
-    
+
     /**
      * parses the given bytes into value.
      */
@@ -47,12 +47,12 @@ enum Converter {
             throw YorkieError.unimplemented(message: String(describing: valueType))
         }
     }
-    
+
     /**
      * `toValueType` converts the given model to Protobuf format.
      */
     static func toValueType(_ valueType: PrimitiveValue) -> PbValueType {
-        switch (valueType) {
+        switch valueType {
         case .null:
             return .null
         case .boolean:
@@ -71,7 +71,7 @@ enum Converter {
             return .date
         }
     }
-    
+
     /**
      * `fromValueType` converts the given Protobuf format to model format.
      */
@@ -111,7 +111,7 @@ extension Converter {
      */
     static func fromPresence(pbPresence: PbPresence) -> PresenceInfo {
         var data = [String: Any]()
-                
+
         pbPresence.data.forEach { (key, value) in
             if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) {
                 data[key] = jsonValue
@@ -133,17 +133,17 @@ extension Converter {
                 }
             }
         }
-                
+
         return PresenceInfo(clock: pbPresence.clock, data: data)
     }
-    
+
     /**
      * `toClient` converts the given model to Protobuf format.
      */
     static func toClient(id: String, presence: PresenceInfo) -> PbClient {
         var pbPresence = PbPresence()
         pbPresence.clock = presence.clock
-        
+
        presence.data.forEach { (key, value) in
             if JSONSerialization.isValidJSONObject(value), let jsonData = try? JSONSerialization.data(withJSONObject: value) {
                 pbPresence.data[key] = String(bytes: jsonData, encoding: .utf8)
@@ -156,7 +156,7 @@ extension Converter {
         var pbClient = PbClient()
         pbClient.id = id.toData ?? Data()
         pbClient.presence = pbPresence
-        return pbClient;
+        return pbClient
     }
 }
 
@@ -171,7 +171,7 @@ extension Converter {
         pbCheckpoint.clientSeq = checkpoint.getClientSeq()
         return pbCheckpoint
     }
-    
+
     /**
      * `fromCheckpoint` converts the given Protobuf format to model format.
      */
@@ -192,7 +192,7 @@ extension Converter {
         pbChangeID.actorID = changeID.getActorID()?.toData ?? Data()
         return pbChangeID
     }
-    
+
     /**
      * `fromChangeID` converts the given Protobuf format to model format.
      */
@@ -215,7 +215,7 @@ extension Converter {
         pbTimeTicket.actorID = ticket.getActorID()?.toData ?? Data()
         return pbTimeTicket
     }
-    
+
     /**
      * `fromTimeTicket` converts the given Protobuf format to model format.
      */
@@ -253,7 +253,7 @@ extension Converter {
      */
     static func toElementSimple(_ element: CRDTElement) throws -> PbJSONElementSimple {
         var pbElementSimple = PbJSONElementSimple()
-        
+
         if element is CRDTObject {
             pbElementSimple.type = .jsonObject
         } else if element is CRDTArray {
@@ -274,14 +274,14 @@ extension Converter {
 //            pbElementSimple.setCreatedAt(toTimeTicket(element.getCreatedAt()));
 //            pbElementSimple.setValue(element.toBytes());
         } else {
-            throw YorkieError.unimplemented(message: "unimplemented element: \(element)");
+            throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
         }
-        
+
         pbElementSimple.createdAt = toTimeTicket(element.getCreatedAt())
 
-        return pbElementSimple;
+        return pbElementSimple
     }
-    
+
     /**
      * `fromElementSimple` converts the given Protobuf format to model format.
      */
@@ -334,7 +334,7 @@ extension Converter {
 //        pbTextNodeID.setOffset(id.getOffset());
 //        return pbTextNodeID;
 //    }
-    
+
     /**
      * `fromTextNodeID` converts the given Protobuf format to model format.
      */
@@ -359,7 +359,7 @@ extension Converter {
 //        pbTextNodePos.setRelativeOffset(pos.getRelativeOffset());
 //        return pbTextNodePos;
 //    }
-    
+
     /**
      * `fromTextNodePos` converts the given Protobuf format to model format.
      */
@@ -380,8 +380,8 @@ extension Converter {
      * `toOperation` converts the given model to Protobuf format.
      */
     static func toOperation(_ operation: Operation) throws -> PbOperation {
-        var pbOperation = PbOperation();
-        
+        var pbOperation = PbOperation()
+
         if let setOperation = operation as? SetOperation {
             var pbSetOperation = PbOperation.Set()
             pbSetOperation.parentCreatedAt = toTimeTicket(setOperation.parentCreatedAt)
@@ -488,19 +488,19 @@ extension Converter {
 //            );
 //            pbOperation.setIncrease(pbIncreaseOperation);
         } else {
-            throw YorkieError.unimplemented(message: "unimplemented operation \(operation)");
+            throw YorkieError.unimplemented(message: "unimplemented operation \(operation)")
         }
-        
-        return pbOperation;
+
+        return pbOperation
     }
-    
+
     /**
      * `toOperations` converts the given model to Protobuf format.
      */
     static func toOperations(_ operations: [Operation]) -> [PbOperation] {
         operations.compactMap { try? toOperation($0) }
     }
-    
+
     /**
      * `fromOperations` converts the given Protobuf format to model format.
      */
@@ -527,7 +527,7 @@ extension Converter {
                                        executedAt: fromTimeTicket(pbRemoveOperation.executedAt))
             } else if case let .edit(pbEditOperation) = pbOperation.body {
                 // TODO: EditOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
+                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                let createdAtMapByActor = pbEditOperation.createdAtMapByActor.map { (key, value) in
                 //                    fromTimeTicket(value)
                 //                }
@@ -541,7 +541,7 @@ extension Converter {
                 //                );
             } else if case let .select(pbSelectOperation) = pbOperation.body {
                 // TODO: SelectOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
+                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                operation = SelectOperation.create(
                 //                    fromTimeTicket(pbSelectOperation!.getParentCreatedAt())!,
                 //                    fromTextNodePos(pbSelectOperation!.getFrom()!),
@@ -550,7 +550,7 @@ extension Converter {
                 //                );
             } else if case let .richEdit(pbEditOperation) = pbOperation.body {
                 // TODO: RichEditOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
+                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                const createdAtMapByActor = new Map();
                 //                pbEditOperation!.getCreatedAtMapByActorMap().forEach((value, key) => {
                 //                    createdAtMapByActor.set(key, fromTimeTicket(value));
@@ -570,7 +570,7 @@ extension Converter {
                 //                );
             } else if case let .style(pbStyleOperation) = pbOperation.body {
                 // TODO: StyleOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
+                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                const attributes = new Map();
                 //                pbStyleOperation!.getAttributesMap().forEach((value, key) => {
                 //                    attributes.set(key, value);
@@ -584,14 +584,14 @@ extension Converter {
                 //                );
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {
                 // TODO: IncreaseOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
+                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                operation = IncreaseOperation.create(
                 //                    fromTimeTicket(pbIncreaseOperation!.getParentCreatedAt())!,
                 //                    fromElementSimple(pbIncreaseOperation!.getValue()!),
                 //                    fromTimeTicket(pbIncreaseOperation!.getExecutedAt())!,
                 //                );
             } else {
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)");
+                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
             }
         }
     }
@@ -607,11 +607,11 @@ extension Converter {
             guard let element = try? toElement($0.rhtValue) else {
                 return nil
             }
-            
+
             var pbRHTNode = PbRHTNode()
             pbRHTNode.key = $0.rhtKey
             pbRHTNode.element = element
-            
+
             return pbRHTNode
         }
     }
@@ -628,9 +628,9 @@ extension Converter {
                 return nil
             }
 
-            var pbRGANode = PbRGANode();
+            var pbRGANode = PbRGANode()
             pbRGANode.element = element
-            
+
             return pbRGANode
         }
     }
@@ -655,12 +655,12 @@ extension Converter {
         } else {
             pbObject.clearRemovedAt()
         }
-        
+
         var pbElement = PbJSONElement()
         pbElement.jsonObject = pbObject
-        return pbElement;
+        return pbElement
     }
-    
+
     /**
      * `fromObject` converts the given Protobuf format to model format.
      */
@@ -669,11 +669,11 @@ extension Converter {
         try pbObject.nodes.forEach { pbRHTNode in
             rht.set(key: pbRHTNode.key, value: try fromElement(pbElement: pbRHTNode.element))
         }
-        
+
         let obj = CRDTObject(createdAt: fromTimeTicket(pbObject.createdAt), memberNodes: rht)
         obj.movedAt = pbObject.hasMovedAt ? fromTimeTicket(pbObject.movedAt) : nil
         obj.removedAt = pbObject.hasRemovedAt ? fromTimeTicket(pbObject.removedAt) : nil
-        return obj;
+        return obj
     }
 
     /**
@@ -693,10 +693,10 @@ extension Converter {
         } else {
             pbArray.clearRemovedAt()
         }
-        
+
         var pbElement = PbJSONElement()
         pbElement.jsonArray = pbArray
-        return pbElement;
+        return pbElement
     }
 
     /**
@@ -707,13 +707,13 @@ extension Converter {
         try pbArray.nodes.forEach { pbRGANode in
             try rgaTreeList.insert(fromElement(pbElement: pbRGANode.element))
         }
-        
+
         let arr = CRDTArray(createdAt: fromTimeTicket(pbArray.createdAt), elements: rgaTreeList)
         arr.movedAt = pbArray.hasMovedAt ? fromTimeTicket(pbArray.movedAt) : nil
         arr.removedAt = pbArray.hasRemovedAt ? fromTimeTicket(pbArray.removedAt) : nil
-        return arr;
+        return arr
     }
-    
+
     /**
      * `toPrimitive` converts the given model to Protobuf format.
      */
@@ -732,12 +732,12 @@ extension Converter {
         } else {
             pbPrimitive.clearRemovedAt()
         }
-        
+
         var pbElement = PbJSONElement()
         pbElement.primitive = pbPrimitive
-        return pbElement;
+        return pbElement
     }
-    
+
     /**
      * `fromPrimitive` converts the given Protobuf format to model format.
      */
@@ -745,7 +745,7 @@ extension Converter {
         let primitive = Primitive(value: try valueFrom(pbPrimitive.type, data: pbPrimitive.value), createdAt: fromTimeTicket(pbPrimitive.createdAt))
         primitive.movedAt = pbPrimitive.hasMovedAt ? fromTimeTicket(pbPrimitive.movedAt) : nil
         primitive.removedAt = pbPrimitive.hasRemovedAt ? fromTimeTicket(pbPrimitive.removedAt) : nil
-        return primitive;
+        return primitive
     }
 
     /**
@@ -763,7 +763,7 @@ extension Converter {
 //        pbElement.text = pbText
 //        return pbElement;
 //    }
-    
+
     /**
      * `fromText` converts the given Protobuf format to model format.
      */
@@ -890,7 +890,7 @@ extension Converter {
 //
 //        return pbTextNodes;
 //    }
-    
+
     /**
      * `fromTextNode` converts the given Protobuf format to model format.
      */
@@ -927,7 +927,7 @@ extension Converter {
 //        textNode.remove(fromTimeTicket(pbTextNode.getRemovedAt()));
 //        return textNode;
 //    }
-    
+
     /**
      * `fromRichText` converts the given Protobuf format to model format.
      */
@@ -960,7 +960,7 @@ extension Converter {
      * `toChangePack` converts the given model to Protobuf format.
      */
     static func toChangePack(pack: ChangePack) -> PbChangePack {
-        var pbChangePack = PbChangePack();
+        var pbChangePack = PbChangePack()
         pbChangePack.documentKey = pack.getDocumentKey()
         pbChangePack.checkpoint = toCheckpoint(pack.getCheckpoint())
         pbChangePack.changes = toChanges(pack.getChanges())
@@ -970,9 +970,9 @@ extension Converter {
         } else {
             pbChangePack.clearMinSyncedTicket()
         }
-        return pbChangePack;
+        return pbChangePack
     }
-    
+
     /**
      * `fromChangePack` converts the given Protobuf format to model format.
      */
@@ -992,11 +992,11 @@ extension Converter {
      * `toChange` converts the given model to Protobuf format.
      */
     static func toChange(_ change: Change) -> PbChange {
-        var pbChange = PbChange();
+        var pbChange = PbChange()
         pbChange.id = toChangeID(change.getID())
         pbChange.message = change.getMessage() ?? ""
         pbChange.operations = toOperations(change.getOperations())
-        return pbChange;
+        return pbChange
     }
 
     /**
@@ -1007,7 +1007,7 @@ extension Converter {
             toChange($0)
         }
     }
-    
+
     /**
      * `fromChanges` converts the given Protobuf format to model format.
      */
@@ -1029,11 +1029,11 @@ extension Converter {
         guard bytes.isEmpty == false else {
             return CRDTObject(createdAt: TimeTicket.initial)
         }
-        
+
         let pbElement = try PbJSONElement(serializedData: bytes)
         return try fromObject(pbElement.jsonObject)
     }
-    
+
     /**
      * `objectToBytes` converts the given JSONObject to byte array.
      */
@@ -1055,18 +1055,18 @@ extension String {
         guard self.count % 2 == 0 else {
             return nil
         }
-                
+
         var data = Data()
         for index in stride(from: 0, to: self.count, by: 2) {
             let pair = self.substring(from: index, to: index + 1)
-            
+
             guard let value = UInt8(pair, radix: 16) else {
                 return nil
             }
-            
+
             data.append(value)
         }
-        
+
         return data
     }
 }

@@ -10,6 +10,7 @@
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
 		9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */; };
+		9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */; };
 		9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF55ED0290684BD006B7146 /* ConverterTests.swift */; };
 		CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE370E5B28EEBFA6008FCABD /* RHTTests.swift */; };
 		CE3EC94D28D189EF009471BC /* HeapTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC94B28D1887B009471BC /* HeapTests.swift */; };
@@ -106,6 +107,7 @@
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClientEvent.swift; sourceTree = "<group>"; };
+		9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Codable+Extension.swift"; sourceTree = "<group>"; };
 		9AF55ED0290684BD006B7146 /* ConverterTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ConverterTests.swift; sourceTree = "<group>"; };
 		CE370E5B28EEBFA6008FCABD /* RHTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHTTests.swift; sourceTree = "<group>"; };
 		CE3EC94B28D1887B009471BC /* HeapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeapTests.swift; sourceTree = "<group>"; };
@@ -374,6 +376,7 @@
 		CE8C22E528C9E54500432DE5 /* Util */ = {
 			isa = PBXGroup;
 			children = (
+				9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */,
 				CE8C22F828C9E8CA00432DE5 /* Heap.swift */,
 				CE3EC94E28D1922E009471BC /* RedBlackTree.swift */,
 				CE3EC96028D2D626009471BC /* SplayTree.swift */,
@@ -687,6 +690,7 @@
 				CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */,
 				CE7B997E28E2FD7000D56198 /* CRDTArray.swift in Sources */,
 				CE3EC94F28D1922E009471BC /* RedBlackTree.swift in Sources */,
+				9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */,
 				CE7B997028E1453E00D56198 /* Strings.swift in Sources */,
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
 				CEA2DA5128F69D3800431B61 /* ChangeContext.swift in Sources */,
