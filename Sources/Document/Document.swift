@@ -262,6 +262,13 @@ public actor Document {
             self.changeID.syncLamport(with: $0.getID().getLamport())
         }
 
+        let changeInfos = changes.map {
+            ChangeInfo(change: $0, paths: self.createPaths(change: $0))
+        }
+
+        let changeEvent = RemoteChangeEvent(value: changeInfos)
+        self.eventStream.send(changeEvent)
+
         Logger.debug(
             """
             after appling \(changes.count) remote changes.
