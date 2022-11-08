@@ -27,8 +27,8 @@ struct KanbanCard: YorkieJSONObjectable {
     let title: String
 }
 
-class YorkieObjectableTests: XCTestCase {
-    func test_() async {
+class YorkieJSONObjectableTests: XCTestCase {
+    func test_can_inject_data_as_types_directly() async {
         let lists: [KanbanColumn] = [
             KanbanColumn(title: "a", cards: [
                 KanbanCard(title: "a-1"),

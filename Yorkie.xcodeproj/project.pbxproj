@@ -78,7 +78,7 @@
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */; };
 		CEDDE26E2914EAD00032B16A /* YorkieJSONObjectable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE26D2914EAD00032B16A /* YorkieJSONObjectable.swift */; };
-		CEDDE2722914EB5C0032B16A /* YorkieObjectableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2702914EB260032B16A /* YorkieObjectableTests.swift */; };
+		CEDDE2722914EB5C0032B16A /* YorkieJSONObjectableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */; };
 		CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E028C84D26004988DD /* yorkie.pb.swift */; };
 		CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E128C84D26004988DD /* resources.pb.swift */; };
 		CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E228C84D26004988DD /* yorkie.grpc.swift */; };
@@ -175,7 +175,7 @@
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObjectTests.swift; sourceTree = "<group>"; };
 		CEDDE26D2914EAD00032B16A /* YorkieJSONObjectable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieJSONObjectable.swift; sourceTree = "<group>"; };
-		CEDDE2702914EB260032B16A /* YorkieObjectableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieObjectableTests.swift; sourceTree = "<group>"; };
+		CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieJSONObjectableTests.swift; sourceTree = "<group>"; };
 		CEEB17DC28C84CC3004988DD /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
 		CEEB17DD28C84CC3004988DD /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
 		CEEB17E028C84D26004988DD /* yorkie.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.pb.swift; sourceTree = "<group>"; };
@@ -505,7 +505,7 @@
 		CEDDE26F2914EB060032B16A /* Util */ = {
 			isa = PBXGroup;
 			children = (
-				CEDDE2702914EB260032B16A /* YorkieObjectableTests.swift */,
+				CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -754,7 +754,7 @@
 				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
 				CE9F6FAE2910FBBA002F776D /* DocumentConcurrentAccessTests.swift in Sources */,
 				CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */,
-				CEDDE2722914EB5C0032B16A /* YorkieObjectableTests.swift in Sources */,
+				CEDDE2722914EB5C0032B16A /* YorkieJSONObjectableTests.swift in Sources */,
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,

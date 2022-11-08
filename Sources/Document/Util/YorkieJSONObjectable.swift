@@ -17,35 +17,36 @@
 import Foundation
 
 /// ``YorkieJSONObjectable`` provide a way to make a dictionary including members of a type confirming ``YorkieJSONObjectable``.
-public protocol YorkieJSONObjectable {
+public protocol YorkieJSONObjectable: Codable {
     /// The members of ``excludedLabels`` is not included in a dictionary made by ``toYorkieObject``.
-    var excludedLabels: [String] { get }
+    var excludedMembers: [String] { get }
 }
 
 public extension YorkieJSONObjectable {
     /// ``toJsonObject`` make a dictionary including members of a type confirming ``YorkieObjectable``.
     internal var toJsonObject: [String: Any] {
-        var result = [String: Any]()
-        Mirror(reflecting: self).children.forEach { child in
-            guard let label = child.label,
-                  excludedLabels.contains(label) == false
-            else {
-                return
-            }
+        guard let data = try? JSONEncoder().encode(self),
+              let dictionary = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+        else {
+            return [:]
+        }
 
-            if let value = child.value as? YorkieJSONObjectable {
-                result[label] = value.toJsonObject
-            } else if let value = child.value as? [Any] {
-                result[label] = value.toJsonArray
+        var result = [String: Any]()
+        for (key, value) in dictionary {
+            guard self.excludedMembers.contains(key) == false else { continue }
+            if let value = value as? YorkieJSONObjectable {
+                result[key] = value.toJsonObject
+            } else if let value = value as? [Any] {
+                result[key] = value.toJsonArray
             } else {
-                result[label] = child.value
+                result[key] = value
             }
         }
 
         return result
     }
 
-    var excludedLabels: [String] {
+    var excludedMembers: [String] {
         []
     }
 }

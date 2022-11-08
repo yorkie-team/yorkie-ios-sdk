@@ -162,7 +162,7 @@ class JSONObjectTests: XCTestCase {
         var serial: Int32 = 1234
         var array: [JsonArrayTestType] = [JsonArrayTestType()]
 
-        var excludedLabels: [String] {
+        var excludedMembers: [String] {
             ["serial"]
         }
     }
