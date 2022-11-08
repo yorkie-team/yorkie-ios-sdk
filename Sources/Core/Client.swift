@@ -505,11 +505,11 @@ public final class Client {
             return
         }
 
-                var request = WatchDocumentsRequest()
-                request.client = Converter.toClient(id: id, presence: self.presenceInfo)
-                request.documentKeys = realtimeSyncDocKeys
+        var request = WatchDocumentsRequest()
+        request.client = Converter.toClient(id: id, presence: self.presenceInfo)
+        request.documentKeys = realtimeSyncDocKeys
 
-                let stream = self.rpcClient.watchDocuments(request)
+        let stream = self.rpcClient.watchDocuments(request)
 
         self.watchLoopTask = Task {
             do {
