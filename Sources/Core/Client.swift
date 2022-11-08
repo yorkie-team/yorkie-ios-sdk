@@ -345,7 +345,7 @@ final class Client {
                     }
                 }
 
-                for try await _ in group {}
+                try await group.waitForAll()
             }
 
             return documents
@@ -442,7 +442,7 @@ final class Client {
                     }
                 }
 
-                for try await _ in group {}
+                try await group.waitForAll()
             }
 
             DispatchQueue.main.async {
