@@ -108,6 +108,7 @@
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClientEvent.swift; sourceTree = "<group>"; };
 		9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Codable+Extension.swift"; sourceTree = "<group>"; };
+		9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientIntegrationTests.swift; sourceTree = "<group>"; };
 		9AF55ED0290684BD006B7146 /* ConverterTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ConverterTests.swift; sourceTree = "<group>"; };
 		CE370E5B28EEBFA6008FCABD /* RHTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHTTests.swift; sourceTree = "<group>"; };
 		CE3EC94B28D1887B009471BC /* HeapTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeapTests.swift; sourceTree = "<group>"; };
@@ -244,6 +245,7 @@
 		96DA808F28C5B7B400E2C1DA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				9ADECA002919FC1A006BA331 /* Integration */,
 				CE3EC97028D40421009471BC /* Document */,
 				CE6071EB28C5ECA900A8783E /* API */,
 				CE8C230828D15F5200432DE5 /* Core */,
@@ -252,6 +254,14 @@
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		9ADECA002919FC1A006BA331 /* Integration */ = {
+			isa = PBXGroup;
+			children = (
+				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
+			);
+			path = Integration;
 			sourceTree = "<group>";
 		};
 		CE3EC94928D18720009471BC /* Recovered References */ = {
