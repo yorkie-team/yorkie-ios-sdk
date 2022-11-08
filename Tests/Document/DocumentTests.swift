@@ -887,7 +887,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
-            _ = try? data?.remove(byID: zero!.getID())
+            _ = data?.remove(byID: zero!.getID())
 
             let one = data?.getElement(byIndex: 0) as? CRDTElement
             _ = try? data?.insertBefore(nextID: one!.getID(), value: Int64(3))
@@ -904,7 +904,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let one = data?.getElement(byIndex: 1) as? CRDTElement
-            _ = try? data?.remove(byID: one!.getID())
+            _ = data?.remove(byID: one!.getID())
 
             let two = data?.getElement(byIndex: 1) as? CRDTElement
             _ = try? data?.insertBefore(nextID: two!.getID(), value: Int64(4))
