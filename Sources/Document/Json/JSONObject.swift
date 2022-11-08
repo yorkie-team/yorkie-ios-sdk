@@ -34,17 +34,7 @@ public class JSONObject {
 
     func set(_ values: [String: Any]) {
         values.forEach { (key: String, value: Any) in
-            if let value = value as? [String: Any] {
-                set(key: key, value: JSONObject())
-                let jsonObject = get(key: key) as? JSONObject
-                jsonObject?.set(value)
-            } else if let value = value as? [Any] {
-                set(key: key, value: JSONArray())
-                let jsonArray = get(key: key) as? JSONArray
-                jsonArray?.push(value)
-            } else {
-                set(key: key, value: value)
-            }
+            set(key: key, value: value)
         }
     }
 
@@ -72,6 +62,10 @@ public class JSONObject {
             self.set(key: key, value: JSONObject())
             let jsonObject = self.get(key: key) as? JSONObject
             jsonObject?.set(value)
+        } else if let value = value as? YorkieJSONObjectable {
+            self.set(key: key, value: JSONObject())
+            let jsonObject = self.get(key: key) as? JSONObject
+            jsonObject?.set(value.toJsonObject)
         } else if value is JSONArray {
             let array = CRDTArray(createdAt: self.context.issueTimeTicket())
             self.setValue(key: key, value: array)
@@ -79,7 +73,7 @@ public class JSONObject {
             let array = CRDTArray(createdAt: self.context.issueTimeTicket())
             self.setValue(key: key, value: array)
             let jsonArray = self.get(key: key) as? JSONArray
-            jsonArray?.append(values: value)
+            jsonArray?.append(values: value.toJsonArray)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
         }
@@ -192,7 +186,7 @@ public class JSONObject {
     /**
      * `getID` returns the ID(time ticket) of this Object.
      */
-    func getID() -> TimeTicket {
+    public func getID() -> TimeTicket {
         self.target.getCreatedAt()
     }
 

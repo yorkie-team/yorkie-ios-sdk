@@ -155,4 +155,31 @@ class JSONObjectTests: XCTestCase {
             XCTAssertEqual(idOfCompD, "d-2")
         }
     }
+
+    struct JsonObejctTestType: YorkieJSONObjectable {
+        var id: Int64 = 100
+        var type: String = "struct"
+        var serial: Int32 = 1234
+        var array: [JsonArrayTestType] = [JsonArrayTestType()]
+
+        var excludedMembers: [String] {
+            ["serial"]
+        }
+    }
+
+    struct JsonArrayTestType: YorkieJSONObjectable {
+        let id: Int64 = 200
+    }
+
+    func test_can_insert_obejct() async {
+        let target = Document(key: "doc1")
+        await target.update { root in
+            root.object = JsonObejctTestType()
+
+            XCTAssertEqual(root.debugDescription,
+                           """
+                           {"object":{"array":[{"id":200}],"id":100,"type":"struct"}}
+                           """)
+        }
+    }
 }

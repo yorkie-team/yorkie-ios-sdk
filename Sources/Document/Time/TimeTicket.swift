@@ -20,14 +20,14 @@ import Foundation
  * `TimeTicket` is a timestamp of the logical clock. Ticket is immutable.
  * It is created by `ChangeID`.
  */
-struct TimeTicket: Comparable {
+public struct TimeTicket: Comparable {
     enum Values {
         static let initialDelimiter: UInt32 = 0
         static let maxDelemiter: UInt32 = .max
         static let maxLamport: Int64 = .max
     }
 
-    static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
+    public static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
     static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
 
     private let lamport: Int64
@@ -103,7 +103,7 @@ struct TimeTicket: Comparable {
         return self > other
     }
 
-    static func < (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
+    public static func < (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
         if lhs.lamport != rhs.lamport {
             return lhs.lamport < rhs.lamport
         }
@@ -117,13 +117,13 @@ struct TimeTicket: Comparable {
 }
 
 extension TimeTicket: Hashable {
-    static func == (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
+    public static func == (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
         return lhs.toIDString() == rhs.toIDString()
     }
 }
 
 extension TimeTicket: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         self.toIDString()
     }
 }
