@@ -21,7 +21,7 @@ import Foundation
  * Presence key, value dictionary
  * Similar to an Indexable in JS SDK
  */
-typealias Presence = [String: Any]
+public typealias Presence = [String: Any]
 
 public actor Document {
     private let key: String
@@ -282,7 +282,7 @@ public actor Document {
         let pathTrie = Trie<String>(value: "$")
         for op in change.getOperations() {
             let createdAt = op.getEffectedCreatedAt()
-            if var subPaths = try? self.root.createSubPaths(createdAt: createdAt) {
+            if var subPaths = try? self.root.createSubPaths(createdAt: createdAt), subPaths.isEmpty == false {
                 subPaths.removeFirst()
                 pathTrie.insert(values: subPaths)
             }

@@ -22,7 +22,7 @@ import NIO
 /**
  * `ClientStatus` represents the status of the client.
  */
-enum ClientStatus: String {
+public enum ClientStatus: String {
     /**
      * Deactivated means that the client is not registered to the server.
      */
@@ -66,7 +66,7 @@ struct PresenceInfo {
 /**
  * `ClientOptions` are user-settable options used when defining clients.
  */
-struct ClientOptions {
+public struct ClientOptions {
     private enum DefaultClientOptions {
         static let syncLoopDuration = 50
         static let reconnectStreamDelay = 1000 // 1000 millisecond
@@ -111,18 +111,23 @@ struct ClientOptions {
      */
     var reconnectStreamDelay: Int
 
-    init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int = DefaultClientOptions.syncLoopDuration, reconnectStreamDelay: Int = DefaultClientOptions.reconnectStreamDelay) {
+    public init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int? = nil, reconnectStreamDelay: Int? = nil) {
         self.key = key
         self.apiKey = apiKey
         self.token = token
-        self.syncLoopDuration = syncLoopDuration
-        self.reconnectStreamDelay = reconnectStreamDelay
+        self.syncLoopDuration = syncLoopDuration ?? DefaultClientOptions.syncLoopDuration
+        self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
     }
 }
 
-struct RPCAddress {
+public struct RPCAddress {
     let host: String
     let port: Int
+
+    public init(host: String, port: Int) {
+        self.host = host
+        self.port = port
+    }
 }
 
 /**
@@ -130,7 +135,7 @@ struct RPCAddress {
  * It has documents and sends changes of the documents in local
  * to the server to synchronize with other replicas in remote.
  */
-final class Client {
+public final class Client {
     private var presenceInfo: PresenceInfo
     private var attachmentMap: [String: Attachment]
     private let syncLoopDuration: Int
@@ -149,13 +154,13 @@ final class Client {
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus
     public var presence: Presence { self.presenceInfo.data }
-    public let eventStream: PassthroughSubject<BaseClientEvent, YorkieError>
+    public let eventStream: PassthroughSubject<BaseClientEvent, Error>
 
     /**
      * @param rpcAddr - the address of the RPC server.
      * @param opts - the options of the client.
      */
-    init(rpcAddress: RPCAddress, options: ClientOptions) throws {
+    public init(rpcAddress: RPCAddress, options: ClientOptions) throws {
         self.key = options.key ?? UUID().uuidString
         self.presenceInfo = PresenceInfo(clock: 0, data: options.presence ?? [String: Any]())
 
@@ -189,7 +194,7 @@ final class Client {
      * and receives a unique ID from the server. The given ID is used to
      * distinguish different clients.
      */
-    func activate() async throws {
+    public func activate() async throws {
         guard self.isActive == false else {
             return
         }
@@ -219,7 +224,7 @@ final class Client {
     /**
      * `deactivate` deactivates this client.
      */
-    func deactivate() async throws {
+    public func deactivate() async throws {
         guard self.status == .activated, let clientID = self.id else {
             return
         }
@@ -254,7 +259,7 @@ final class Client {
      *   the client will synchronize the given document.
      */
     @discardableResult
-    func attach(_ doc: Document, _ isManualSync: Bool = false) async throws -> Document {
+    public func attach(_ doc: Document, _ isManualSync: Bool = false) async throws -> Document {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -500,11 +505,11 @@ final class Client {
             return
         }
 
-        var request = WatchDocumentsRequest()
-        request.client = Converter.toClient(id: id, presence: self.presenceInfo)
-        request.documentKeys = realtimeSyncDocKeys
+                var request = WatchDocumentsRequest()
+                request.client = Converter.toClient(id: id, presence: self.presenceInfo)
+                request.documentKeys = realtimeSyncDocKeys
 
-        let stream = self.rpcClient.watchDocuments(request)
+                let stream = self.rpcClient.watchDocuments(request)
 
         self.watchLoopTask = Task {
             do {
