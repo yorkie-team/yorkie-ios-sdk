@@ -129,7 +129,9 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        try await Task.sleep(nanoseconds: 5_000_000_000)
+        // Since attach's response doesn't wait for the watch ready,
+        // We need to wait here until the threshold.
+        try await Task.sleep(nanoseconds: 1_000_000_000)
 
         await self.d1.update { root in
             root.k1 = "v1"

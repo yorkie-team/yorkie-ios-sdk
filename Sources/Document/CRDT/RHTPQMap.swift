@@ -64,8 +64,7 @@ class RHTPQMap {
 
         if let queue = self.elementQueueMapByKey[key],
            queue.isEmpty == false,
-           let node = queue.peek()
-        {
+           let node = queue.peek() {
             if node.value.isRemoved() == false, node.value.remove(removedAt: value.getCreatedAt()) {
                 removed = node.value.rhtValue
             }

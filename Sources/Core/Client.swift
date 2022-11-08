@@ -141,6 +141,7 @@ final class Client {
     private var watchLoopTask: Task<Void, Never>?
 
     private let group: EventLoopGroup
+    private let loopQueue = DispatchQueue.global()
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -442,21 +443,30 @@ final class Client {
                 for try await _ in group {}
             }
 
-            let syncLoopDuration = self.watchLoopTask != nil ? self.syncLoopDuration : self.reconnectStreamDelay
-            Timer.scheduledTimer(withTimeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
-                Task {
-                    await self.doSyncLoop()
+            DispatchQueue.main.async {
+                let syncLoopDuration = self.watchLoopTask != nil ? self.syncLoopDuration : self.reconnectStreamDelay
+                Timer.scheduledTimer(withTimeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
+                    self.loopQueue.sync {
+                        Task {
+                            await self.doSyncLoop()
+                        }
+                    }
                 }
             }
+
         } catch {
             Logger.error("[SL] c:\"\(self.key)\" sync failed: \(error)")
 
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
 
-            Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
-                Task {
-                    await self.doSyncLoop()
+            DispatchQueue.main.async {
+                Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+                    self.loopQueue.sync {
+                        Task {
+                            await self.doSyncLoop()
+                        }
+                    }
                 }
             }
         }
@@ -497,7 +507,9 @@ final class Client {
         self.watchLoopTask = Task {
             do {
                 for try await response in stream {
-                    self.handleWatchDocumentsResponse(keys: realtimeSyncDocKeys, response: response)
+                    self.loopQueue.sync {
+                        self.handleWatchDocumentsResponse(keys: realtimeSyncDocKeys, response: response)
+                    }
                 }
             } catch {
                 switch error {
@@ -576,8 +588,10 @@ final class Client {
         self.watchLoopTask?.cancel()
         self.watchLoopTask = nil
 
-        self.watchLoopReconnectTimer = Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
-            self.doWatchLoop()
+        DispatchQueue.main.async {
+            self.watchLoopReconnectTimer = Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+                self.doWatchLoop()
+            }
         }
 
         let event = StreamConnectionStatusChangedEvent(value: .disconnected)
