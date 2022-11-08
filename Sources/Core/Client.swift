@@ -436,7 +436,9 @@ final class Client {
 
                     if docChanged || attachment.remoteChangeEventReceived ?? false {
                         self.attachmentMap[key]?.remoteChangeEventReceived = false
-                        try await self.syncInternal(attachment.doc)
+                        group.addTask {
+                            try await self.syncInternal(attachment.doc)
+                        }
                     }
                 }
 
