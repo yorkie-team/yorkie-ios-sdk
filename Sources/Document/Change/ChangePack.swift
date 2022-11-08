@@ -87,13 +87,6 @@ class ChangePack {
     }
 
     /**
-     * `hasSnapshot` returns the whether this pack has a snapshot or not.
-     */
-    func hasSnapshot() -> Bool {
-        return self.snapshot?.isEmpty == false
-    }
-
-    /**
      * `getSnapshot` returns the snapshot of this pack.
      */
     func getSnapshot() -> Data? {

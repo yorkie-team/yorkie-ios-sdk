@@ -14,22 +14,117 @@
  * limitations under the License.
  */
 
+import Combine
 import XCTest
 @testable import Yorkie
 
 class ClientTests: XCTestCase {
+    var cancellables = Set<AnyCancellable>()
+
     func skip_test_activate_and_deactivate_client_with_key() async throws {
-        let clientId = UUID().uuidString
+        let clientKey = "\(self.description)-\(Date().description)"
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
-        let options = ClientOptions(key: clientId)
+        let options = ClientOptions(key: clientKey)
         let target: Client
+        var status = ClientStatus.deactivated
+
         do {
             target = try Client(rpcAddress: rpcAddress, options: options)
         } catch {
             XCTFail(error.localizedDescription)
             return
         }
+
+        target.eventStream.sink { _ in
+        } receiveValue: { event in
+            switch event {
+            case let event as StatusChangedEvent:
+                status = event.value
+            default:
+                break
+            }
+        }.store(in: &self.cancellables)
+
+        do {
+            try await target.activate()
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+
+        XCTAssertTrue(target.isActive)
+        XCTAssertEqual(target.key, clientKey)
+        XCTAssert(status == .activated)
+
+        do {
+            try await target.deactivate()
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+        XCTAssertFalse(target.isActive)
+        XCTAssert(status == .deactivated)
+    }
+
+    func skip_test_activate_and_deactivate_client_without_key() async throws {
+        let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+
+        let options = ClientOptions()
+        let target: Client
+        var status = ClientStatus.deactivated
+
+        do {
+            target = try Client(rpcAddress: rpcAddress, options: options)
+        } catch {
+            XCTFail(error.localizedDescription)
+            return
+        }
+
+        target.eventStream.sink { _ in
+        } receiveValue: { event in
+            switch event {
+            case let event as StatusChangedEvent:
+                status = event.value
+            default:
+                break
+            }
+        }.store(in: &self.cancellables)
+
+        try await target.activate()
+
+        XCTAssertTrue(target.isActive)
+        XCTAssertFalse(target.key.isEmpty)
+        XCTAssert(status == .activated)
+
+        try await target.deactivate()
+        XCTAssertFalse(target.isActive)
+        XCTAssert(status == .deactivated)
+    }
+
+    func skip_test_attach_detach_document_with_key() async throws {
+        let clientId = UUID().uuidString
+        let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+
+        let options = ClientOptions(key: clientId)
+        let target: Client
+        var status = ClientStatus.deactivated
+
+        do {
+            target = try Client(rpcAddress: rpcAddress, options: options)
+        } catch {
+            XCTFail(error.localizedDescription)
+            return
+        }
+
+        target.eventStream.sink { _ in
+        } receiveValue: { event in
+            print("#### \(event)")
+            switch event {
+            case let event as StatusChangedEvent:
+                status = event.value
+            default:
+                break
+            }
+        }.store(in: &self.cancellables)
 
         do {
             try await target.activate()
@@ -39,6 +134,23 @@ class ClientTests: XCTestCase {
 
         XCTAssertTrue(target.isActive)
         XCTAssertEqual(target.key, clientId)
+        XCTAssert(status == .activated)
+
+        let doc = Document(key: "doc1")
+
+        do {
+            try await target.attach(doc)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
+
+        //        sleep(60)
+
+        do {
+            try await target.detach(doc)
+        } catch {
+            XCTFail(error.localizedDescription)
+        }
 
         do {
             try await target.deactivate()
@@ -46,26 +158,6 @@ class ClientTests: XCTestCase {
             XCTFail(error.localizedDescription)
         }
         XCTAssertFalse(target.isActive)
-    }
-
-    func skip_test_activate_and_deactivate_client_without_key() async throws {
-        let rpcAddress = RPCAddress(host: "localhost", port: 8080)
-
-        let options = ClientOptions()
-        let target: Client
-        do {
-            target = try Client(rpcAddress: rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
-
-        try await target.activate()
-
-        XCTAssertTrue(target.isActive)
-        XCTAssertFalse(target.key.isEmpty)
-
-        try await target.deactivate()
-        XCTAssertFalse(target.isActive)
+        XCTAssert(status == .deactivated)
     }
 }

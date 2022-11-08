@@ -355,4 +355,15 @@ class ConverterTests: XCTestCase {
             XCTFail("\(error)")
         }
     }
+
+    func test_presence() {
+        let samplePresence: Presence = ["a": "str", "b": 10, "c": 0.5, "d": false, "e": ["a", "b", "c"], "f": ""]
+
+        let presence = PresenceInfo(clock: Int32.random(in: 0 ... Int32.max), data: samplePresence)
+        let converted = Converter.fromPresence(pbPresence: Converter.toClient(id: ActorIDs.initial, presence: presence).presence)
+
+        XCTAssertEqual(presence.clock, converted.clock)
+        // swiftlint: disable force_cast
+        XCTAssert((presence.data as NSDictionary).isEqual(to: (converted.data as NSDictionary) as! [AnyHashable: Any]))
+    }
 }

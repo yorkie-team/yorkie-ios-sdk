@@ -16,8 +16,15 @@
 
 import Foundation
 
-enum YorkieError: Error {
-    case unexpected(message: String)
-    case unimplemented(message: String)
-    case clientNotActive(message: String)
+extension Encodable {
+    var createdDictionary: [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+
+        guard let data = try? encoder.encode(self) else {
+            return [:]
+        }
+
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
 }

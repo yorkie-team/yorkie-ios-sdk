@@ -17,8 +17,14 @@
 import Combine
 import Foundation
 
+/**
+ * Presence key, value dictionary
+ * Similar to an Indexable in JS SDK
+ */
+typealias Presence = [String: Any]
+
 public actor Document {
-    private var key: String
+    private let key: String
     private var root: CRDTRoot
     private var clone: CRDTRoot?
     private var changeID: ChangeID
@@ -71,8 +77,8 @@ public actor Document {
      * - Parameter pack: change pack
      */
     func applyChangePack(pack: ChangePack) throws {
-        if pack.hasSnapshot() {
-            self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: pack.getSnapshot())
+        if let snapshot = pack.getSnapshot() {
+            try self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: snapshot)
         } else if pack.hasChanges() {
             try self.applyChanges(changes: pack.getChanges())
         }
@@ -154,7 +160,7 @@ public actor Document {
      * `getKey` returns the key of this document.
      *
      */
-    func getKey() -> String {
+    nonisolated func getKey() -> String {
         return self.key
     }
 
@@ -221,19 +227,16 @@ public actor Document {
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    func applySnapshot(serverSeq: Int64, snapshot: Data?) {
-        // TODOs Converter.bytesToObject is not implemented yet.
-//      let obj = Converter.bytesToObject(snapshot)
-//      self.root = new CRDTRoot(obj)
+    func applySnapshot(serverSeq: Int64, snapshot: Data) throws {
+        let obj = try Converter.bytesToObject(bytes: snapshot)
+        self.root = CRDTRoot(rootObject: obj)
         self.changeID.syncLamport(with: serverSeq)
 
         // drop clone because it is contaminated.
         self.clone = nil
 
-        if let snapshot {
-            let snapshotEvent = SnapshotEvent(value: snapshot)
-            self.eventStream.send(snapshotEvent)
-        }
+        let snapshotEvent = SnapshotEvent(value: snapshot)
+        self.eventStream.send(snapshotEvent)
     }
 
     /**
