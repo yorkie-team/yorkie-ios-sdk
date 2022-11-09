@@ -35,7 +35,7 @@ public class JSONArray {
     }
 
     /**
-     * `id` returns the ID, `TimeTicket` of this Object.
+     * `getID` returns the ID, `TimeTicket` of this Object.
      */
     public func getID() -> TimeTicket {
         return self.target.createdAt

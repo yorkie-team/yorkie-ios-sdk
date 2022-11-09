@@ -154,7 +154,7 @@ public actor Document {
     }
 
     /**
-     * `key` returns the key of this document.
+     * `getKey` returns the key of this document.
      *
      */
     nonisolated func getKey() -> String {
