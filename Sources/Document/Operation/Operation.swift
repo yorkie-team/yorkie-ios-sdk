@@ -18,8 +18,9 @@ import Foundation
 
 /**
  * `Operation` represents an operation to be executed on a document.
+ *  Types confiming ``Operation`` must be struct to avoid data racing.
  */
-protocol Operation: AnyObject {
+protocol Operation {
     var parentCreatedAt: TimeTicket { get }
     var executedAt: TimeTicket { get set }
 
@@ -58,7 +59,7 @@ extension Operation {
     /**
      * `setActor` sets the given actor to this operation.
      */
-    func setActor(_ actorID: ActorID) {
+    mutating func setActor(_ actorID: ActorID) {
         self.executedAt.setActor(actorID)
     }
 }

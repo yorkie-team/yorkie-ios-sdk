@@ -19,7 +19,7 @@ import Foundation
 /**
  * `AddOperation` is an operation representing adding an element to an Array.
  */
-class AddOperation: Operation {
+struct AddOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
     private var previousCreatedAt: TimeTicket

@@ -20,7 +20,7 @@ import Foundation
  * `SetOperation` represents an operation that stores the value corresponding to the
  * given key in the Object.
  */
-class SetOperation: Operation {
+struct SetOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
     private let key: String

@@ -42,7 +42,7 @@ class ChangeTests: XCTestCase {
 
         let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: self.actorId)
 
-        let target = Change(id: changeID, operations: [setOperation])
+        var target = Change(id: changeID, operations: [setOperation])
 
         XCTAssertEqual(target.getOperations()[0].executedAt.getStructureAsString(), "8:actor-1:0")
 

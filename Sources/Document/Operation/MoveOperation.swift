@@ -19,7 +19,7 @@ import Foundation
 /**
  * `MoveOperation` is an operation representing moving an element to an Array.
  */
-class MoveOperation: Operation {
+struct MoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
     private var previousCreatedAt: TimeTicket
