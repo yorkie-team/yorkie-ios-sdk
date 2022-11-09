@@ -53,7 +53,7 @@ class RemoveOperationTests: XCTestCase {
         // then
 
         XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":{\"k-b1\":\"b1\"}}")
-        XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.REMOVE")
-        XCTAssertEqual(target.getEffectedCreatedAt(), object2.createdAt)
+        XCTAssertEqual(target.structureAsString, "4:actor-1:0.REMOVE")
+        XCTAssertEqual(target.effectedCreatedAt, object2.createdAt)
     }
 }

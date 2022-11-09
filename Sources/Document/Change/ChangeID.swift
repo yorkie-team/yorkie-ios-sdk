@@ -99,9 +99,9 @@ struct ChangeID {
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data of this ID.
+     * `structureAsString` returns a string containing the meta data of this ID.
      */
-    func getStructureAsString() -> String {
+    var structureAsString: String {
         var actor: String
         if let value = self.actor {
             actor = String(value.suffix(2))

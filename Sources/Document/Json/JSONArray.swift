@@ -35,10 +35,10 @@ public class JSONArray {
     }
 
     /**
-     * `getID` returns the ID, `TimeTicket` of this Object.
+     * `id` returns the ID, `TimeTicket` of this Object.
      */
     public func getID() -> TimeTicket {
-        return self.target.getCreatedAt()
+        return self.target.createdAt
     }
 
     /**
@@ -212,7 +212,7 @@ public class JSONArray {
         let ticket = self.context.issueTimeTicket()
         let previousCreatedAt = try target.getPreviousCreatedAt(createdAt: nextCreatedAt)
         try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
-        let operation = MoveOperation(parentCreatedAt: target.getCreatedAt(), previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
+        let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
 
@@ -223,7 +223,7 @@ public class JSONArray {
     private func moveAfterInternal(previousCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket()
         try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
-        let operation = MoveOperation(parentCreatedAt: target.getCreatedAt(), previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
+        let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
 
@@ -234,8 +234,8 @@ public class JSONArray {
     private func moveFrontInternal(createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket()
         let head = self.target.getHead()
-        try self.target.move(createdAt: createdAt, afterCreatedAt: head.getCreatedAt(), executedAt: ticket)
-        let operation = MoveOperation(parentCreatedAt: target.getCreatedAt(), previousCreatedAt: head.getCreatedAt(), createdAt: createdAt, executedAt: ticket)
+        try self.target.move(createdAt: createdAt, afterCreatedAt: head.createdAt, executedAt: ticket)
+        let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: head.createdAt, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
 
@@ -247,7 +247,7 @@ public class JSONArray {
         let ticket = self.context.issueTimeTicket()
         let last = self.target.getLastCreatedAt()
         try self.target.move(createdAt: createdAt, afterCreatedAt: last, executedAt: ticket)
-        let operation = MoveOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: last, createdAt: createdAt, executedAt: ticket)
+        let operation = MoveOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: last, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
 
@@ -265,7 +265,7 @@ public class JSONArray {
             try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
-            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: primitive, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: primitive, executedAt: ticket)
             self.context.push(operation: operation)
 
             return primitive
@@ -278,7 +278,7 @@ public class JSONArray {
             try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
-            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             let child = JSONArray(target: clone, changeContext: self.context)
@@ -295,7 +295,7 @@ public class JSONArray {
             try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
-            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             return crdtArray
@@ -305,7 +305,7 @@ public class JSONArray {
             try self.target.insert(value: crdtObject, afterCreatedAt: previousCreatedAt)
             self.context.registerElement(crdtObject, parent: self.target)
 
-            let operation = AddOperation(parentCreatedAt: self.target.getCreatedAt(), previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
             return crdtObject
         }
@@ -332,7 +332,7 @@ public class JSONArray {
             return nil
         }
 
-        let operation = RemoveOperation(parentCreatedAt: target.getCreatedAt(), createdAt: removed.getCreatedAt(), executedAt: ticket)
+        let operation = RemoveOperation(parentCreatedAt: target.createdAt, createdAt: removed.createdAt, executedAt: ticket)
         self.context.push(operation: operation)
         self.context.registerRemovedElement(removed)
         return removed
@@ -346,7 +346,7 @@ public class JSONArray {
         let ticket = self.context.issueTimeTicket()
         let removed = try self.target.remove(createdAt: createdAt, executedAt: ticket)
 
-        let operation = RemoveOperation(parentCreatedAt: self.target.getCreatedAt(), createdAt: removed.getCreatedAt(), executedAt: ticket)
+        let operation = RemoveOperation(parentCreatedAt: self.target.createdAt, createdAt: removed.createdAt, executedAt: ticket)
         self.context.push(operation: operation)
         self.context.registerRemovedElement(removed)
 
@@ -385,14 +385,14 @@ public class JSONArray {
         if items.isEmpty == false {
             var previousID: TimeTicket
             if from == 0 {
-                previousID = self.target.getHead().getID()
+                previousID = self.target.getHead().id
             } else {
-                previousID = try self.target.get(index: from - 1).getID()
+                previousID = try self.target.get(index: from - 1).id
             }
 
             for item in items {
                 let newElement = try insertAfterInternal(previousCreatedAt: previousID, value: item)
-                previousID = newElement.getID()
+                previousID = newElement.id
             }
         }
 
@@ -438,12 +438,12 @@ public class JSONArray {
             }
         }
 
-        guard let searchId = (searchElement as? JSONDatable)?.crdtElement.getID() else {
+        guard let searchId = (searchElement as? JSONDatable)?.crdtElement.id else {
             return false
         }
 
         for index in from ..< length {
-            guard let id = try? target.get(index: index).getID() else {
+            guard let id = try? target.get(index: index).id else {
                 continue
             }
             if id == searchId {
@@ -478,12 +478,12 @@ public class JSONArray {
             } ?? Self.notFound
         }
 
-        guard let searchId = (searchElement as? JSONDatable)?.crdtElement.getID() else {
+        guard let searchId = (searchElement as? JSONDatable)?.crdtElement.id else {
             return Self.notFound
         }
 
         for index in from ..< length {
-            guard let id = try? target.get(index: index).getID() else {
+            guard let id = try? target.get(index: index).id else {
                 continue
             }
             if id == searchId {
@@ -527,12 +527,12 @@ public class JSONArray {
             } ?? Self.notFound
         }
 
-        guard let searchId = (searchElement as? JSONDatable)?.crdtElement.getID() else {
+        guard let searchId = (searchElement as? JSONDatable)?.crdtElement.id else {
             return Self.notFound
         }
 
         for index in stride(from: from, to: 0, by: -1) {
-            guard let id = try? self.target.get(index: index).getID() else {
+            guard let id = try? self.target.get(index: index).id else {
                 continue
             }
 

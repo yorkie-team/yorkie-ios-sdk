@@ -21,18 +21,20 @@ import Foundation
  *  Types confiming ``Operation`` must be struct to avoid data racing.
  */
 protocol Operation {
+    /// `parentCreatedAt` returns the creation time of the target element to
     var parentCreatedAt: TimeTicket { get }
+    /// `executedAt` returns execution time of this operation.
     var executedAt: TimeTicket { get set }
 
     /**
-     * `getEffectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the time of the effected element.
      */
-    func getEffectedCreatedAt() -> TimeTicket
+    var effectedCreatedAt: TimeTicket { get }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data.
+     * `structureAsString` returns a string containing the meta data.
      */
-    func getStructureAsString() -> String
+    var structureAsString: String { get }
 
     /**
      * `execute` executes this operation on the given document(`root`).
@@ -41,21 +43,6 @@ protocol Operation {
 }
 
 extension Operation {
-    /**
-     * `getParentCreatedAt` returns the creation time of the target element to
-     * execute the operation.
-     */
-    func getParentCreatedAt() -> TimeTicket {
-        return self.parentCreatedAt
-    }
-
-    /**
-     * `getExecutedAt` returns execution time of this operation.
-     */
-    func getExecutedAt() -> TimeTicket {
-        return self.executedAt
-    }
-
     /**
      * `setActor` sets the given actor to this operation.
      */

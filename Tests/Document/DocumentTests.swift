@@ -407,7 +407,7 @@ class DocumentTests: XCTestCase {
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
             let two = data?.getElement(byIndex: 2) as? CRDTElement
-            try? data?.moveBefore(nextID: two!.getID(), id: zero!.getID())
+            try? data?.moveBefore(nextID: two!.id, id: zero!.id)
         }
 
         result = await target.toSortedJSON()
@@ -423,7 +423,7 @@ class DocumentTests: XCTestCase {
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
             let three = data?.getElement(byIndex: 3) as? CRDTElement
-            try? data?.moveBefore(nextID: one!.getID(), id: three!.getID())
+            try? data?.moveBefore(nextID: one!.id, id: three!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[1,3,0,2]}
@@ -459,7 +459,7 @@ class DocumentTests: XCTestCase {
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
             let three = data?.getElement(byIndex: 3) as? CRDTElement
-            try? data?.moveBefore(nextID: one!.getID(), id: three!.getID())
+            try? data?.moveBefore(nextID: one!.id, id: three!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[0,3,1,2]}
@@ -494,7 +494,7 @@ class DocumentTests: XCTestCase {
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
             let two = data?.getElement(byIndex: 2) as? CRDTElement
-            try? data?.moveAfter(previousID: two!.getID(), id: zero!.getID())
+            try? data?.moveAfter(previousID: two!.id, id: zero!.id)
         }
 
         result = await target.toSortedJSON()
@@ -511,7 +511,7 @@ class DocumentTests: XCTestCase {
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
             let three = data?.getElement(byIndex: 3) as? CRDTElement
-            try? data?.moveAfter(previousID: one!.getID(), id: three!.getID())
+            try? data?.moveAfter(previousID: one!.id, id: three!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[1,2,3,0]}
@@ -547,7 +547,7 @@ class DocumentTests: XCTestCase {
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
             let three = data?.getElement(byIndex: 3) as? CRDTElement
-            try? data?.moveAfter(previousID: one!.getID(), id: three!.getID())
+            try? data?.moveAfter(previousID: one!.id, id: three!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[0,1,3,2]}
@@ -580,7 +580,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let two = data?.getElement(byIndex: 2) as? CRDTElement
-            try? data?.moveFront(id: two!.getID())
+            try? data?.moveFront(id: two!.id)
         }
         result = await target.toSortedJSON()
         XCTAssertEqual(result,
@@ -594,7 +594,7 @@ class DocumentTests: XCTestCase {
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let three = data?.getElement(byIndex: 3) as? CRDTElement
-            try? data?.moveFront(id: three!.getID())
+            try? data?.moveFront(id: three!.id)
         }
 
         result = await target.toSortedJSON()
@@ -624,7 +624,7 @@ class DocumentTests: XCTestCase {
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
-            try? data?.moveFront(id: one!.getID())
+            try? data?.moveFront(id: one!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[1,0,2,3]}
@@ -657,7 +657,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let two = data?.getElement(byIndex: 2) as? CRDTElement
-            try? data?.moveLast(id: two!.getID())
+            try? data?.moveLast(id: two!.id)
         }
 
         result = await target.toSortedJSON()
@@ -672,7 +672,7 @@ class DocumentTests: XCTestCase {
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let two = data?.getElement(byIndex: 2) as? CRDTElement
-            try? data?.moveLast(id: two!.getID())
+            try? data?.moveLast(id: two!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[0,1,3,2]}
@@ -706,7 +706,7 @@ class DocumentTests: XCTestCase {
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
-            try? data?.moveLast(id: one!.getID())
+            try? data?.moveLast(id: one!.id)
             XCTAssertEqual(root.debugDescription,
                            """
                            {"data":[0,2,3,1]}
@@ -833,7 +833,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
-            _ = try? data?.insertBefore(nextID: zero!.getID(), value: Int64(3))
+            _ = try? data?.insertBefore(nextID: zero!.id, value: Int64(3))
         }
         result = await target.toSortedJSON()
         XCTAssertEqual(result,
@@ -846,7 +846,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let one = data?.getElement(byIndex: 2) as? CRDTElement
-            _ = try? data?.insertBefore(nextID: one!.getID(), value: Int64(4))
+            _ = try? data?.insertBefore(nextID: one!.id, value: Int64(4))
         }
         result = await target.toSortedJSON()
         XCTAssertEqual(result,
@@ -859,7 +859,7 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let two = data?.getElement(byIndex: 4) as? CRDTElement
-            _ = try? data?.insertBefore(nextID: two!.getID(), value: Int64(5))
+            _ = try? data?.insertBefore(nextID: two!.id, value: Int64(5))
         }
         result = await target.toSortedJSON()
         XCTAssertEqual(result,
@@ -887,10 +887,10 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
-            _ = data?.remove(byID: zero!.getID())
+            _ = data?.remove(byID: zero!.id)
 
             let one = data?.getElement(byIndex: 0) as? CRDTElement
-            _ = try? data?.insertBefore(nextID: one!.getID(), value: Int64(3))
+            _ = try? data?.insertBefore(nextID: one!.id, value: Int64(3))
         }
 
         result = await target.toSortedJSON()
@@ -904,10 +904,10 @@ class DocumentTests: XCTestCase {
         await target.update { root in
             let data = root.data as? JSONArray
             let one = data?.getElement(byIndex: 1) as? CRDTElement
-            _ = data?.remove(byID: one!.getID())
+            _ = data?.remove(byID: one!.id)
 
             let two = data?.getElement(byIndex: 1) as? CRDTElement
-            _ = try? data?.insertBefore(nextID: two!.getID(), value: Int64(4))
+            _ = try? data?.insertBefore(nextID: two!.id, value: Int64(4))
         }
 
         result = await target.toSortedJSON()

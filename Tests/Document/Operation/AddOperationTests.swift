@@ -108,7 +108,7 @@ class AddOperationTests: XCTestCase {
         XCTAssertFalse(isFailed)
 
         XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",{\"k-c1\":\"c1\"},\"new-value\",\"d1\"]}")
-        XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.ADD")
-        XCTAssertEqual(target.getEffectedCreatedAt(), valueToAdd.createdAt)
+        XCTAssertEqual(target.structureAsString, "4:actor-1:0.ADD")
+        XCTAssertEqual(target.effectedCreatedAt, valueToAdd.createdAt)
     }
 }

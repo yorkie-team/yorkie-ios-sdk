@@ -20,8 +20,11 @@ import Foundation
  * `CRDTElement` represents element type containing logical clock.
  */
 protocol CRDTElement: AnyObject {
+    /// `createdAt` returns the creation time of this element.
     var createdAt: TimeTicket { get }
+    /// `movedAt` returns the move time of this element.
     var movedAt: TimeTicket? { get set }
+    /// `removedAt` returns the removal time of this element.
     var removedAt: TimeTicket? { get set }
 
     func toJSON() -> String
@@ -35,36 +38,15 @@ extension CRDTElement {
     /**
      * `isRemoved` check if this element was removed.
      */
-    func isRemoved() -> Bool {
+    var isRemoved: Bool {
         return self.removedAt != nil
     }
 
     /**
-     * `getCreatedAt` returns the creation time of this element.
+     * `id` returns the creation time of this element.
      */
-    func getCreatedAt() -> TimeTicket {
+    var id: TimeTicket {
         return self.createdAt
-    }
-
-    /**
-     * `getID` returns the creation time of this element.
-     */
-    func getID() -> TimeTicket {
-        return self.createdAt
-    }
-
-    /**
-     * `getMovedAt` returns the move time of this element.
-     */
-    func getMovedAt() -> TimeTicket? {
-        return self.movedAt
-    }
-
-    /**
-     * `getRemovedAt` returns the removal time of this element.
-     */
-    func getRemovedAt() -> TimeTicket? {
-        return self.removedAt
     }
 
     /**
@@ -83,13 +65,6 @@ extension CRDTElement {
         }
 
         return false
-    }
-
-    /**
-     * `setRemovedAt` sets the remove time of this element.
-     */
-    func setRemovedAt(_ removedAt: TimeTicket?) {
-        self.removedAt = removedAt
     }
 
     /**
@@ -114,7 +89,7 @@ extension CRDTElement {
         return false
     }
 
-    func equal(_ target: CRDTElement) -> Bool {
+    func equals(_ target: CRDTElement) -> Bool {
         return self.createdAt == target.createdAt && self.movedAt == target.movedAt && self.removedAt == target.removedAt
     }
 }
@@ -137,7 +112,7 @@ protocol CRDTContainer: CRDTElement {
  * `CRDTTextElement` represents CRDTText or CRDTRichText.
  */
 protocol CRDTTextElement: CRDTElement {
-    func getRemovedNodesLength() -> Int
+    var removedNodesLength: Int { get }
 
     func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int
 }

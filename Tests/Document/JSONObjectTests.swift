@@ -52,7 +52,7 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_remove() async {
+    func test_can_removes() async {
         let target = Document(key: "doc1")
         await target.update { root in
             root.boolean = true
@@ -168,7 +168,7 @@ class JSONObjectTests: XCTestCase {
     }
 
     struct JsonArrayTestType: YorkieJSONObjectable {
-        let id: Int64 = 200
+        var id: Int64 = 200
     }
 
     func test_can_insert_obejct() async {

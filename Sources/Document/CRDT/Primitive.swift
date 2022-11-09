@@ -32,7 +32,7 @@ enum PrimitiveValue: Equatable {
  * It has a type and a value.
  */
 class Primitive: CRDTElement {
-    var createdAt: TimeTicket
+    let createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
@@ -163,8 +163,8 @@ extension Primitive {
      * `deepcopy` copies itself deeply.
      */
     func deepcopy() -> CRDTElement {
-        let primitive = Primitive(value: self.value, createdAt: self.getCreatedAt())
-        primitive.setMovedAt(self.getMovedAt())
+        let primitive = Primitive(value: self.value, createdAt: self.createdAt)
+        primitive.setMovedAt(self.movedAt)
         return primitive
     }
 }

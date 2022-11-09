@@ -42,7 +42,7 @@ class TestCRDTElementTests: XCTestCase {
         let movedResult = target.setMovedAt(small)
 
         XCTAssertEqual(movedResult, true)
-        XCTAssertTrue(target.getMovedAt() == small)
+        XCTAssertTrue(target.movedAt == small)
     }
 
     func test_can_set_bigger_movedAt_when_movedAt_is_nil() {
@@ -53,7 +53,7 @@ class TestCRDTElementTests: XCTestCase {
         let movedResult = target.setMovedAt(big)
 
         XCTAssertEqual(movedResult, true)
-        XCTAssertTrue(target.getMovedAt() == big)
+        XCTAssertTrue(target.movedAt == big)
     }
 
     func test_can_not_set_bigger_movedAt_when_movedAt_is_non_nil() {
@@ -68,7 +68,7 @@ class TestCRDTElementTests: XCTestCase {
 
         XCTAssertEqual(movedResult, false)
 
-        XCTAssertTrue(target.getMovedAt()! > small)
+        XCTAssertTrue(target.movedAt! > small)
     }
 
     func test_can_not_remove_when_nil() {
@@ -91,14 +91,14 @@ class TestCRDTElementTests: XCTestCase {
 
     func test_can_remove_when_current_removeAt_is_not_nil_and_samll() {
         let target = TestCRDTElement(createdAt: TimeTicket.initial)
-        target.setRemovedAt(TimeTicket.initial)
+        target.removedAt = TimeTicket.initial
 
         XCTAssertEqual(target.remove(TimeTicket.max), true)
     }
 
     func test_can_not_remove_when_current_removeAt_is_not_nil_and_big() {
         let target = TestCRDTElement(createdAt: TimeTicket.initial)
-        target.setRemovedAt(TimeTicket.max)
+        target.removedAt = TimeTicket.max
 
         let timeTicket = TimeTicket(lamport: 10, delimiter: 10, actorID: ActorIDs.initial)
         XCTAssertEqual(target.remove(timeTicket), false)

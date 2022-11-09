@@ -49,7 +49,7 @@ class ChangeContextTests: XCTestCase {
 
         XCTAssertTrue(target.hasOperations())
 
-        XCTAssertEqual(target.getChange().getStructureAsString(), "4:actor-1:0.SET")
+        XCTAssertEqual(target.getChange().structureAsString, "4:actor-1:0.SET")
     }
 
     func test_can_create_timeticket() {
@@ -70,6 +70,6 @@ class ChangeContextTests: XCTestCase {
         let target = ChangeContext(id: changeID, root: root, message: "test message.")
 
         let result = target.issueTimeTicket()
-        XCTAssertEqual(result.getStructureAsString(), "2:nil:1")
+        XCTAssertEqual(result.structureAsString, "2:nil:1")
     }
 }

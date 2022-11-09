@@ -20,8 +20,8 @@ import Foundation
  * `RGATreeListNode` is a node of RGATreeList.
  */
 final class RGATreeListNode: SplayNode<CRDTElement> {
-    private var previous: RGATreeListNode?
-    private var next: RGATreeListNode?
+    fileprivate private(set) var previous: RGATreeListNode?
+    fileprivate var next: RGATreeListNode?
 
     override init(_ value: CRDTElement) {
         super.init(value)
@@ -44,10 +44,10 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     }
 
     /**
-     * `getLength` returns the length of this node.
+     * `length` returns the length of this node.
      */
-    override func getLength() -> Int {
-        return self.value.isRemoved() ? 0 : 1
+    override var length: Int {
+        return self.value.isRemoved ? 0 : 1
     }
 
     /**
@@ -60,19 +60,19 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     /**
      * `getCreatedAt` returns creation time of this value
      */
-    fileprivate func getCreatedAt() -> TimeTicket {
-        return self.value.getCreatedAt()
+    fileprivate var createdAt: TimeTicket {
+        return self.value.createdAt
     }
 
     /**
      * `getPositionedAt` returns time this element was positioned in the array.
      */
-    fileprivate func getPositionedAt() -> TimeTicket {
-        if let movedAt = self.value.getMovedAt() {
+    fileprivate var positionedAt: TimeTicket {
+        if let movedAt = self.value.movedAt {
             return movedAt
         }
 
-        return self.value.getCreatedAt()
+        return self.value.createdAt
     }
 
     /**
@@ -90,25 +90,10 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     }
 
     /**
-     * `getPrev` returns a previous node.
-     */
-    fileprivate func getPrevious() -> RGATreeListNode? {
-        return self.previous
-    }
-
-    /**
-     * `getNext` returns a next node.
-     */
-    fileprivate func getNext() -> RGATreeListNode? {
-        return self.next
-    }
-
-    /**
      * `isRemoved` checks if the value was removed.
      */
-    @discardableResult
-    fileprivate func isRemoved() -> Bool {
-        return self.value.isRemoved()
+    fileprivate var isRemoved: Bool {
+        return self.value.isRemoved
     }
 }
 
@@ -123,12 +108,12 @@ class RGATreeList {
 
     init() {
         let dummyValue = Primitive(value: .null, createdAt: .initial)
-        dummyValue.setRemovedAt(.initial)
+        dummyValue.removedAt = .initial
         self.dummyHead = RGATreeListNode(dummyValue)
         self.last = self.dummyHead
         self.nodeMapByIndex = SplayTree()
         self.nodeMapByIndex.insert(self.dummyHead)
-        self.nodeMapByCreatedAt = [self.dummyHead.getCreatedAt(): self.dummyHead]
+        self.nodeMapByCreatedAt = [self.dummyHead.createdAt: self.dummyHead]
     }
 
     /**
@@ -156,7 +141,7 @@ class RGATreeList {
         }
 
         while true {
-            guard let next = node.getNext(), next.getPositionedAt().after(executedAt) else {
+            guard let next = node.next, next.positionedAt.after(executedAt) else {
                 break
             }
             node = next
@@ -166,20 +151,20 @@ class RGATreeList {
     }
 
     private func delete(node: RGATreeListNode) {
-        if self.last === node, let previousNode = node.getPrevious() {
+        if self.last === node, let previousNode = node.previous {
             self.last = previousNode
         }
 
         node.delete()
         self.nodeMapByIndex.delete(node)
-        self.nodeMapByCreatedAt.removeValue(forKey: node.getValue().getCreatedAt())
+        self.nodeMapByCreatedAt.removeValue(forKey: node.value.createdAt)
     }
 
     /**
      * `insert` adds next element of previously created node.
      */
     func insert(_ value: CRDTElement, afterCreatedAt createdAt: TimeTicket, executedAt: TimeTicket? = nil) throws {
-        let executedAt: TimeTicket = executedAt ?? value.getCreatedAt()
+        let executedAt: TimeTicket = executedAt ?? value.createdAt
 
         let previousNode = try findNode(fromCreatedAt: createdAt, executedAt: executedAt)
         let newNode = RGATreeListNode.create(with: value, previousNode: previousNode)
@@ -188,7 +173,7 @@ class RGATreeList {
         }
 
         self.nodeMapByIndex.insert(previousNode: previousNode, newNode: newNode)
-        self.nodeMapByCreatedAt[newNode.getCreatedAt()] = newNode
+        self.nodeMapByCreatedAt[newNode.createdAt] = newNode
     }
 
     /**
@@ -213,9 +198,9 @@ class RGATreeList {
         }
 
         var needToMove = false
-        if movingNode.getValue().getMovedAt() == nil {
+        if movingNode.value.movedAt == nil {
             needToMove = true
-        } else if let movedAt = movingNode.getValue().getMovedAt(), executedAt.after(movedAt) {
+        } else if let movedAt = movingNode.value.movedAt, executedAt.after(movedAt) {
             needToMove = true
         }
 
@@ -224,15 +209,15 @@ class RGATreeList {
         }
 
         self.delete(node: movingNode)
-        try self.insert(movingNode.getValue(), afterCreatedAt: previsousNode.getCreatedAt(), executedAt: executedAt)
-        movingNode.getValue().setMovedAt(executedAt)
+        try self.insert(movingNode.value, afterCreatedAt: previsousNode.createdAt, executedAt: executedAt)
+        movingNode.value.setMovedAt(executedAt)
     }
 
     /**
      * `insert` adds the given element after  the last creation time.
      */
     func insert(_ value: CRDTElement) throws {
-        try self.insert(value, afterCreatedAt: self.last.getCreatedAt())
+        try self.insert(value, afterCreatedAt: self.last.createdAt)
     }
 
     /**
@@ -245,7 +230,7 @@ class RGATreeList {
             throw YorkieError.unexpected(message: log)
         }
 
-        return node.getValue()
+        return node.value
     }
 
     /**
@@ -265,8 +250,8 @@ class RGATreeList {
      * `delete` physically purges child element.
      */
     func delete(_ value: CRDTElement) throws {
-        guard let node = self.nodeMapByCreatedAt[value.getCreatedAt()] else {
-            let log = "failed to find the given createdAt: \(value.getCreatedAt())"
+        guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
+            let log = "failed to find the given createdAt: \(value.createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -300,9 +285,9 @@ class RGATreeList {
             if nextRgaNode == nil {
                 break
             }
-            nextRgaNode = nextRgaNode?.getNext()
+            nextRgaNode = nextRgaNode?.next
 
-        } while nextRgaNode?.isRemoved() == true
+        } while nextRgaNode?.isRemoved == true
 
         guard let nextRgaNode else {
             let log = "failed to find the given index: \(index)"
@@ -324,10 +309,10 @@ class RGATreeList {
         }
         var previousNode: RGATreeListNode? = node
         repeat {
-            previousNode = previousNode?.getPrevious()
-        } while self.dummyHead !== previousNode && previousNode?.isRemoved() == true
+            previousNode = previousNode?.previous
+        } while self.dummyHead !== previousNode && previousNode?.isRemoved == true
 
-        return previousNode?.getValue().getCreatedAt() ?? self.getHead().getCreatedAt()
+        return previousNode?.value.createdAt ?? self.getHead().createdAt
     }
 
     /**
@@ -340,11 +325,11 @@ class RGATreeList {
             throw YorkieError.unexpected(message: log)
         }
 
-        let alreadyRemoved = node.isRemoved()
+        let alreadyRemoved = node.isRemoved
         if node.remove(executedAt), alreadyRemoved == false {
             self.nodeMapByIndex.splayNode(node)
         }
-        return node.getValue()
+        return node.value
     }
 
     /**
@@ -356,40 +341,40 @@ class RGATreeList {
         if node.remove(executedAt) {
             self.nodeMapByIndex.splayNode(node)
         }
-        return node.getValue()
+        return node.value
     }
 
     /**
      * `getHead` returns the value of head elements.
      */
     func getHead() -> CRDTElement {
-        return self.dummyHead.getValue()
+        return self.dummyHead.value
     }
 
     /**
      * `getLast` returns the value of last elements.
      */
     func getLast() -> CRDTElement {
-        return self.last.getValue()
+        return self.last.value
     }
 
     /**
      * `getLastCreatedAt` returns the creation time of last elements.
      */
     func getLastCreatedAt() -> TimeTicket {
-        return self.last.getCreatedAt()
+        return self.last.createdAt
     }
 
     /**
-     * `getStructureAsString` returns a String containing the meta data of the node id
+     * `structureAsString` returns a String containing the meta data of the node id
      * for debugging purpose.
      */
-    func getStructureAsString() -> String {
+    var structureAsString: String {
         var result: [String] = []
 
         for node in self {
-            let value = "\(node.getCreatedAt()):\(node.getValue().toJSON())"
-            if node.isRemoved() {
+            let value = "\(node.createdAt):\(node.value.toJSON())"
+            if node.isRemoved {
                 result.append("{\(value)}")
             } else {
                 result.append("[\(value)]")
@@ -404,7 +389,7 @@ extension RGATreeList: Sequence {
     typealias Element = RGATreeListNode
 
     func makeIterator() -> RGATreeListIterator {
-        return RGATreeListIterator(self.dummyHead.getNext())
+        return RGATreeListIterator(self.dummyHead.next)
     }
 }
 
@@ -421,7 +406,7 @@ class RGATreeListIterator: IteratorProtocol {
         }
 
         defer {
-            self.iteratorNext = result.getNext()
+            self.iteratorNext = result.next
         }
         return result
     }

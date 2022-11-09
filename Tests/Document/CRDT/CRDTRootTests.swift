@@ -88,7 +88,7 @@ class CRDTRootTests: XCTestCase {
 
         let target = CRDTRoot(rootObject: rootObject)
 
-        XCTAssertEqual(target.getElementMapSize(), 3)
+        XCTAssertEqual(target.elementMapSize, 3)
     }
 
     func test_getRemovedElementSetSize() throws {
@@ -105,14 +105,14 @@ class CRDTRootTests: XCTestCase {
 
         let target = CRDTRoot(rootObject: rootObject)
 
-        b1.setRemovedAt(TimeTicket(lamport: 6, delimiter: 0, actorID: self.actorId))
+        b1.removedAt = TimeTicket(lamport: 6, delimiter: 0, actorID: self.actorId)
         target.registerRemovedElement(b1)
 
-        a2.setRemovedAt(TimeTicket(lamport: 7, delimiter: 0, actorID: self.actorId))
+        a2.removedAt = TimeTicket(lamport: 7, delimiter: 0, actorID: self.actorId)
         target.registerRemovedElement(a2)
 
         // when
-        let result = target.getRemovedElementSetSize()
+        let result = target.removedElementSetSize
 
         // then
         XCTAssertEqual(result, 2)
@@ -139,9 +139,9 @@ class CRDTRootTests: XCTestCase {
         // when
         let target = CRDTRoot(rootObject: rootObject)
 
-        object2ToRemove.setRemovedAt(TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId))
+        object2ToRemove.removedAt = TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId)
         target.registerRemovedElement(object2ToRemove)
-        let result = target.getGarbageLength()
+        let result = target.garbageLength
 
         // then
         XCTAssertEqual(result, 4)
@@ -170,12 +170,12 @@ class CRDTRootTests: XCTestCase {
 
         let removedAtForGarbage = TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId)
 
-        object2ToGarbage.setRemovedAt(removedAtForGarbage)
+        object2ToGarbage.removedAt = removedAtForGarbage
         target.registerRemovedElement(object2ToGarbage)
 
-        a1.setRemovedAt(TimeTicket(lamport: 9, delimiter: 0, actorID: self.actorId))
+        a1.removedAt = TimeTicket(lamport: 9, delimiter: 0, actorID: self.actorId)
         target.registerRemovedElement(a1)
-        let garbageLength = target.getGarbageLength()
+        let garbageLength = target.garbageLength
         XCTAssertEqual(garbageLength, 5)
         let result = target.garbageCollect(lessThanOrEqualTo: removedAtForGarbage)
 

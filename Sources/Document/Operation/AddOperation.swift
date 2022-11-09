@@ -22,8 +22,8 @@ import Foundation
 struct AddOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
-    private var previousCreatedAt: TimeTicket
-    private var value: CRDTElement
+    let previousCreatedAt: TimeTicket
+    let value: CRDTElement
 
     init(parentCreatedAt: TimeTicket, previousCreatedAt: TimeTicket, value: CRDTElement, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -36,11 +36,11 @@ struct AddOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     func execute(root: CRDTRoot) throws {
-        let parent = root.find(createdAt: self.getParentCreatedAt())
+        let parent = root.find(createdAt: self.parentCreatedAt)
         guard let array = parent as? CRDTArray else {
             let log: String
             if parent == nil {
-                log = "fail to find \(self.getParentCreatedAt())"
+                log = "fail to find \(self.parentCreatedAt)"
             } else {
                 log = "fail to execute, only array can execute add"
             }
@@ -54,30 +54,16 @@ struct AddOperation: Operation {
     }
 
     /**
-     * `getEffectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the time of the effected element.
      */
-    func getEffectedCreatedAt() -> TimeTicket {
-        return self.value.getCreatedAt()
+    var effectedCreatedAt: TimeTicket {
+        return self.value.createdAt
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data.
+     * `structureAsString` returns a string containing the meta data.
      */
-    func getStructureAsString() -> String {
-        return "\(self.getParentCreatedAt().getStructureAsString()).ADD"
-    }
-
-    /**
-     * `getPrevCreatedAt` returns the creation time of previous element.
-     */
-    func getPrevCreatedAt() -> TimeTicket {
-        return self.previousCreatedAt
-    }
-
-    /**
-     * `getValue` returns the value of this operation.
-     */
-    func getValue() -> CRDTElement {
-        return self.value
+    var structureAsString: String {
+        return "\(self.parentCreatedAt.structureAsString).ADD"
     }
 }

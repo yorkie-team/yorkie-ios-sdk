@@ -63,7 +63,7 @@ class ObjectDataHandler {
 
         let operation = SetOperation(key: key,
                                      value: primitive,
-                                     parentCreatedAt: self.target.getCreatedAt(),
+                                     parentCreatedAt: self.target.createdAt,
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
@@ -101,7 +101,7 @@ class ObjectDataHandler {
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
-                                     parentCreatedAt: self.target.getCreatedAt(),
+                                     parentCreatedAt: self.target.createdAt,
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
@@ -111,7 +111,7 @@ class ObjectDataHandler {
 
         let operation = SetOperation(key: key,
                                      value: value,
-                                     parentCreatedAt: self.target.getCreatedAt(),
+                                     parentCreatedAt: self.target.createdAt,
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
@@ -154,8 +154,8 @@ class ObjectDataHandler {
             return
         }
 
-        let removeOperation = RemoveOperation(parentCreatedAt: self.target.getCreatedAt(),
-                                              createdAt: removed.getCreatedAt(),
+        let removeOperation = RemoveOperation(parentCreatedAt: self.target.createdAt,
+                                              createdAt: removed.createdAt,
                                               executedAt: self.context.issueTimeTicket())
         self.context.push(operation: removeOperation)
         self.context.registerRemovedElement(removed)

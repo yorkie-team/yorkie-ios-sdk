@@ -81,10 +81,10 @@ struct Checkpoint: Equatable {
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data of this
+     * `structureAsString` returns a string containing the meta data of this
      * checkpoint.
      */
-    func getStructureAsString() -> String {
+    var structureAsString: String {
         return "serverSeq=\(self.serverSeq), clientSeq=\(self.clientSeq)"
     }
 

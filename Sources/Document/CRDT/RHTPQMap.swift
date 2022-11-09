@@ -31,8 +31,8 @@ struct RHTPQMapNode: Equatable {
     /**
      * `isRemoved` checks whether this value was removed.
      */
-    func isRemoved() -> Bool {
-        return self.rhtValue.isRemoved()
+    var isRemoved: Bool {
+        return self.rhtValue.isRemoved
     }
 
     /**
@@ -44,7 +44,7 @@ struct RHTPQMapNode: Equatable {
     }
 
     static func == (lhs: RHTPQMapNode, rhs: RHTPQMapNode) -> Bool {
-        return lhs.rhtKey == rhs.rhtKey && lhs.rhtValue.equal(rhs.rhtValue)
+        return lhs.rhtKey == rhs.rhtKey && lhs.rhtValue.equals(rhs.rhtValue)
     }
 }
 
@@ -66,7 +66,7 @@ class RHTPQMap {
            queue.isEmpty == false,
            let node = queue.peek()
         {
-            if node.value.isRemoved() == false, node.value.remove(removedAt: value.getCreatedAt()) {
+            if node.value.isRemoved == false, node.value.remove(removedAt: value.createdAt) {
                 removed = node.value.rhtValue
             }
         }
@@ -84,9 +84,9 @@ class RHTPQMap {
         }
 
         let pqMapNode = RHTPQMapNode(key: key, value: value)
-        let node = HeapNode(key: value.getCreatedAt(), value: pqMapNode)
+        let node = HeapNode(key: value.createdAt, value: pqMapNode)
         self.elementQueueMapByKey[key]?.push(node)
-        self.nodeMapByCreatedAt[value.getCreatedAt()] = pqMapNode
+        self.nodeMapByCreatedAt[value.createdAt] = pqMapNode
     }
 
     /**
@@ -121,8 +121,8 @@ class RHTPQMap {
      * `delete` physically deletes child element.
      */
     func delete(value: CRDTElement) throws {
-        guard let node = self.nodeMapByCreatedAt[value.getCreatedAt()] else {
-            let log = "can't find the given node: \(value.getCreatedAt())"
+        guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
+            let log = "can't find the given node: \(value.createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
@@ -133,9 +133,9 @@ class RHTPQMap {
             throw YorkieError.unexpected(message: log)
         }
 
-        let heapNode = HeapNode(key: node.rhtValue.getCreatedAt(), value: node)
+        let heapNode = HeapNode(key: node.rhtValue.createdAt, value: node)
         queue.delete(heapNode)
-        self.nodeMapByCreatedAt[node.rhtValue.getCreatedAt()] = nil
+        self.nodeMapByCreatedAt[node.rhtValue.createdAt] = nil
     }
 
     /**
@@ -164,7 +164,7 @@ class RHTPQMap {
             return false
         }
 
-        return node.value.isRemoved() == false
+        return node.value.isRemoved == false
     }
 
     /**

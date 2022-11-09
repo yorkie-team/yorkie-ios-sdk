@@ -46,7 +46,7 @@ class MoveOperationTests: XCTestCase {
         // when
         let target = MoveOperation(parentCreatedAt: object3.createdAt,
                                    previousCreatedAt: c2.createdAt,
-                                   createdAt: c1.getCreatedAt(),
+                                   createdAt: c1.createdAt,
                                    executedAt: TimeTicket(lamport: 10, delimiter: 0, actorID: self.actorId))
 
         var isFailed = false
@@ -87,13 +87,13 @@ class MoveOperationTests: XCTestCase {
 
         let target = MoveOperation(parentCreatedAt: object2.createdAt,
                                    previousCreatedAt: b1.createdAt,
-                                   createdAt: valueToMove.getCreatedAt(),
+                                   createdAt: valueToMove.createdAt,
                                    executedAt: TimeTicket(lamport: 10, delimiter: 0, actorID: self.actorId))
 
         try target.execute(root: root)
 
         XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",\"value-to-move\",{\"k-c1\":\"c1\"}]}")
-        XCTAssertEqual(target.getStructureAsString(), "4:actor-1:0.MOV")
-        XCTAssertEqual(target.getEffectedCreatedAt(), target.getCreatedAt())
+        XCTAssertEqual(target.structureAsString, "4:actor-1:0.MOV")
+        XCTAssertEqual(target.effectedCreatedAt, target.createdAt)
     }
 }
