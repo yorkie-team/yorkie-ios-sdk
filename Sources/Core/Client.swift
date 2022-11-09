@@ -596,7 +596,9 @@ public actor Client {
             }
         }
 
-        RunLoop.main.add(self.watchLoopReconnectTimer!, forMode: .common)
+        if let watchLoopReconnectTimer = self.watchLoopReconnectTimer {
+            RunLoop.main.add(watchLoopReconnectTimer, forMode: .common)
+        }
 
         let event = StreamConnectionStatusChangedEvent(value: .disconnected)
         self.eventStream.send(event)
