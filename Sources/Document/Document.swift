@@ -21,7 +21,7 @@ import Foundation
  * Presence key, value dictionary
  * Similar to an Indexable in JS SDK
  */
-typealias Presence = [String: Any]
+public typealias Presence = [String: Any]
 
 public actor Document {
     private let key: String
@@ -262,6 +262,13 @@ public actor Document {
             self.changeID.syncLamport(with: $0.getID().getLamport())
         }
 
+        let changeInfos = changes.map {
+            ChangeInfo(change: $0, paths: self.createPaths(change: $0))
+        }
+
+        let changeEvent = RemoteChangeEvent(value: changeInfos)
+        self.eventStream.send(changeEvent)
+
         Logger.debug(
             """
             after appling \(changes.count) remote changes.
@@ -275,7 +282,7 @@ public actor Document {
         let pathTrie = Trie<String>(value: "$")
         for op in change.getOperations() {
             let createdAt = op.getEffectedCreatedAt()
-            if var subPaths = try? self.root.createSubPaths(createdAt: createdAt) {
+            if var subPaths = try? self.root.createSubPaths(createdAt: createdAt), subPaths.isEmpty == false {
                 subPaths.removeFirst()
                 pathTrie.insert(values: subPaths)
             }

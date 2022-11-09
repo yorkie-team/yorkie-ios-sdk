@@ -19,12 +19,27 @@
 		CE79C53029136B5F00D5DE3F /* KanbanViewCardCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52F29136B5F00D5DE3F /* KanbanViewCardCell.swift */; };
 		CE79C5322913741E00D5DE3F /* KanbanViewColumnHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C5312913741E00D5DE3F /* KanbanViewColumnHeader.swift */; };
 		CE79C5342913742500D5DE3F /* KanbanViewColumnFooter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C5332913742500D5DE3F /* KanbanViewColumnFooter.swift */; };
-		CE95E41A291135E0005076C8 /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE95E419291135E0005076C8 /* Yorkie.framework */; };
 		CEDDE2612914A2C00032B16A /* KanbanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2602914A2C00032B16A /* KanbanViewModel.swift */; };
 		CEDDE2632914AA280032B16A /* KanbanLayoutProperty.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2622914AA280032B16A /* KanbanLayoutProperty.swift */; };
 		CEDDE2662914B94D0032B16A /* UILabelWithPadding.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2652914B94D0032B16A /* UILabelWithPadding.swift */; };
 		CEDDE2682914BA620032B16A /* UIColor+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2672914BA620032B16A /* UIColor+Extensions.swift */; };
+		CEFD67DD291A3C66003E82FB /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE95E419291135E0005076C8 /* Yorkie.framework */; };
+		CEFD67DE291A3C66003E82FB /* Yorkie.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CE95E419291135E0005076C8 /* Yorkie.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CEFD67DF291A3C66003E82FB /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				CEFD67DE291A3C66003E82FB /* Yorkie.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		9603ABB2291114DF00696E1A /* ExampleApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExampleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -55,7 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CE95E41A291135E0005076C8 /* Yorkie.framework in Frameworks */,
+				CEFD67DD291A3C66003E82FB /* Yorkie.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,6 +162,7 @@
 				9603ABAE291114DF00696E1A /* Sources */,
 				9603ABAF291114DF00696E1A /* Frameworks */,
 				9603ABB0291114DF00696E1A /* Resources */,
+				CEFD67DF291A3C66003E82FB /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

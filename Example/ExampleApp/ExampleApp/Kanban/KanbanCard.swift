@@ -22,7 +22,7 @@ struct KanbanCard: YorkieJSONObjectable {
     var columnId: TimeTicket = .initial
     let title: String
 
-    var excludedLabels: [String] {
-        ["id", "columnId"]
+    private enum CodingKeys: String, CodingKey {
+        case title
     }
 }

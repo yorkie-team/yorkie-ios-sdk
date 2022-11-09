@@ -19,7 +19,7 @@ import Foundation
 /**
  * `ClientEventType` is client event types
  */
-enum ClientEventType: String {
+public enum ClientEventType: String {
     /**
      * client event type when status changed.
      */
@@ -42,7 +42,7 @@ enum ClientEventType: String {
     case documentSynced = "document-synced"
 }
 
-protocol BaseClientEvent {
+public protocol BaseClientEvent {
     var type: ClientEventType { get }
 }
 

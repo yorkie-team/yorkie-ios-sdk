@@ -31,13 +31,16 @@ class KanbanViewModel: ObservableObject {
         ])
     ]
 
+    private var client: Client?
+
     @Published
     private(set) var columns: [KanbanColumn] = []
 
     private let document: Document
 
     init() {
-        self.document = Document(key: "kanban-1")
+        let docKey = "KanbanViewModel-8"
+        self.document = Document(key: docKey)
 
         Task { [weak self] in
             guard let self else { return }
@@ -47,7 +50,11 @@ class KanbanViewModel: ObservableObject {
                     guard let self, let lists = await self.document.getRoot().lists as? JSONArray else { return }
 
                     self.columns = lists.compactMap { each -> KanbanColumn? in
-                        guard let column = each as? JSONObject, let cardArray = column.cards as? JSONArray else { return nil }
+                        guard let column = each as? JSONObject,
+                              let cardArray = column.cards as? JSONArray
+                        else {
+                            return nil
+                        }
 
                         let cards = cardArray.compactMap { each -> KanbanCard? in
                             guard let card = each as? JSONObject else { return nil }
@@ -57,14 +64,14 @@ class KanbanViewModel: ObservableObject {
                     }
                 }
             }.store(in: &self.cancellables)
-        }
 
-        Task { [weak self] in
-            guard let self else { return }
-
-            await self.document.update { root in
-                if root.lists == nil {
-                    root.lists = self.defaultColumns
+            if let client = try? Client(rpcAddress: RPCAddress(host: "localhost", port: 8080),
+                                        options: ClientOptions())
+            {
+                self.client = client
+                Task {
+                    try! await self.client?.activate()
+                    _ = try! await self.client?.attach(self.document)
                 }
             }
         }
@@ -73,9 +80,14 @@ class KanbanViewModel: ObservableObject {
     func addColumn(title: String) {
         Task {
             await self.document.update { root in
-                guard let lists = root.lists as? JSONArray else { return }
+                var lists = root.lists as? JSONArray
+                if lists == nil {
+                    root.lists = []
+                    lists = root.lists as? JSONArray
+                }
+
                 let column = KanbanColumn(title: title)
-                lists.append(column)
+                lists!.append(column)
             }
         }
     }
