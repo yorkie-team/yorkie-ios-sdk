@@ -135,7 +135,7 @@ public struct RPCAddress {
  * It has documents and sends changes of the documents in local
  * to the server to synchronize with other replicas in remote.
  */
-public final class Client {
+public actor Client {
     private var presenceInfo: PresenceInfo
     private var attachmentMap: [String: Attachment]
     private let syncLoopDuration: Int
@@ -146,15 +146,14 @@ public final class Client {
     private var watchLoopTask: Task<Void, Never>?
 
     private let group: EventLoopGroup
-    private let loopQueue = DispatchQueue.global()
 
     // Public variables.
     public private(set) var id: ActorID?
-    public let key: String
+    public nonisolated let key: String
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus
     public var presence: Presence { self.presenceInfo.data }
-    public let eventStream: PassthroughSubject<BaseClientEvent, Error>
+    public nonisolated let eventStream: PassthroughSubject<BaseClientEvent, Error>
 
     /**
      * @param rpcAddr - the address of the RPC server.
@@ -428,6 +427,22 @@ public final class Client {
         return newPeerMap
     }
 
+    private func clearAttachmentRemoteChangeEventReceived(_ key: String) {
+        self.attachmentMap[key]?.remoteChangeEventReceived = false
+    }
+
+    private func setSyncTimer(_ reconnect: Bool) {
+        let syncLoopDuration = (reconnect || self.watchLoopTask == nil) ? self.reconnectStreamDelay : self.syncLoopDuration
+
+        let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
+            Task {
+                await self.doSyncLoop()
+            }
+        }
+
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
     private func doSyncLoop() async {
         guard self.isActive else {
             Logger.debug("[SL] c:\"\(self.key)\" exit sync loop")
@@ -440,7 +455,7 @@ public final class Client {
                     let docChanged = await attachment.doc.hasLocalChanges()
 
                     if docChanged || attachment.remoteChangeEventReceived ?? false {
-                        self.attachmentMap[key]?.remoteChangeEventReceived = false
+                        self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
                             try await self.syncInternal(attachment.doc)
                         }
@@ -450,32 +465,14 @@ public final class Client {
                 try await group.waitForAll()
             }
 
-            DispatchQueue.main.async {
-                let syncLoopDuration = self.watchLoopTask != nil ? self.syncLoopDuration : self.reconnectStreamDelay
-                Timer.scheduledTimer(withTimeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
-                    self.loopQueue.sync {
-                        Task {
-                            await self.doSyncLoop()
-                        }
-                    }
-                }
-            }
-
+            self.setSyncTimer(false)
         } catch {
             Logger.error("[SL] c:\"\(self.key)\" sync failed: \(error)")
 
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
 
-            DispatchQueue.main.async {
-                Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
-                    self.loopQueue.sync {
-                        Task {
-                            await self.doSyncLoop()
-                        }
-                    }
-                }
-            }
+            self.setSyncTimer(true)
         }
     }
 
@@ -514,9 +511,7 @@ public final class Client {
         self.watchLoopTask = Task {
             do {
                 for try await response in stream {
-                    self.loopQueue.sync {
-                        self.handleWatchDocumentsResponse(keys: realtimeSyncDocKeys, response: response)
-                    }
+                    self.handleWatchDocumentsResponse(keys: realtimeSyncDocKeys, response: response)
                 }
             } catch {
                 switch error {
@@ -595,11 +590,13 @@ public final class Client {
         self.watchLoopTask?.cancel()
         self.watchLoopTask = nil
 
-        DispatchQueue.main.async {
-            self.watchLoopReconnectTimer = Timer.scheduledTimer(withTimeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
-                self.doWatchLoop()
+        self.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+            Task {
+                await self.doWatchLoop()
             }
         }
+
+        RunLoop.main.add(self.watchLoopReconnectTimer!, forMode: .common)
 
         let event = StreamConnectionStatusChangedEvent(value: .disconnected)
         self.eventStream.send(event)

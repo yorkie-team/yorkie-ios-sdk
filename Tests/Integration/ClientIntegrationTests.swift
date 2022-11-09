@@ -167,14 +167,15 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
+    // swiftlint: disable force_cast
     func skip_test_send_peer_changed_event_to_the_user_who_updated_presence() async throws {
-        struct Cursor: Encodable {
+        struct Cursor: Codable {
             // swiftlint: disable identifier_name
             var x: Int
             var y: Int
         }
 
-        struct PresenceType: Encodable {
+        struct PresenceType: Codable {
             var name: String
             var cursor: Cursor
         }
@@ -202,16 +203,11 @@ final class ClientIntegrationTests: XCTestCase {
         var c1Name = "c1"
         var c2Name = "c2"
 
-        var c1EventResult: String?
-        var c2EventResult: String?
-
         c1.eventStream.sink { _ in
         } receiveValue: { event in
             switch event {
             case let event as PeerChangedEvent:
                 print("#### c1 \(event)")
-                c1EventResult = c1.presence["name"] as? String
-                XCTAssert(c1Name == c1EventResult)
             default:
                 break
             }
@@ -222,8 +218,6 @@ final class ClientIntegrationTests: XCTestCase {
             switch event {
             case let event as PeerChangedEvent:
                 print("#### c2 \(event)")
-                c2EventResult = c2.presence["name"] as? String
-                XCTAssert(c2Name == c2EventResult)
             default:
                 break
             }
@@ -236,18 +230,38 @@ final class ClientIntegrationTests: XCTestCase {
         c1Name = "c1+"
         try await c1.updatePresence("name", c1Name)
 
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+
+        let presence1: PresenceType = self.decodePresence(await c2.getPeers(key: d2.getKey())[c1.id!]!)!
+
+        XCTAssert(c1Name == presence1.name)
+
         c2Name = "c2+"
         try await c2.updatePresence("name", c2Name)
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        // swiftlint: disable force_cast
-        XCTAssert((c1.getPeers(key: d1.getKey()) as NSDictionary).isEqual(to: (c2.getPeers(key: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]))
+        let presence2: PresenceType = self.decodePresence(await c1.getPeers(key: d1.getKey())[c2.id!]!)!
+
+        XCTAssert(c2Name == presence2.name)
+
+        let c1Peer = await c1.getPeers(key: d1.getKey()) as NSDictionary
+        let c2Peer = (await c2.getPeers(key: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
+
+        XCTAssert(c1Peer.isEqual(to: c2Peer))
 
         try await c1.detach(d1)
         try await c2.detach(d2)
 
         try await c1.deactivate()
         try await c2.deactivate()
+    }
+
+    private func decodePresence<T: Decodable>(_ dictionary: [String: Any]) -> T? {
+        guard let data = try? JSONSerialization.data(withJSONObject: dictionary, options: []) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(T.self, from: data)
     }
 }
