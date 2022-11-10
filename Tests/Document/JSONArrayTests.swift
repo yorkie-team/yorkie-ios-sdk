@@ -68,7 +68,7 @@ class JSONArrayTests: XCTestCase {
             let element = array?.getElement(byIndex: 0) as? Primitive
             XCTAssertNotNil(element)
 
-            let elementById = array?.getElement(byID: element!.getCreatedAt())
+            let elementById = array?.getElement(byID: element!.createdAt)
             XCTAssertNotNil(elementById)
         }
     }
@@ -101,7 +101,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            let insertedElement = try? array?.insertAfter(previousID: firstElement.getCreatedAt(), value: [Int32(11), Int32(12), Int32(13)])
+            let insertedElement = try? array?.insertAfter(previousID: firstElement.createdAt, value: [Int32(11), Int32(12), Int32(13)])
             XCTAssertNotNil(insertedElement)
 
             XCTAssertEqual(root.debugDescription, "{\"array\":[1,[11,12,13],2,3]}")
@@ -118,7 +118,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            let insertedElement = try? array?.insertBefore(nextID: thirdElement.getCreatedAt(), value: [Int32(11), Int32(12), Int32(13)])
+            let insertedElement = try? array?.insertBefore(nextID: thirdElement.createdAt, value: [Int32(11), Int32(12), Int32(13)])
             XCTAssertNotNil(insertedElement)
 
             XCTAssertEqual(root.debugDescription, "{\"array\":[1,2,[11,12,13],3]}")
@@ -140,7 +140,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            try? array?.moveBefore(nextID: lastElement.getCreatedAt(), id: firstElement.getCreatedAt())
+            try? array?.moveBefore(nextID: lastElement.createdAt, id: firstElement.createdAt)
 
             XCTAssertEqual(root.debugDescription, "{\"array\":[2,1,3]}")
         }
@@ -161,7 +161,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            try? array?.moveAfter(previousID: lastElement.getCreatedAt(), id: firstElement.getCreatedAt())
+            try? array?.moveAfter(previousID: lastElement.createdAt, id: firstElement.createdAt)
 
             XCTAssertEqual(root.debugDescription, "{\"array\":[2,3,1]}")
         }
@@ -178,7 +178,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            try? array?.moveFront(id: lastElement.getCreatedAt())
+            try? array?.moveFront(id: lastElement.createdAt)
 
             XCTAssertEqual(root.debugDescription, "{\"array\":[3,1,2]}")
         }
@@ -194,7 +194,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            try? array?.moveLast(id: firstElement.getCreatedAt())
+            try? array?.moveLast(id: firstElement.createdAt)
 
             XCTAssertEqual(root.debugDescription, "{\"array\":[2,3,1]}")
         }
@@ -210,7 +210,7 @@ class JSONArrayTests: XCTestCase {
                 return
             }
 
-            let removedByID = array?.remove(byID: firstElement.getCreatedAt())
+            let removedByID = array?.remove(byID: firstElement.createdAt)
             XCTAssertNotNil(removedByID)
 
             let result = root.debugDescription

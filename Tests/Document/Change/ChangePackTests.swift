@@ -26,7 +26,7 @@ class ChangePackTests: XCTestCase {
                                 minSyncedTicket: nil)
 
         XCTAssertEqual(target.getDocumentKey(), "documentKey-1")
-        XCTAssertEqual(target.getCheckpoint().getStructureAsString(), "serverSeq=1, clientSeq=10")
+        XCTAssertEqual(target.getCheckpoint().structureAsString, "serverSeq=1, clientSeq=10")
         XCTAssertFalse(target.hasChanges())
         XCTAssertEqual(target.getChangeSize(), 0)
         XCTAssertNil(target.getSnapshot())

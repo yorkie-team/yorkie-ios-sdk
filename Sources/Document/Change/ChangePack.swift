@@ -52,7 +52,7 @@ struct ChangePack {
     }
 
     /**
-     * `getKey` returns the document key of this pack.
+     * `getDocumentKey` returns the document key of this pack.
      */
     func getDocumentKey() -> String {
         return self.documentKey

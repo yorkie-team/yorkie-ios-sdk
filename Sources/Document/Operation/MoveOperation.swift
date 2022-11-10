@@ -22,8 +22,9 @@ import Foundation
 struct MoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
-    private var previousCreatedAt: TimeTicket
-    private var createdAt: TimeTicket
+    /// The creation time of previous element.
+    let previousCreatedAt: TimeTicket
+    let createdAt: TimeTicket
 
     init(parentCreatedAt: TimeTicket, previousCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -36,11 +37,11 @@ struct MoveOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     func execute(root: CRDTRoot) throws {
-        let parent = root.find(createdAt: self.getParentCreatedAt())
+        let parent = root.find(createdAt: self.parentCreatedAt)
         guard let array = parent as? CRDTArray else {
             let log: String
             if parent == nil {
-                log = "fail to find \(self.getParentCreatedAt())"
+                log = "fail to find \(self.parentCreatedAt)"
             } else {
                 log = "fail to execute, only array can execute add"
             }
@@ -48,34 +49,20 @@ struct MoveOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        try array.move(createdAt: self.createdAt, afterCreatedAt: self.previousCreatedAt, executedAt: self.getExecutedAt())
+        try array.move(createdAt: self.createdAt, afterCreatedAt: self.previousCreatedAt, executedAt: self.executedAt)
     }
 
     /**
-     * `getEffectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the time of the effected element.
      */
-    func getEffectedCreatedAt() -> TimeTicket {
+    var effectedCreatedAt: TimeTicket {
         return self.createdAt
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data.
+     * `structureAsString` returns a string containing the meta data.
      */
-    func getStructureAsString() -> String {
-        return "\(self.getParentCreatedAt().getStructureAsString()).MOV"
-    }
-
-    /**
-     * `getPrevCreatedAt` returns the creation time of previous element.
-     */
-    func getPrevCreatedAt() -> TimeTicket {
-        return self.previousCreatedAt
-    }
-
-    /**
-     * `getCreatedAt` returns the creation time of the target element.
-     */
-    func getCreatedAt() -> TimeTicket {
-        return self.createdAt
+    var structureAsString: String {
+        return "\(self.parentCreatedAt.structureAsString).MOV"
     }
 }

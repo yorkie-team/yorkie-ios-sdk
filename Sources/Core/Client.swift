@@ -630,7 +630,7 @@ public final class Client {
 
             let docKey = doc.getKey()
             let remoteSize = responsePack.getChangeSize()
-            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().getStructureAsString())")
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().structureAsString)")
 
             return doc
         } catch {

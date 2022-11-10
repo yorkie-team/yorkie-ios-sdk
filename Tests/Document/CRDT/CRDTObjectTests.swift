@@ -97,7 +97,7 @@ class CRDTObjectTests: XCTestCase {
         XCTAssertFalse(target.has(key: targetKey))
 
         let result = try target.get(key: targetKey)
-        XCTAssertTrue(result.isRemoved())
+        XCTAssertTrue(result.isRemoved)
     }
 
     func test_toSortedJSON() throws {
@@ -131,7 +131,7 @@ class CRDTObjectTests: XCTestCase {
         let a3 = Primitive(value: .boolean(true), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         target.set(key: "K3", value: a3)
 
-        let result = target.getKeys().sorted()
+        let result = target.keys.sorted()
 
         XCTAssertEqual(result, ["K1", "K2", "K3"])
     }

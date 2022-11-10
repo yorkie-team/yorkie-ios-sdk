@@ -20,39 +20,19 @@ import Foundation
  * `Change` represents a unit of modification in the document.
  */
 struct Change {
-    private var id: ChangeID
+    /// The ID of this change.
+    private(set) var id: ChangeID
 
     // `operations` represent a series of user edits.
-    private var operations: [Operation]
+    private(set) var operations: [Operation]
 
     // `message` is used to save a description of the change.
-    private let message: String?
+    let message: String?
 
     init(id: ChangeID, operations: [Operation], message: String? = nil) {
         self.id = id
         self.operations = operations
         self.message = message
-    }
-
-    /**
-     * `getID` returns the ID of this change.
-     */
-    func getID() -> ChangeID {
-        return self.id
-    }
-
-    /**
-     * `getMessage` returns the message of this change.
-     */
-    func getMessage() -> String? {
-        return self.message
-    }
-
-    /**
-     * `getOperations` returns the operations of this change.
-     */
-    func getOperations() -> [Operation] {
-        return self.operations
     }
 
     /**
@@ -79,11 +59,11 @@ struct Change {
     }
 
     /**
-     * `getStructureAsString` returns a String containing the meta data of this change.
+     * `structureAsString` returns a String containing the meta data of this change.
      */
-    func getStructureAsString() -> String {
+    var structureAsString: String {
         return self.operations
-            .map { $0.getStructureAsString() }
+            .map { $0.structureAsString }
             .joined(separator: ",")
     }
 }

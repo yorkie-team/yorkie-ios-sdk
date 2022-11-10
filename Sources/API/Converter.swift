@@ -260,10 +260,10 @@ extension Converter {
             pbElementSimple.type = .jsonArray
 //        } else if let element = element as? CRDTText {
 //            pbElementSimple.setType(PbValueType.VALUE_TYPE_TEXT);
-//            pbElementSimple.setCreatedAt(toTimeTicket(element.getCreatedAt()));
+//            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
 //        } else if let element = element as? CRDTRichText {
 //            pbElementSimple.setType(PbValueType.VALUE_TYPE_RICH_TEXT);
-//            pbElementSimple.setCreatedAt(toTimeTicket(element.getCreatedAt()));
+//            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
         } else if let element = element as? Primitive {
             let primitive = element.value
             pbElementSimple.type = toValueType(primitive)
@@ -271,13 +271,13 @@ extension Converter {
 //        } else if let element = element as CRDTCounter {
 //            const counter = element as CRDTCounter;
 //            pbElementSimple.setType(toCounterType(counter.getType()));
-//            pbElementSimple.setCreatedAt(toTimeTicket(element.getCreatedAt()));
+//            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
 //            pbElementSimple.setValue(element.toBytes());
         } else {
             throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
         }
 
-        pbElementSimple.createdAt = toTimeTicket(element.getCreatedAt())
+        pbElementSimple.createdAt = toTimeTicket(element.createdAt)
 
         return pbElementSimple
     }
@@ -296,14 +296,14 @@ extension Converter {
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
 //            return CRDTText.create(
 //                RGATreeSplit.create(),
-//                fromTimeTicket(pbElementSimple.getCreatedAt())!,
+//                fromTimeTicket(pbElementSimple.createdAt)!,
 //            );
         case .richText:
             // TODO: CRDTRichText is not implemented!
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
 //            return new CRDTRichText(
 //                RGATreeSplit.create(),
-//                fromTimeTicket(pbElementSimple.getCreatedAt())!,
+//                fromTimeTicket(pbElementSimple.createdAt)!,
 //            );
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
             return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
@@ -315,7 +315,7 @@ extension Converter {
 //                    fromCounterType(pbElementSimple.getType()),
 //                    pbElementSimple.getValue_asU8(),
 //                ),
-//                fromTimeTicket(pbElementSimple.getCreatedAt())!,
+//                fromTimeTicket(pbElementSimple.createdAt)!,
 //            );
         default:
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
@@ -330,7 +330,7 @@ extension Converter {
     // TODO: RGATreeSplitNodeID is not implemented!
 //    static func toTextNodeID(id: RGATreeSplitNodeID) -> PbTextNodeID {
 //        const pbTextNodeID = new PbTextNodeID();
-//        pbTextNodeID.setCreatedAt(toTimeTicket(id.getCreatedAt()));
+//        pbTextNodeID.setCreatedAt(toTimeTicket(id.createdAt));
 //        pbTextNodeID.setOffset(id.getOffset());
 //        return pbTextNodeID;
 //    }
@@ -340,7 +340,7 @@ extension Converter {
      */
 //    function fromTextNodeID(pbTextNodeID: PbTextNodeID): RGATreeSplitNodeID {
 //      return RGATreeSplitNodeID.of(
-//        fromTimeTicket(pbTextNodeID.getCreatedAt())!,
+//        fromTimeTicket(pbTextNodeID.createdAt)!,
 //        pbTextNodeID.getOffset(),
 //      );
 //    }
@@ -354,8 +354,8 @@ extension Converter {
     // TODO: RGATreeSplitNodePos is not implemented!
 //    static func toTextNodePos(pos: RGATreeSplitNodePos) -> PbTextNodePos {
 //        const pbTextNodePos = new PbTextNodePos();
-//        pbTextNodePos.setCreatedAt(toTimeTicket(pos.getID().getCreatedAt()));
-//        pbTextNodePos.setOffset(pos.getID().getOffset());
+//        pbTextNodePos.setCreatedAt(toTimeTicket(pos.id.createdAt));
+//        pbTextNodePos.setOffset(pos.id.getOffset());
 //        pbTextNodePos.setRelativeOffset(pos.getRelativeOffset());
 //        return pbTextNodePos;
 //    }
@@ -366,7 +366,7 @@ extension Converter {
 //    function fromTextNodePos(pbTextNodePos: PbTextNodePos): RGATreeSplitNodePos {
 //      return RGATreeSplitNodePos.of(
 //        RGATreeSplitNodeID.of(
-//          fromTimeTicket(pbTextNodePos.getCreatedAt())!,
+//          fromTimeTicket(pbTextNodePos.createdAt)!,
 //          pbTextNodePos.getOffset(),
 //        ),
 //        pbTextNodePos.getRelativeOffset(),
@@ -385,37 +385,37 @@ extension Converter {
         if let setOperation = operation as? SetOperation {
             var pbSetOperation = PbOperation.Set()
             pbSetOperation.parentCreatedAt = toTimeTicket(setOperation.parentCreatedAt)
-            pbSetOperation.key = setOperation.getKey()
+            pbSetOperation.key = setOperation.key
             // TODO: Remove try!
-            pbSetOperation.value = try! toElementSimple(setOperation.getValue())
-            pbSetOperation.executedAt = toTimeTicket(setOperation.getExecutedAt())
+            pbSetOperation.value = try! toElementSimple(setOperation.value)
+            pbSetOperation.executedAt = toTimeTicket(setOperation.executedAt)
             pbOperation.set = pbSetOperation
         } else if let addOperation = operation as? AddOperation {
             var pbAddOperation = PbOperation.Add()
-            pbAddOperation.parentCreatedAt = toTimeTicket(addOperation.getParentCreatedAt())
-            pbAddOperation.prevCreatedAt = toTimeTicket(addOperation.getPrevCreatedAt())
+            pbAddOperation.parentCreatedAt = toTimeTicket(addOperation.parentCreatedAt)
+            pbAddOperation.prevCreatedAt = toTimeTicket(addOperation.previousCreatedAt)
             // TODO: Remove try!
-            pbAddOperation.value = try! toElementSimple(addOperation.getValue())
-            pbAddOperation.executedAt = toTimeTicket(addOperation.getExecutedAt())
+            pbAddOperation.value = try! toElementSimple(addOperation.value)
+            pbAddOperation.executedAt = toTimeTicket(addOperation.executedAt)
             pbOperation.add = pbAddOperation
         } else if let moveOperation = operation as? MoveOperation {
             var pbMoveOperation = PbOperation.Move()
-            pbMoveOperation.parentCreatedAt = toTimeTicket(moveOperation.getParentCreatedAt())
-            pbMoveOperation.prevCreatedAt = toTimeTicket(moveOperation.getPrevCreatedAt())
-            pbMoveOperation.createdAt = toTimeTicket(moveOperation.getCreatedAt())
-            pbMoveOperation.executedAt = toTimeTicket(moveOperation.getExecutedAt())
+            pbMoveOperation.parentCreatedAt = toTimeTicket(moveOperation.parentCreatedAt)
+            pbMoveOperation.prevCreatedAt = toTimeTicket(moveOperation.previousCreatedAt)
+            pbMoveOperation.createdAt = toTimeTicket(moveOperation.createdAt)
+            pbMoveOperation.executedAt = toTimeTicket(moveOperation.executedAt)
             pbOperation.move = pbMoveOperation
         } else if let removeOperation = operation as? RemoveOperation {
             var pbRemoveOperation = PbOperation.Remove()
-            pbRemoveOperation.parentCreatedAt = toTimeTicket(removeOperation.getParentCreatedAt())
-            pbRemoveOperation.createdAt = toTimeTicket(removeOperation.getCreatedAt())
-            pbRemoveOperation.executedAt =  toTimeTicket(removeOperation.getExecutedAt())
+            pbRemoveOperation.parentCreatedAt = toTimeTicket(removeOperation.parentCreatedAt)
+            pbRemoveOperation.createdAt = toTimeTicket(removeOperation.createdAt)
+            pbRemoveOperation.executedAt =  toTimeTicket(removeOperation.executedAt)
             pbOperation.remove = pbRemoveOperation
             // TODO: EditOperaion is not implemented!
 //        } else if let editOperation = operation as? EditOperation {
 //            const pbEditOperation = new PbOperation.Edit();
 //            pbEditOperation.setParentCreatedAt(
-//                toTimeTicket(editOperation.getParentCreatedAt()),
+//                toTimeTicket(editOperation.parentCreatedAt),
 //            );
 //            pbEditOperation.setFrom(toTextNodePos(editOperation.getFromPos()));
 //            pbEditOperation.setTo(toTextNodePos(editOperation.getToPos()));
@@ -424,25 +424,25 @@ extension Converter {
 //                pbCreatedAtMapByActor.set(key, toTimeTicket(value)!);
 //            }
 //            pbEditOperation.setContent(editOperation.getContent());
-//            pbEditOperation.setExecutedAt(toTimeTicket(editOperation.getExecutedAt()));
+//            pbEditOperation.setExecutedAt(toTimeTicket(editOperation.executedAt));
 //            pbOperation.setEdit(pbEditOperation);
             // TODO: SelectOperation is not implemented!
 //        } else if let selectOperaion = operation as? SelectOperation {
 //            const pbSelectOperation = new PbOperation.Select();
 //            pbSelectOperation.setParentCreatedAt(
-//                toTimeTicket(selectOperation.getParentCreatedAt()),
+//                toTimeTicket(selectOperation.parentCreatedAt),
 //            );
 //            pbSelectOperation.setFrom(toTextNodePos(selectOperation.getFromPos()));
 //            pbSelectOperation.setTo(toTextNodePos(selectOperation.getToPos()));
 //            pbSelectOperation.setExecutedAt(
-//                toTimeTicket(selectOperation.getExecutedAt()),
+//                toTimeTicket(selectOperation.executedAt),
 //            );
 //            pbOperation.setSelect(pbSelectOperation);
             // TODO: RichEditOperation is not implemented!
 //        } else if let richEditOperation = operation as? RichEditOperation {
 //            const pbRichEditOperation = new PbOperation.RichEdit();
 //            pbRichEditOperation.setParentCreatedAt(
-//                toTimeTicket(richEditOperation.getParentCreatedAt()),
+//                toTimeTicket(richEditOperation.parentCreatedAt),
 //            );
 //            pbRichEditOperation.setFrom(toTextNodePos(richEditOperation.getFromPos()));
 //            pbRichEditOperation.setTo(toTextNodePos(richEditOperation.getToPos()));
@@ -457,14 +457,14 @@ extension Converter {
 //                pbAttributes.set(key, value);
 //            }
 //            pbRichEditOperation.setExecutedAt(
-//                toTimeTicket(richEditOperation.getExecutedAt()),
+//                toTimeTicket(richEditOperation.executedAt),
 //            );
 //            pbOperation.setRichEdit(pbRichEditOperation);
             // TODO: StyleOperation is not implemented!
 //        } else if let styleOperation = operation as? StyleOperation {
 //            const pbStyleOperation = new PbOperation.Style();
 //            pbStyleOperation.setParentCreatedAt(
-//                toTimeTicket(styleOperation.getParentCreatedAt()),
+//                toTimeTicket(styleOperation.parentCreatedAt),
 //            );
 //            pbStyleOperation.setFrom(toTextNodePos(styleOperation.getFromPos()));
 //            pbStyleOperation.setTo(toTextNodePos(styleOperation.getToPos()));
@@ -473,18 +473,18 @@ extension Converter {
 //                pbAttributes.set(key, value);
 //            }
 //            pbStyleOperation.setExecutedAt(
-//                toTimeTicket(styleOperation.getExecutedAt()),
+//                toTimeTicket(styleOperation.executedAt),
 //            );
 //            pbOperation.setStyle(pbStyleOperation);
             // TODO: IncreaseOperation is not implemented!
 //        } else if let increaseOperation = operation as? IncreaseOperation {
 //            const pbIncreaseOperation = new PbOperation.Increase();
 //            pbIncreaseOperation.setParentCreatedAt(
-//                toTimeTicket(increaseOperation.getParentCreatedAt()),
+//                toTimeTicket(increaseOperation.parentCreatedAt),
 //            );
-//            pbIncreaseOperation.setValue(toElementSimple(increaseOperation.getValue()));
+//            pbIncreaseOperation.setValue(toElementSimple(increaseOperation.value));
 //            pbIncreaseOperation.setExecutedAt(
-//                toTimeTicket(increaseOperation.getExecutedAt()),
+//                toTimeTicket(increaseOperation.executedAt),
 //            );
 //            pbOperation.setIncrease(pbIncreaseOperation);
         } else {
@@ -532,21 +532,21 @@ extension Converter {
                 //                    fromTimeTicket(value)
                 //                }
                 //                operation = EditOperation.create(
-                //                    fromTimeTicket(pbEditOperation!.getParentCreatedAt())!,
+                //                    fromTimeTicket(pbEditOperation!.parentCreatedAt)!,
                 //                    fromTextNodePos(pbEditOperation!.getFrom()!),
                 //                    fromTextNodePos(pbEditOperation!.getTo()!),
                 //                    createdAtMapByActor,
                 //                    pbEditOperation!.getContent(),
-                //                    fromTimeTicket(pbEditOperation!.getExecutedAt())!,
+                //                    fromTimeTicket(pbEditOperation!.executedAt)!,
                 //                );
             } else if case let .select(pbSelectOperation) = pbOperation.body {
                 // TODO: SelectOperation is not implemented!
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                operation = SelectOperation.create(
-                //                    fromTimeTicket(pbSelectOperation!.getParentCreatedAt())!,
+                //                    fromTimeTicket(pbSelectOperation!.parentCreatedAt)!,
                 //                    fromTextNodePos(pbSelectOperation!.getFrom()!),
                 //                    fromTextNodePos(pbSelectOperation!.getTo()!),
-                //                    fromTimeTicket(pbSelectOperation!.getExecutedAt())!,
+                //                    fromTimeTicket(pbSelectOperation!.executedAt)!,
                 //                );
             } else if case let .richEdit(pbEditOperation) = pbOperation.body {
                 // TODO: RichEditOperation is not implemented!
@@ -560,13 +560,13 @@ extension Converter {
                 //                    attributes.set(key, value);
                 //                });
                 //                operation = RichEditOperation.create(
-                //                    fromTimeTicket(pbEditOperation!.getParentCreatedAt())!,
+                //                    fromTimeTicket(pbEditOperation!.parentCreatedAt)!,
                 //                    fromTextNodePos(pbEditOperation!.getFrom()!),
                 //                    fromTextNodePos(pbEditOperation!.getTo()!),
                 //                    createdAtMapByActor,
                 //                    pbEditOperation!.getContent(),
                 //                    attributes,
-                //                    fromTimeTicket(pbEditOperation!.getExecutedAt())!,
+                //                    fromTimeTicket(pbEditOperation!.executedAt)!,
                 //                );
             } else if case let .style(pbStyleOperation) = pbOperation.body {
                 // TODO: StyleOperation is not implemented!
@@ -576,19 +576,19 @@ extension Converter {
                 //                    attributes.set(key, value);
                 //                });
                 //                operation = StyleOperation.create(
-                //                    fromTimeTicket(pbStyleOperation!.getParentCreatedAt())!,
+                //                    fromTimeTicket(pbStyleOperation!.parentCreatedAt)!,
                 //                    fromTextNodePos(pbStyleOperation!.getFrom()!),
                 //                    fromTextNodePos(pbStyleOperation!.getTo()!),
                 //                    attributes,
-                //                    fromTimeTicket(pbStyleOperation!.getExecutedAt())!,
+                //                    fromTimeTicket(pbStyleOperation!.executedAt)!,
                 //                );
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {
                 // TODO: IncreaseOperation is not implemented!
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
                 //                operation = IncreaseOperation.create(
-                //                    fromTimeTicket(pbIncreaseOperation!.getParentCreatedAt())!,
-                //                    fromElementSimple(pbIncreaseOperation!.getValue()!),
-                //                    fromTimeTicket(pbIncreaseOperation!.getExecutedAt())!,
+                //                    fromTimeTicket(pbIncreaseOperation!.parentCreatedAt)!,
+                //                    fromElementSimple(pbIncreaseOperation!.value!),
+                //                    fromTimeTicket(pbIncreaseOperation!.executedAt)!,
                 //                );
             } else {
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
@@ -624,7 +624,7 @@ extension Converter {
      */
     static func toRGANodes(_ rgaTreeList: RGATreeList) -> [PbRGANode] {
         rgaTreeList.compactMap {
-            guard let element = try? toElement($0.getValue()) else {
+            guard let element = try? toElement($0.value) else {
                 return nil
             }
 
@@ -643,14 +643,14 @@ extension Converter {
      */
     static func toObject(_ obj: CRDTObject) -> PbJSONElement {
         var pbObject = PbJSONElement.JSONObject()
-        pbObject.nodes = toRHTNodes(rht: obj.getRHT())
-        pbObject.createdAt = toTimeTicket(obj.getCreatedAt())
-        if let ticket = obj.getMovedAt() {
+        pbObject.nodes = toRHTNodes(rht: obj.rht)
+        pbObject.createdAt = toTimeTicket(obj.createdAt)
+        if let ticket = obj.movedAt {
             pbObject.movedAt = toTimeTicket(ticket)
         } else {
             pbObject.clearMovedAt()
         }
-        if let ticket = obj.getRemovedAt() {
+        if let ticket = obj.removedAt {
             pbObject.removedAt = toTimeTicket(ticket)
         } else {
             pbObject.clearRemovedAt()
@@ -682,13 +682,13 @@ extension Converter {
     static func toArray(_ arr: CRDTArray) -> PbJSONElement {
         var pbArray = PbJSONElement.JSONArray()
         pbArray.nodes = toRGANodes(arr.getElements())
-        pbArray.createdAt = toTimeTicket(arr.getCreatedAt())
-        if let ticket = arr.getMovedAt() {
+        pbArray.createdAt = toTimeTicket(arr.createdAt)
+        if let ticket = arr.movedAt {
             pbArray.movedAt = toTimeTicket(ticket)
         } else {
             pbArray.clearMovedAt()
         }
-        if let ticket = arr.getRemovedAt() {
+        if let ticket = arr.removedAt {
             pbArray.removedAt = toTimeTicket(ticket)
         } else {
             pbArray.clearRemovedAt()
@@ -721,13 +721,13 @@ extension Converter {
         var pbPrimitive = PbJSONElement.Primitive()
         pbPrimitive.type = toValueType(primitive.value)
         pbPrimitive.value = primitive.toBytes()
-        pbPrimitive.createdAt = toTimeTicket(primitive.getCreatedAt())
-        if let ticket = primitive.getMovedAt() {
+        pbPrimitive.createdAt = toTimeTicket(primitive.createdAt)
+        if let ticket = primitive.movedAt {
             pbPrimitive.movedAt = toTimeTicket(ticket)
         } else {
             pbPrimitive.clearMovedAt()
         }
-        if let ticket = primitive.getRemovedAt() {
+        if let ticket = primitive.removedAt {
             pbPrimitive.removedAt = toTimeTicket(ticket)
         } else {
             pbPrimitive.clearRemovedAt()
@@ -755,9 +755,9 @@ extension Converter {
 //    static func toText(text: CRDTText) -> PbJSONElement {
 //        var pbText = PbJSONElement.Text()
 //        pbText.nodes = toTextNodes(text.getRGATreeSplit())
-//        pbText.createdAt = toTimeTicket(text.getCreatedAt())
+//        pbText.createdAt = toTimeTicket(text.createdAt)
 //        pbText.movedAt = toTimeTicket(text.getMovedAt())
-//        pbText.removedAt = toTimeTicket(text.getRemovedAt())
+//        pbText.removedAt = toTimeTicket(text.removedAt)
 //
 //        var pbElement = PbJSONElement();
 //        pbElement.text = pbText
@@ -783,10 +783,10 @@ extension Converter {
 //
 //        const text = CRDTText.create(
 //            rgaTreeSplit,
-//            fromTimeTicket(pbText.getCreatedAt())!,
+//            fromTimeTicket(pbText.createdAt)!,
 //        );
 //        text.setMovedAt(fromTimeTicket(pbText.getMovedAt()));
-//        text.setRemovedAt(fromTimeTicket(pbText.getRemovedAt()));
+//        text.removedAt = fromTimeTicket(pbText.removedAt));
 //        return text;
 //    }
 
@@ -798,9 +798,9 @@ extension Converter {
 //        const pbCounter = new PbJSONElement.Counter();
 //        pbCounter.setType(toCounterType(counter.getType()));
 //        pbCounter.setValue(counter.toBytes());
-//        pbCounter.setCreatedAt(toTimeTicket(counter.getCreatedAt()));
+//        pbCounter.setCreatedAt(toTimeTicket(counter.createdAt));
 //        pbCounter.setMovedAt(toTimeTicket(counter.getMovedAt()));
-//        pbCounter.setRemovedAt(toTimeTicket(counter.getRemovedAt()));
+//        pbCounter.removedAt = toTimeTicket(counter.removedAt));
 //
 //        const pbElement = new PbJSONElement();
 //        pbElement.setCounter(pbCounter);
@@ -816,10 +816,10 @@ extension Converter {
 //                fromCounterType(pbCounter.getType()),
 //                pbCounter.getValue_asU8(),
 //            ),
-//            fromTimeTicket(pbCounter.getCreatedAt())!,
+//            fromTimeTicket(pbCounter.createdAt)!,
 //        );
 //        counter.setMovedAt(fromTimeTicket(pbCounter.getMovedAt()));
-//        counter.setRemovedAt(fromTimeTicket(pbCounter.getRemovedAt()));
+//        counter.removedAt = fromTimeTicket(pbCounter.removedAt));
 //        return counter;
 //    }
 
@@ -881,9 +881,9 @@ extension Converter {
 //        const pbTextNodes = [];
 //        for (const textNode of rgaTreeSplit) {
 //            const pbTextNode = new PbTextNode();
-//            pbTextNode.setId(toTextNodeID(textNode.getID()));
-//            pbTextNode.setValue(textNode.getValue());
-//            pbTextNode.setRemovedAt(toTimeTicket(textNode.getRemovedAt()));
+//            pbTextNode.setId(toTextNodeID(textNode.id));
+//            pbTextNode.setValue(textNode.value);
+//            pbTextNode.removedAt = toTimeTicket(textNode.removedAt));
 //
 //            pbTextNodes.push(pbTextNode);
 //        }
@@ -897,9 +897,9 @@ extension Converter {
 //    function fromTextNode(pbTextNode: PbTextNode): RGATreeSplitNode<string> {
 //        const textNode = RGATreeSplitNode.create(
 //            fromTextNodeID(pbTextNode.getId()!),
-//            pbTextNode.getValue(),
+//            pbTextNode.value,
 //        );
-//        textNode.remove(fromTimeTicket(pbTextNode.getRemovedAt()));
+//        textNode.remove(fromTimeTicket(pbTextNode.removedAt));
 //        return textNode;
 //    }
 }
@@ -911,11 +911,11 @@ extension Converter {
      */
     // TODO: RGATreeSplitNode is not implemented
 //    static func fromRichTextNode(_ pbTextNode: PbRichTextNode) -> RGATreeSplitNode<RichTextValue> {
-//        const richTextValue = RichTextValue.create(pbTextNode.getValue());
+//        const richTextValue = RichTextValue.create(pbTextNode.value);
 //        pbTextNode.getAttributesMap().forEach((value) => {
 //            richTextValue.setAttr(
-//                value.getKey(),
-//                value.getValue(),
+//                value.key,
+//                value.value,
 //                fromTimeTicket(value.getUpdatedAt())!,
 //            );
 //        });
@@ -924,7 +924,7 @@ extension Converter {
 //            fromTextNodeID(pbTextNode.getId()!),
 //            richTextValue,
 //        );
-//        textNode.remove(fromTimeTicket(pbTextNode.getRemovedAt()));
+//        textNode.remove(fromTimeTicket(pbTextNode.removedAt));
 //        return textNode;
 //    }
 
@@ -946,10 +946,10 @@ extension Converter {
 //        }
 //        const text = new CRDTRichText<A>(
 //            rgaTreeSplit,
-//            fromTimeTicket(pbText.getCreatedAt())!,
+//            fromTimeTicket(pbText.createdAt)!,
 //        );
 //        text.setMovedAt(fromTimeTicket(pbText.getMovedAt()));
-//        text.setRemovedAt(fromTimeTicket(pbText.getRemovedAt()));
+//        text.removedAt = fromTimeTicket(pbText.removedAt));
 //        return text;
 //    }
 }
@@ -993,9 +993,9 @@ extension Converter {
      */
     static func toChange(_ change: Change) -> PbChange {
         var pbChange = PbChange()
-        pbChange.id = toChangeID(change.getID())
-        pbChange.message = change.getMessage() ?? ""
-        pbChange.operations = toOperations(change.getOperations())
+        pbChange.id = toChangeID(change.id)
+        pbChange.message = change.message ?? ""
+        pbChange.operations = toOperations(change.operations)
         return pbChange
     }
 

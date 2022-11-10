@@ -22,26 +22,18 @@ import Foundation
 class SplayNode<V> {
     private(set) var value: V
 
-    fileprivate private(set) var left: SplayNode<V>?
-    private var right: SplayNode<V>?
-    private var parent: SplayNode<V>?
-    private(set) var weight: Int = 0
+    fileprivate var left: SplayNode<V>?
+    fileprivate var right: SplayNode<V>?
+    fileprivate var parent: SplayNode<V>?
+    fileprivate(set) var weight: Int = 0
 
     init(_ value: V) {
         self.value = value
         self.initWeight()
     }
 
-    func getLength() -> Int {
+    var length: Int {
         fatalError("Must be implemented.")
-    }
-
-    func getWeight() -> Int {
-        return self.weight
-    }
-
-    func getValue() -> V {
-        return self.value
     }
 
     /**
@@ -54,7 +46,7 @@ class SplayNode<V> {
     /**
      * `getLeftWeight` returns left weight of this node.
      */
-    fileprivate func getLeftWeight() -> Int {
+    fileprivate var leftWeight: Int {
         if let left = self.left {
             return left.weight
         } else {
@@ -65,7 +57,7 @@ class SplayNode<V> {
     /**
      * `getRightWeight` returns right weight of this node.
      */
-    fileprivate func getRightWeight() -> Int {
+    fileprivate var rightWeight: Int {
         if let right = self.right {
             return right.weight
         } else {
@@ -73,48 +65,24 @@ class SplayNode<V> {
         }
     }
 
-    fileprivate func setLeft(_ node: SplayNode<V>?) {
-        self.left = node
-    }
-
-    fileprivate func setRight(_ node: SplayNode<V>?) {
-        self.right = node
-    }
-
-    fileprivate func setParent(_ node: SplayNode<V>?) {
-        self.parent = node
-    }
-
-    fileprivate func getLeft() -> SplayNode<V>? {
-        return self.left
-    }
-
-    fileprivate func getRight() -> SplayNode<V>? {
-        return self.right
-    }
-
-    fileprivate func getParent() -> SplayNode<V>? {
-        return self.parent
-    }
-
     /**
      * `hasLeft` check if the left node exists
      */
-    fileprivate func hasLeft() -> Bool {
+    fileprivate var hasLeft: Bool {
         return self.left != nil
     }
 
     /**
      * `hasRight` check if the right node exists
      */
-    fileprivate func hasRight() -> Bool {
+    fileprivate var hasRight: Bool {
         return self.right != nil
     }
 
     /**
      * `hasParent` check if the parent node exists
      */
-    fileprivate func hasParent() -> Bool {
+    fileprivate var hasParent: Bool {
         return self.parent != nil
     }
 
@@ -131,7 +99,7 @@ class SplayNode<V> {
      * `hasLinks` checks if parent, right and left node exists.
      */
     fileprivate var hasLinks: Bool {
-        return self.hasParent() || self.hasLeft() || self.hasRight()
+        return self.hasParent || self.hasLeft || self.hasRight
     }
 
     /**
@@ -145,7 +113,7 @@ class SplayNode<V> {
      * `initWeight` sets initial weight of this node.
      */
     fileprivate func initWeight() {
-        self.weight = self.getLength()
+        self.weight = self.length
     }
 }
 
@@ -183,18 +151,18 @@ class SplayTree<V> {
         var offset = position
         var node = root
         while true {
-            if let left = node.left, offset <= node.getLeftWeight() {
+            if let left = node.left, offset <= node.leftWeight {
                 node = left
-            } else if node.hasRight(), offset > node.getLeftWeight() + node.getLength() {
-                offset -= node.getLeftWeight() + node.getLength()
-                node = node.getRight()!
+            } else if node.hasRight, offset > node.leftWeight + node.length {
+                offset -= node.leftWeight + node.length
+                node = node.right!
             } else {
-                offset -= node.getLeftWeight()
+                offset -= node.leftWeight
                 break
             }
         }
-        if offset > node.getLength() {
-            Logger.error("out of index range: pos: \(offset) > node.length: \(node.getLength())")
+        if offset > node.length {
+            Logger.error("out of index range: pos: \(offset) > node.length: \(node.length)")
         }
         return (node, offset)
     }
@@ -218,13 +186,13 @@ class SplayTree<V> {
                 break
             }
 
-            if previousNode == nil || previousNode === current.getRight() {
-                index += current.getLength() + (current.hasLeft() ? current.getLeftWeight() : 0)
+            if previousNode == nil || previousNode === current.right {
+                index += current.length + (current.hasLeft ? current.leftWeight : 0)
             }
             previousNode = current
-            tempCurrent = current.getParent()
+            tempCurrent = current.parent
         }
-        return index - node.getLength()
+        return index - node.length
     }
 
     /**
@@ -254,13 +222,13 @@ class SplayTree<V> {
 
         self.splayNode(previousNode)
         self.root = newNode
-        newNode.setRight(previousNode.getRight())
-        if previousNode.hasRight() {
-            previousNode.getRight()?.setParent(newNode)
+        newNode.right = previousNode.right
+        if previousNode.hasRight {
+            previousNode.right?.parent = newNode
         }
-        newNode.setLeft(previousNode)
-        previousNode.setParent(newNode)
-        previousNode.setRight(nil)
+        newNode.left = previousNode
+        previousNode.parent = newNode
+        previousNode.right = nil
         self.updateWeight(previousNode)
         self.updateWeight(newNode)
 
@@ -273,11 +241,11 @@ class SplayTree<V> {
     func updateWeight(_ node: SplayNode<V>) {
         node.initWeight()
 
-        if node.hasLeft() {
-            node.increaseWeight(node.getLeftWeight())
+        if node.hasLeft {
+            node.increaseWeight(node.leftWeight)
         }
-        if node.hasRight() {
-            node.increaseWeight(node.getRightWeight())
+        if node.hasRight {
+            node.increaseWeight(node.rightWeight)
         }
     }
 
@@ -288,7 +256,7 @@ class SplayTree<V> {
                 break
             }
             self.updateWeight(node)
-            tempNode = node.getParent()
+            tempNode = node.parent
         }
     }
 
@@ -301,27 +269,27 @@ class SplayTree<V> {
         }
 
         while true {
-            if self.isLeftChild(node.getParent()), self.isRightChild(node) {
+            if self.isLeftChild(node.parent), self.isRightChild(node) {
                 // zig-zag
                 self.rotateLeft(node)
                 self.rotateRight(node)
             } else if
-                self.isRightChild(node.getParent()),
+                self.isRightChild(node.parent),
                 self.isLeftChild(node)
             {
                 // zig-zag
                 self.rotateRight(node)
                 self.rotateLeft(node)
-            } else if self.isLeftChild(node.getParent()), self.isLeftChild(node) {
+            } else if self.isLeftChild(node.parent), self.isLeftChild(node) {
                 // zig-zig
-                self.rotateRight(node.getParent()!)
+                self.rotateRight(node.parent!)
                 self.rotateRight(node)
             } else if
-                self.isRightChild(node.getParent()),
+                self.isRightChild(node.parent),
                 self.isRightChild(node)
             {
                 // zig-zig
-                self.rotateLeft(node.getParent()!)
+                self.rotateLeft(node.parent!)
                 self.rotateLeft(node)
             } else {
                 // zig
@@ -342,22 +310,22 @@ class SplayTree<V> {
     func delete(_ node: SplayNode<V>) {
         self.splayNode(node)
 
-        let leftTree = SplayTree(root: node.getLeft())
+        let leftTree = SplayTree(root: node.left)
         if let root = leftTree.root {
-            root.setParent(nil)
+            root.parent = nil
         }
 
-        let rightTree = SplayTree(root: node.getRight())
+        let rightTree = SplayTree(root: node.right)
         if let root = rightTree.root {
-            root.setParent(nil)
+            root.parent = nil
         }
 
         if let leftTreeRoot = leftTree.root {
             let maxNode = leftTree.getMaximum()
             leftTree.splayNode(maxNode)
-            leftTreeRoot.setRight(rightTree.root)
+            leftTreeRoot.right = rightTree.root
             if let rightTreeRoot = rightTree.root {
-                rightTreeRoot.setParent(leftTree.root)
+                rightTreeRoot.parent = leftTree.root
             }
             self.root = leftTree.root
         } else {
@@ -386,7 +354,7 @@ class SplayTree<V> {
         }
         self.splayNode(leftBoundary)
         self.splayNode(rightBoundary)
-        if rightBoundary.getLeft() !== leftBoundary {
+        if rightBoundary.left !== leftBoundary {
             self.rotateRight(leftBoundary)
         }
         self.cutOffRight(root: leftBoundary)
@@ -394,7 +362,7 @@ class SplayTree<V> {
 
     private func cutOffRight(root: SplayNode<V>) {
         var nodesToFreeWeight: [SplayNode<V>] = []
-        self.traversePostorder(root.getRight(), stack: &nodesToFreeWeight)
+        self.traversePostorder(root.right, stack: &nodesToFreeWeight)
         for node in nodesToFreeWeight {
             node.initWeight()
         }
@@ -402,15 +370,15 @@ class SplayTree<V> {
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data of the Node
+     * `structureAsString` returns a string containing the meta data of the Node
      * for debugging purpose.
      */
-    func getStructureAsString() -> String {
+    var structureAsString: String {
         var metaString: [SplayNode<V>] = []
         self.traverseInorder(self.root!, stack: &metaString)
         return metaString
             .map {
-                "[\($0.getWeight()),\($0.getLength())]\($0.getValue())"
+                "[\($0.weight),\($0.length)]\($0.value)"
             }
             .joined(separator: "")
     }
@@ -422,7 +390,7 @@ class SplayTree<V> {
     func checkWeight() -> Bool {
         var nodes: [SplayNode<V>] = []
         self.traverseInorder(self.root!, stack: &nodes)
-        for node in nodes where node.getWeight() != node.getLength() + node.getLeftWeight() + node.getRightWeight() {
+        for node in nodes where node.weight != node.length + node.leftWeight + node.rightWeight {
             return false
         }
         return true
@@ -432,8 +400,8 @@ class SplayTree<V> {
         guard var node = self.root else {
             return nil
         }
-        while node.hasRight() {
-            node = node.getRight()!
+        while node.hasRight {
+            node = node.right!
         }
         return node
     }
@@ -443,9 +411,9 @@ class SplayTree<V> {
             return
         }
 
-        self.traverseInorder(node.getLeft(), stack: &stack)
+        self.traverseInorder(node.left, stack: &stack)
         stack.append(node)
-        self.traverseInorder(node.getRight(), stack: &stack)
+        self.traverseInorder(node.right, stack: &stack)
     }
 
     private func traversePostorder(_ node: SplayNode<V>?, stack: inout [SplayNode<V>]) {
@@ -453,75 +421,75 @@ class SplayTree<V> {
             return
         }
 
-        self.traversePostorder(node.getLeft(), stack: &stack)
-        self.traversePostorder(node.getRight(), stack: &stack)
+        self.traversePostorder(node.left, stack: &stack)
+        self.traversePostorder(node.right, stack: &stack)
         stack.append(node)
     }
 
     private func rotateLeft(_ pivot: SplayNode<V>) {
-        guard let root = pivot.getParent() else {
+        guard let root = pivot.parent else {
             return
         }
-        if root.hasParent() {
-            if root === root.getParent()!.getLeft() {
-                root.getParent()!.setLeft(pivot)
+        if root.hasParent {
+            if root === root.parent!.left {
+                root.parent!.left = pivot
             } else {
-                root.getParent()!.setRight(pivot)
+                root.parent!.right = pivot
             }
         } else {
             self.root = pivot
         }
-        pivot.setParent(root.getParent())
+        pivot.parent = root.parent
 
-        root.setRight(pivot.getLeft())
-        if root.hasRight() {
-            root.getRight()!.setParent(root)
+        root.right = pivot.left
+        if root.hasRight {
+            root.right!.parent = root
         }
 
-        pivot.setLeft(root)
-        pivot.getLeft()!.setParent(pivot)
+        pivot.left = root
+        pivot.left!.parent = pivot
 
         self.updateWeight(root)
         self.updateWeight(pivot)
     }
 
     private func rotateRight(_ pivot: SplayNode<V>) {
-        guard let root = pivot.getParent() else {
+        guard let root = pivot.parent else {
             return
         }
-        if root.hasParent() {
-            if root === root.getParent()?.getLeft() {
-                root.getParent()?.setLeft(pivot)
+        if root.hasParent {
+            if root === root.parent?.left {
+                root.parent?.left = pivot
             } else {
-                root.getParent()?.setRight(pivot)
+                root.parent?.right = pivot
             }
         } else {
             self.root = pivot
         }
-        pivot.setParent(root.getParent())
+        pivot.parent = root.parent
 
-        root.setLeft(pivot.getRight())
-        if root.hasLeft() {
-            root.getLeft()!.setParent(root)
+        root.left = pivot.right
+        if root.hasLeft {
+            root.left!.parent = root
         }
 
-        pivot.setRight(root)
-        pivot.getRight()!.setParent(pivot)
+        pivot.right = root
+        pivot.right!.parent = pivot
 
         self.updateWeight(root)
         self.updateWeight(pivot)
     }
 
     private func isLeftChild(_ node: SplayNode<V>?) -> Bool {
-        if let node = node, node.hasParent() {
-            return node.getParent()?.getLeft() === node
+        if let node = node, node.hasParent {
+            return node.parent?.left === node
         }
         return false
     }
 
     private func isRightChild(_ node: SplayNode<V>?) -> Bool {
-        if let node = node, node.hasParent() {
-            return node.getParent()?.getRight() === node
+        if let node = node, node.hasParent {
+            return node.parent?.right === node
         }
         return false
     }

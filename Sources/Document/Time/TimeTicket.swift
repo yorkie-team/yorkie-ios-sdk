@@ -51,10 +51,10 @@ public struct TimeTicket: Comparable {
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data of the ticket
+     * `structureAsString` returns a string containing the meta data of the ticket
      * for debugging purpose.
      */
-    func getStructureAsString() -> String {
+    var structureAsString: String {
         guard let actorID = self.actorID else {
             return "\(self.lamport):nil:\(self.delimiter)"
         }

@@ -32,9 +32,9 @@ class RHTPQMapTests: XCTestCase {
         let elementA2 = try target.get(key: "a2")
 
         XCTAssertEqual(elementA1.toJSON(), "\"A1\"")
-        XCTAssertEqual(elementA1.isRemoved(), false)
+        XCTAssertEqual(elementA1.isRemoved, false)
         XCTAssertEqual(elementA2.toJSON(), "\"A2\"")
-        XCTAssertEqual(elementA2.isRemoved(), false)
+        XCTAssertEqual(elementA2.isRemoved, false)
     }
 
     func test_set_value_by_key_is_used_alreay() throws {
@@ -49,7 +49,7 @@ class RHTPQMapTests: XCTestCase {
         let result = try target.get(key: "a1")
 
         XCTAssertEqual(result.toJSON(), "\"A2\"")
-        XCTAssertEqual(result.isRemoved(), false)
+        XCTAssertEqual(result.isRemoved, false)
     }
 
     func test_remove_by_createdAt() throws {
@@ -62,11 +62,11 @@ class RHTPQMapTests: XCTestCase {
         target.set(key: "a2", value: a2)
 
         let executedAt = TimeTicket(lamport: 3, delimiter: 0, actorID: actorId)
-        let removed = try target.remove(createdAt: a2.getCreatedAt(), executedAt: executedAt)
+        let removed = try target.remove(createdAt: a2.createdAt, executedAt: executedAt)
 
         XCTAssertEqual(removed.toJSON(), "\"A2\"")
-        XCTAssertEqual(try target.get(key: "a2").isRemoved(), true)
-        XCTAssertEqual(try target.get(key: "a1").isRemoved(), false)
+        XCTAssertEqual(try target.get(key: "a2").isRemoved, true)
+        XCTAssertEqual(try target.get(key: "a1").isRemoved, false)
     }
 
     func test_remove_by_key() throws {
@@ -82,8 +82,8 @@ class RHTPQMapTests: XCTestCase {
         let removed = try target.remove(key: "a2", executedAt: executedAt)
 
         XCTAssertEqual(removed.toJSON(), "\"A2\"")
-        XCTAssertEqual(try target.get(key: "a2").isRemoved(), true)
-        XCTAssertEqual(try target.get(key: "a1").isRemoved(), false)
+        XCTAssertEqual(try target.get(key: "a2").isRemoved, true)
+        XCTAssertEqual(try target.get(key: "a1").isRemoved, false)
     }
 
     func test_subPath() throws {
@@ -95,7 +95,7 @@ class RHTPQMapTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        let subPath = try target.subPath(createdAt: a2.getCreatedAt())
+        let subPath = try target.subPath(createdAt: a2.createdAt)
         XCTAssertEqual(subPath, "a2")
     }
 

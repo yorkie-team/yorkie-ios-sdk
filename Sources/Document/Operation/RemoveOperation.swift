@@ -22,7 +22,8 @@ import Foundation
 struct RemoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
-    private var createdAt: TimeTicket
+    /// The creation time of the target element.
+    let createdAt: TimeTicket
 
     init(parentCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -34,41 +35,34 @@ struct RemoveOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     func execute(root: CRDTRoot) throws {
-        let parent = root.find(createdAt: getParentCreatedAt())
+        let parent = root.find(createdAt: self.parentCreatedAt)
         guard let object = parent as? CRDTContainer else {
             let log: String
             if let parent {
                 log = "only object and array can execute remove: \(parent)"
             } else {
-                log = "fail to find \(getParentCreatedAt())"
+                log = "fail to find \(self.parentCreatedAt)"
             }
 
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        let element = try object.remove(createdAt: self.createdAt, executedAt: getExecutedAt())
+        let element = try object.remove(createdAt: self.createdAt, executedAt: self.executedAt)
         root.registerRemovedElement(element)
     }
 
     /**
-     * `getEffectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the time of the effected element.
      */
-    func getEffectedCreatedAt() -> TimeTicket {
-        return getParentCreatedAt()
+    var effectedCreatedAt: TimeTicket {
+        return self.parentCreatedAt
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data.
+     * `structureAsString` returns a string containing the meta data.
      */
-    func getStructureAsString() -> String {
-        return "\(getParentCreatedAt().getStructureAsString()).REMOVE"
-    }
-
-    /**
-     * `getCreatedAt` returns the creation time of the target element.
-     */
-    func getCreatedAt() -> TimeTicket {
-        return self.createdAt
+    var structureAsString: String {
+        return "\(self.parentCreatedAt.structureAsString).REMOVE"
     }
 }

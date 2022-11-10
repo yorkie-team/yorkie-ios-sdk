@@ -50,7 +50,7 @@ class CRDTArray: CRDTContainer {
      * `get` returns the element of the given createAt.
      */
     func get(createdAt: TimeTicket) throws -> CRDTElement {
-        guard let node = try? self.elements.get(createdAt: createdAt), node.isRemoved() == false else {
+        guard let node = try? self.elements.get(createdAt: createdAt), node.isRemoved == false else {
             let log = "can't find the given node: \(createdAt)"
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
@@ -64,7 +64,7 @@ class CRDTArray: CRDTContainer {
      */
     func get(index: Int) throws -> CRDTElement {
         let node = try self.elements.getNode(index: index)
-        return node.getValue()
+        return node.value
     }
 
     /**
@@ -143,11 +143,11 @@ extension CRDTArray {
      * `deepcopy` copies itself deeply.
      */
     func deepcopy() -> CRDTElement {
-        let result = CRDTArray(createdAt: self.getCreatedAt())
+        let result = CRDTArray(createdAt: self.createdAt)
         for node in self.elements {
-            try? result.elements.insert(node.getValue().deepcopy(), afterCreatedAt: result.getLastCreatedAt())
+            try? result.elements.insert(node.value.deepcopy(), afterCreatedAt: result.getLastCreatedAt())
         }
-        result.remove(self.getRemovedAt())
+        result.remove(self.removedAt)
         return result
     }
 
@@ -178,7 +178,7 @@ extension CRDTArray {
      */
     func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool) {
         for node in self.elements {
-            let element = node.getValue()
+            let element = node.value
             if callback(element, self) {
                 return
             }
@@ -204,8 +204,8 @@ class CRDTArrayIterator: IteratorProtocol {
 
     init(_ rgaTreeList: RGATreeList) {
         self.values = rgaTreeList
-            .map { $0.getValue() }
-            .filter { $0.isRemoved() == false }
+            .map { $0.value }
+            .filter { $0.isRemoved == false }
     }
 
     func next() -> CRDTElement? {

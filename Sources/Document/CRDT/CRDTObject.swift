@@ -62,16 +62,16 @@ class CRDTObject: CRDTContainer {
     }
 
     /**
-     * `getKeys` returns array of this object.
+     * `keys` returns array of this object.
      */
-    func getKeys() -> [String] {
+    var keys: [String] {
         return self.map { $0.key }
     }
 
     /**
-     * `getRHT` RHTNodes returns the RHTPQMap nodes.
+     * `rht` RHTNodes returns the RHTPQMap nodes.
      */
-    func getRHT() -> RHTPQMap {
+    var rht: RHTPQMap {
         return self.memberNodes
     }
 }
@@ -93,7 +93,7 @@ extension CRDTObject {
      * `toSortedJSON` returns the sorted JSON encoding of this object.
      */
     func toSortedJSON() -> String {
-        let value = self.getKeys().sorted()
+        let value = self.keys.sorted()
             .compactMap {
                 guard let node = try? self.memberNodes.get(key: $0) else {
                     return nil
@@ -110,12 +110,12 @@ extension CRDTObject {
      * `deepcopy` copies itself deeply.
      */
     func deepcopy() -> CRDTElement {
-        let clone = CRDTObject(createdAt: self.getCreatedAt())
+        let clone = CRDTObject(createdAt: self.createdAt)
         self.memberNodes.forEach {
             clone.memberNodes.set(key: $0.rhtKey, value: $0.rhtValue.deepcopy())
         }
 
-        clone.remove(self.getRemovedAt())
+        clone.remove(self.removedAt)
         return clone
     }
 
@@ -171,7 +171,7 @@ class CRDTObjectIterator: IteratorProtocol {
     private var iteratorNext: Int = 0
 
     init(_ rhtPqMap: RHTPQMap) {
-        self.nodes = rhtPqMap.filter { $0.isRemoved() == false }
+        self.nodes = rhtPqMap.filter { $0.isRemoved == false }
     }
 
     func next() -> (key: String, value: CRDTElement)? {

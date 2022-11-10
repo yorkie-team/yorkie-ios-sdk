@@ -93,7 +93,7 @@ public class JSONObject {
 
         let operation = SetOperation(key: key,
                                      value: primitive,
-                                     parentCreatedAt: self.target.getCreatedAt(),
+                                     parentCreatedAt: self.target.createdAt,
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
@@ -135,7 +135,7 @@ public class JSONObject {
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
-                                     parentCreatedAt: self.target.getCreatedAt(),
+                                     parentCreatedAt: self.target.createdAt,
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
@@ -145,7 +145,7 @@ public class JSONObject {
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
-                                     parentCreatedAt: self.target.getCreatedAt(),
+                                     parentCreatedAt: self.target.createdAt,
                                      executedAt: self.context.issueTimeTicket())
         self.context.push(operation: operation)
     }
@@ -167,8 +167,8 @@ public class JSONObject {
             return
         }
 
-        let removeOperation = RemoveOperation(parentCreatedAt: self.target.getCreatedAt(),
-                                              createdAt: removed.getCreatedAt(),
+        let removeOperation = RemoveOperation(parentCreatedAt: self.target.createdAt,
+                                              createdAt: removed.createdAt,
                                               executedAt: self.context.issueTimeTicket())
         self.context.push(operation: removeOperation)
         self.context.registerRemovedElement(removed)
@@ -184,10 +184,10 @@ public class JSONObject {
     }
 
     /**
-     * `getID` returns the ID(time ticket) of this Object.
+     * `id` returns the ID(time ticket) of this Object.
      */
     public func getID() -> TimeTicket {
-        self.target.getCreatedAt()
+        self.target.createdAt
     }
 
     /**

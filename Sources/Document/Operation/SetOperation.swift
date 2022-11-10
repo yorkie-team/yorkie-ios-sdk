@@ -23,8 +23,10 @@ import Foundation
 struct SetOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
-    private let key: String
-    private let value: CRDTElement
+    /// The key of this operation.
+    let key: String
+    /// The value of this operation.
+    let value: CRDTElement
 
     init(key: String, value: CRDTElement, parentCreatedAt: TimeTicket, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -37,11 +39,11 @@ struct SetOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     func execute(root: CRDTRoot) throws {
-        let parent = root.find(createdAt: self.getParentCreatedAt())
+        let parent = root.find(createdAt: self.parentCreatedAt)
         guard let parent = parent as? CRDTObject else {
             let log: String
             if parent == nil {
-                log = "failed to find \(self.getParentCreatedAt())"
+                log = "failed to find \(self.parentCreatedAt)"
 
             } else {
                 log = "fail to execute, only object can execute set"
@@ -57,30 +59,16 @@ struct SetOperation: Operation {
     }
 
     /**
-     * `getEffectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the time of the effected element.
      */
-    func getEffectedCreatedAt() -> TimeTicket {
-        return self.value.getCreatedAt()
+    var effectedCreatedAt: TimeTicket {
+        return self.value.createdAt
     }
 
     /**
-     * `getStructureAsString` returns a String containing the meta data.
+     * `structureAsString` returns a String containing the meta data.
      */
-    func getStructureAsString() -> String {
-        return "\(self.getParentCreatedAt().getStructureAsString()).SET"
-    }
-
-    /**
-     * `getKey` returns the key of this operation.
-     */
-    func getKey() -> String {
-        return self.key
-    }
-
-    /**
-     * `getValue` returns the value of this operation.
-     */
-    func getValue() -> CRDTElement {
-        return self.value
+    var structureAsString: String {
+        return "\(self.parentCreatedAt.structureAsString).SET"
     }
 }

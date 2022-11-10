@@ -21,34 +21,34 @@ class CheckpointTests: XCTestCase {
     func test_can_increase_client_seq() {
         let target = Checkpoint(serverSeq: 1, clientSeq: 10)
         let result = target.increasedClientSeq(by: 100)
-        XCTAssertEqual(result.getStructureAsString(), "serverSeq=1, clientSeq=110")
+        XCTAssertEqual(result.structureAsString, "serverSeq=1, clientSeq=110")
     }
 
     func test_can_forward() {
         var target = Checkpoint(serverSeq: 1, clientSeq: 2)
         let other = Checkpoint(serverSeq: 100, clientSeq: 200)
         target.forward(other: other)
-        XCTAssertEqual(target.getStructureAsString(), "serverSeq=100, clientSeq=200")
+        XCTAssertEqual(target.structureAsString, "serverSeq=100, clientSeq=200")
     }
 
     func test_can_not_forward() {
         var target = Checkpoint(serverSeq: 100, clientSeq: 200)
         let other = Checkpoint(serverSeq: 1, clientSeq: 2)
         target.forward(other: other)
-        XCTAssertEqual(target.getStructureAsString(), "serverSeq=100, clientSeq=200")
+        XCTAssertEqual(target.structureAsString, "serverSeq=100, clientSeq=200")
     }
 
     func test_can_forward_clientSeq() {
         var target = Checkpoint(serverSeq: 100, clientSeq: 2)
         let other = Checkpoint(serverSeq: 1, clientSeq: 200)
         target.forward(other: other)
-        XCTAssertEqual(target.getStructureAsString(), "serverSeq=100, clientSeq=200")
+        XCTAssertEqual(target.structureAsString, "serverSeq=100, clientSeq=200")
     }
 
     func test_can_forward_serverSeq() {
         var target = Checkpoint(serverSeq: 1, clientSeq: 200)
         let other = Checkpoint(serverSeq: 100, clientSeq: 2)
         target.forward(other: other)
-        XCTAssertEqual(target.getStructureAsString(), "serverSeq=100, clientSeq=200")
+        XCTAssertEqual(target.structureAsString, "serverSeq=100, clientSeq=200")
     }
 }

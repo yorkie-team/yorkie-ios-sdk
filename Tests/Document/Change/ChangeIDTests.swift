@@ -21,14 +21,14 @@ class ChangeIDTests: XCTestCase {
     func test_no_actor() {
         let target = ChangeID(clientSeq: 1, lamport: 2)
 
-        XCTAssertEqual(target.getStructureAsString(), "2:nil:1")
+        XCTAssertEqual(target.structureAsString, "2:nil:1")
     }
 
     func test_with_actor() {
         let actorID = "abcdefghijklmnopqrstuvwxyz"
         let target = ChangeID(clientSeq: 1, lamport: 2, actor: actorID)
 
-        XCTAssertEqual(target.getStructureAsString(), "2:yz:1")
+        XCTAssertEqual(target.structureAsString, "2:yz:1")
     }
 
     func test_change_lmport_to_bigger_than_current_lamport() {
@@ -46,6 +46,6 @@ class ChangeIDTests: XCTestCase {
     func test_can_create_time_ticket() {
         let target = ChangeID(clientSeq: 1, lamport: 2, actor: "actor-1")
         let result = target.createTimeTicket(delimiter: 3)
-        XCTAssertEqual(result.getStructureAsString(), "2:actor-1:3")
+        XCTAssertEqual(result.structureAsString, "2:actor-1:3")
     }
 }

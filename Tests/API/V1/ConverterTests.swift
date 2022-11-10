@@ -74,7 +74,7 @@ class ConverterTests: XCTestCase {
         XCTAssertEqual(changeID.getClientSeq(), converted.getClientSeq())
         XCTAssertEqual(changeID.getLamport(), converted.getLamport())
         XCTAssertEqual(changeID.getActorID(), converted.getActorID())
-        XCTAssertEqual(changeID.getStructureAsString(), converted.getStructureAsString())
+        XCTAssertEqual(changeID.structureAsString, converted.structureAsString)
         XCTAssertEqual(changeID.getLamportAsString(), converted.getLamportAsString())
     }
 
@@ -94,7 +94,7 @@ class ConverterTests: XCTestCase {
         let change = Change(id: ChangeID.initial, operations: [addOperation], message: "AddOperation")
         do {
             let converted = try Converter.fromChanges([Converter.toChange(change)]).first
-            XCTAssertEqual(change.getStructureAsString(), converted?.getStructureAsString())
+            XCTAssertEqual(change.structureAsString, converted?.structureAsString)
         } catch {
             XCTFail("\(error)")
         }
@@ -111,11 +111,11 @@ class ConverterTests: XCTestCase {
                                         value: Primitive(value: .null, createdAt: TimeTicket.initial),
                                         executedAt: TimeTicket.initial)
         let setChange = Change(id: ChangeID.initial, operations: [setOperation], message: "SetOperation")
-        let addChange = Change(id: setChange.getID().next(), operations: [addOperation], message: "AddOperation")
+        let addChange = Change(id: setChange.id.next(), operations: [addOperation], message: "AddOperation")
         do {
             let convertedArray = try Converter.fromChanges(Converter.toChanges([setChange, addChange]))
-            XCTAssertEqual(setChange.getStructureAsString(), convertedArray[0].getStructureAsString())
-            XCTAssertEqual(addChange.getStructureAsString(), convertedArray[1].getStructureAsString())
+            XCTAssertEqual(setChange.structureAsString, convertedArray[0].structureAsString)
+            XCTAssertEqual(addChange.structureAsString, convertedArray[1].structureAsString)
         } catch {
             XCTFail("\(error)")
         }
@@ -132,7 +132,7 @@ class ConverterTests: XCTestCase {
         do {
             let converted = try Converter.fromChangePack(Converter.toChangePack(pack: changePack))
             XCTAssertEqual(changePack.getChangeSize(), converted.getChangeSize())
-            XCTAssertEqual(changePack.getChanges().first?.getStructureAsString(), converted.getChanges().first?.getStructureAsString())
+            XCTAssertEqual(changePack.getChanges().first?.structureAsString, converted.getChanges().first?.structureAsString)
             XCTAssertEqual(changePack.getCheckpoint(), converted.getCheckpoint())
             XCTAssertEqual(changePack.getDocumentKey(), converted.getDocumentKey())
             XCTAssertEqual(changePack.getMinSyncedTicket(), converted.getMinSyncedTicket())
@@ -149,12 +149,12 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(setOperation)]).first as? SetOperation
-            XCTAssertEqual(setOperation.getStructureAsString(), converted?.getStructureAsString())
-            XCTAssertEqual(setOperation.getValue().toJSON(), converted?.getValue().toJSON())
-            XCTAssertEqual(setOperation.getKey(), converted?.getKey())
-            XCTAssertEqual(setOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
-            XCTAssertEqual(setOperation.getExecutedAt(), converted?.getExecutedAt())
-            XCTAssertEqual(setOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+            XCTAssertEqual(setOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(setOperation.value.toJSON(), converted?.value.toJSON())
+            XCTAssertEqual(setOperation.key, converted?.key)
+            XCTAssertEqual(setOperation.effectedCreatedAt, converted?.effectedCreatedAt)
+            XCTAssertEqual(setOperation.executedAt, converted?.executedAt)
+            XCTAssertEqual(setOperation.parentCreatedAt, converted?.parentCreatedAt)
         } catch {
             XCTFail("\(error)")
         }
@@ -166,12 +166,12 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(addOperation)]).first as? AddOperation
-            XCTAssertEqual(addOperation.getStructureAsString(), converted?.getStructureAsString())
-            XCTAssertEqual(addOperation.getValue().toJSON(), converted?.getValue().toJSON())
-            XCTAssertEqual(addOperation.getPrevCreatedAt(), converted?.getPrevCreatedAt())
-            XCTAssertEqual(addOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
-            XCTAssertEqual(addOperation.getExecutedAt(), converted?.getExecutedAt())
-            XCTAssertEqual(addOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+            XCTAssertEqual(addOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(addOperation.value.toJSON(), converted?.value.toJSON())
+            XCTAssertEqual(addOperation.previousCreatedAt, converted?.previousCreatedAt)
+            XCTAssertEqual(addOperation.effectedCreatedAt, converted?.effectedCreatedAt)
+            XCTAssertEqual(addOperation.executedAt, converted?.executedAt)
+            XCTAssertEqual(addOperation.parentCreatedAt, converted?.parentCreatedAt)
         } catch {
             XCTFail("\(error)")
         }
@@ -183,12 +183,12 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(moveOperation)]).first as? MoveOperation
-            XCTAssertEqual(moveOperation.getStructureAsString(), converted?.getStructureAsString())
-            XCTAssertEqual(moveOperation.getPrevCreatedAt(), converted?.getPrevCreatedAt())
-            XCTAssertEqual(moveOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
-            XCTAssertEqual(moveOperation.getCreatedAt(), converted?.getCreatedAt())
-            XCTAssertEqual(moveOperation.getExecutedAt(), converted?.getExecutedAt())
-            XCTAssertEqual(moveOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+            XCTAssertEqual(moveOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(moveOperation.previousCreatedAt, converted?.previousCreatedAt)
+            XCTAssertEqual(moveOperation.effectedCreatedAt, converted?.effectedCreatedAt)
+            XCTAssertEqual(moveOperation.createdAt, converted?.createdAt)
+            XCTAssertEqual(moveOperation.executedAt, converted?.executedAt)
+            XCTAssertEqual(moveOperation.parentCreatedAt, converted?.parentCreatedAt)
         } catch {
             XCTFail("\(error)")
         }
@@ -199,11 +199,11 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(removeOperation)]).first as? RemoveOperation
-            XCTAssertEqual(removeOperation.getStructureAsString(), converted?.getStructureAsString())
-            XCTAssertEqual(removeOperation.getEffectedCreatedAt(), converted?.getEffectedCreatedAt())
-            XCTAssertEqual(removeOperation.getCreatedAt(), converted?.getCreatedAt())
-            XCTAssertEqual(removeOperation.getExecutedAt(), converted?.getExecutedAt())
-            XCTAssertEqual(removeOperation.getParentCreatedAt(), converted?.getParentCreatedAt())
+            XCTAssertEqual(removeOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(removeOperation.effectedCreatedAt, converted?.effectedCreatedAt)
+            XCTAssertEqual(removeOperation.createdAt, converted?.createdAt)
+            XCTAssertEqual(removeOperation.executedAt, converted?.executedAt)
+            XCTAssertEqual(removeOperation.parentCreatedAt, converted?.parentCreatedAt)
         } catch {
             XCTFail("\(error)")
         }
@@ -233,44 +233,44 @@ class ConverterTests: XCTestCase {
             let convertedArray = try Converter.fromOperations(Converter.toOperations([setOperation, addOperation, moveOperation, removeOperation]))
 
             if let converted = convertedArray[0] as? SetOperation {
-                XCTAssertEqual(setOperation.getStructureAsString(), converted.getStructureAsString())
-                XCTAssertEqual(setOperation.getValue().toJSON(), converted.getValue().toJSON())
-                XCTAssertEqual(setOperation.getKey(), converted.getKey())
-                XCTAssertEqual(setOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
-                XCTAssertEqual(setOperation.getExecutedAt(), converted.getExecutedAt())
-                XCTAssertEqual(setOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+                XCTAssertEqual(setOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(setOperation.value.toJSON(), converted.value.toJSON())
+                XCTAssertEqual(setOperation.key, converted.key)
+                XCTAssertEqual(setOperation.effectedCreatedAt, converted.effectedCreatedAt)
+                XCTAssertEqual(setOperation.executedAt, converted.executedAt)
+                XCTAssertEqual(setOperation.parentCreatedAt, converted.parentCreatedAt)
             } else {
                 XCTFail("Operation Type mismatch!")
             }
 
             if let converted = convertedArray[1] as? AddOperation {
-                XCTAssertEqual(addOperation.getStructureAsString(), converted.getStructureAsString())
-                XCTAssertEqual(addOperation.getValue().toJSON(), converted.getValue().toJSON())
-                XCTAssertEqual(addOperation.getPrevCreatedAt(), converted.getPrevCreatedAt())
-                XCTAssertEqual(addOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
-                XCTAssertEqual(addOperation.getExecutedAt(), converted.getExecutedAt())
-                XCTAssertEqual(addOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+                XCTAssertEqual(addOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(addOperation.value.toJSON(), converted.value.toJSON())
+                XCTAssertEqual(addOperation.previousCreatedAt, converted.previousCreatedAt)
+                XCTAssertEqual(addOperation.effectedCreatedAt, converted.effectedCreatedAt)
+                XCTAssertEqual(addOperation.executedAt, converted.executedAt)
+                XCTAssertEqual(addOperation.parentCreatedAt, converted.parentCreatedAt)
             } else {
                 XCTFail("Operation Type mismatch!")
             }
 
             if let converted = convertedArray[2] as? MoveOperation {
-                XCTAssertEqual(moveOperation.getStructureAsString(), converted.getStructureAsString())
-                XCTAssertEqual(moveOperation.getPrevCreatedAt(), converted.getPrevCreatedAt())
-                XCTAssertEqual(moveOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
-                XCTAssertEqual(moveOperation.getCreatedAt(), converted.getCreatedAt())
-                XCTAssertEqual(moveOperation.getExecutedAt(), converted.getExecutedAt())
-                XCTAssertEqual(moveOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+                XCTAssertEqual(moveOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(moveOperation.previousCreatedAt, converted.previousCreatedAt)
+                XCTAssertEqual(moveOperation.effectedCreatedAt, converted.effectedCreatedAt)
+                XCTAssertEqual(moveOperation.createdAt, converted.createdAt)
+                XCTAssertEqual(moveOperation.executedAt, converted.executedAt)
+                XCTAssertEqual(moveOperation.parentCreatedAt, converted.parentCreatedAt)
             } else {
                 XCTFail("Operation Type mismatch!")
             }
 
             if let converted = convertedArray[3] as? RemoveOperation {
-                XCTAssertEqual(removeOperation.getStructureAsString(), converted.getStructureAsString())
-                XCTAssertEqual(removeOperation.getEffectedCreatedAt(), converted.getEffectedCreatedAt())
-                XCTAssertEqual(removeOperation.getCreatedAt(), converted.getCreatedAt())
-                XCTAssertEqual(removeOperation.getExecutedAt(), converted.getExecutedAt())
-                XCTAssertEqual(removeOperation.getParentCreatedAt(), converted.getParentCreatedAt())
+                XCTAssertEqual(removeOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(removeOperation.effectedCreatedAt, converted.effectedCreatedAt)
+                XCTAssertEqual(removeOperation.createdAt, converted.createdAt)
+                XCTAssertEqual(removeOperation.executedAt, converted.executedAt)
+                XCTAssertEqual(removeOperation.parentCreatedAt, converted.parentCreatedAt)
             } else {
                 XCTFail("Operation Type mismatch!")
             }

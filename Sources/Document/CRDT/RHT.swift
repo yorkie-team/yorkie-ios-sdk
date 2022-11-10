@@ -20,35 +20,14 @@ import Foundation
  * `RHTNode` is a node of RHT(Replicated Hashtable).
  */
 struct RHTNode {
-    private var key: String
-    private var value: String
-    private var updatedAt: TimeTicket
+    fileprivate var key: String
+    fileprivate var value: String
+    fileprivate var updatedAt: TimeTicket
 
     init(key: String, value: String, updatedAt: TimeTicket) {
         self.key = key
         self.value = value
         self.updatedAt = updatedAt
-    }
-
-    /**
-     * `getKey` returns a key of node.
-     */
-    func getKey() -> String {
-        return self.key
-    }
-
-    /**
-     * `getValue` returns a value of node.
-     */
-    func getValue() -> String {
-        return self.value
-    }
-
-    /**
-     * `getUpdatedAt `returns updated time of node.
-     */
-    func getUpdatedAt() -> TimeTicket {
-        return self.updatedAt
     }
 }
 
@@ -65,7 +44,7 @@ class RHT {
     func set(key: String, value: String, executedAt: TimeTicket) {
         let previous = self.nodeMapByKey[key]
 
-        if let previous, executedAt.after(previous.getUpdatedAt()) == false {
+        if let previous, executedAt.after(previous.updatedAt) == false {
             return
         }
 
@@ -90,7 +69,7 @@ class RHT {
             throw YorkieError.unexpected(message: log)
         }
 
-        return node.getValue()
+        return node.value
     }
 
     /**
@@ -99,7 +78,7 @@ class RHT {
     func deepcopy() -> RHT {
         let rht = RHT()
         self.nodeMapByKey.forEach {
-            rht.set(key: $1.getKey(), value: $1.getValue(), executedAt: $1.getUpdatedAt())
+            rht.set(key: $1.key, value: $1.value, executedAt: $1.updatedAt)
         }
         return rht
     }
@@ -110,7 +89,7 @@ class RHT {
     func toJSON() -> String {
         var result = [String]()
         self.nodeMapByKey.forEach { (key: String, node: RHTNode) in
-            result.append("\"\(key)\":\"\(node.getValue().escaped())\"")
+            result.append("\"\(key)\":\"\(node.value.escaped())\"")
         }
 
         return "{\(result.joined(separator: ","))}"
@@ -122,7 +101,7 @@ class RHT {
     func toObject() -> [String: String] {
         var result = [String: String]()
         self.nodeMapByKey.forEach { (key: String, node: RHTNode) in
-            result[key] = node.getValue()
+            result[key] = node.value
         }
 
         return result
