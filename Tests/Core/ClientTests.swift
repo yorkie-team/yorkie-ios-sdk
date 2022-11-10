@@ -52,7 +52,9 @@ class ClientTests: XCTestCase {
             XCTFail(error.localizedDescription)
         }
 
-        XCTAssertTrue(target.isActive)
+        var isActive = await target.isActive
+
+        XCTAssertTrue(isActive)
         XCTAssertEqual(target.key, clientKey)
         XCTAssert(status == .activated)
 
@@ -61,7 +63,10 @@ class ClientTests: XCTestCase {
         } catch {
             XCTFail(error.localizedDescription)
         }
-        XCTAssertFalse(target.isActive)
+
+        isActive = await target.isActive
+
+        XCTAssertFalse(isActive)
         XCTAssert(status == .deactivated)
     }
 
@@ -91,12 +96,17 @@ class ClientTests: XCTestCase {
 
         try await target.activate()
 
-        XCTAssertTrue(target.isActive)
+        var isActive = await target.isActive
+
+        XCTAssertTrue(isActive)
         XCTAssertFalse(target.key.isEmpty)
         XCTAssert(status == .activated)
 
         try await target.deactivate()
-        XCTAssertFalse(target.isActive)
+
+        isActive = await target.isActive
+
+        XCTAssertFalse(isActive)
         XCTAssert(status == .deactivated)
     }
 
@@ -132,7 +142,9 @@ class ClientTests: XCTestCase {
             XCTFail(error.localizedDescription)
         }
 
-        XCTAssertTrue(target.isActive)
+        var isActive = await target.isActive
+
+        XCTAssertTrue(isActive)
         XCTAssertEqual(target.key, clientId)
         XCTAssert(status == .activated)
 
@@ -144,7 +156,7 @@ class ClientTests: XCTestCase {
             XCTFail(error.localizedDescription)
         }
 
-        //        sleep(60)
+        try await Task.sleep(nanoseconds: 1_000_000_000)
 
         do {
             try await target.detach(doc)
@@ -157,7 +169,10 @@ class ClientTests: XCTestCase {
         } catch {
             XCTFail(error.localizedDescription)
         }
-        XCTAssertFalse(target.isActive)
+
+        isActive = await target.isActive
+
+        XCTAssertFalse(isActive)
         XCTAssert(status == .deactivated)
     }
 }
