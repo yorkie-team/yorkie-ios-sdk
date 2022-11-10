@@ -108,18 +108,18 @@ class Primitive: CRDTElement {
             var valueInInt = Int(exactly: NSNumber(value: value))
             return Data(bytes: &valueInInt, count: MemoryLayout.size(ofValue: valueInInt))
         case .integer(let value):
-            return withUnsafeBytes(of: value.bigEndian) { Data($0) }
+            return withUnsafeBytes(of: value.littleEndian) { Data($0) }
         case .double(let value):
-            return withUnsafeBytes(of: value.bitPattern.bigEndian) { Data($0) }
+            return withUnsafeBytes(of: value.bitPattern.littleEndian) { Data($0) }
         case .string(let value):
             return value.data(using: .utf8) ?? Data()
         case .long(let value):
-            return withUnsafeBytes(of: value.bigEndian) { Data($0) }
+            return withUnsafeBytes(of: value.littleEndian) { Data($0) }
         case .bytes(let value):
             return value
         case .date(let value):
             let milliseconds = value.millisecondTimeIntervalSince1970
-            return withUnsafeBytes(of: milliseconds.bigEndian) { Data($0) }
+            return withUnsafeBytes(of: milliseconds.littleEndian) { Data($0) }
         }
     }
 }
