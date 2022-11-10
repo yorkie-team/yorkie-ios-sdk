@@ -19,11 +19,11 @@ import Foundation
 /**
  * `Change` represents a unit of modification in the document.
  */
-class Change {
+struct Change {
     private var id: ChangeID
 
     // `operations` represent a series of user edits.
-    private let operations: [Operation]
+    private var operations: [Operation]
 
     // `message` is used to save a description of the change.
     private let message: String?
@@ -58,11 +58,14 @@ class Change {
     /**
      * `setActor` sets the given actor.
      */
-    func setActor(_ actorID: ActorID) {
-        self.operations.forEach {
-            $0.setActor(actorID)
+    mutating func setActor(_ actorID: ActorID) {
+        let operations = self.operations.map {
+            var new = $0
+            new.setActor(actorID)
+            return new
         }
 
+        self.operations = operations
         self.id.setActor(actorID)
     }
 

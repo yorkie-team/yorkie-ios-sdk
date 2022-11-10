@@ -19,7 +19,7 @@ import Foundation
 /**
  * `RemoveOperation` is an operation representing removes an element from Container.
  */
-class RemoveOperation: Operation {
+struct RemoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
     private var createdAt: TimeTicket

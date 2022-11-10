@@ -148,9 +148,14 @@ public actor Document {
      *
      */
     func setActor(_ actorID: ActorID) {
-        for change in self.localChanges {
-            change.setActor(actorID)
+        let changes = self.localChanges.map {
+            var new = $0
+            new.setActor(actorID)
+            return new
         }
+
+        self.localChanges = changes
+
         self.changeID.setActor(actorID)
 
         // TODOs also apply into root.
