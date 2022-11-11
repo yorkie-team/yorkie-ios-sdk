@@ -41,7 +41,7 @@ enum Converter {
         case .bytes:
             return .bytes(data)
         case .date:
-            let milliseconds = Int(littleEndian: data.withUnsafeBytes { $0.load(as: Int.self) })
+            let milliseconds = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
             return .date(Date(timeIntervalSince1970: TimeInterval(Double(milliseconds) / 1000)))
         default:
             throw YorkieError.unimplemented(message: String(describing: valueType))

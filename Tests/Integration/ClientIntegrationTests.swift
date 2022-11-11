@@ -135,30 +135,50 @@ final class ClientIntegrationTests: XCTestCase {
 
         await self.d1.update { root in
             root.k1 = "v1"
+            root.k2 = "v2"
+            root.k3 = "v3"
         }
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
         var result = await d2.getRoot().get(key: "k1") as? String
         XCTAssert(result == "v1")
-
-        await self.d1.update { root in
-            root.k2 = "v2"
-        }
-
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-
         result = await self.d2.getRoot().get(key: "k2") as? String
         XCTAssert(result == "v2")
+        result = await self.d2.getRoot().get(key: "k3") as? String
+        XCTAssert(result == "v3")
 
         await self.d1.update { root in
-            root.k3 = "v3"
+            root.integer = Int32.max
+            root.long = Int64.max
+            root.double = Double.pi
         }
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        result = await self.d2.getRoot().get(key: "k3") as? String
-        XCTAssert(result == "v3")
+        let resultInteger = await self.d2.getRoot().get(key: "integer") as? Int32
+        XCTAssert(resultInteger == Int32.max)
+        let resultLong = await self.d2.getRoot().get(key: "long") as? Int64
+        XCTAssert(resultLong == Int64.max)
+        let resultDouble = await self.d2.getRoot().get(key: "double") as? Double
+        XCTAssert(resultDouble == Double.pi)
+
+        let curr = Date()
+
+        await self.d1.update { root in
+            root.true = true
+            root.false = false
+            root.date = curr
+        }
+
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+
+        let resultTrue = await self.d2.getRoot().get(key: "true") as? Bool
+        XCTAssert(resultTrue == true)
+        let resultFalse = await self.d2.getRoot().get(key: "false") as? Bool
+        XCTAssert(resultFalse == false)
+        let resultDate = await self.d2.getRoot().get(key: "date") as? Date
+        XCTAssert(resultDate?.trimedLessThanMilliseconds == curr.trimedLessThanMilliseconds)
 
         try await self.c1.detach(self.d1)
         try await self.c2.detach(self.d2)
