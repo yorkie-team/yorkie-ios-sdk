@@ -44,7 +44,7 @@ class Primitive: CRDTElement {
         switch value {
         case .date(let dateValue):
             // Trim the less than a millisecond
-            self.value = .date(Date(timeIntervalSince1970: Double(dateValue.millisecondTimeIntervalSince1970) / 1000))
+            self.value = .date(dateValue.trimedLessThanMilliseconds)
         default:
             self.value = value
         }
@@ -118,7 +118,7 @@ class Primitive: CRDTElement {
         case .bytes(let value):
             return value
         case .date(let value):
-            let milliseconds = value.millisecondTimeIntervalSince1970
+            let milliseconds = value.millisecondsTimeIntervalSince1970
             return withUnsafeBytes(of: milliseconds.littleEndian) { Data($0) }
         }
     }
@@ -148,7 +148,7 @@ extension Primitive {
         case .bytes(let value):
             return "\(value)"
         case .date(let value):
-            return "\(value.millisecondTimeIntervalSince1970)"
+            return "\(value.millisecondsTimeIntervalSince1970)"
         }
     }
 
@@ -169,12 +169,16 @@ extension Primitive {
     }
 }
 
-private extension Date {
+extension Date {
     /**
-     * `millisecondTimeIntervalSince1970` returns the number representing the milliseconds elapsed between 1 January 1970 00:00:00 UTC and the given date.
+     * `millisecondsTimeIntervalSince1970` returns the number representing the milliseconds elapsed between 1 January 1970 00:00:00 UTC and the given date.
      *  It's simmilar getTime() in javascript
      */
-    var millisecondTimeIntervalSince1970: Int {
-        Int(floor(self.timeIntervalSince1970 * 1000))
+    var millisecondsTimeIntervalSince1970: Int64 {
+        Int64(floor(self.timeIntervalSince1970 * 1000))
+    }
+
+    var trimedLessThanMilliseconds: Date {
+        Date(timeIntervalSince1970: TimeInterval(Double(self.millisecondsTimeIntervalSince1970) / 1000))
     }
 }
