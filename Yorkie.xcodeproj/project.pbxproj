@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
+		9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC736292273D200C89478 /* CRDTCounter.swift */; };
+		9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC738292273E400C89478 /* CRDTCountTests.swift */; };
+		9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73B2922741200C89478 /* IncreaseOperation.swift */; };
 		9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */; };
 		9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */; };
 		9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */; };
@@ -109,6 +112,9 @@
 		96DA808B28C5B7B400E2C1DA /* YorkieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YorkieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A4DC736292273D200C89478 /* CRDTCounter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CRDTCounter.swift; sourceTree = "<group>"; };
+		9A4DC738292273E400C89478 /* CRDTCountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CRDTCountTests.swift; sourceTree = "<group>"; };
+		9A4DC73B2922741200C89478 /* IncreaseOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IncreaseOperation.swift; sourceTree = "<group>"; };
 		9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClientEvent.swift; sourceTree = "<group>"; };
 		9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Codable+Extension.swift"; sourceTree = "<group>"; };
 		9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientIntegrationTests.swift; sourceTree = "<group>"; };
@@ -300,6 +306,7 @@
 		CE3EC96F28D40415009471BC /* CRDT */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC738292273E400C89478 /* CRDTCountTests.swift */,
 				CE3EC97128D4042D009471BC /* CRDTElementTests.swift */,
 				CE7B997128E1750000D56198 /* PrimitiveTests.swift */,
 				CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */,
@@ -421,6 +428,7 @@
 		CE8C22E728C9E55800432DE5 /* CRDT */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC736292273D200C89478 /* CRDTCounter.swift */,
 				CE3EC96628D30E74009471BC /* CRDTElement.swift */,
 				CE3EC97428D41903009471BC /* Primitive.swift */,
 				CE7B997928E2820200D56198 /* RGATreeList.swift */,
@@ -449,6 +457,7 @@
 		CE8C22E928C9E56400432DE5 /* Operation */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC73B2922741200C89478 /* IncreaseOperation.swift */,
 				CE8C22F428C9E88500432DE5 /* Operation.swift */,
 				CE8ED31528F55BF7009A5419 /* SetOperation.swift */,
 				CE8ED31B28F56506009A5419 /* RemoveOperation.swift */,
@@ -715,6 +724,7 @@
 				CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */,
 				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
+				9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */,
 				CE72E85228EE531C00D1331C /* Collection+Extensions.swift in Sources */,
 				CE3EC97528D41903009471BC /* Primitive.swift in Sources */,
 				CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */,
@@ -749,6 +759,7 @@
 				CE8ED31628F55BF7009A5419 /* SetOperation.swift in Sources */,
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
 				CEBC840A2909252000781AE9 /* ElementConverter.swift in Sources */,
+				9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */,
 				CE8ED31C28F56506009A5419 /* RemoveOperation.swift in Sources */,
 				CEDDE26E2914EAD00032B16A /* YorkieJSONObjectable.swift in Sources */,
 			);
@@ -779,6 +790,7 @@
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
 				CE8BB74628FE5AC40020F62A /* ChangePackTests.swift in Sources */,
+				9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */,
 				CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */,
 				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */,

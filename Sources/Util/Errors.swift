@@ -20,4 +20,5 @@ enum YorkieError: Error {
     case unexpected(message: String)
     case unimplemented(message: String)
     case clientNotActive(message: String)
+    case type(message: String)
 }
