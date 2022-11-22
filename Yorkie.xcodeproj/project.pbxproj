@@ -250,12 +250,8 @@
 		96DA808F28C5B7B400E2C1DA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				CE0EE07A292CD14100CB81F4 /* Unit */,
 				9ADECA002919FC1A006BA331 /* Integration */,
-				CE3EC97028D40421009471BC /* Document */,
-				CE6071EB28C5ECA900A8783E /* API */,
-				CE8C230828D15F5200432DE5 /* Core */,
-				CE3EC94A28D1885F009471BC /* Util */,
-				CECCCB8128C96C8500544204 /* TestUtils */,
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
 			);
 			path = Tests;
@@ -267,6 +263,18 @@
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
 			);
 			path = Integration;
+			sourceTree = "<group>";
+		};
+		CE0EE07A292CD14100CB81F4 /* Unit */ = {
+			isa = PBXGroup;
+			children = (
+				CE3EC97028D40421009471BC /* Document */,
+				CE6071EB28C5ECA900A8783E /* API */,
+				CE8C230828D15F5200432DE5 /* Core */,
+				CE3EC94A28D1885F009471BC /* Util */,
+				CECCCB8128C96C8500544204 /* TestUtils */,
+			);
+			path = Unit;
 			sourceTree = "<group>";
 		};
 		CE3EC94928D18720009471BC /* Recovered References */ = {
