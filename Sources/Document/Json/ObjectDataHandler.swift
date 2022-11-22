@@ -44,6 +44,10 @@ class ObjectDataHandler {
             self.setValue(key: key, value: value)
         } else if let value = value as? CRDTArray {
             self.setValue(key: key, value: value)
+        } else if let value = value as? CRDTCounter<Int32> {
+            self.setValue(key: key, value: value)
+        } else if let value = value as? CRDTCounter<Int64> {
+            self.setValue(key: key, value: value)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
         }
@@ -107,6 +111,16 @@ class ObjectDataHandler {
     }
 
     private func setValue(key: String, value: CRDTArray) {
+        self.setAndRegister(key: key, value: value)
+
+        let operation = SetOperation(key: key,
+                                     value: value,
+                                     parentCreatedAt: self.target.createdAt,
+                                     executedAt: self.context.issueTimeTicket())
+        self.context.push(operation: operation)
+    }
+
+    private func setValue<T: YorkieCountable>(key: String, value: CRDTCounter<T>) {
         self.setAndRegister(key: key, value: value)
 
         let operation = SetOperation(key: key,

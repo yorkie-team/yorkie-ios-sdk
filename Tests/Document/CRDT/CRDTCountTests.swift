@@ -19,22 +19,19 @@ import XCTest
 
 final class CRDTCountTests: XCTestCase {
     func test_can_increase_numeric_data_of_counter() throws {
-        let double = CRDTCounter(value: .double(10), createdAt: TimeTicket.initial)
-        let long = CRDTCounter(value: .long(100), createdAt: TimeTicket.initial)
+        let int = CRDTCounter(value: Int32(10), createdAt: TimeTicket.initial)
+        let long = CRDTCounter(value: Int64(100), createdAt: TimeTicket.initial)
 
-        let doubleOperand = Primitive(value: .double(10), createdAt: TimeTicket.initial)
+        let intOperand = Primitive(value: .integer(10), createdAt: TimeTicket.initial)
         let longOperand = Primitive(value: .long(100), createdAt: TimeTicket.initial)
 
-        try double.increase(doubleOperand)
-        try double.increase(longOperand)
-        XCTAssert(double.value == .double(120))
-
-        try long.increase(doubleOperand)
+        try int.increase(intOperand)
         try long.increase(longOperand)
-        XCTAssert(long.value == .long(210))
+        XCTAssert(int.value == 20)
+        XCTAssert(long.value == 200)
 
         // error process test
-        let errorTest = { (couter: CRDTCounter, operand: Primitive) in
+        let errorTest = { (couter: CRDTCounter<Int64>, operand: Primitive) in
             var failed = false
             do {
                 try couter.increase(operand)
@@ -50,23 +47,17 @@ final class CRDTCountTests: XCTestCase {
         let data = Primitive(value: .bytes(Data()), createdAt: TimeTicket.initial)
         let date = Primitive(value: .date(Date()), createdAt: TimeTicket.initial)
 
-        errorTest(double, str)
-        errorTest(double, bool)
-        errorTest(double, data)
-        errorTest(double, date)
-
-        XCTAssert(double.value == .double(120))
-        XCTAssert(long.value == .long(210))
+        errorTest(long, str)
+        errorTest(long, bool)
+        errorTest(long, data)
+        errorTest(long, date)
 
         // subtraction test
         let negative = Primitive(value: .integer(-50), createdAt: TimeTicket.initial)
         let negativeLong = Primitive(value: .long(-100), createdAt: TimeTicket.initial)
-        try double.increase(negative)
-        try double.increase(negativeLong)
-        XCTAssert(double.value == .double(-30))
-
-        try long.increase(negative)
+        try int.increase(negative)
         try long.increase(negativeLong)
-        XCTAssert(long.value == .long(60))
+        XCTAssert(int.value == -30)
+        XCTAssert(long.value == 100)
     }
 }

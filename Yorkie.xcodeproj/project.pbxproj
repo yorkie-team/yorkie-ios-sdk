@@ -12,6 +12,8 @@
 		9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC736292273D200C89478 /* CRDTCounter.swift */; };
 		9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC738292273E400C89478 /* CRDTCountTests.swift */; };
 		9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73B2922741200C89478 /* IncreaseOperation.swift */; };
+		9A4DC73E2923203700C89478 /* JSONCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73D2923203700C89478 /* JSONCounter.swift */; };
+		9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */; };
 		9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */; };
 		9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */; };
 		9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */; };
@@ -115,6 +117,8 @@
 		9A4DC736292273D200C89478 /* CRDTCounter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CRDTCounter.swift; sourceTree = "<group>"; };
 		9A4DC738292273E400C89478 /* CRDTCountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CRDTCountTests.swift; sourceTree = "<group>"; };
 		9A4DC73B2922741200C89478 /* IncreaseOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IncreaseOperation.swift; sourceTree = "<group>"; };
+		9A4DC73D2923203700C89478 /* JSONCounter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONCounter.swift; sourceTree = "<group>"; };
+		9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CounterIntegrationTests.swift; sourceTree = "<group>"; };
 		9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClientEvent.swift; sourceTree = "<group>"; };
 		9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Codable+Extension.swift"; sourceTree = "<group>"; };
 		9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientIntegrationTests.swift; sourceTree = "<group>"; };
@@ -270,6 +274,7 @@
 		9ADECA002919FC1A006BA331 /* Integration */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */,
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
 			);
 			path = Integration;
@@ -450,6 +455,7 @@
 				CEFF0014290120000020561A /* JSONObject.swift */,
 				CE9557CC2907523A00DF4DFA /* JSONArray.swift */,
 				CE7B996F28E1453E00D56198 /* Strings.swift */,
+				9A4DC73D2923203700C89478 /* JSONCounter.swift */,
 			);
 			path = Json;
 			sourceTree = "<group>";
@@ -748,6 +754,7 @@
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
 				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
+				9A4DC73E2923203700C89478 /* JSONCounter.swift in Sources */,
 				CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */,
 				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
 				CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */,
@@ -776,6 +783,7 @@
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */,
 				CE8BB73B28FE2BE90020F62A /* ChangeIDTests.swift in Sources */,
+				9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */,
 				CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
 				9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */,

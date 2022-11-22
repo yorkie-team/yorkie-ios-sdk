@@ -47,7 +47,11 @@ struct IncreaseOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        if let counter = parentObject as? CRDTCounter {
+        if let counter = parentObject as? CRDTCounter<Int32> {
+            if let value = self.value.deepcopy() as? Primitive {
+                try counter.increase(value)
+            }
+        } else if let counter = parentObject as? CRDTCounter<Int64> {
             if let value = self.value.deepcopy() as? Primitive {
                 try counter.increase(value)
             }

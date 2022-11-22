@@ -47,23 +47,18 @@ enum Converter {
             throw YorkieError.unimplemented(message: String(describing: valueType))
         }
     }
-    
-    static func countValueFrom(_ valueType: PbValueType, data: Data) throws -> CounterValue {
+
+    static func countValueFrom(_ valueType: PbValueType, data: Data) throws -> any YorkieCountable {
         switch valueType {
         case .integerCnt:
-            let count = Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
-            return .integer(count)
+            return Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
         case .longCnt:
-            let count = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
-            return .long(count)
-        case .doubleCnt:
-            let count = Double(bitPattern: UInt64(littleEndian: data.withUnsafeBytes { $0.load(as: UInt64.self) }))
-            return .double(count)
+            return Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
         default:
             throw YorkieError.unimplemented(message: String(describing: valueType))
         }
     }
-    
+
     /**
      * `toValueType` converts the given model to Protobuf format.
      */
@@ -216,14 +211,11 @@ extension Converter {
     /**
      * `toCounterType` converts the given model to Protobuf format.
      */
-    static func toCounterType(_ valueType: CounterValue) -> PbValueType {
-        switch valueType {
-        case .integer:
+    static func toCounterType(_ valueType: any YorkieCountable) -> PbValueType {
+        if valueType is Int32 {
             return .integerCnt
-        case .long:
+        } else {
             return .longCnt
-        case .double:
-            return .doubleCnt
         }
     }
 }
@@ -240,9 +232,11 @@ extension Converter {
             pbElementSimple.type = .jsonObject
         } else if element is CRDTArray {
             pbElementSimple.type = .jsonArray
+            // TODO: CRDTText is not implemented!
 //        } else if let element = element as? CRDTText {
 //            pbElementSimple.setType(PbValueType.VALUE_TYPE_TEXT);
 //            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
+            // TODO: CRDTRichText is not implemented!
 //        } else if let element = element as? CRDTRichText {
 //            pbElementSimple.setType(PbValueType.VALUE_TYPE_RICH_TEXT);
 //            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
@@ -250,8 +244,11 @@ extension Converter {
             let primitive = element.value
             pbElementSimple.type = toValueType(primitive)
             pbElementSimple.value = element.toBytes()
-        } else if let counter = element as? CRDTCounter {
-            pbElementSimple.type = toCounterType(counter.value)
+        } else if let counter = element as? CRDTCounter<Int32> {
+            pbElementSimple.type = .integerCnt
+            pbElementSimple.value = counter.toBytes()
+        } else if let counter = element as? CRDTCounter<Int64> {
+            pbElementSimple.type = .longCnt
             pbElementSimple.value = counter.toBytes()
         } else {
             throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
@@ -287,8 +284,18 @@ extension Converter {
 //            );
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
             return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
-        case .integerCnt, .doubleCnt, .longCnt:
-            return CRDTCounter(value: try countValueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
+        case .integerCnt:
+            guard let value = try countValueFrom(pbElementSimple.type, data: pbElementSimple.value) as? Int32 else {
+                throw YorkieError.unexpected(message: "unexpected counter value type")
+            }
+
+            return CRDTCounter<Int32>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
+        case .longCnt:
+            guard let value = try countValueFrom(pbElementSimple.type, data: pbElementSimple.value) as? Int64 else {
+                throw YorkieError.unexpected(message: "unexpected counter value type")
+            }
+
+            return CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
         default:
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
         }
@@ -756,7 +763,7 @@ extension Converter {
     /**
      * `toCounter` converts the given model to Protobuf format.
      */
-    static func toCounter(_ counter: CRDTCounter) -> PbJSONElement {
+    static func toCounter<T: YorkieCountable>(_ counter: CRDTCounter<T>) -> PbJSONElement {
         var pbCounter = PbJSONElement.Counter()
         pbCounter.type = toCounterType(counter.value)
         pbCounter.value = counter.toBytes()
@@ -780,11 +787,25 @@ extension Converter {
     /**
      * `fromCounter` converts the given Protobuf format to model format.
      */
-    static func fromCounter(_ pbCounter: PbJSONElement.Counter) throws -> CRDTCounter {
-        let counter = CRDTCounter(value: try countValueFrom(pbCounter.type, data: pbCounter.value), createdAt: fromTimeTicket(pbCounter.createdAt))
-        counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
-        counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
-        return counter;
+    static func fromCounter(_ pbCounter: PbJSONElement.Counter) throws -> CRDTElement {
+        let value = try countValueFrom(pbCounter.type, data: pbCounter.value)
+
+        switch pbCounter.type {
+        case .integerCnt:
+            let counter = CRDTCounter<Int32>(value: value as! Int32, createdAt: fromTimeTicket(pbCounter.createdAt))
+            counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
+            counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
+
+            return counter
+        case .longCnt:
+            let counter = CRDTCounter<Int64>(value: value as! Int64, createdAt: fromTimeTicket(pbCounter.createdAt))
+            counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
+            counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
+
+            return counter
+        default:
+            throw YorkieError.unimplemented(message: "\(pbCounter.type) is not implemented.")
+        }
     }
 
     /**
@@ -800,8 +821,10 @@ extension Converter {
             // TODO: CRDTText is not implemented!
 //        } else if let element = element as? CRDTText {
 //            return toText(element);
-        } else if let element = element as? CRDTCounter {
-            return toCounter(element);
+        } else if let element = element as? CRDTCounter<Int32> {
+            return toCounter(element)
+        } else if let element = element as? CRDTCounter<Int64> {
+            return toCounter(element)
         } else {
             throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
         }

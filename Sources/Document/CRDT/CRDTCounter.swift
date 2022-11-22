@@ -16,25 +16,19 @@
 
 import Foundation
 
-enum CounterValue: Equatable {
-    case integer(Int32)
-    case long(Int64)
-    case double(Double)
-}
-
 /**
  * `CounterInternal` represents changeable number data type.
  *
  * @internal
  */
-class CRDTCounter: CRDTElement {
+class CRDTCounter<T: YorkieCountable>: CRDTElement {
     var createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
-    var value: CounterValue
+    var value: T
 
-    init(value: CounterValue, createdAt: TimeTicket) {
+    init(value: T, createdAt: TimeTicket) {
         self.createdAt = createdAt
         self.value = value
     }
@@ -58,14 +52,7 @@ class CRDTCounter: CRDTElement {
      * `toBytes` creates an array representing the value.
      */
     public func toBytes() -> Data {
-        switch self.value {
-        case .integer(let int32Value):
-            return withUnsafeBytes(of: int32Value.littleEndian) { Data($0) }
-        case .long(let int64Value):
-            return withUnsafeBytes(of: int64Value.littleEndian) { Data($0) }
-        case .double(let doubleValue):
-            return withUnsafeBytes(of: doubleValue.bitPattern.littleEndian) { Data($0) }
-        }
+        return withUnsafeBytes(of: self.value.littleEndian) { Data($0) }
     }
 
     /**
@@ -73,30 +60,21 @@ class CRDTCounter: CRDTElement {
      */
     @discardableResult
     public func increase(_ by: Primitive) throws -> CRDTCounter {
-        guard by.isNumericType else {
-            throw YorkieError.type(message: "Unsupported type of value: \(type(of: by.value))")
-        }
-
-        let byValue: Double
-
         switch by.value {
         case .integer(let int32Value):
-            byValue = Double(int32Value)
+            guard let value = int32Value as? T else {
+                throw YorkieError.type(message: "Value Type mismatch: \(type(of: value)), \(T.self)")
+            }
+
+            self.value = self.value.addingReportingOverflow(value).partialValue
         case .long(let int64Value):
-            byValue = Double(int64Value)
-        case .double(let doubleValue):
-            byValue = doubleValue
+            guard let value = int64Value as? T else {
+                throw YorkieError.type(message: "Value Type mismatch: \(type(of: by.value))")
+            }
+
+            self.value = self.value.addingReportingOverflow(value).partialValue
         default:
             throw YorkieError.type(message: "Unsupported type of value: \(type(of: by.value))")
-        }
-
-        switch self.value {
-        case .integer(let int32Value):
-            self.value = .integer(int32Value + Int32(byValue))
-        case .long(let int64Value):
-            self.value = .long(int64Value + Int64(byValue))
-        case .double(let doubleValue):
-            self.value = .double(doubleValue + byValue)
         }
 
         return self
