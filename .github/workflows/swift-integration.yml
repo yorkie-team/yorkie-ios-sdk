@@ -1,4 +1,4 @@
-name: Swift CI
+name: Integration tests
 
 on:
   push:
