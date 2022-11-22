@@ -22,6 +22,12 @@ import Foundation
  */
 @dynamicMemberLookup
 public class JSONObject {
+    private static let keySeparator = "/.^/"
+    private let reservedCharacterForKey = JSONObject.keySeparator
+    private func isValidKey(_ key: String) -> Bool {
+        return key.contains(self.reservedCharacterForKey) == false
+    }
+
     private var target: CRDTObject!
     private var context: ChangeContext!
 
@@ -39,6 +45,11 @@ public class JSONObject {
     }
 
     func set<T>(key: String, value: T) {
+        guard self.isValidKey(key) else {
+            Logger.error("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
+            return
+        }
+
         if let optionalValue = value as? OptionalValue, optionalValue.isNil {
             self.setValueNull(key: key)
         } else if let value = value as? Bool {
@@ -79,7 +90,7 @@ public class JSONObject {
         }
     }
 
-    private func setAndRegister(key: String, value: CRDTElement) {
+    private func setToCRDTObject(key: String, value: CRDTElement) {
         let removed = self.target.set(key: key, value: value)
         self.context.registerElement(value, parent: self.target)
         if let removed {
@@ -89,7 +100,7 @@ public class JSONObject {
 
     private func setPrimitive(key: String, value: PrimitiveValue) {
         let primitive = Primitive(value: value, createdAt: context.issueTimeTicket())
-        self.setAndRegister(key: key, value: primitive)
+        self.setToCRDTObject(key: key, value: primitive)
 
         let operation = SetOperation(key: key,
                                      value: primitive,
@@ -131,7 +142,7 @@ public class JSONObject {
     }
 
     private func setValue(key: String, value: CRDTObject) {
-        self.setAndRegister(key: key, value: value)
+        self.setToCRDTObject(key: key, value: value)
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
@@ -141,7 +152,7 @@ public class JSONObject {
     }
 
     private func setValue(key: String, value: CRDTArray) {
-        self.setAndRegister(key: key, value: value)
+        self.setToCRDTObject(key: key, value: value)
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
@@ -157,6 +168,22 @@ public class JSONObject {
         }
 
         return toJSONElement(from: value)
+    }
+
+    /// Search the value by separating the key with dot and return it.
+    func get(keyPath: String) -> Any? {
+        let keys = keyPath.components(separatedBy: JSONObject.keySeparator)
+        var nested: JSONObject = self
+        for key in keys {
+            let value = nested.get(key: key)
+            if let jsonObject = value as? JSONObject {
+                nested = jsonObject
+            } else {
+                return value
+            }
+        }
+
+        return nested
     }
 
     public func remove(key: String) {
@@ -181,6 +208,10 @@ public class JSONObject {
         set {
             self.set(key: key, value: newValue)
         }
+    }
+
+    subscript(keyPath keyPath: String) -> Any? {
+        self.get(keyPath: keyPath)
     }
 
     /**
