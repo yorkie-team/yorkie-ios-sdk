@@ -28,7 +28,7 @@ final class ClientIntegrationTests: XCTestCase {
     var d1: Document!
     var d2: Document!
 
-    func skip_test_can_handle_sync() async throws {
+    func test_can_handle_sync() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
@@ -97,7 +97,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
-    func skip_test_can_handle_sync_auto() async throws {
+    func test_can_handle_sync_auto() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
@@ -188,7 +188,7 @@ final class ClientIntegrationTests: XCTestCase {
     }
 
     // swiftlint: disable force_cast
-    func skip_test_send_peer_changed_event_to_the_user_who_updated_presence() async throws {
+    func test_send_peer_changed_event_to_the_user_who_updated_presence() async throws {
         struct Cursor: Codable {
             // swiftlint: disable identifier_name
             var x: Int

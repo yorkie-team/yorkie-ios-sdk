@@ -25,10 +25,14 @@ let package = Package(
                       "API/V1/Protos"]
         ),
         .testTarget(
-            name: "YorkieTests",
+            name: "YorkieUnitTests",
             dependencies: ["Yorkie"],
-            path: "Tests",
-            exclude: ["Info.plist"]
+            path: "Tests/Unit"
+        ),
+        .testTarget(
+            name: "YorkieIntegrationTests",
+            dependencies: ["Yorkie"],
+            path: "Tests/Integration"
         )
     ]
 )
