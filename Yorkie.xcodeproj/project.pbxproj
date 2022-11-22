@@ -80,7 +80,7 @@
 		CEC631DE28F4F36100915A85 /* StringEscapingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */; };
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */; };
-		CEDDE26E2914EAD00032B16A /* YorkieJSONObjectable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE26D2914EAD00032B16A /* YorkieJSONObjectable.swift */; };
+		CEDDE26E2914EAD00032B16A /* JSONObjectable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */; };
 		CEDDE2722914EB5C0032B16A /* YorkieJSONObjectableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */; };
 		CEEB17E328C84D26004988DD /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E028C84D26004988DD /* yorkie.pb.swift */; };
 		CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB17E128C84D26004988DD /* resources.pb.swift */; };
@@ -180,7 +180,7 @@
 		CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringEscapingTests.swift; sourceTree = "<group>"; };
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObjectTests.swift; sourceTree = "<group>"; };
-		CEDDE26D2914EAD00032B16A /* YorkieJSONObjectable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieJSONObjectable.swift; sourceTree = "<group>"; };
+		CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONObjectable.swift; sourceTree = "<group>"; };
 		CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieJSONObjectableTests.swift; sourceTree = "<group>"; };
 		CEEB17DC28C84CC3004988DD /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
 		CEEB17DD28C84CC3004988DD /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
@@ -514,7 +514,7 @@
 		CEDDE26C2914EABA0032B16A /* Util */ = {
 			isa = PBXGroup;
 			children = (
-				CEDDE26D2914EAD00032B16A /* YorkieJSONObjectable.swift */,
+				CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -750,7 +750,7 @@
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
 				CEBC840A2909252000781AE9 /* ElementConverter.swift in Sources */,
 				CE8ED31C28F56506009A5419 /* RemoveOperation.swift in Sources */,
-				CEDDE26E2914EAD00032B16A /* YorkieJSONObjectable.swift in Sources */,
+				CEDDE26E2914EAD00032B16A /* JSONObjectable.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -16,14 +16,14 @@
 
 import Foundation
 
-/// ``YorkieJSONObjectable`` provide a way to make a dictionary including members of a type confirming ``YorkieJSONObjectable``.
-public protocol YorkieJSONObjectable: Codable {
-    /// The members of ``excludedLabels`` is not included in a dictionary made by ``toYorkieObject``.
+/// ``JSONObjectable`` provide a way to make a dictionary including members of a type confirming ``JSONObjectable``.
+public protocol JSONObjectable: Codable {
+    /// The members of ``JSONObjectable/excludedMembers`` is not included in a dictionary made by ``JSONObjectable/toJsonObject``.
     var excludedMembers: [String] { get }
 }
 
-public extension YorkieJSONObjectable {
-    /// ``toJsonObject`` make a dictionary including members of a type confirming ``YorkieObjectable``.
+public extension JSONObjectable {
+    /// ``toJsonObject`` make a dictionary including members of a type confirming ``JSONObjectable``.
     internal var toJsonObject: [String: Any] {
         guard let data = try? JSONEncoder().encode(self),
               let dictionary = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
@@ -34,7 +34,7 @@ public extension YorkieJSONObjectable {
         var result = [String: Any]()
         for (key, value) in dictionary {
             guard self.excludedMembers.contains(key) == false else { continue }
-            if let value = value as? YorkieJSONObjectable {
+            if let value = value as? JSONObjectable {
                 result[key] = value.toJsonObject
             } else if let value = value as? [Any] {
                 result[key] = value.toJsonArray
@@ -51,11 +51,11 @@ public extension YorkieJSONObjectable {
     }
 }
 
-/// ``toJsonArray`` provide a way to make a array including types confiming``YorkieJSONObjectable``, arrys, and values.
+/// ``toJsonArray`` provide a way to make an array including types confiming``JSONObjectable``, arrys, and values.
 internal extension Array {
     var toJsonArray: [Any] {
         self.map {
-            if let value = $0 as? YorkieJSONObjectable {
+            if let value = $0 as? JSONObjectable {
                 return value.toJsonObject
             } else if let value = $0 as? Array {
                 return value.toJsonArray
