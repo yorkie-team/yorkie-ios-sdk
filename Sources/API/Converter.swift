@@ -792,13 +792,19 @@ extension Converter {
 
         switch pbCounter.type {
         case .integerCnt:
-            let counter = CRDTCounter<Int32>(value: value as! Int32, createdAt: fromTimeTicket(pbCounter.createdAt))
+            guard let value = value as? Int32 else {
+                throw YorkieError.unexpected(message: "[\(pbCounter.type)] value is not Int32.")
+            }
+            let counter = CRDTCounter<Int32>(value: value, createdAt: fromTimeTicket(pbCounter.createdAt))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
             counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
 
             return counter
         case .longCnt:
-            let counter = CRDTCounter<Int64>(value: value as! Int64, createdAt: fromTimeTicket(pbCounter.createdAt))
+            guard let value = value as? Int64 else {
+                throw YorkieError.unexpected(message: "[\(pbCounter.type)] value is not Int64.")
+            }
+            let counter = CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbCounter.createdAt))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
             counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
 

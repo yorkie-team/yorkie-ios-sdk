@@ -76,7 +76,7 @@ final class CounterIntegrationTests: XCTestCase {
         XCTAssert(failedTestResult)
     }
 
-    func test_can_sync_counter() async throws {
+    func skip_test_can_sync_counter() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
@@ -135,7 +135,7 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
-    func test_can_sync_counter_with_Array() async throws {
+    func skip_test_can_sync_counter_with_array() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
