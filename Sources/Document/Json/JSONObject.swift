@@ -73,7 +73,7 @@ public class JSONObject {
             self.set(key: key, value: JSONObject())
             let jsonObject = self.get(key: key) as? JSONObject
             jsonObject?.set(value)
-        } else if let value = value as? YorkieJSONObjectable {
+        } else if let value = value as? JSONObjectable {
             self.set(key: key, value: JSONObject())
             let jsonObject = self.get(key: key) as? JSONObject
             jsonObject?.set(value.toJsonObject)

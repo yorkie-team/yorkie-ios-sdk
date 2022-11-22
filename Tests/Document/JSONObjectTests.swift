@@ -156,7 +156,7 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    private struct JsonObejctTestType: YorkieJSONObjectable {
+    private struct JsonObejctTestType: JSONObjectable {
         var id: Int64 = 100
         var type: String = "struct"
         var serial: Int32 = 1234
@@ -167,7 +167,7 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    private struct JsonArrayTestType: YorkieJSONObjectable {
+    private struct JsonArrayTestType: JSONObjectable {
         var id: Int64 = 200
     }
 
@@ -203,19 +203,19 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    private struct JSONObject0: YorkieJSONObjectable {
+    private struct JSONObject0: JSONObjectable {
         let first: JSONObject1
     }
 
-    private struct JSONObject1: YorkieJSONObjectable {
+    private struct JSONObject1: JSONObjectable {
         let second: JSONObject2
     }
 
-    private struct JSONObject2: YorkieJSONObjectable {
+    private struct JSONObject2: JSONObjectable {
         let third: JSONObject3
     }
 
-    private struct JSONObject3: YorkieJSONObjectable {
+    private struct JSONObject3: JSONObjectable {
         let value: String
     }
 
