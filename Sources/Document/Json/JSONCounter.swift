@@ -66,10 +66,6 @@ public class JSONCounter<T: YorkieCountable> {
             throw YorkieError.unexpected(message: log)
         }
 
-        guard type(of: value) == type(of: self._value) else {
-            throw YorkieError.type(message: "Type mismatch: \(type(of: value.self)), \(type(of: T.self))")
-        }
-
         guard let primitiveValue = Primitive.type(of: value) else {
             throw YorkieError.type(message: "Unsupported type of value: \(type(of: T.self))")
         }

@@ -149,27 +149,7 @@ public class JSONObject {
         self.setPrimitive(key: key, value: .date(value))
     }
 
-    private func setValue(key: String, value: CRDTObject) {
-        self.setToCRDTObject(key: key, value: value)
-
-        let operation = SetOperation(key: key,
-                                     value: value.deepcopy(),
-                                     parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
-        self.context.push(operation: operation)
-    }
-
-    private func setValue(key: String, value: CRDTArray) {
-        self.setToCRDTObject(key: key, value: value)
-
-        let operation = SetOperation(key: key,
-                                     value: value.deepcopy(),
-                                     parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
-        self.context.push(operation: operation)
-    }
-
-    private func setValue<T: YorkieCountable>(key: String, value: CRDTCounter<T>) {
+    private func setValue(key: String, value: CRDTElement) {
         self.setToCRDTObject(key: key, value: value)
 
         let operation = SetOperation(key: key,
