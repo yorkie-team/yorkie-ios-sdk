@@ -1,4 +1,4 @@
-name: Swift CI
+name: CI
 
 on:
   push:
@@ -15,10 +15,8 @@ jobs:
       run: swiftlint lint --strict
     - name: SwiftFormat
       run: swiftformat --lint .
-    - name: Build
-      run: swift build -v
     - name: Run tests
-      run: swift test --enable-code-coverage -v
+      run: swift test --enable-code-coverage -v --filter YorkieUnitTests
     - name: Prepare Code Coverage
       run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
     - name: Upload coverage to Codecov
