@@ -17,9 +17,7 @@
 import Foundation
 
 /**
- * `CounterInternal` represents changeable number data type.
- *
- * @internal
+ * `CRDTCounter` represents changeable number data type.
  */
 class CRDTCounter<T: YorkieCountable>: CRDTElement {
     var createdAt: TimeTicket
