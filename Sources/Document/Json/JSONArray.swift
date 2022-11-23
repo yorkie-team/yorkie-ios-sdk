@@ -308,6 +308,32 @@ public class JSONArray {
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
             return crdtObject
+        } else if let element = value as? JSONCounter<Int32>, let value = element.value as? Int32 {
+            let counter = CRDTCounter<Int32>(value: value, createdAt: ticket)
+            element.initialize(context: self.context, counter: counter)
+
+            let clone = counter.deepcopy()
+
+            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
+            self.context.push(operation: operation)
+
+            return counter
+        } else if let element = value as? JSONCounter<Int64>, let value = element.value as? Int64 {
+            let counter = CRDTCounter<Int64>(value: value, createdAt: ticket)
+            element.initialize(context: self.context, counter: counter)
+
+            let clone = counter.deepcopy()
+
+            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
+            self.context.push(operation: operation)
+
+            return counter
         }
 
         throw YorkieError.unimplemented(message: "Unsupported type of value: \(type(of: value))")

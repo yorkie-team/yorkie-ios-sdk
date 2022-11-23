@@ -85,6 +85,14 @@ public class JSONObject {
             self.setValue(key: key, value: array)
             let jsonArray = self.get(key: key) as? JSONArray
             jsonArray?.append(values: value.toJsonArray)
+        } else if let element = value as? JSONCounter<Int32>, let value = element.value as? Int32 {
+            let counter = CRDTCounter<Int32>(value: value, createdAt: self.context.issueTimeTicket())
+            element.initialize(context: self.context, counter: counter)
+            self.setValue(key: key, value: counter)
+        } else if let element = value as? JSONCounter<Int64>, let value = element.value as? Int64 {
+            let counter = CRDTCounter<Int64>(value: value, createdAt: self.context.issueTimeTicket())
+            element.initialize(context: self.context, counter: counter)
+            self.setValue(key: key, value: counter)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
         }
@@ -141,17 +149,7 @@ public class JSONObject {
         self.setPrimitive(key: key, value: .date(value))
     }
 
-    private func setValue(key: String, value: CRDTObject) {
-        self.setToCRDTObject(key: key, value: value)
-
-        let operation = SetOperation(key: key,
-                                     value: value.deepcopy(),
-                                     parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
-        self.context.push(operation: operation)
-    }
-
-    private func setValue(key: String, value: CRDTArray) {
+    private func setValue(key: String, value: CRDTElement) {
         self.setToCRDTObject(key: key, value: value)
 
         let operation = SetOperation(key: key,

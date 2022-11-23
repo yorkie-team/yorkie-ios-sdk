@@ -9,6 +9,13 @@
 /* Begin PBXBuildFile section */
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
+		9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC736292273D200C89478 /* CRDTCounter.swift */; };
+		9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC738292273E400C89478 /* CRDTCountTests.swift */; };
+		9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73B2922741200C89478 /* IncreaseOperation.swift */; };
+		9A4DC73E2923203700C89478 /* JSONCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73D2923203700C89478 /* JSONCounter.swift */; };
+		9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */; };
+		9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC744292DD82500C89478 /* YorkieCountable.swift */; };
+		9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
 		9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */; };
 		9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */; };
 		9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */; };
@@ -32,7 +39,6 @@
 		CE7B996E28E142A300D56198 /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B996D28E142A300D56198 /* Errors.swift */; };
 		CE7B997028E1453E00D56198 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B996F28E1453E00D56198 /* Strings.swift */; };
 		CE7B997428E1766F00D56198 /* Converter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997328E1766F00D56198 /* Converter.swift */; };
-		CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
 		CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997128E1750000D56198 /* PrimitiveTests.swift */; };
 		CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997928E2820200D56198 /* RGATreeList.swift */; };
 		CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */; };
@@ -109,6 +115,12 @@
 		96DA808B28C5B7B400E2C1DA /* YorkieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YorkieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A4DC736292273D200C89478 /* CRDTCounter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CRDTCounter.swift; sourceTree = "<group>"; };
+		9A4DC738292273E400C89478 /* CRDTCountTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CRDTCountTests.swift; sourceTree = "<group>"; };
+		9A4DC73B2922741200C89478 /* IncreaseOperation.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IncreaseOperation.swift; sourceTree = "<group>"; };
+		9A4DC73D2923203700C89478 /* JSONCounter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONCounter.swift; sourceTree = "<group>"; };
+		9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CounterIntegrationTests.swift; sourceTree = "<group>"; };
+		9A4DC744292DD82500C89478 /* YorkieCountable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieCountable.swift; sourceTree = "<group>"; };
 		9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClientEvent.swift; sourceTree = "<group>"; };
 		9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Codable+Extension.swift"; sourceTree = "<group>"; };
 		9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientIntegrationTests.swift; sourceTree = "<group>"; };
@@ -260,6 +272,8 @@
 		9ADECA002919FC1A006BA331 /* Integration */ = {
 			isa = PBXGroup;
 			children = (
+				96DA809028C5B7B400E2C1DA /* GRPCTests.swift */,
+				9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */,
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
 			);
 			path = Integration;
@@ -308,6 +322,7 @@
 		CE3EC96F28D40415009471BC /* CRDT */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC738292273E400C89478 /* CRDTCountTests.swift */,
 				CE3EC97128D4042D009471BC /* CRDTElementTests.swift */,
 				CE7B997128E1750000D56198 /* PrimitiveTests.swift */,
 				CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */,
@@ -429,6 +444,7 @@
 		CE8C22E728C9E55800432DE5 /* CRDT */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC736292273D200C89478 /* CRDTCounter.swift */,
 				CE3EC96628D30E74009471BC /* CRDTElement.swift */,
 				CE3EC97428D41903009471BC /* Primitive.swift */,
 				CE7B997928E2820200D56198 /* RGATreeList.swift */,
@@ -450,6 +466,7 @@
 				CEFF0014290120000020561A /* JSONObject.swift */,
 				CE9557CC2907523A00DF4DFA /* JSONArray.swift */,
 				CE7B996F28E1453E00D56198 /* Strings.swift */,
+				9A4DC73D2923203700C89478 /* JSONCounter.swift */,
 			);
 			path = Json;
 			sourceTree = "<group>";
@@ -457,6 +474,7 @@
 		CE8C22E928C9E56400432DE5 /* Operation */ = {
 			isa = PBXGroup;
 			children = (
+				9A4DC73B2922741200C89478 /* IncreaseOperation.swift */,
 				CE8C22F428C9E88500432DE5 /* Operation.swift */,
 				CE8ED31528F55BF7009A5419 /* SetOperation.swift */,
 				CE8ED31B28F56506009A5419 /* RemoveOperation.swift */,
@@ -506,7 +524,6 @@
 			isa = PBXGroup;
 			children = (
 				9AF55ED0290684BD006B7146 /* ConverterTests.swift */,
-				96DA809028C5B7B400E2C1DA /* GRPCTests.swift */,
 			);
 			path = V1;
 			sourceTree = "<group>";
@@ -523,6 +540,7 @@
 			isa = PBXGroup;
 			children = (
 				CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */,
+				9A4DC744292DD82500C89478 /* YorkieCountable.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -723,6 +741,7 @@
 				CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */,
 				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
+				9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */,
 				CE72E85228EE531C00D1331C /* Collection+Extensions.swift in Sources */,
 				CE3EC97528D41903009471BC /* Primitive.swift in Sources */,
 				CEEB17E428C84D26004988DD /* resources.pb.swift in Sources */,
@@ -746,17 +765,20 @@
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
 				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
+				9A4DC73E2923203700C89478 /* JSONCounter.swift in Sources */,
 				CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */,
 				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
-				CE7B997628E1773A00D56198 /* GRPCTypeAlias.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
 				CE3EC96728D30E74009471BC /* CRDTElement.swift in Sources */,
 				9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */,
 				CE8BB74B28FE71550020F62A /* Document.swift in Sources */,
 				CE8BB74D28FE86020020F62A /* ObjectDataHandler.swift in Sources */,
+				9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */,
 				CE8ED31628F55BF7009A5419 /* SetOperation.swift in Sources */,
 				CEEB17E528C84D26004988DD /* yorkie.grpc.swift in Sources */,
 				CEBC840A2909252000781AE9 /* ElementConverter.swift in Sources */,
+				9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */,
+				9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */,
 				CE8ED31C28F56506009A5419 /* RemoveOperation.swift in Sources */,
 				CEDDE26E2914EAD00032B16A /* JSONObjectable.swift in Sources */,
 			);
@@ -773,6 +795,7 @@
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* RHTPQMapTests.swift in Sources */,
 				CE8BB73B28FE2BE90020F62A /* ChangeIDTests.swift in Sources */,
+				9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */,
 				CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
 				9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */,
@@ -787,6 +810,7 @@
 				CE8C230B28D15FF200432DE5 /* ClientTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
 				CE8BB74628FE5AC40020F62A /* ChangePackTests.swift in Sources */,
+				9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */,
 				CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */,
 				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */,
