@@ -20,11 +20,11 @@ import Foundation
  * `CRDTCounter` represents changeable number data type.
  */
 class CRDTCounter<T: YorkieCountable>: CRDTElement {
-    var createdAt: TimeTicket
+    let createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
-    var value: T
+    private(set) var value: T
 
     init(value: T, createdAt: TimeTicket) {
         self.createdAt = createdAt
