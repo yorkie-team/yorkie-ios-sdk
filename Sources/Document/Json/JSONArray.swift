@@ -155,7 +155,7 @@ public class JSONArray {
     @discardableResult
     /// - Returns: The number of elements.
     func push(_ value: Any) -> Int {
-        if let value = value as? YorkieJSONObjectable {
+        if let value = value as? JSONObjectable {
             let length = self.push(JSONObject())
             let appendedIndex = length - 1
             let jsonObject = self[appendedIndex] as? JSONObject

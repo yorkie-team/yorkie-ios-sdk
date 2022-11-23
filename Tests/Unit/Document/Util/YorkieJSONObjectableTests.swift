@@ -18,12 +18,12 @@ import Combine
 import XCTest
 @testable import Yorkie
 
-struct KanbanColumn: YorkieJSONObjectable {
+struct KanbanColumn: JSONObjectable {
     let title: String
     var cards: [KanbanCard] = []
 }
 
-struct KanbanCard: YorkieJSONObjectable {
+struct KanbanCard: JSONObjectable {
     let title: String
 }
 
