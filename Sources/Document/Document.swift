@@ -50,7 +50,7 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(updater: (_ root: JSONObject) -> Void, message: String? = nil) {
+    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) {
         let clone = self.cloned
         let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
 
