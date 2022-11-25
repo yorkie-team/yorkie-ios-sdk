@@ -161,7 +161,7 @@ class RGATreeList {
     }
 
     /**
-     * `insert` adds next element of previously created node.
+     * `insert` adds a new node with the value after the given node.
      */
     func insert(_ value: CRDTElement, afterCreatedAt createdAt: TimeTicket, executedAt: TimeTicket? = nil) throws {
         let executedAt: TimeTicket = executedAt ?? value.createdAt
@@ -214,14 +214,14 @@ class RGATreeList {
     }
 
     /**
-     * `insert` adds the given element after  the last creation time.
+     * `insert` adds the given element after the last node.
      */
     func insert(_ value: CRDTElement) throws {
         try self.insert(value, afterCreatedAt: self.last.createdAt)
     }
 
     /**
-     * `get` returns the element of the given index.
+     * `get` returns the element of the given creation time.
      */
     func get(createdAt: TimeTicket) throws -> CRDTElement {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
@@ -234,7 +234,7 @@ class RGATreeList {
     }
 
     /**
-     * `subpath` subpath  of JSONPath based on the creation time of the node.
+     * `subPath` returns the sub path of the given element.
      */
     func subPath(createdAt: TimeTicket) throws -> String {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
@@ -247,7 +247,7 @@ class RGATreeList {
     }
 
     /**
-     * `delete` physically purges child element.
+     * `delete` physically purges element.
      */
     func delete(_ value: CRDTElement) throws {
         guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
@@ -359,7 +359,7 @@ class RGATreeList {
     }
 
     /**
-     * `getLastCreatedAt` returns the creation time of last elements.
+     * `getLastCreatedAt` returns the creation time of last element.
      */
     func getLastCreatedAt() -> TimeTicket {
         return self.last.createdAt

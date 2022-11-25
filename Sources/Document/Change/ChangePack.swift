@@ -33,13 +33,14 @@ struct ChangePack {
     private let changes: [Change]
 
     /**
-     * `snapshot` is a byte array that encode the document.
+     * `snapshot` is a byte array that encodes the document.
      */
     private let snapshot: Data?
 
     /**
      * `minSyncedTicket` is the minimum logical time taken by clients who attach
-     * the document. It used to collect garbage on the replica on the client.
+     * to the document. It is used to collect garbage on the replica on the
+     * client.
      */
     private let minSyncedTicket: TimeTicket?
 

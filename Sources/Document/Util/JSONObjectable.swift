@@ -16,14 +16,14 @@
 
 import Foundation
 
-/// ``JSONObjectable`` provide a way to make a dictionary including members of a type confirming ``JSONObjectable``.
+/// `JSONObjectable` provides a way to make a dictionary including members of a type confirming ``JSONObjectable``.
 public protocol JSONObjectable: Codable {
-    /// The members of ``JSONObjectable/excludedMembers`` is not included in a dictionary made by ``JSONObjectable/toJsonObject``.
+    /// The members of excludedMembers is not included in a dictionary made by toJsonObject.
     var excludedMembers: [String] { get }
 }
 
 public extension JSONObjectable {
-    /// ``toJsonObject`` make a dictionary including members of a type confirming ``JSONObjectable``.
+    /// `toJsonObject` make a dictionary including members of a type confirming ``JSONObjectable``.
     internal var toJsonObject: [String: Any] {
         guard let data = try? JSONEncoder().encode(self),
               let dictionary = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
@@ -51,8 +51,8 @@ public extension JSONObjectable {
     }
 }
 
-/// ``toJsonArray`` provide a way to make an array including types confiming``JSONObjectable``, arrys, and values.
 internal extension Array {
+    /// `toJsonArray` provides a way to make an array including types confiming``JSONObjectable``, arrys, and values.
     var toJsonArray: [Any] {
         self.map {
             if let value = $0 as? JSONObjectable {

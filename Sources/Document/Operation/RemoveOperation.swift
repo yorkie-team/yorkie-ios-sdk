@@ -53,7 +53,7 @@ struct RemoveOperation: Operation {
     }
 
     /**
-     * `effectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the creation time of the effected element.
      */
     var effectedCreatedAt: TimeTicket {
         return self.parentCreatedAt

@@ -46,8 +46,8 @@ struct Checkpoint: Equatable {
     }
 
     /**
-     * `forward` updates the given checkpoint with those values when it is greater
-     * than the values of internal properties.
+     * `forward` creates a new instance with the given checkpoint if it is
+     * greater than the values of internal properties.
      */
     mutating func forward(other: Checkpoint) {
         if self == other {

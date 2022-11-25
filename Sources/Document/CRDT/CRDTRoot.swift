@@ -105,7 +105,7 @@ class CRDTRoot {
     }
 
     /**
-     * `registerRemovedElement` registers the given element to hash table.
+     * `registerRemovedElement` registers the given element to the hash set.
      */
     func registerRemovedElement(_ element: CRDTElement) {
         self.removedElementSetByCreatedAt.insert(element.createdAt)
@@ -140,7 +140,7 @@ class CRDTRoot {
     }
 
     /**
-     * `garbageLength` returns length of nodes which should garbage collection task
+     * `garbageLength` returns length of nodes which can be garbage collected.
      */
     var garbageLength: Int {
         var count = 0

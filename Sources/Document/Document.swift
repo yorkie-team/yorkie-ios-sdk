@@ -23,6 +23,11 @@ import Foundation
  */
 public typealias Presence = [String: Any]
 
+/**
+ * A CRDT-based data type. We can representing the model
+ * of the application. And we can edit it even while offline.
+ *
+ */
 public actor Document {
     private let key: String
     private var root: CRDTRoot
@@ -45,7 +50,7 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(updater: (_ root: JSONObject) -> Void, message: String? = nil) {
+    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) {
         let clone = self.cloned
         let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
 

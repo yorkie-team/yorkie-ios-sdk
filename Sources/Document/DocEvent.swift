@@ -34,6 +34,10 @@ public enum DocEventType: String {
     case remoteChange = "remote-change"
 }
 
+/**
+ * An event that occurs in ``Document``. It can be delivered
+ * using ``Document/eventStream``.
+ */
 public protocol DocEvent {
     var type: DocEventType { get }
 }

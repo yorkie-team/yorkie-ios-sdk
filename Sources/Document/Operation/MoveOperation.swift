@@ -43,7 +43,7 @@ struct MoveOperation: Operation {
             if parent == nil {
                 log = "fail to find \(self.parentCreatedAt)"
             } else {
-                log = "fail to execute, only array can execute add"
+                log = "fail to execute, only array can execute move"
             }
             Logger.fatal(log)
             throw YorkieError.unexpected(message: log)
@@ -53,7 +53,7 @@ struct MoveOperation: Operation {
     }
 
     /**
-     * `effectedCreatedAt` returns the time of the effected element.
+     * `effectedCreatedAt` returns the creation time of the effected element.
      */
     var effectedCreatedAt: TimeTicket {
         return self.createdAt
@@ -63,6 +63,6 @@ struct MoveOperation: Operation {
      * `structureAsString` returns a string containing the meta data.
      */
     var structureAsString: String {
-        return "\(self.parentCreatedAt.structureAsString).MOV"
+        return "\(self.parentCreatedAt.structureAsString).MOVE"
     }
 }
