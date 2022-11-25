@@ -62,7 +62,7 @@ class CRDTObject: CRDTContainer {
     }
 
     /**
-     * `keys` returns array of this object.
+     * `keys` returns array of keys in this object.
      */
     var keys: [String] {
         return self.map { $0.key }
@@ -127,7 +127,7 @@ extension CRDTObject {
     }
 
     /**
-     * `delete` physically deletes child element.
+     * `delete` physically deletes the given element.
      */
     func delete(element: CRDTElement) throws {
         try self.memberNodes.delete(value: element)

@@ -99,6 +99,9 @@ extension CRDTElement {
  * `CRDTContainer` represents CRDTArray or CRDtObject.
  */
 protocol CRDTContainer: CRDTElement {
+    /**
+     * `subPath` returns the sub path of the given element.
+     */
     func subPath(createdAt: TimeTicket) throws -> String
 
     func delete(element: CRDTElement) throws

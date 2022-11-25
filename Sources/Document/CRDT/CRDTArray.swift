@@ -33,7 +33,7 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `insert` inserts the given element after the given previous element.
+     * `insert` adds a new node after the the given node.
      */
     func insert(value: CRDTElement, afterCreatedAt: TimeTicket) throws {
         try self.elements.insert(value, afterCreatedAt: afterCreatedAt)
@@ -82,8 +82,7 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `getPreviousCreatedAt` returns the creation time of
-     * the previous element of the given element.
+     * `getPreviousCreatedAt` returns the creation time of the previous node.
      */
     func getPreviousCreatedAt(createdAt: TimeTicket) throws -> TimeTicket {
         return try self.elements.getPreviousCreatedAt(ofCreatedAt: createdAt)
@@ -152,21 +151,21 @@ extension CRDTArray {
     }
 
     /**
-     * `subPath` returns subPath of JSONPath of the given `createdAt` element.
+     * `subPath` returns the sub path of the given element.
      */
     func subPath(createdAt: TimeTicket) throws -> String {
         return try self.elements.subPath(createdAt: createdAt)
     }
 
     /**
-     * `delete` physically deletes child element.
+     * `delete` physically deletes the given element.
      */
     func delete(element: CRDTElement) throws {
         try self.elements.delete(element)
     }
 
     /**
-     * `remove` removes the element of the given index.
+     * `remove` removes  the element of the given creation time.
      */
     @discardableResult
     func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
