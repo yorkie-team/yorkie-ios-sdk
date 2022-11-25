@@ -13,7 +13,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/grpc/grpc-swift.git", exact: "1.9.0"),
-        .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.19.0")
+        .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.19.0"),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0")
     ],
     targets: [
         .target(
