@@ -1,0 +1,26 @@
+name: Add API reference docs to release assets
+
+on:
+  push:
+    tags:
+    - '*'
+
+env:
+  DOC_ARCH: Yorkie.doccarchive
+
+jobs:
+  build:
+    runs-on: macos-12
+    steps:
+    - uses: actions/checkout@v3
+    - name: Generate API reference doc
+      run: |
+        swift package --allow-writing-to-directory $DOC_ARCH \
+            generate-documentation --target Yorkie \
+            --output-path $DOC_ARCH
+        zip -r Yorkie.doccarchive.zip $DOC_ARCH
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: Yorkie.doccarchive.zip
