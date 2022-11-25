@@ -223,8 +223,7 @@ final class ClientIntegrationTests: XCTestCase {
         var c1Name = "c1"
         var c2Name = "c2"
 
-        c1.eventStream.sink { _ in
-        } receiveValue: { event in
+        c1.eventStream.sink { event in
             switch event {
             case let event as PeerChangedEvent:
                 print("#### c1 \(event)")
@@ -233,8 +232,7 @@ final class ClientIntegrationTests: XCTestCase {
             }
         }.store(in: &self.cancellables)
 
-        c2.eventStream.sink { _ in
-        } receiveValue: { event in
+        c2.eventStream.sink { event in
             switch event {
             case let event as PeerChangedEvent:
                 print("#### c2 \(event)")
