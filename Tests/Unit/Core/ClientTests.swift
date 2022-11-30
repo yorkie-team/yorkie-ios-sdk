@@ -36,8 +36,7 @@ class ClientTests: XCTestCase {
             return
         }
 
-        target.eventStream.sink { _ in
-        } receiveValue: { event in
+        target.eventStream.sink { event in
             switch event {
             case let event as StatusChangedEvent:
                 status = event.value
@@ -84,8 +83,7 @@ class ClientTests: XCTestCase {
             return
         }
 
-        target.eventStream.sink { _ in
-        } receiveValue: { event in
+        target.eventStream.sink { event in
             switch event {
             case let event as StatusChangedEvent:
                 status = event.value
@@ -125,8 +123,7 @@ class ClientTests: XCTestCase {
             return
         }
 
-        target.eventStream.sink { _ in
-        } receiveValue: { event in
+        target.eventStream.sink { event in
             print("#### \(event)")
             switch event {
             case let event as StatusChangedEvent:

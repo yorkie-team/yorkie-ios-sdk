@@ -153,7 +153,7 @@ public actor Client {
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus
     public var presence: Presence { self.presenceInfo.data }
-    public nonisolated let eventStream: PassthroughSubject<BaseClientEvent, Error>
+    public nonisolated let eventStream: PassthroughSubject<BaseClientEvent, Never>
 
     /**
      * @param rpcAddr - the address of the RPC server.

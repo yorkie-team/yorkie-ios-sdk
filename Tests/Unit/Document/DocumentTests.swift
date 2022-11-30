@@ -727,9 +727,7 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_object() async {
         let target = Document(key: "test-doc")
 
-        await target.eventStream.sink { _ in
-
-        } receiveValue: { event in
+        await target.eventStream.sink { event in
             XCTAssertEqual(event.type, .localChange)
             XCTAssertEqual((event as? LocalChangeEvent)?.value[0].paths, ["$."])
         }.store(in: &self.cancellables)
@@ -791,9 +789,7 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_array() async {
         let target = Document(key: "test-doc")
 
-        await target.eventStream.sink { _ in
-
-        } receiveValue: { event in
+        await target.eventStream.sink { event in
             XCTAssertEqual(event.type, .localChange)
 
             XCTAssertEqual((event as? LocalChangeEvent)?.value[0].paths.sorted(), ["$.arr", "$.\\$\\$\\.\\.\\.hello"].sorted())
