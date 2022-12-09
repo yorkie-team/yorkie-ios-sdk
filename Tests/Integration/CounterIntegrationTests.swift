@@ -107,7 +107,7 @@ final class CounterIntegrationTests: XCTestCase {
             root.length = JSONCounter(value: Int64(10))
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 2_000_000_000)
 
         var result1 = await self.d1.toSortedJSON()
         var result2 = await self.d2.toSortedJSON()
@@ -121,7 +121,7 @@ final class CounterIntegrationTests: XCTestCase {
             } catch {}
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 2_000_000_000)
 
         result1 = await self.d1.toSortedJSON()
         result2 = await self.d2.toSortedJSON()
