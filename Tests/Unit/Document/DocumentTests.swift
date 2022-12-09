@@ -107,6 +107,7 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 0)
     }
 
+    // swiftlint: disable function_body_length
     func test_splice_array_with_number() async throws {
         let target = Document(key: "test-doc")
         await target.update { root in

@@ -17,7 +17,7 @@
 import Foundation
 import Yorkie
 
-struct KanbanColumn: YorkieJSONObjectable {
+struct KanbanColumn: JSONObjectable {
     var id: TimeTicket = .initial
     let title: String
     var cards: [KanbanCard] = []
