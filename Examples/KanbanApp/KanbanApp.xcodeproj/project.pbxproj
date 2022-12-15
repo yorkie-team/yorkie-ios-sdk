@@ -13,6 +13,7 @@
 		9603ABBD291114DF00696E1A /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9603ABBB291114DF00696E1A /* Main.storyboard */; };
 		9603ABBF291114E200696E1A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9603ABBE291114E200696E1A /* Assets.xcassets */; };
 		9603ABC2291114E200696E1A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9603ABC0291114E200696E1A /* LaunchScreen.storyboard */; };
+		9A6399A4294B0BE700BF27F5 /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A3294B0BE700BF27F5 /* Yorkie */; };
 		CE79C52629135EB400D5DE3F /* KanbanViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52529135EB400D5DE3F /* KanbanViewController.swift */; };
 		CE79C52929135F7B00D5DE3F /* KanbanColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52829135F7B00D5DE3F /* KanbanColumn.swift */; };
 		CE79C52B291360FE00D5DE3F /* KanbanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52A291360FE00D5DE3F /* KanbanCard.swift */; };
@@ -23,8 +24,6 @@
 		CEDDE2632914AA280032B16A /* KanbanLayoutProperty.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2622914AA280032B16A /* KanbanLayoutProperty.swift */; };
 		CEDDE2662914B94D0032B16A /* UILabelWithPadding.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2652914B94D0032B16A /* UILabelWithPadding.swift */; };
 		CEDDE2682914BA620032B16A /* UIColor+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2672914BA620032B16A /* UIColor+Extensions.swift */; };
-		CEFD67DD291A3C66003E82FB /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CE95E419291135E0005076C8 /* Yorkie.framework */; };
-		CEFD67DE291A3C66003E82FB /* Yorkie.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = CE95E419291135E0005076C8 /* Yorkie.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -34,7 +33,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				CEFD67DE291A3C66003E82FB /* Yorkie.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -42,7 +40,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		9603ABB2291114DF00696E1A /* ExampleApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ExampleApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9603ABB2291114DF00696E1A /* KanbanApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KanbanApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9603ABB5291114DF00696E1A /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9603ABB7291114DF00696E1A /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		9603ABB9291114DF00696E1A /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
@@ -56,9 +54,6 @@
 		CE79C52F29136B5F00D5DE3F /* KanbanViewCardCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanViewCardCell.swift; sourceTree = "<group>"; };
 		CE79C5312913741E00D5DE3F /* KanbanViewColumnHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanViewColumnHeader.swift; sourceTree = "<group>"; };
 		CE79C5332913742500D5DE3F /* KanbanViewColumnFooter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanViewColumnFooter.swift; sourceTree = "<group>"; };
-		CE95E41529113593005076C8 /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		CE95E417291135C6005076C8 /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		CE95E419291135E0005076C8 /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CEDDE2602914A2C00032B16A /* KanbanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanViewModel.swift; sourceTree = "<group>"; };
 		CEDDE2622914AA280032B16A /* KanbanLayoutProperty.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanLayoutProperty.swift; sourceTree = "<group>"; };
 		CEDDE2652914B94D0032B16A /* UILabelWithPadding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UILabelWithPadding.swift; sourceTree = "<group>"; };
@@ -70,7 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CEFD67DD291A3C66003E82FB /* Yorkie.framework in Frameworks */,
+				9A6399A4294B0BE700BF27F5 /* Yorkie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -80,7 +75,7 @@
 		9603ABA9291114DF00696E1A = {
 			isa = PBXGroup;
 			children = (
-				9603ABB4291114DF00696E1A /* ExampleApp */,
+				9603ABB4291114DF00696E1A /* KanbanApp */,
 				9603ABB3291114DF00696E1A /* Products */,
 				CE95E41429113593005076C8 /* Frameworks */,
 			);
@@ -89,12 +84,12 @@
 		9603ABB3291114DF00696E1A /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				9603ABB2291114DF00696E1A /* ExampleApp.app */,
+				9603ABB2291114DF00696E1A /* KanbanApp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		9603ABB4291114DF00696E1A /* ExampleApp */ = {
+		9603ABB4291114DF00696E1A /* KanbanApp */ = {
 			isa = PBXGroup;
 			children = (
 				CEDDE2642914B9430032B16A /* Utils */,
@@ -107,7 +102,7 @@
 				9603ABC0291114E200696E1A /* LaunchScreen.storyboard */,
 				9603ABC3291114E200696E1A /* Info.plist */,
 			);
-			path = ExampleApp;
+			path = KanbanApp;
 			sourceTree = "<group>";
 		};
 		CE79C52729135F3700D5DE3F /* Kanban */ = {
@@ -136,9 +131,6 @@
 		CE95E41429113593005076C8 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				CE95E419291135E0005076C8 /* Yorkie.framework */,
-				CE95E417291135C6005076C8 /* Yorkie.framework */,
-				CE95E41529113593005076C8 /* Yorkie.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -155,9 +147,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		9603ABB1291114DF00696E1A /* ExampleApp */ = {
+		9603ABB1291114DF00696E1A /* KanbanApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 9603ABC6291114E200696E1A /* Build configuration list for PBXNativeTarget "ExampleApp" */;
+			buildConfigurationList = 9603ABC6291114E200696E1A /* Build configuration list for PBXNativeTarget "KanbanApp" */;
 			buildPhases = (
 				9603ABAE291114DF00696E1A /* Sources */,
 				9603ABAF291114DF00696E1A /* Frameworks */,
@@ -168,11 +160,12 @@
 			);
 			dependencies = (
 			);
-			name = ExampleApp;
+			name = KanbanApp;
 			packageProductDependencies = (
+				9A6399A3294B0BE700BF27F5 /* Yorkie */,
 			);
 			productName = ExampleApp;
-			productReference = 9603ABB2291114DF00696E1A /* ExampleApp.app */;
+			productReference = 9603ABB2291114DF00696E1A /* KanbanApp.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -190,7 +183,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 9603ABAD291114DF00696E1A /* Build configuration list for PBXProject "ExampleApp" */;
+			buildConfigurationList = 9603ABAD291114DF00696E1A /* Build configuration list for PBXProject "KanbanApp" */;
 			compatibilityVersion = "Xcode 13.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -200,12 +193,13 @@
 			);
 			mainGroup = 9603ABA9291114DF00696E1A;
 			packageReferences = (
+				9A566BF6294B0B800032E242 /* XCRemoteSwiftPackageReference "yorkie-ios-sdk" */,
 			);
 			productRefGroup = 9603ABB3291114DF00696E1A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				9603ABB1291114DF00696E1A /* ExampleApp */,
+				9603ABB1291114DF00696E1A /* KanbanApp */,
 			);
 		};
 /* End PBXProject section */
@@ -390,7 +384,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = ExampleApp/Info.plist;
+				INFOPLIST_FILE = KanbanApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -401,7 +395,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.yorkie.ExampleApp;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.yorkie.KanbanApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -420,7 +414,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = ExampleApp/Info.plist;
+				INFOPLIST_FILE = KanbanApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -431,7 +425,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.yorkie.ExampleApp;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.yorkie.KanbanApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
@@ -445,7 +439,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		9603ABAD291114DF00696E1A /* Build configuration list for PBXProject "ExampleApp" */ = {
+		9603ABAD291114DF00696E1A /* Build configuration list for PBXProject "KanbanApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9603ABC4291114E200696E1A /* Debug */,
@@ -454,7 +448,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		9603ABC6291114E200696E1A /* Build configuration list for PBXNativeTarget "ExampleApp" */ = {
+		9603ABC6291114E200696E1A /* Build configuration list for PBXNativeTarget "KanbanApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9603ABC7291114E200696E1A /* Debug */,
@@ -464,6 +458,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9A566BF6294B0B800032E242 /* XCRemoteSwiftPackageReference "yorkie-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/yorkie-team/yorkie-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.19;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9A6399A3294B0BE700BF27F5 /* Yorkie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9A566BF6294B0B800032E242 /* XCRemoteSwiftPackageReference "yorkie-ios-sdk" */;
+			productName = Yorkie;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9603ABAA291114DF00696E1A /* Project object */;
 }
