@@ -185,7 +185,7 @@ public class JSONObject {
     }
 
     public func remove(key: String) {
-        Logger.trivial("obj[\(key)]")
+        Logger.trace("obj[\(key)]")
 
         let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket())
         guard let removed else {

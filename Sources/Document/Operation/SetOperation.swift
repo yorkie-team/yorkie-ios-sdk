@@ -49,7 +49,7 @@ struct SetOperation: Operation {
                 log = "fail to execute, only object can execute set"
             }
 
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 

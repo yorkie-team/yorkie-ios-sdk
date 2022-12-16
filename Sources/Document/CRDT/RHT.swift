@@ -65,7 +65,7 @@ class RHT {
     func get(key: String) throws -> String {
         guard let node = self.nodeMapByKey[key] else {
             let log = "can't find the given node with: \(key)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 

@@ -187,7 +187,7 @@ public class JSONArray {
 
     @discardableResult
     func remove(index: Int) -> CRDTElement? {
-        Logger.trivial("array[\(index)]")
+        Logger.trace("array[\(index)]")
         return self.removeInternal(byIndex: index)
     }
 

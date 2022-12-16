@@ -12,15 +12,17 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/grpc/grpc-swift.git", exact: "1.9.0"),
-        .package(url: "https://github.com/apple/swift-protobuf.git", exact: "1.19.0"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0")
+        .package(url: "https://github.com/grpc/grpc-swift.git", from: "1.9.0"),
+        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.19.0"),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0")
     ],
     targets: [
         .target(
             name: "Yorkie",
             dependencies: [.product(name: "GRPC", package: "grpc-swift"),
-                           .product(name: "SwiftProtobuf", package: "swift-protobuf")],
+                           .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                           .product(name: "Logging", package: "swift-log")],
             path: "Sources",
             exclude: ["Info.plist",
                       "API/V1/Protos"]

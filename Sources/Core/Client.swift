@@ -518,7 +518,7 @@ public actor Client {
                 case is CancellationError:
                     break
                 default:
-                    Logger.warn("[WL] c:\"\(self.key)\" has Error \(error)")
+                    Logger.warning("[WL] c:\"\(self.key)\" has Error \(error)")
 
                     self.onStreamDisconnect()
                 }

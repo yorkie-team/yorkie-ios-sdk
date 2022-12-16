@@ -44,7 +44,7 @@ struct RemoveOperation: Operation {
                 log = "fail to find \(self.parentCreatedAt)"
             }
 
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 

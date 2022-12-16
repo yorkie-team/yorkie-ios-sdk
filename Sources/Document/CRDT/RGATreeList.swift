@@ -136,7 +136,7 @@ class RGATreeList {
     private func findNode(fromCreatedAt createdAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode {
         guard var node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -183,13 +183,13 @@ class RGATreeList {
     func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
         guard let previsousNode = self.nodeMapByCreatedAt[afterCreatedAt] else {
             let log = "can't find the given node: \(afterCreatedAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
         guard let movingNode = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -226,7 +226,7 @@ class RGATreeList {
     func get(createdAt: TimeTicket) throws -> CRDTElement {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -239,7 +239,7 @@ class RGATreeList {
     func subPath(createdAt: TimeTicket) throws -> String {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -252,7 +252,7 @@ class RGATreeList {
     func delete(_ value: CRDTElement) throws {
         guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
             let log = "failed to find the given createdAt: \(value.createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -265,14 +265,14 @@ class RGATreeList {
     func getNode(index: Int) throws -> RGATreeListNode {
         guard index < self.length else {
             let log = "length is smaller than or equal to: \(index)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
         let (node, offset) = self.nodeMapByIndex.find(position: index)
         guard let rgaNode = node as? RGATreeListNode else {
             let log = "failed to find the given index: \(index)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -291,7 +291,7 @@ class RGATreeList {
 
         guard let nextRgaNode else {
             let log = "failed to find the given index: \(index)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -304,7 +304,7 @@ class RGATreeList {
     func getPreviousCreatedAt(ofCreatedAt createdAt: TimeTicket) throws -> TimeTicket {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
         var previousNode: RGATreeListNode? = node
@@ -321,7 +321,7 @@ class RGATreeList {
     func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
