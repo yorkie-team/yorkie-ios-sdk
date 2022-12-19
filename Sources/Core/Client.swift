@@ -17,6 +17,7 @@
 import Combine
 import Foundation
 import GRPC
+import Logging
 import NIO
 
 /**
@@ -121,10 +122,16 @@ public struct ClientOptions {
 }
 
 public struct RPCAddress {
+    public static let tlsPort = 443
+
     let host: String
     let port: Int
 
-    public init(host: String, port: Int) {
+    public var isSecured: Bool {
+        self.port == Self.tlsPort
+    }
+
+    public init(host: String, port: Int = Self.tlsPort) {
         self.host = host
         self.port = port
     }
@@ -159,7 +166,7 @@ public actor Client {
      * @param rpcAddr - the address of the RPC server.
      * @param opts - the options of the client.
      */
-    public init(rpcAddress: RPCAddress, options: ClientOptions) throws {
+    public init(rpcAddress: RPCAddress, options: ClientOptions) {
         self.key = options.key ?? UUID().uuidString
         self.presenceInfo = PresenceInfo(clock: 0, data: options.presence ?? [String: Any]())
 
@@ -170,15 +177,18 @@ public actor Client {
 
         self.group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
 
-        let channel: GRPCChannel
-        do {
-            channel = try GRPCChannelPool.with(target: .host(rpcAddress.host, port: rpcAddress.port),
-                                               transportSecurity: .plaintext,
-                                               eventLoopGroup: self.group)
-        } catch {
-            Logger.error("Failed to initialize client", error: error)
-            throw error
+        let builder: ClientConnection.Builder
+        if rpcAddress.isSecured {
+            builder = ClientConnection.usingTLSBackedByNetworkFramework(on: self.group)
+        } else {
+            builder = ClientConnection.insecure(group: self.group)
         }
+
+        var gRPCLogger = Logging.Logger(label: "gRPC")
+        gRPCLogger.logLevel = .trace
+        builder.withBackgroundActivityLogger(gRPCLogger)
+
+        let channel = builder.connect(host: rpcAddress.host, port: rpcAddress.port)
 
         self.rpcClient = YorkieServiceAsyncClient(channel: channel)
         self.eventStream = PassthroughSubject()
@@ -186,6 +196,7 @@ public actor Client {
 
     deinit {
         try? self.group.syncShutdownGracefully()
+        try? self.rpcClient.channel.close().wait()
     }
 
     /**
