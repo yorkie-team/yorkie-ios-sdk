@@ -15,44 +15,49 @@
  */
 
 import Foundation
-
-enum LogLevel: String {
-    case trivial = "TRIVIAL"
-    case debug = "DEBUG"
-    case info = "INFO"
-    case warn = "WARN"
-    case error = "ERROR"
-    case fatal = "FATAL"
-}
+import Logging
 
 enum Logger {
-    static func trivial(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
-        self.log(level: .trivial, message, error: error, filename: filename, function: function, line: line)
+    static var logLevel: Logging.Logger.Level {
+        get {
+            yorkieLogger.logLevel
+        }
+
+        set {
+            yorkieLogger.logLevel = newValue
+        }
     }
 
-    static func debug(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
+    private static var yorkieLogger = Logging.Logger(label: "Yorkie")
+
+    static func trace(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .trace, message, error: error, filename: filename, function: function, line: line)
+    }
+
+    static func debug(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .debug, message, error: error, filename: filename, function: function, line: line)
     }
 
-    static func info(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
+    static func info(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .info, message, error: error, filename: filename, function: function, line: line)
     }
 
-    static func warn(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
-        self.log(level: .warn, message, error: error, filename: filename, function: function, line: line)
+    static func warning(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .warning, message, error: error, filename: filename, function: function, line: line)
     }
 
-    static func error(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
+    static func error(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .error, message, error: error, filename: filename, function: function, line: line)
     }
 
-    static func fatal(_ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
-        self.log(level: .fatal, message, error: error, filename: filename, function: function, line: line)
+    static func critical(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .critical, message, error: error, filename: filename, function: function, line: line)
     }
 
-    static func log(level: LogLevel, _ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: Int = #line) {
-        let file = URL(fileURLWithPath: filename).lastPathComponent
+    static func log(level: Logging.Logger.Level, _ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: UInt = #line) {
         let log = message + (error?.localizedDescription ?? "")
-        print("[\(level.rawValue)][\(file):\(line)] \(function) - \(log)")
+        let message = "\(function) - \(log)"
+
+        self.yorkieLogger.log(level: level, Logging.Logger.Message(stringLiteral: message), source: "\(filename):\(line)", file: filename, function: function, line: line)
     }
 }

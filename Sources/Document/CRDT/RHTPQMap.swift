@@ -96,7 +96,7 @@ class RHTPQMap {
     func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -110,7 +110,7 @@ class RHTPQMap {
     func subPath(createdAt: TimeTicket) throws -> String {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -123,13 +123,13 @@ class RHTPQMap {
     func delete(value: CRDTElement) throws {
         guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
             let log = "can't find the given node: \(value.createdAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
         guard let queue = self.elementQueueMapByKey[node.rhtKey] else {
             let log = "can't find the given node: \(node.rhtKey)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -146,7 +146,7 @@ class RHTPQMap {
               let node = heap.peek()
         else {
             let log = "can't find the given node: \(key)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -173,7 +173,7 @@ class RHTPQMap {
     func get(key: String) throws -> CRDTElement {
         guard let heap = elementQueueMapByKey[key], let node = heap.peek() else {
             let log = "can't find the given node: \(key)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 

@@ -43,7 +43,7 @@ struct IncreaseOperation: Operation {
     func execute(root: CRDTRoot) throws {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
@@ -57,7 +57,7 @@ struct IncreaseOperation: Operation {
             }
         } else {
             let log = "fail to execute, only Counter can execute increase"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
     }

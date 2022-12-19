@@ -45,7 +45,7 @@ struct MoveOperation: Operation {
             } else {
                 log = "fail to execute, only array can execute move"
             }
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 

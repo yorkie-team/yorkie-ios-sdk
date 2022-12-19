@@ -58,7 +58,7 @@ public actor Document {
         updater(proxy)
 
         if context.hasOperations() {
-            Logger.trivial("trying to update a local change: \(self.toJSON())")
+            Logger.trace("trying to update a local change: \(self.toJSON())")
 
             let change = context.getChange()
             try? change.execute(root: self.root)
@@ -69,7 +69,7 @@ public actor Document {
             let changeEvent = LocalChangeEvent(value: [changeInfo])
             self.eventStream.send(changeEvent)
 
-            Logger.trivial("after update a local change: \(self.toJSON())")
+            Logger.trace("after update a local change: \(self.toJSON())")
         }
     }
 
@@ -104,7 +104,7 @@ public actor Document {
             self.garbageCollect(lessThanOrEqualTo: ticket)
         }
 
-        Logger.trivial("\(self.root.toJSON())")
+        Logger.trace("\(self.root.toJSON())")
     }
 
     /**
@@ -252,7 +252,7 @@ public actor Document {
             removeds:\(self.root.removedElementSetSize)
             """)
 
-        Logger.trivial(changes.map { "\($0.id.structureAsString)\t\($0.structureAsString)" }.joined(separator: "\n"))
+        Logger.trace(changes.map { "\($0.id.structureAsString)\t\($0.structureAsString)" }.joined(separator: "\n"))
 
         let clone = self.cloned
         try changes.forEach {

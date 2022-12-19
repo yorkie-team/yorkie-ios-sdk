@@ -62,7 +62,7 @@ public class JSONCounter<T: YorkieCountable> {
     public func increase<T: YorkieCountable>(value: T) throws -> Self {
         guard let context, let counter else {
             let log = "it is not initialized yet"
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 

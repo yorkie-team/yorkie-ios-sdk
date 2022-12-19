@@ -44,7 +44,7 @@ struct AddOperation: Operation {
             } else {
                 log = "fail to execute, only array can execute add"
             }
-            Logger.fatal(log)
+            Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
