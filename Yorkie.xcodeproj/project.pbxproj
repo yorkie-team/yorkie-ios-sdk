@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
+		9A30D40429514F150036F732 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC736292273D200C89478 /* CRDTCounter.swift */; };
 		9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC738292273E400C89478 /* CRDTCountTests.swift */; };
 		9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73B2922741200C89478 /* IncreaseOperation.swift */; };
@@ -785,6 +786,7 @@
 				9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */,
 				CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
+				9A30D40429514F150036F732 /* ClientTests.swift in Sources */,
 				9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */,
 				CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,

@@ -185,7 +185,7 @@ public actor Client {
         }
 
         var gRPCLogger = Logging.Logger(label: "gRPC")
-        gRPCLogger.logLevel = .trace
+        gRPCLogger.logLevel = .info
         builder.withBackgroundActivityLogger(gRPCLogger)
 
         let channel = builder.connect(host: rpcAddress.host, port: rpcAddress.port)

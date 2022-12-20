@@ -55,9 +55,14 @@ enum Logger {
     }
 
     static func log(level: Logging.Logger.Level, _ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: UInt = #line) {
-        let log = message + (error?.localizedDescription ?? "")
-        let message = "\(function) - \(log)"
+        var log = message
 
-        self.yorkieLogger.log(level: level, Logging.Logger.Message(stringLiteral: message), source: "\(filename):\(line)", file: filename, function: function, line: line)
+        if let error {
+            log += "(\(String(describing: error)))"
+        }
+
+        let logMessage = "\(function) - \(log)"
+
+        self.yorkieLogger.log(level: level, Logging.Logger.Message(stringLiteral: logMessage), source: "\(filename):\(line)", file: filename, function: function, line: line)
     }
 }
