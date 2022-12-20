@@ -20,7 +20,7 @@ import Foundation
  * `SplayNode` is a node of SplayTree.
  */
 class SplayNode<V> {
-    private(set) var value: V
+    internal(set) var value: V
 
     fileprivate var left: SplayNode<V>?
     fileprivate var right: SplayNode<V>?
