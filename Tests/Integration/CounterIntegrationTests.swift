@@ -80,13 +80,8 @@ final class CounterIntegrationTests: XCTestCase {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
-        do {
-            self.c1 = try Client(rpcAddress: self.rpcAddress, options: options)
-            self.c2 = try Client(rpcAddress: self.rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
         self.d1 = Document(key: docKey)
         self.d2 = Document(key: docKey)
@@ -139,13 +134,8 @@ final class CounterIntegrationTests: XCTestCase {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
-        do {
-            self.c1 = try Client(rpcAddress: self.rpcAddress, options: options)
-            self.c2 = try Client(rpcAddress: self.rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
         self.d1 = Document(key: docKey)
         self.d2 = Document(key: docKey)

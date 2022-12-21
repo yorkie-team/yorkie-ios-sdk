@@ -32,13 +32,8 @@ final class ClientIntegrationTests: XCTestCase {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
-        do {
-            self.c1 = try Client(rpcAddress: self.rpcAddress, options: options)
-            self.c2 = try Client(rpcAddress: self.rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
         self.d1 = Document(key: docKey)
         await self.d1.update { root in
@@ -101,13 +96,8 @@ final class ClientIntegrationTests: XCTestCase {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)"
 
-        do {
-            self.c1 = try Client(rpcAddress: self.rpcAddress, options: options)
-            self.c2 = try Client(rpcAddress: self.rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
         self.d1 = Document(key: docKey)
         await self.d1.update { root in
@@ -203,11 +193,11 @@ final class ClientIntegrationTests: XCTestCase {
         var option = ClientOptions()
         option.presence = PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary
 
-        let c1 = try Client(rpcAddress: rpcAddress, options: option)
+        let c1 = Client(rpcAddress: rpcAddress, options: option)
 
         option.presence = PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary
 
-        let c2 = try Client(rpcAddress: rpcAddress, options: option)
+        let c2 = Client(rpcAddress: rpcAddress, options: option)
 
         try await c1.activate()
         try await c2.activate()

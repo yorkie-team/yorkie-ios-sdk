@@ -21,7 +21,7 @@ import XCTest
 class ClientTests: XCTestCase {
     var cancellables = Set<AnyCancellable>()
 
-    func skip_test_activate_and_deactivate_client_with_key() async throws {
+    func test_activate_and_deactivate_client_with_key() async throws {
         let clientKey = "\(self.description)-\(Date().description)"
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
@@ -29,12 +29,7 @@ class ClientTests: XCTestCase {
         let target: Client
         var status = ClientStatus.deactivated
 
-        do {
-            target = try Client(rpcAddress: rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        target = Client(rpcAddress: rpcAddress, options: options)
 
         target.eventStream.sink { event in
             switch event {
@@ -69,19 +64,14 @@ class ClientTests: XCTestCase {
         XCTAssert(status == .deactivated)
     }
 
-    func skip_test_activate_and_deactivate_client_without_key() async throws {
+    func test_activate_and_deactivate_client_without_key() async throws {
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
         let options = ClientOptions()
         let target: Client
         var status = ClientStatus.deactivated
 
-        do {
-            target = try Client(rpcAddress: rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        target = Client(rpcAddress: rpcAddress, options: options)
 
         target.eventStream.sink { event in
             switch event {
@@ -108,7 +98,7 @@ class ClientTests: XCTestCase {
         XCTAssert(status == .deactivated)
     }
 
-    func skip_test_attach_detach_document_with_key() async throws {
+    func test_attach_detach_document_with_key() async throws {
         let clientId = UUID().uuidString
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
@@ -116,12 +106,7 @@ class ClientTests: XCTestCase {
         let target: Client
         var status = ClientStatus.deactivated
 
-        do {
-            target = try Client(rpcAddress: rpcAddress, options: options)
-        } catch {
-            XCTFail(error.localizedDescription)
-            return
-        }
+        target = Client(rpcAddress: rpcAddress, options: options)
 
         target.eventStream.sink { event in
             print("#### \(event)")
