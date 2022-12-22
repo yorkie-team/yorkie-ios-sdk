@@ -95,8 +95,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/yorkie-team/yorkie-ios-sdk.git",
       "state" : {
-        "revision" : "b722270e2a146baadc9953bbf80d81e51f956833",
-        "version" : "0.2.19"
+        "branch" : "main",
+        "revision" : "6ef6d950f4537aaed55e1b2d5323ba5441d87f08"
       }
     }
   ],
