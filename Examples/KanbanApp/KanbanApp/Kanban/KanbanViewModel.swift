@@ -48,7 +48,7 @@ class KanbanViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
 
-            await self.document.eventStream.sink { event in
+            await self.document.eventStream.sink { _ in
                 Task { @MainActor [weak self] in
                     guard let self, let lists = await self.document.getRoot().lists as? JSONArray else { return }
 
