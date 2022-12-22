@@ -31,7 +31,7 @@ class KanbanViewModel: ObservableObject {
         ])
     ]
 
-    private var client: Client?
+    private var client: Client
 
     @Published
     private(set) var columns: [KanbanColumn] = []
@@ -39,13 +39,16 @@ class KanbanViewModel: ObservableObject {
     private let document: Document
 
     init() {
+        self.client = Client(rpcAddress: RPCAddress(host: "localhost", port: 8080),
+                             options: ClientOptions())
+
         let docKey = "KanbanViewModel-8"
         self.document = Document(key: docKey)
 
         Task { [weak self] in
             guard let self else { return }
 
-            await self.document.eventStream.sink { _ in
+            await self.document.eventStream.sink { event in
                 Task { @MainActor [weak self] in
                     guard let self, let lists = await self.document.getRoot().lists as? JSONArray else { return }
 
@@ -65,14 +68,9 @@ class KanbanViewModel: ObservableObject {
                 }
             }.store(in: &self.cancellables)
 
-            if let client = try? Client(rpcAddress: RPCAddress(host: "localhost", port: 8080),
-                                        options: ClientOptions())
-            {
-                self.client = client
-                Task {
-                    try! await self.client?.activate()
-                    _ = try! await self.client?.attach(self.document)
-                }
+            Task {
+                try! await self.client.activate()
+                try! await self.client.attach(self.document)
             }
         }
     }
