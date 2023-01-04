@@ -1,0 +1,866 @@
+/*
+ * Copyright 2022 The Yorkie Authors. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import Foundation
+
+/**
+ * `TextChangeType` is the type of TextChange.
+ *
+ * @internal
+ */
+enum TextChangeType {
+    case content
+    case selection
+    case style
+}
+
+/**
+ * `TextChange` is the value passed as an argument to `Text.onChanges()`.
+ * `Text.onChanges()` is called when the `Text` is modified.
+ */
+class TextChange {
+    let type: TextChangeType
+    let actor: ActorID
+    let from: Int
+    let to: Int
+    var content: String?
+
+    init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String?) {
+        self.type = type
+        self.actor = actor
+        self.from = from
+        self.to = to
+        self.content = content
+    }
+}
+
+/**
+ * `RichTextChange` is the value passed as an argument to `RichText.onChanges()`.
+ * `RichText.onChanges()` is called when the `RichText` is modified.
+ */
+class RichTextChange<A> {
+    let type: TextChangeType
+    let actor: ActorID
+    let from: Int
+    let to: Int
+    var content: String?
+    var attributes: A?
+
+    init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String?, attributes: A?) {
+        self.type = type
+        self.actor = actor
+        self.from = from
+        self.to = to
+        self.content = content
+        self.attributes = attributes
+    }
+}
+
+protocol RGATreeSplitValue {
+    init()
+    var count: Int { get }
+    func substring(indexStart: Int, indexEnd: Int?) -> Self
+    var string: String { get }
+}
+
+/**
+ * `RGATreeSplitNodeID` is an ID of RGATreeSplitNode.
+ */
+public class RGATreeSplitNodeID: Equatable, Comparable {
+    public static let initial = RGATreeSplitNodeID(TimeTicket.initial, 0)
+
+    /**
+     * `createdAt` the creation time of this ID.
+     */
+    public let createdAt: TimeTicket
+    /**
+     * `offset` the offset of this ID.
+     */
+    public let offset: Int
+
+    init(_ createdAt: TimeTicket, _ offset: Int) {
+        self.createdAt = createdAt
+        self.offset = offset
+    }
+
+    /**
+     * `==` returns whether given ID equals to this ID or not.
+     */
+    public static func == (lhs: RGATreeSplitNodeID, rhs: RGATreeSplitNodeID) -> Bool {
+        lhs.createdAt == rhs.createdAt && lhs.offset == rhs.offset
+    }
+
+    public static func < (lhs: RGATreeSplitNodeID, rhs: RGATreeSplitNodeID) -> Bool {
+        if lhs.createdAt == rhs.createdAt {
+            return lhs.offset < rhs.offset
+        } else {
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+
+    /**
+     * `hasSameCreatedAt` returns whether given ID has same creation time with this ID.
+     */
+    public func hasSameCreatedAt(_ other: RGATreeSplitNodeID) -> Bool {
+        self.createdAt == other.createdAt
+    }
+
+    /**
+     * `split` creates a new ID with an offset from this ID.
+     */
+    public func split(_ offset: Int) -> RGATreeSplitNodeID {
+        RGATreeSplitNodeID(self.createdAt, self.offset + offset)
+    }
+
+    /**
+     * `structureAsString` returns a String containing
+     * the meta data of the node id for debugging purpose.
+     */
+    public var structureAsString: String {
+        "\(self.createdAt.structureAsString):\(self.offset)"
+    }
+}
+
+/**
+ * `RGATreeSplitNodePos` is the position of the text inside the node.
+ */
+public class RGATreeSplitNodePos: Equatable {
+    /**
+     * `id` returns the ID of this RGATreeSplitNodePos.
+     */
+    public let id: RGATreeSplitNodeID
+
+    /**
+     * `relativeOffset` returns the relative offset of this RGATreeSplitNodePos.
+     */
+    public let relativeOffset: Int
+
+    init(_ id: RGATreeSplitNodeID, _ relativeOffset: Int) {
+        self.id = id
+        self.relativeOffset = relativeOffset
+    }
+
+    /**
+     * `absoluteID` returns the absolute id of this RGATreeSplitNodePos.
+     */
+    public var absoluteID: RGATreeSplitNodeID {
+        RGATreeSplitNodeID(self.id.createdAt, self.id.offset + self.relativeOffset)
+    }
+
+    /**
+     *`structureAsString` returns a String containing
+     * the meta data of the position for debugging purpose.
+     */
+    public var structureAsString: String {
+        "\(self.id.structureAsString):\(self.relativeOffset)"
+    }
+
+    /**
+     * `==` returns whether given pos equal to this pos or not.
+     */
+    public static func == (lhs: RGATreeSplitNodePos, rhs: RGATreeSplitNodePos) -> Bool {
+        lhs.id == rhs.id && lhs.relativeOffset == rhs.relativeOffset
+    }
+}
+
+public typealias RGATreeSplitNodeRange = (RGATreeSplitNodePos, RGATreeSplitNodePos)
+
+/**
+ * `RGATreeSplitNode` is a node of RGATreeSplit.
+ */
+class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
+    /**
+     * `id` returns the ID of this RGATreeSplitNode.
+     */
+    public let id: RGATreeSplitNodeID
+
+    /**
+     * `removedAt` returns the remove time of this node.
+     */
+    private(set) var removedAt: TimeTicket?
+
+    /**
+     * `prev` returns a previous node of this node.
+     */
+    private(set) var prev: RGATreeSplitNode<T>?
+
+    /**
+     * `next`  returns a next node of this node.
+     */
+    private(set) var next: RGATreeSplitNode<T>? {
+        didSet {}
+    }
+
+    /**
+     * `insPrev` returns a previous node of this node insertion.
+     */
+    private(set) var insPrev: RGATreeSplitNode<T>?
+
+    /**
+     * `insNext` returns a next node of this node insertion.
+     */
+    private(set) var insNext: RGATreeSplitNode<T>?
+
+    init(_ id: RGATreeSplitNodeID, _ value: T? = nil, _ removedAt: TimeTicket? = nil) {
+        self.id = id
+        self.removedAt = removedAt
+
+        super.init(value ?? T())
+    }
+
+    /**
+     * `createdAt` returns creation time of the Id of RGATreeSplitNode.
+     */
+    public var createdAt: TimeTicket {
+        self.id.createdAt
+    }
+
+    /**
+     * `length` returns the length of this node.
+     */
+    override public var length: Int {
+        guard self.removedAt == nil else {
+            return 0
+        }
+
+        return self.contentLength
+    }
+
+    /**
+     * `contentLength` returns the length of this value.
+     */
+    public var contentLength: Int {
+        self.value.count
+    }
+
+    /**
+     * `insPrevID` returns a ID of previous node insertion.
+     */
+    public var insPrevID: RGATreeSplitNodeID? {
+        self.insPrev?.id
+    }
+
+    /**
+     * `setPrev` sets a previous node of this node.
+     */
+    public func setPrev(_ node: RGATreeSplitNode<T>?) {
+        self.prev = node
+        node?.next = self
+    }
+
+    /**
+     * `setNext`  sets a next node of this node.
+     */
+    public func setNext(_ node: RGATreeSplitNode<T>?) {
+        self.next = node
+        node?.prev = self
+    }
+
+    /**
+     * `setInsPrev` sets a previous node of this node insertion.
+     */
+    public func setInsPrev(_ node: RGATreeSplitNode<T>?) {
+        self.insPrev = node
+        node?.insNext = self
+    }
+
+    /**
+     * `setInsNext` sets a next node of this node insertion.
+     */
+    public func setInsNext(_ node: RGATreeSplitNode<T>?) {
+        self.insNext = node
+        node?.insPrev = self
+    }
+
+    /**
+     * `hasNext` checks if next node exists.
+     */
+    public var hasNext: Bool {
+        self.next != nil
+    }
+
+    /**
+     * `hasInsPrev` checks if previous insertion node exists.
+     */
+    public var hasInsPrev: Bool {
+        self.insPrev != nil
+    }
+
+    /**
+     * `hasInsPrev` checks if previous insertion node exists.
+     */
+    public var hasInsNext: Bool {
+        self.insNext != nil
+    }
+
+    /**
+     * `isRemoved` checks if removed time exists.
+     */
+    public var isRemoved: Bool {
+        self.removedAt != nil
+    }
+
+    /**
+     * `split` creates a new split node of the given offset.
+     */
+    public func split(_ offset: Int) -> RGATreeSplitNode<T> {
+        RGATreeSplitNode(
+            self.id.split(offset),
+            self.splitValue(offset),
+            self.removedAt
+        )
+    }
+
+    /**
+     * `canDelete` checks if node is able to delete.
+     */
+    public func canDelete(_ editedAt: TimeTicket, _ latestCreatedAt: TimeTicket) -> Bool {
+        !self.createdAt.after(latestCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    }
+
+    /**
+     * `remove` removes node of given edited time.
+     */
+    public func remove(_ editedAt: TimeTicket?) {
+        self.removedAt = editedAt
+    }
+
+    /**
+     * `createRange` creates ranges of RGATreeSplitNodePos.
+     */
+    public var createRange: RGATreeSplitNodeRange {
+        (RGATreeSplitNodePos(self.id, 0), RGATreeSplitNodePos(self.id, self.length))
+    }
+
+    /**
+     * `deepcopy` returns a new instance of this RGATreeSplitNode without structural info.
+     */
+    public func deepcopy() -> RGATreeSplitNode<T> {
+        RGATreeSplitNode(self.id, self.value, self.removedAt)
+    }
+
+    /**
+     * `structureAsString` returns a String containing
+     * the meta data of the node for debugging purpose.
+     */
+    public var structureAsString: String {
+        "\(self.id.structureAsString) (\(String(describing: self.value)))"
+    }
+
+    private func splitValue(_ offset: Int) -> T {
+        let value = self.value
+        self.value = value.substring(indexStart: 0, indexEnd: offset - 1)
+        return value.substring(indexStart: offset, indexEnd: value.count - 1)
+    }
+}
+
+/**
+ * `RGATreeSplit` is a block-based list with improved index-based lookup in RGA.
+ * The difference from RGATreeList is that it has data on a block basis to
+ * reduce the size of CRDT metadata. When an edit occurs on a block,
+ * the block is split.
+ */
+class RGATreeSplit<T: RGATreeSplitValue> {
+    /**
+     * `head` returns head of RGATreeSplitNode.
+     */
+    private var head: RGATreeSplitNode<T>
+    private var treeByIndex: SplayTree<T>
+    private var treeByID: LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>>
+    private var removedNodeMap = [String: RGATreeSplitNode<T>]()
+
+    init() {
+        self.head = RGATreeSplitNode(RGATreeSplitNodeID.initial)
+        self.treeByIndex = SplayTree()
+        self.treeByID = LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>>()
+        self.treeByIndex.insert(self.head)
+        self.treeByID.insert(self.head.id, self.head)
+    }
+
+    /**
+     * `edit` does following steps
+     * 1. split nodes with from and to
+     * 2. delete between from and to
+     * 3. insert a new node
+     * 4. add removed node
+     * @param range - range of RGATreeSplitNode
+     * @param editedAt - edited time
+     * @param value - value
+     * @param latestCreatedAtMapByActor - latestCreatedAtMapByActor
+     * @returns `[RGATreeSplitNodePos, Map<string, TimeTicket>, Array<Change>]`
+     */
+    @discardableResult
+    public func edit(_ range: RGATreeSplitNodeRange,
+                     _ editedAt: TimeTicket,
+                     _ value: T?,
+                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) -> (RGATreeSplitNodePos, [String: TimeTicket], [TextChange])
+    {
+        // 01. split nodes with from and to
+        let (toLeft, toRight) = self.findNodeWithSplit(range.1, editedAt)
+        let (fromLeft, fromRight) = self.findNodeWithSplit(range.0, editedAt)
+
+        // 02. delete between from and to
+        let nodesToDelete = self.findBetween(fromRight, toRight)
+        var (changes, latestCreatedAtMap, removedNodeMapByNodeKey) = self.deleteNodes(nodesToDelete, editedAt, latestCreatedAtMapByActor)
+
+        let caretID = toRight?.id ?? toLeft.id
+        var caretPos = RGATreeSplitNodePos(caretID, 0)
+
+        // 03. insert a new node
+        if let value {
+            let idx = self.findIdxFromNodePos(fromLeft.createRange.1, true)
+
+            let inserted = self.insertAfter(
+                fromLeft,
+                RGATreeSplitNode(RGATreeSplitNodeID(editedAt, 0), value)
+            )
+
+            if !changes.isEmpty, changes[changes.count - 1].from == idx {
+                changes[changes.count - 1].content = value.string
+            } else {
+                changes.append(TextChange(type: .content, actor: editedAt.actorID!, from: idx, to: idx, content: value.string))
+            }
+
+            caretPos = RGATreeSplitNodePos(inserted.id, inserted.contentLength)
+        }
+
+        // 04. add removed node
+        for (key, removedNode) in removedNodeMapByNodeKey {
+            self.removedNodeMap[key] = removedNode
+        }
+
+        return (caretPos, latestCreatedAtMap, changes)
+    }
+
+    /**
+     * `findNodePos` finds RGATreeSplitNodePos of given offset.
+     */
+    public func findNodePos(_ idx: Int) -> RGATreeSplitNodePos? {
+        let (node, offset) = self.treeByIndex.find(idx)
+        guard let splitNode = node as? RGATreeSplitNode<T> else {
+            return nil
+        }
+
+        return RGATreeSplitNodePos(splitNode.id, offset)
+    }
+
+    /**
+     * `findIndexesFromRange` finds indexes based on range.
+     */
+    public func findIndexesFromRange(_ range: RGATreeSplitNodeRange) -> (Int, Int) {
+        let (fromPos, toPos) = range
+        return (self.findIdxFromNodePos(fromPos, false), self.findIdxFromNodePos(toPos, true))
+    }
+
+    /**
+     * `findIdxFromNodePos` finds index based on node position.
+     */
+    public func findIdxFromNodePos(_ pos: RGATreeSplitNodePos, _ preferToLeft: Bool) -> Int {
+        let absoluteID = pos.absoluteID
+        guard let node = preferToLeft ? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
+            Logger.critical("the node of the given id should be found: \(absoluteID.structureAsString)")
+            fatalError()
+        }
+        let index = self.treeByIndex.indexOf(node)
+        let offset = node.isRemoved ? 0 : absoluteID.offset - node.id.offset
+
+        return index + offset
+    }
+
+    /**
+     * `findNode` finds node of given id.
+     */
+    public func findNode(_ id: RGATreeSplitNodeID) -> RGATreeSplitNode<T>? {
+        self.findFloorNode(id)
+    }
+
+    /**
+     * `length` returns size of RGATreeList.
+     */
+    public var length: Int {
+        self.treeByIndex.length
+    }
+
+    /**
+     * `checkWeight` returns false when there is an incorrect weight node.
+     * for debugging purpose.
+     */
+    public func checkWeight() -> Bool {
+        self.treeByIndex.checkWeight()
+    }
+
+    /**
+     * `toJSON` returns the JSON encoding of this Array.
+     */
+    public var toJSON: String {
+        var result = [String]()
+
+        var node: RGATreeSplitNode<T>? = self.head
+        while node != nil {
+            if !node!.isRemoved {
+                result.append("\(node!.value)")
+            }
+
+            node = node?.next
+        }
+
+        return result.joined(separator: "")
+    }
+
+    /**
+     * `deepcopy` copies itself deeply.
+     */
+    public func deepcopy() -> RGATreeSplit<T> {
+        let clone = RGATreeSplit<T>()
+
+        var node: RGATreeSplitNode<T>? = self.head.next
+        var prev: RGATreeSplitNode<T>? = clone.head
+        var current: RGATreeSplitNode<T>?
+
+        while node != nil {
+            current = clone.insertAfter(prev!, node!.deepcopy())
+            if let insPrevID = node!.insPrevID {
+                current?.setInsPrev(clone.findNode(insPrevID))
+            }
+
+            prev = current
+            node = node!.next
+        }
+
+        return clone
+    }
+
+    /**
+     * `structureAsString` returns a String containing the meta data of the node
+     * for debugging purpose.
+     */
+    public var structureAsString: String {
+        var result = [String]()
+
+        var node: RGATreeSplitNode<T>? = self.head
+        while node != nil {
+            if node!.isRemoved {
+                result.append("{\(node!.structureAsString)}")
+            } else {
+                result.append("[\(node!.structureAsString)]")
+            }
+
+            node = node!.next
+        }
+
+        return result.joined(separator: "")
+    }
+
+    /**
+     * `insertAfter` inserts the given node after the given previous node.
+     */
+    @discardableResult
+    public func insertAfter(_ prevNode: RGATreeSplitNode<T>, _ newNode: RGATreeSplitNode<T>) -> RGATreeSplitNode<T> {
+        let next = prevNode.next
+        newNode.setPrev(prevNode)
+
+        if next != nil {
+            next!.setPrev(newNode)
+        }
+
+        self.treeByID.insert(newNode.id, newNode)
+        self.treeByIndex.insert(previousNode: prevNode, newNode: newNode)
+
+        return newNode
+    }
+
+    /**
+     * `findNodeWithSplit` splits and return nodes of the given position.
+     */
+    public func findNodeWithSplit(_ pos: RGATreeSplitNodePos, _ editedAt: TimeTicket) -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
+        let absoluteID = pos.absoluteID
+        var node = self.findFloorNodePreferToLeft(absoluteID)
+        let relativeOffset = absoluteID.offset - node.id.offset
+
+        self.splitNode(node, relativeOffset)
+
+        while let next = node.next, next.createdAt.after(editedAt) {
+            node = next
+        }
+
+        return (node, node.next)
+    }
+
+    private func findFloorNodePreferToLeft(_ id: RGATreeSplitNodeID) -> RGATreeSplitNode<T> {
+        guard let node = self.findFloorNode(id) else {
+            Logger.critical("the node of the given id should be found: \(id.structureAsString)")
+            fatalError()
+        }
+
+        if id.offset > 0, node.id.offset == id.offset {
+            // NOTE: InsPrev may not be present due to GC.
+            if let insPrev = node.insPrev {
+                return insPrev
+            }
+        }
+
+        return node
+    }
+
+    private func findFloorNode(_ id: RGATreeSplitNodeID) -> RGATreeSplitNode<T>? {
+        guard let entry = self.treeByID.floorEntry(id) else {
+            return nil
+        }
+
+        if !(entry.key == id), !entry.key.hasSameCreatedAt(id) {
+            return nil
+        }
+
+        return entry.value
+    }
+
+    /**
+     * `findBetween` returns nodes between fromNode and toNode.
+     */
+    public func findBetween(_ fromNode: RGATreeSplitNode<T>?, _ toNode: RGATreeSplitNode<T>?) -> [RGATreeSplitNode<T>] {
+        var nodes = [RGATreeSplitNode<T>]()
+
+        var current: RGATreeSplitNode<T>? = fromNode
+        while current != nil, current! !== toNode {
+            nodes.append(current!)
+            current = current!.next
+        }
+
+        return nodes
+    }
+
+    @discardableResult
+    private func splitNode(_ node: RGATreeSplitNode<T>, _ offset: Int) -> RGATreeSplitNode<T>? {
+        guard offset <= node.contentLength else {
+            Logger.critical("offset should be less than or equal to length")
+
+            return nil
+        }
+
+        if offset == 0 {
+            return node
+        } else if offset == node.contentLength {
+            return node.next
+        }
+
+        let splitNode = node.split(offset)
+        self.treeByIndex.updateWeight(splitNode)
+        self.insertAfter(node, splitNode)
+
+        if node.hasInsNext {
+            node.insNext!.setInsPrev(splitNode)
+        }
+        splitNode.setInsPrev(node)
+
+        return splitNode
+    }
+
+    private func deleteNodes(_ candidates: [RGATreeSplitNode<T>],
+                             _ editedAt: TimeTicket,
+                             _ latestCreatedAtMapByActor: [String: TimeTicket]?) -> ([TextChange],
+                                                                                     [String: TimeTicket],
+                                                                                     [String: RGATreeSplitNode<T>])
+    {
+        guard !candidates.isEmpty else {
+            return ([], [:], [:])
+        }
+
+        // There are 2 types of nodes in `candidates`: should delete, should not delete.
+        // `nodesToKeep` contains nodes should not delete,
+        // then is used to find the boundary of the range to be deleted.
+        let (nodesToDelete, nodesToKeep) = self.filterNodes(candidates, editedAt, latestCreatedAtMapByActor)
+
+        var createdAtMapByActor = [ActorID: TimeTicket]()
+        var removedNodeMap = [ActorID: RGATreeSplitNode<T>]()
+        // First we need to collect indexes for change.
+        let changes = self.makeChanges(nodesToKeep, editedAt)
+        for node in nodesToDelete {
+            // Then make nodes be tombstones and map that.
+            if let actorID = node.createdAt.actorID {
+                if createdAtMapByActor[actorID] == nil ||
+                    node.id.createdAt.after(createdAtMapByActor[actorID]!)
+                {
+                    createdAtMapByActor[actorID] = node.id.createdAt
+                }
+            }
+            removedNodeMap[node.id.structureAsString] = node
+            node.remove(editedAt)
+        }
+        // Finally remove index nodes of tombstones.
+        self.deleteIndexNodes(nodesToKeep)
+
+        return (changes, createdAtMapByActor, removedNodeMap)
+    }
+
+    private func filterNodes(_ candidates: [RGATreeSplitNode<T>],
+                             _ editedAt: TimeTicket,
+                             _ latestCreatedAtMapByActor: [ActorID: TimeTicket]?) -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?])
+    {
+        let isRemote = latestCreatedAtMapByActor != nil
+        var nodesToDelete = [RGATreeSplitNode<T>]()
+        var nodesToKeep = [RGATreeSplitNode<T>?]()
+
+        let (leftEdge, rightEdge) = self.findEdgesOfCandidates(candidates)
+        nodesToKeep.append(leftEdge)
+
+        for node in candidates {
+            let latestCreatedAt: TimeTicket
+
+            if isRemote {
+                if let actorID = node.createdAt.actorID, let latest = latestCreatedAtMapByActor?[actorID] {
+                    latestCreatedAt = latest
+                } else {
+                    latestCreatedAt = TimeTicket.initial
+                }
+            } else {
+                latestCreatedAt = TimeTicket.max
+            }
+
+            if node.canDelete(editedAt, latestCreatedAt) {
+                nodesToDelete.append(node)
+            } else {
+                nodesToKeep.append(node)
+            }
+        }
+        nodesToKeep.append(rightEdge)
+
+        return (nodesToDelete, nodesToKeep)
+    }
+
+    /**
+     * `findEdgesOfCandidates` finds the edges outside `candidates`,
+     * (which has not already been deleted, or be undefined but not yet implemented)
+     * right edge is undefined means `candidates` contains the end of text.
+     */
+    private func findEdgesOfCandidates(_ candidates: [RGATreeSplitNode<T>]) -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
+        guard let prev = candidates[0].prev else {
+            fatalError("prev must not nil!")
+        }
+
+        return (prev, candidates[safe: candidates.count - 1]?.next)
+    }
+
+    // TODO: Too many forced unwrap!!!
+    private func makeChanges(_ boundaries: [RGATreeSplitNode<T>?], _ editedAt: TimeTicket) -> [TextChange] {
+        var changes = [TextChange]()
+        var fromIdx: Int, toIdx: Int
+
+        for index in 0 ..< (boundaries.count - 1) {
+            guard let leftBoundary = boundaries[index] else {
+                continue
+            }
+
+            let rightBoundary = boundaries[index + 1]
+
+            if leftBoundary.next === rightBoundary {
+                continue
+            }
+
+            fromIdx = self.findIndexesFromRange(leftBoundary.next!.createRange).0
+            if rightBoundary != nil {
+                toIdx = self.findIndexesFromRange(rightBoundary!.prev!.createRange).1
+            } else {
+                toIdx = self.treeByIndex.length
+            }
+
+            if fromIdx < toIdx {
+                changes.append(TextChange(type: .content, actor: editedAt.actorID!, from: fromIdx, to: toIdx, content: nil))
+            }
+        }
+
+        return changes.reversed()
+    }
+
+    /**
+     * `deleteIndexNodes` clears the index nodes of the given deletion boundaries.
+     * The boundaries mean the nodes that will not be deleted in the range.
+     */
+    private func deleteIndexNodes(_ boundaries: [RGATreeSplitNode<T>?]) {
+        for index in 0 ..< (boundaries.count - 1) {
+            let leftBoundary = boundaries[index]
+            let rightBoundary = boundaries[index + 1]
+            // If there is no node to delete between boundaries, do notting.
+            if leftBoundary != nil, leftBoundary!.next !== rightBoundary {
+                self.treeByIndex.removeRange(leftBoundary!, rightBoundary)
+            }
+        }
+    }
+
+    /**
+     * `removedNodesLength` returns size of removed nodes.
+     */
+    public var removedNodesLength: Int {
+        self.removedNodeMap.count
+    }
+
+    /**
+     * `purgeTextNodesWithGarbage` physically purges nodes that have been removed.
+     */
+    public func purgeTextNodesWithGarbage(_ ticket: TimeTicket) -> Int {
+        var count = 0
+
+        for (_, node) in self.removedNodeMap {
+            if let removedAt = node.removedAt, ticket > removedAt {
+                self.treeByIndex.delete(node)
+                self.purge(node)
+                self.treeByID.delete(node.id)
+                self.removedNodeMap.removeValue(forKey: node.id.structureAsString)
+                count += 1
+            }
+        }
+
+        return count
+    }
+
+    /**
+     * `purge` physically purges the given node from RGATreeSplit.
+     */
+    public func purge(_ node: RGATreeSplitNode<T>) {
+        node.prev?.setNext(node.next)
+        node.next?.setPrev(node.prev)
+
+        node.setPrev(nil)
+        node.setNext(nil)
+
+        node.insPrev?.setInsNext(node.insNext)
+        node.insNext?.setInsPrev(node.insPrev)
+
+        node.setInsPrev(nil)
+        node.setInsNext(nil)
+    }
+}
+
+/**
+ * `Selection` represents the selection of text range in the editor.
+ */
+class Selection {
+    private let from: RGATreeSplitNodePos
+    private let to: RGATreeSplitNodePos
+    /**
+     * `updatedAt` returns update time of this selection.
+     */
+    public let updatedAt: TimeTicket
+
+    init(_ from: RGATreeSplitNodePos, _ to: RGATreeSplitNodePos, _ updatedAt: TimeTicket) {
+        self.from = from
+        self.to = to
+        self.updatedAt = updatedAt
+    }
+
+    convenience init(_ range: RGATreeSplitNodeRange, _ updatedAt: TimeTicket) {
+        self.init(range.0, range.1, updatedAt)
+    }
+}

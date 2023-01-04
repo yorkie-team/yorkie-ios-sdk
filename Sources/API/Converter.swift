@@ -190,9 +190,9 @@ extension Converter {
      */
     static func toTimeTicket(_ ticket: TimeTicket) -> PbTimeTicket {
         var pbTimeTicket = PbTimeTicket()
-        pbTimeTicket.lamport = ticket.getLamport()
-        pbTimeTicket.delimiter = ticket.getDelimiter()
-        pbTimeTicket.actorID = ticket.getActorID()?.toData ?? Data()
+        pbTimeTicket.lamport = ticket.lamport
+        pbTimeTicket.delimiter = ticket.delimiter
+        pbTimeTicket.actorID = ticket.actorID?.toData ?? Data()
         return pbTimeTicket
     }
 

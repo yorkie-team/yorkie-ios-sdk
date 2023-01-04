@@ -30,9 +30,20 @@ public struct TimeTicket: Comparable {
     public static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
     static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
 
-    private let lamport: Int64
-    private let delimiter: UInt32
-    private var actorID: ActorID?
+    /**
+     * `lamport` returns the lamport int64.
+     */
+    public let lamport: Int64
+
+    /**
+     * `delimiter` returns delimiter.
+     */
+    public let delimiter: UInt32
+
+    /**
+     * `actorID` returns actorID.
+     */
+    private(set) var actorID: ActorID?
 
     init(lamport: Int64, delimiter: UInt32, actorID: ActorID?) {
         self.lamport = lamport
@@ -69,38 +80,17 @@ public struct TimeTicket: Comparable {
     }
 
     /**
-     * `getLamport` returns the lamport int64.
+     * `lamportAsString` returns the lamport string.
      */
-    func getLamport() -> Int64 {
-        return self.lamport
-    }
-
-    /**
-     * `getLamportAsString` returns the lamport string.
-     */
-    func getLamportAsString() -> String {
-        return "\(self.lamport)"
-    }
-
-    /**
-     * `getDelimiter` returns delimiter.
-     */
-    func getDelimiter() -> UInt32 {
-        return self.delimiter
-    }
-
-    /**
-     * `getActorID` returns actorID.
-     */
-    func getActorID() -> ActorID? {
-        return self.actorID
+    var lamportAsString: String {
+        "\(self.lamport)"
     }
 
     /**
      * `after` returns whether the given ticket was created later.
      */
     func after(_ other: TimeTicket) -> Bool {
-        return self > other
+        self > other
     }
 
     public static func < (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
