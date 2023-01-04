@@ -21,4 +21,5 @@ enum YorkieError: Error {
     case unimplemented(message: String)
     case clientNotActive(message: String)
     case type(message: String)
+    case noSuchElement(message: String)
 }

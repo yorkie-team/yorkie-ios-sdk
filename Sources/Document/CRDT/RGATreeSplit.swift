@@ -72,7 +72,7 @@ class RichTextChange<A> {
 protocol RGATreeSplitValue {
     init()
     var count: Int { get }
-    func substring(indexStart: Int, indexEnd: Int?) -> Self
+    func substring(from: Int, to: Int) -> Self
     var string: String { get }
 }
 
@@ -362,8 +362,8 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
 
     private func splitValue(_ offset: Int) -> T {
         let value = self.value
-        self.value = value.substring(indexStart: 0, indexEnd: offset - 1)
-        return value.substring(indexStart: offset, indexEnd: value.count - 1)
+        self.value = value.substring(from: 0, to: offset - 1)
+        return value.substring(from: offset, to: value.count - 1)
     }
 }
 
@@ -406,22 +406,22 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     public func edit(_ range: RGATreeSplitNodeRange,
                      _ editedAt: TimeTicket,
                      _ value: T?,
-                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) -> (RGATreeSplitNodePos, [String: TimeTicket], [TextChange])
+                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> (RGATreeSplitNodePos, [String: TimeTicket], [TextChange])
     {
         // 01. split nodes with from and to
-        let (toLeft, toRight) = self.findNodeWithSplit(range.1, editedAt)
-        let (fromLeft, fromRight) = self.findNodeWithSplit(range.0, editedAt)
+        let (toLeft, toRight) = try self.findNodeWithSplit(range.1, editedAt)
+        let (fromLeft, fromRight) = try self.findNodeWithSplit(range.0, editedAt)
 
         // 02. delete between from and to
         let nodesToDelete = self.findBetween(fromRight, toRight)
-        var (changes, latestCreatedAtMap, removedNodeMapByNodeKey) = self.deleteNodes(nodesToDelete, editedAt, latestCreatedAtMapByActor)
+        var (changes, latestCreatedAtMap, removedNodeMapByNodeKey) = try self.deleteNodes(nodesToDelete, editedAt, latestCreatedAtMapByActor)
 
         let caretID = toRight?.id ?? toLeft.id
         var caretPos = RGATreeSplitNodePos(caretID, 0)
 
         // 03. insert a new node
         if let value {
-            let idx = self.findIdxFromNodePos(fromLeft.createRange.1, true)
+            let idx = try self.findIdxFromNodePos(fromLeft.createRange.1, true)
 
             let inserted = self.insertAfter(
                 fromLeft,
@@ -448,10 +448,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodePos` finds RGATreeSplitNodePos of given offset.
      */
-    public func findNodePos(_ idx: Int) -> RGATreeSplitNodePos? {
+    public func findNodePos(_ idx: Int) throws -> RGATreeSplitNodePos {
         let (node, offset) = self.treeByIndex.find(idx)
         guard let splitNode = node as? RGATreeSplitNode<T> else {
-            return nil
+            throw YorkieError.noSuchElement(message: "no element for index \(idx)")
         }
 
         return RGATreeSplitNodePos(splitNode.id, offset)
@@ -460,19 +460,20 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findIndexesFromRange` finds indexes based on range.
      */
-    public func findIndexesFromRange(_ range: RGATreeSplitNodeRange) -> (Int, Int) {
+    public func findIndexesFromRange(_ range: RGATreeSplitNodeRange) throws -> (Int, Int) {
         let (fromPos, toPos) = range
-        return (self.findIdxFromNodePos(fromPos, false), self.findIdxFromNodePos(toPos, true))
+        return (try self.findIdxFromNodePos(fromPos, false), try self.findIdxFromNodePos(toPos, true))
     }
 
     /**
      * `findIdxFromNodePos` finds index based on node position.
      */
-    public func findIdxFromNodePos(_ pos: RGATreeSplitNodePos, _ preferToLeft: Bool) -> Int {
+    public func findIdxFromNodePos(_ pos: RGATreeSplitNodePos, _ preferToLeft: Bool) throws -> Int {
         let absoluteID = pos.absoluteID
-        guard let node = preferToLeft ? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
-            Logger.critical("the node of the given id should be found: \(absoluteID.structureAsString)")
-            fatalError()
+        guard let node = preferToLeft ? try? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
+            let message = "the node of the given id should be found: \(absoluteID.structureAsString)"
+            Logger.critical(message)
+            throw YorkieError.noSuchElement(message: message)
         }
         let index = self.treeByIndex.indexOf(node)
         let offset = node.isRemoved ? 0 : absoluteID.offset - node.id.offset
@@ -585,9 +586,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodeWithSplit` splits and return nodes of the given position.
      */
-    public func findNodeWithSplit(_ pos: RGATreeSplitNodePos, _ editedAt: TimeTicket) -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
+    public func findNodeWithSplit(_ pos: RGATreeSplitNodePos, _ editedAt: TimeTicket) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
         let absoluteID = pos.absoluteID
-        var node = self.findFloorNodePreferToLeft(absoluteID)
+        var node = try self.findFloorNodePreferToLeft(absoluteID)
         let relativeOffset = absoluteID.offset - node.id.offset
 
         self.splitNode(node, relativeOffset)
@@ -599,10 +600,11 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         return (node, node.next)
     }
 
-    private func findFloorNodePreferToLeft(_ id: RGATreeSplitNodeID) -> RGATreeSplitNode<T> {
+    private func findFloorNodePreferToLeft(_ id: RGATreeSplitNodeID) throws -> RGATreeSplitNode<T> {
         guard let node = self.findFloorNode(id) else {
-            Logger.critical("the node of the given id should be found: \(id.structureAsString)")
-            fatalError()
+            let message = "the node of the given id should be found: \(id.structureAsString)"
+            Logger.critical(message)
+            throw YorkieError.noSuchElement(message: message)
         }
 
         if id.offset > 0, node.id.offset == id.offset {
@@ -670,9 +672,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
     private func deleteNodes(_ candidates: [RGATreeSplitNode<T>],
                              _ editedAt: TimeTicket,
-                             _ latestCreatedAtMapByActor: [String: TimeTicket]?) -> ([TextChange],
-                                                                                     [String: TimeTicket],
-                                                                                     [String: RGATreeSplitNode<T>])
+                             _ latestCreatedAtMapByActor: [String: TimeTicket]?) throws -> ([TextChange],
+                                                                                            [String: TimeTicket],
+                                                                                            [String: RGATreeSplitNode<T>])
     {
         guard !candidates.isEmpty else {
             return ([], [:], [:])
@@ -681,12 +683,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // There are 2 types of nodes in `candidates`: should delete, should not delete.
         // `nodesToKeep` contains nodes should not delete,
         // then is used to find the boundary of the range to be deleted.
-        let (nodesToDelete, nodesToKeep) = self.filterNodes(candidates, editedAt, latestCreatedAtMapByActor)
+        let (nodesToDelete, nodesToKeep) = try self.filterNodes(candidates, editedAt, latestCreatedAtMapByActor)
 
         var createdAtMapByActor = [ActorID: TimeTicket]()
         var removedNodeMap = [ActorID: RGATreeSplitNode<T>]()
         // First we need to collect indexes for change.
-        let changes = self.makeChanges(nodesToKeep, editedAt)
+        let changes = try self.makeChanges(nodesToKeep, editedAt)
+
         for node in nodesToDelete {
             // Then make nodes be tombstones and map that.
             if let actorID = node.createdAt.actorID {
@@ -707,13 +710,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
     private func filterNodes(_ candidates: [RGATreeSplitNode<T>],
                              _ editedAt: TimeTicket,
-                             _ latestCreatedAtMapByActor: [ActorID: TimeTicket]?) -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?])
+                             _ latestCreatedAtMapByActor: [ActorID: TimeTicket]?) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?])
     {
         let isRemote = latestCreatedAtMapByActor != nil
         var nodesToDelete = [RGATreeSplitNode<T>]()
         var nodesToKeep = [RGATreeSplitNode<T>?]()
 
-        let (leftEdge, rightEdge) = self.findEdgesOfCandidates(candidates)
+        let (leftEdge, rightEdge) = try self.findEdgesOfCandidates(candidates)
         nodesToKeep.append(leftEdge)
 
         for node in candidates {
@@ -745,16 +748,15 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * (which has not already been deleted, or be undefined but not yet implemented)
      * right edge is undefined means `candidates` contains the end of text.
      */
-    private func findEdgesOfCandidates(_ candidates: [RGATreeSplitNode<T>]) -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
+    private func findEdgesOfCandidates(_ candidates: [RGATreeSplitNode<T>]) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
         guard let prev = candidates[0].prev else {
-            fatalError("prev must not nil!")
+            throw YorkieError.noSuchElement(message: "prev must not nil!")
         }
 
         return (prev, candidates[safe: candidates.count - 1]?.next)
     }
 
-    // TODO: Too many forced unwrap!!!
-    private func makeChanges(_ boundaries: [RGATreeSplitNode<T>?], _ editedAt: TimeTicket) -> [TextChange] {
+    private func makeChanges(_ boundaries: [RGATreeSplitNode<T>?], _ editedAt: TimeTicket) throws -> [TextChange] {
         var changes = [TextChange]()
         var fromIdx: Int, toIdx: Int
 
@@ -769,9 +771,17 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 continue
             }
 
-            fromIdx = self.findIndexesFromRange(leftBoundary.next!.createRange).0
+            guard let range = leftBoundary.next?.createRange else {
+                throw YorkieError.noSuchElement(message: "The next node of leftBoundary is nil")
+            }
+
+            fromIdx = try self.findIndexesFromRange(range).0
             if rightBoundary != nil {
-                toIdx = self.findIndexesFromRange(rightBoundary!.prev!.createRange).1
+                guard let range = rightBoundary!.prev?.createRange else {
+                    throw YorkieError.noSuchElement(message: "The prev node of rightBoundary is nil")
+                }
+
+                toIdx = try self.findIndexesFromRange(range).1
             } else {
                 toIdx = self.treeByIndex.length
             }
