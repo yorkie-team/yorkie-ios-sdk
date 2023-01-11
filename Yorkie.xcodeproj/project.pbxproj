@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 52;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -286,7 +286,6 @@
 				CE0EE07A292CD14100CB81F4 /* Unit */,
 				9ADECA002919FC1A006BA331 /* Integration */,
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
-				9A8150512967FCD700DFADFB /* Helper.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -324,6 +323,7 @@
 		CE3EC94A28D1885F009471BC /* Util */ = {
 			isa = PBXGroup;
 			children = (
+				9A8150512967FCD700DFADFB /* Helper.swift */,
 				CE3EC94B28D1887B009471BC /* HeapTests.swift */,
 				CE3EC95028D195E0009471BC /* LLRBTreeTests.swift */,
 				CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */,
@@ -708,6 +708,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		CEEB17EC28C84E5B004988DD /* SwiftFormat */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -726,6 +727,7 @@
 		};
 		CEEB17ED28C898E4004988DD /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);

@@ -17,6 +17,7 @@ disabled_rules:
   - line_length
   - file_length
   - opening_brace
+  - large_tuple
 opt_in_rules:
   - empty_count
 # Rewrited rules
