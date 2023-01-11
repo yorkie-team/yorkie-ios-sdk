@@ -69,7 +69,17 @@ public struct TimeTicket: Comparable {
         guard let actorID = self.actorID else {
             return "\(self.lamport):nil:\(self.delimiter)"
         }
-        return "\(self.lamport):\(actorID):\(self.delimiter)"
+
+        // If aactorID is digit display last two charactors.
+        let formatedActorID: String
+
+        if actorID.count >= 2, CharacterSet(charactersIn: actorID).isSubset(of: .decimalDigits) {
+            formatedActorID = actorID.substring(from: actorID.count - 2, to: actorID.count - 1)
+        } else {
+            formatedActorID = actorID
+        }
+
+        return "\(self.lamport):\(formatedActorID):\(self.delimiter)"
     }
 
     /**

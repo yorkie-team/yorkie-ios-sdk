@@ -50,25 +50,27 @@ public class JSONObject {
             return
         }
 
+        let ticket = self.context.issueTimeTicket()
+
         if let optionalValue = value as? OptionalValue, optionalValue.isNil {
-            self.setValueNull(key: key)
+            self.setValueNull(key: key, ticket: ticket)
         } else if let value = value as? Bool {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Int32 {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Int64 {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Double {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? String {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Data {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Date {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if value is JSONObject {
-            let object = CRDTObject(createdAt: self.context.issueTimeTicket())
-            self.setValue(key: key, value: object)
+            let object = CRDTObject(createdAt: ticket)
+            self.setValue(key: key, value: object, ticket: ticket)
         } else if let value = value as? [String: Any] {
             self.set(key: key, value: JSONObject())
             let jsonObject = self.get(key: key) as? JSONObject
@@ -78,23 +80,28 @@ public class JSONObject {
             let jsonObject = self.get(key: key) as? JSONObject
             jsonObject?.set(value.toJsonObject)
         } else if value is JSONArray {
-            let array = CRDTArray(createdAt: self.context.issueTimeTicket())
-            self.setValue(key: key, value: array)
+            let array = CRDTArray(createdAt: ticket)
+            self.setValue(key: key, value: array, ticket: ticket)
         } else if let value = value as? [Any] {
-            let array = CRDTArray(createdAt: self.context.issueTimeTicket())
-            self.setValue(key: key, value: array)
+            let array = CRDTArray(createdAt: ticket)
+            self.setValue(key: key, value: array, ticket: ticket)
             let jsonArray = self.get(key: key) as? JSONArray
             jsonArray?.append(values: value.toJsonArray)
         } else if let element = value as? JSONCounter<Int32>, let value = element.value as? Int32 {
-            let counter = CRDTCounter<Int32>(value: value, createdAt: self.context.issueTimeTicket())
+            let counter = CRDTCounter<Int32>(value: value, createdAt: ticket)
             element.initialize(context: self.context, counter: counter)
-            self.setValue(key: key, value: counter)
+            self.setValue(key: key, value: counter, ticket: ticket)
         } else if let element = value as? JSONCounter<Int64>, let value = element.value as? Int64 {
-            let counter = CRDTCounter<Int64>(value: value, createdAt: self.context.issueTimeTicket())
+            let counter = CRDTCounter<Int64>(value: value, createdAt: ticket)
             element.initialize(context: self.context, counter: counter)
-            self.setValue(key: key, value: counter)
+            self.setValue(key: key, value: counter, ticket: ticket)
+        } else if let element = value as? JSONText {
+            let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: ticket)
+            element.initialize(context: self.context, text: text)
+            self.setValue(key: key, value: text, ticket: ticket)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
+            assertionFailure()
         }
     }
 
@@ -106,56 +113,56 @@ public class JSONObject {
         }
     }
 
-    private func setPrimitive(key: String, value: PrimitiveValue) {
+    private func setPrimitive(key: String, value: PrimitiveValue, ticket: TimeTicket) {
         let primitive = Primitive(value: value, createdAt: context.issueTimeTicket())
         self.setToCRDTObject(key: key, value: primitive)
 
         let operation = SetOperation(key: key,
                                      value: primitive,
                                      parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
+                                     executedAt: ticket)
         self.context.push(operation: operation)
     }
 
-    private func setValueNull(key: String) {
-        self.setPrimitive(key: key, value: .null)
+    private func setValueNull(key: String, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .null, ticket: ticket)
     }
 
-    private func setValue(key: String, value: Bool) {
-        self.setPrimitive(key: key, value: .boolean(value))
+    private func setValue(key: String, value: Bool, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .boolean(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Int32) {
-        self.setPrimitive(key: key, value: .integer(value))
+    private func setValue(key: String, value: Int32, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .integer(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Int64) {
-        self.setPrimitive(key: key, value: .long(value))
+    private func setValue(key: String, value: Int64, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .long(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Double) {
-        self.setPrimitive(key: key, value: .double(value))
+    private func setValue(key: String, value: Double, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .double(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: String) {
-        self.setPrimitive(key: key, value: .string(value))
+    private func setValue(key: String, value: String, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .string(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Data) {
-        self.setPrimitive(key: key, value: .bytes(value))
+    private func setValue(key: String, value: Data, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .bytes(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Date) {
-        self.setPrimitive(key: key, value: .date(value))
+    private func setValue(key: String, value: Date, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .date(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: CRDTElement) {
+    private func setValue(key: String, value: CRDTElement, ticket: TimeTicket) {
         self.setToCRDTObject(key: key, value: value)
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
                                      parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
+                                     executedAt: ticket)
         self.context.push(operation: operation)
     }
 
