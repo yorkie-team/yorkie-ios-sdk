@@ -99,7 +99,7 @@ class JSONObjectTests: XCTestCase {
                 "compB": ["id": "b",
                           "compC": ["id": "c",
                                     "compD": ["id": "d-1"]]]
-                ])
+            ])
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -133,7 +133,7 @@ class JSONObjectTests: XCTestCase {
                 "compB": ["id": "b",
                           "compC": ["id": "c",
                                     "compD": ["id": "d-1"]]]
-                ])
+            ])
 
             XCTAssertEqual(root.debugDescription,
                            """
