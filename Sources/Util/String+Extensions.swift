@@ -17,7 +17,7 @@
 import Foundation
 
 extension String {
-    func substring(from: Int, to: Int) -> SubSequence {
+    func substring(from: Int, to: Int) -> String {
         guard from <= to, from < self.count else {
             return ""
         }
@@ -27,6 +27,7 @@ extension String {
         let start = index(self.startIndex, offsetBy: from)
         let end = index(self.startIndex, offsetBy: adaptedTo)
         let range = start ... end
-        return self[range]
+
+        return String(self[range])
     }
 }

@@ -26,28 +26,30 @@ class ObjectDataHandler {
     }
 
     func set<T>(key: String, value: T) {
+        let ticket = self.context.issueTimeTicket()
+
         if let value = value as? Bool {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Int32 {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Int64 {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Double {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? String {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Data {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? Date {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? CRDTObject {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? CRDTArray {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? CRDTCounter<Int32> {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else if let value = value as? CRDTCounter<Int64> {
-            self.setValue(key: key, value: value)
+            self.setValue(key: key, value: value, ticket: ticket)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
         }
@@ -61,72 +63,72 @@ class ObjectDataHandler {
         }
     }
 
-    private func setPrimitive(key: String, value: PrimitiveValue) {
-        let primitive = Primitive(value: value, createdAt: context.issueTimeTicket())
+    private func setPrimitive(key: String, value: PrimitiveValue, ticket: TimeTicket) {
+        let primitive = Primitive(value: value, createdAt: ticket)
         self.setAndRegister(key: key, value: primitive)
 
         let operation = SetOperation(key: key,
                                      value: primitive,
                                      parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
+                                     executedAt: ticket)
         self.context.push(operation: operation)
     }
 
-    private func setValue(key: String, value: Bool) {
-        self.setPrimitive(key: key, value: .boolean(value))
+    private func setValue(key: String, value: Bool, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .boolean(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Int32) {
-        self.setPrimitive(key: key, value: .integer(value))
+    private func setValue(key: String, value: Int32, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .integer(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Int64) {
-        self.setPrimitive(key: key, value: .long(value))
+    private func setValue(key: String, value: Int64, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .long(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Double) {
-        self.setPrimitive(key: key, value: .double(value))
+    private func setValue(key: String, value: Double, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .double(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: String) {
-        self.setPrimitive(key: key, value: .string(value))
+    private func setValue(key: String, value: String, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .string(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Data) {
-        self.setPrimitive(key: key, value: .bytes(value))
+    private func setValue(key: String, value: Data, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .bytes(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: Date) {
-        self.setPrimitive(key: key, value: .date(value))
+    private func setValue(key: String, value: Date, ticket: TimeTicket) {
+        self.setPrimitive(key: key, value: .date(value), ticket: ticket)
     }
 
-    private func setValue(key: String, value: CRDTObject) {
+    private func setValue(key: String, value: CRDTObject, ticket: TimeTicket) {
         self.setAndRegister(key: key, value: value)
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
                                      parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
+                                     executedAt: ticket)
         self.context.push(operation: operation)
     }
 
-    private func setValue(key: String, value: CRDTArray) {
+    private func setValue(key: String, value: CRDTArray, ticket: TimeTicket) {
         self.setAndRegister(key: key, value: value)
 
         let operation = SetOperation(key: key,
                                      value: value,
                                      parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
+                                     executedAt: ticket)
         self.context.push(operation: operation)
     }
 
-    private func setValue<T: YorkieCountable>(key: String, value: CRDTCounter<T>) {
+    private func setValue<T: YorkieCountable>(key: String, value: CRDTCounter<T>, ticket: TimeTicket) {
         self.setAndRegister(key: key, value: value)
 
         let operation = SetOperation(key: key,
                                      value: value,
                                      parentCreatedAt: self.target.createdAt,
-                                     executedAt: self.context.issueTimeTicket())
+                                     executedAt: ticket)
         self.context.push(operation: operation)
     }
 
