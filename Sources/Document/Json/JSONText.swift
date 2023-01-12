@@ -70,7 +70,13 @@ public class JSONText {
         }
 
         context.push(
-            operation: EditOperation(parentCreatedAt: text.createdAt, fromPos: range.0, toPos: range.1, maxCreatedAtMapByActor: maxCreatedAtMapByActor, content: content, attributes: attributes, executedAt: ticket)
+            operation: EditOperation(parentCreatedAt: text.createdAt,
+                                     fromPos: range.0,
+                                     toPos: range.1,
+                                     maxCreatedAtMapByActor: maxCreatedAtMapByActor,
+                                     content: content,
+                                     attributes: attributes != nil ? stringifyAttributes(attributes!) : nil,
+                                     executedAt: ticket)
         )
 
         if range.0 != range.1 {
@@ -83,6 +89,7 @@ public class JSONText {
     /**
      * `setStyle` styles this text with the given attributes.
      */
+    @discardableResult
     public func setStyle(fromIdx: Int, toIdx: Int, attributes: TextAttributes) -> Bool {
         guard let context, let text else {
             Logger.critical("it is not initialized yet")
@@ -109,7 +116,11 @@ public class JSONText {
             return false
         }
 
-        context.push(operation: StyleOperation(parentCreatedAt: text.createdAt, fromPos: range.0, toPos: range.1, attributes: attributes, executedAt: ticket))
+        context.push(operation: StyleOperation(parentCreatedAt: text.createdAt,
+                                               fromPos: range.0,
+                                               toPos: range.1,
+                                               attributes: stringifyAttributes(attributes),
+                                               executedAt: ticket))
 
         return true
     }
@@ -161,19 +172,17 @@ public class JSONText {
         self.text?.plainText ?? ""
     }
 
-    /*
-     /**
-      * `values` returns values of this text.
-      */
-     public var values: [CRDTText.TextVal<A>]? {
-         guard context != nil, let text else {
-             Logger.critical("it is not initialized yet")
-             return nil
-         }
-
-         return text.values()
-     }
+    /**
+     * `values` returns values of this text.
      */
+    public var values: [TextValue]? {
+        guard self.context != nil, let text else {
+            Logger.critical("it is not initialized yet")
+            return nil
+        }
+
+        return text.values
+    }
 
     /**
      * `setEventStream` registers a event Stream of TextChange events.
@@ -196,24 +205,5 @@ public class JSONText {
         }
 
         return try? text.createRange(fromIdx, toIdx)
-    }
-
-    /**
-     * `stringifyAttributes` makes values of attributes to JSON parsable string.
-     */
-    private func stringifyAttributes(_ attributes: TextAttributes) -> [String: String] {
-        guard let jsonData = try? JSONEncoder().encode(attributes),
-              let jsonObject = try? JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) as? [String: Any]
-        else {
-            return [:]
-        }
-
-        return jsonObject.mapValues {
-            if let result = try? JSONSerialization.data(withJSONObject: $0, options: .fragmentsAllowed) {
-                return String(data: result, encoding: .utf8) ?? ""
-            } else {
-                return ""
-            }
-        }
     }
 }

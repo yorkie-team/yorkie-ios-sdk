@@ -43,9 +43,9 @@ struct EditOperation: Operation {
     /**
      * `attributes` returns the attributes of this Edit.
      */
-    private(set) var attributes: TextAttributes?
+    private(set) var attributes: [String: String]?
 
-    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitNodePos, toPos: RGATreeSplitNodePos, maxCreatedAtMapByActor: [String: TimeTicket], content: String, attributes: TextAttributes?, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitNodePos, toPos: RGATreeSplitNodePos, maxCreatedAtMapByActor: [String: TimeTicket], content: String, attributes: [String: String]?, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos

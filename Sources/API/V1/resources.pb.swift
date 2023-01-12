@@ -48,10 +48,9 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
   case jsonObject // = 8
   case jsonArray // = 9
   case text // = 10
-  case richText // = 11
-  case integerCnt // = 12
-  case longCnt // = 13
-  case doubleCnt // = 14
+  case integerCnt // = 11
+  case longCnt // = 12
+  case doubleCnt // = 13
   case UNRECOGNIZED(Int)
 
   init() {
@@ -71,10 +70,9 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
     case 8: self = .jsonObject
     case 9: self = .jsonArray
     case 10: self = .text
-    case 11: self = .richText
-    case 12: self = .integerCnt
-    case 13: self = .longCnt
-    case 14: self = .doubleCnt
+    case 11: self = .integerCnt
+    case 12: self = .longCnt
+    case 13: self = .doubleCnt
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -92,10 +90,9 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
     case .jsonObject: return 8
     case .jsonArray: return 9
     case .text: return 10
-    case .richText: return 11
-    case .integerCnt: return 12
-    case .longCnt: return 13
-    case .doubleCnt: return 14
+    case .integerCnt: return 11
+    case .longCnt: return 12
+    case .doubleCnt: return 13
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -118,7 +115,6 @@ extension Yorkie_V1_ValueType: CaseIterable {
     .jsonObject,
     .jsonArray,
     .text,
-    .richText,
     .integerCnt,
     .longCnt,
     .doubleCnt,
@@ -310,14 +306,6 @@ struct Yorkie_V1_Operation {
     set {body = .select(newValue)}
   }
 
-  var richEdit: Yorkie_V1_Operation.RichEdit {
-    get {
-      if case .richEdit(let v)? = body {return v}
-      return Yorkie_V1_Operation.RichEdit()
-    }
-    set {body = .richEdit(newValue)}
-  }
-
   var style: Yorkie_V1_Operation.Style {
     get {
       if case .style(let v)? = body {return v}
@@ -343,7 +331,6 @@ struct Yorkie_V1_Operation {
     case remove(Yorkie_V1_Operation.Remove)
     case edit(Yorkie_V1_Operation.Edit)
     case select(Yorkie_V1_Operation.Select)
-    case richEdit(Yorkie_V1_Operation.RichEdit)
     case style(Yorkie_V1_Operation.Style)
     case increase(Yorkie_V1_Operation.Increase)
 
@@ -375,10 +362,6 @@ struct Yorkie_V1_Operation {
       }()
       case (.select, .select): return {
         guard case .select(let l) = lhs, case .select(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.richEdit, .richEdit): return {
-        guard case .richEdit(let l) = lhs, case .richEdit(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       case (.style, .style): return {
@@ -630,6 +613,11 @@ struct Yorkie_V1_Operation {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    var attributes: Dictionary<String,String> {
+      get {return _storage._attributes}
+      set {_uniqueStorage()._attributes = newValue}
+    }
+
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
@@ -686,69 +674,6 @@ struct Yorkie_V1_Operation {
     fileprivate var _from: Yorkie_V1_TextNodePos? = nil
     fileprivate var _to: Yorkie_V1_TextNodePos? = nil
     fileprivate var _executedAt: Yorkie_V1_TimeTicket? = nil
-  }
-
-  struct RichEdit {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
-      set {_uniqueStorage()._parentCreatedAt = newValue}
-    }
-    /// Returns true if `parentCreatedAt` has been explicitly set.
-    var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
-    /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
-    mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
-
-    var from: Yorkie_V1_TextNodePos {
-      get {return _storage._from ?? Yorkie_V1_TextNodePos()}
-      set {_uniqueStorage()._from = newValue}
-    }
-    /// Returns true if `from` has been explicitly set.
-    var hasFrom: Bool {return _storage._from != nil}
-    /// Clears the value of `from`. Subsequent reads from it will return its default value.
-    mutating func clearFrom() {_uniqueStorage()._from = nil}
-
-    var to: Yorkie_V1_TextNodePos {
-      get {return _storage._to ?? Yorkie_V1_TextNodePos()}
-      set {_uniqueStorage()._to = newValue}
-    }
-    /// Returns true if `to` has been explicitly set.
-    var hasTo: Bool {return _storage._to != nil}
-    /// Clears the value of `to`. Subsequent reads from it will return its default value.
-    mutating func clearTo() {_uniqueStorage()._to = nil}
-
-    var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
-      get {return _storage._createdAtMapByActor}
-      set {_uniqueStorage()._createdAtMapByActor = newValue}
-    }
-
-    var content: String {
-      get {return _storage._content}
-      set {_uniqueStorage()._content = newValue}
-    }
-
-    var attributes: Dictionary<String,String> {
-      get {return _storage._attributes}
-      set {_uniqueStorage()._attributes = newValue}
-    }
-
-    var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
-      set {_uniqueStorage()._executedAt = newValue}
-    }
-    /// Returns true if `executedAt` has been explicitly set.
-    var hasExecutedAt: Bool {return _storage._executedAt != nil}
-    /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
-    mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _storage = _StorageClass.defaultInstance
   }
 
   struct Style {
@@ -930,14 +855,6 @@ struct Yorkie_V1_JSONElement {
     set {body = .text(newValue)}
   }
 
-  var richText: Yorkie_V1_JSONElement.RichText {
-    get {
-      if case .richText(let v)? = body {return v}
-      return Yorkie_V1_JSONElement.RichText()
-    }
-    set {body = .richText(newValue)}
-  }
-
   var counter: Yorkie_V1_JSONElement.Counter {
     get {
       if case .counter(let v)? = body {return v}
@@ -953,7 +870,6 @@ struct Yorkie_V1_JSONElement {
     case jsonArray(Yorkie_V1_JSONElement.JSONArray)
     case primitive(Yorkie_V1_JSONElement.Primitive)
     case text(Yorkie_V1_JSONElement.Text)
-    case richText(Yorkie_V1_JSONElement.RichText)
     case counter(Yorkie_V1_JSONElement.Counter)
 
   #if !swift(>=4.1)
@@ -976,10 +892,6 @@ struct Yorkie_V1_JSONElement {
       }()
       case (.text, .text): return {
         guard case .text(let l) = lhs, case .text(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.richText, .richText): return {
-        guard case .richText(let l) = lhs, case .richText(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       case (.counter, .counter): return {
@@ -1166,49 +1078,6 @@ struct Yorkie_V1_JSONElement {
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
   }
 
-  struct RichText {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    var nodes: [Yorkie_V1_RichTextNode] = []
-
-    var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
-      set {_createdAt = newValue}
-    }
-    /// Returns true if `createdAt` has been explicitly set.
-    var hasCreatedAt: Bool {return self._createdAt != nil}
-    /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
-    mutating func clearCreatedAt() {self._createdAt = nil}
-
-    var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
-      set {_movedAt = newValue}
-    }
-    /// Returns true if `movedAt` has been explicitly set.
-    var hasMovedAt: Bool {return self._movedAt != nil}
-    /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
-    mutating func clearMovedAt() {self._movedAt = nil}
-
-    var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
-      set {_removedAt = newValue}
-    }
-    /// Returns true if `removedAt` has been explicitly set.
-    var hasRemovedAt: Bool {return self._removedAt != nil}
-    /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
-    mutating func clearRemovedAt() {self._removedAt = nil}
-
-    var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    init() {}
-
-    fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
-    fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
-    fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
-  }
-
   struct Counter {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1310,6 +1179,31 @@ struct Yorkie_V1_RGANode {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
+struct Yorkie_V1_TextNodeAttr {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var key: String = String()
+
+  var value: String = String()
+
+  var updatedAt: Yorkie_V1_TimeTicket {
+    get {return _updatedAt ?? Yorkie_V1_TimeTicket()}
+    set {_updatedAt = newValue}
+  }
+  /// Returns true if `updatedAt` has been explicitly set.
+  var hasUpdatedAt: Bool {return self._updatedAt != nil}
+  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
+  mutating func clearUpdatedAt() {self._updatedAt = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _updatedAt: Yorkie_V1_TimeTicket? = nil
+}
+
 struct Yorkie_V1_TextNode {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1344,75 +1238,7 @@ struct Yorkie_V1_TextNode {
   /// Clears the value of `insPrevID`. Subsequent reads from it will return its default value.
   mutating func clearInsPrevID() {self._insPrevID = nil}
 
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-
-  fileprivate var _id: Yorkie_V1_TextNodeID? = nil
-  fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
-  fileprivate var _insPrevID: Yorkie_V1_TextNodeID? = nil
-}
-
-struct Yorkie_V1_RichTextNodeAttr {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var key: String = String()
-
-  var value: String = String()
-
-  var updatedAt: Yorkie_V1_TimeTicket {
-    get {return _updatedAt ?? Yorkie_V1_TimeTicket()}
-    set {_updatedAt = newValue}
-  }
-  /// Returns true if `updatedAt` has been explicitly set.
-  var hasUpdatedAt: Bool {return self._updatedAt != nil}
-  /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
-  mutating func clearUpdatedAt() {self._updatedAt = nil}
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-
-  fileprivate var _updatedAt: Yorkie_V1_TimeTicket? = nil
-}
-
-struct Yorkie_V1_RichTextNode {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var id: Yorkie_V1_TextNodeID {
-    get {return _id ?? Yorkie_V1_TextNodeID()}
-    set {_id = newValue}
-  }
-  /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return self._id != nil}
-  /// Clears the value of `id`. Subsequent reads from it will return its default value.
-  mutating func clearID() {self._id = nil}
-
-  var attributes: Dictionary<String,Yorkie_V1_RichTextNodeAttr> = [:]
-
-  var value: String = String()
-
-  var removedAt: Yorkie_V1_TimeTicket {
-    get {return _removedAt ?? Yorkie_V1_TimeTicket()}
-    set {_removedAt = newValue}
-  }
-  /// Returns true if `removedAt` has been explicitly set.
-  var hasRemovedAt: Bool {return self._removedAt != nil}
-  /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
-  mutating func clearRemovedAt() {self._removedAt = nil}
-
-  var insPrevID: Yorkie_V1_TextNodeID {
-    get {return _insPrevID ?? Yorkie_V1_TextNodeID()}
-    set {_insPrevID = newValue}
-  }
-  /// Returns true if `insPrevID` has been explicitly set.
-  var hasInsPrevID: Bool {return self._insPrevID != nil}
-  /// Clears the value of `insPrevID`. Subsequent reads from it will return its default value.
-  mutating func clearInsPrevID() {self._insPrevID = nil}
+  var attributes: Dictionary<String,Yorkie_V1_TextNodeAttr> = [:]
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1757,7 +1583,6 @@ extension Yorkie_V1_Operation.Move: @unchecked Sendable {}
 extension Yorkie_V1_Operation.Remove: @unchecked Sendable {}
 extension Yorkie_V1_Operation.Edit: @unchecked Sendable {}
 extension Yorkie_V1_Operation.Select: @unchecked Sendable {}
-extension Yorkie_V1_Operation.RichEdit: @unchecked Sendable {}
 extension Yorkie_V1_Operation.Style: @unchecked Sendable {}
 extension Yorkie_V1_Operation.Increase: @unchecked Sendable {}
 extension Yorkie_V1_JSONElementSimple: @unchecked Sendable {}
@@ -1767,13 +1592,11 @@ extension Yorkie_V1_JSONElement.JSONObject: @unchecked Sendable {}
 extension Yorkie_V1_JSONElement.JSONArray: @unchecked Sendable {}
 extension Yorkie_V1_JSONElement.Primitive: @unchecked Sendable {}
 extension Yorkie_V1_JSONElement.Text: @unchecked Sendable {}
-extension Yorkie_V1_JSONElement.RichText: @unchecked Sendable {}
 extension Yorkie_V1_JSONElement.Counter: @unchecked Sendable {}
 extension Yorkie_V1_RHTNode: @unchecked Sendable {}
 extension Yorkie_V1_RGANode: @unchecked Sendable {}
+extension Yorkie_V1_TextNodeAttr: @unchecked Sendable {}
 extension Yorkie_V1_TextNode: @unchecked Sendable {}
-extension Yorkie_V1_RichTextNodeAttr: @unchecked Sendable {}
-extension Yorkie_V1_RichTextNode: @unchecked Sendable {}
 extension Yorkie_V1_TextNodeID: @unchecked Sendable {}
 extension Yorkie_V1_User: @unchecked Sendable {}
 extension Yorkie_V1_Project: @unchecked Sendable {}
@@ -1806,10 +1629,9 @@ extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
     8: .same(proto: "VALUE_TYPE_JSON_OBJECT"),
     9: .same(proto: "VALUE_TYPE_JSON_ARRAY"),
     10: .same(proto: "VALUE_TYPE_TEXT"),
-    11: .same(proto: "VALUE_TYPE_RICH_TEXT"),
-    12: .same(proto: "VALUE_TYPE_INTEGER_CNT"),
-    13: .same(proto: "VALUE_TYPE_LONG_CNT"),
-    14: .same(proto: "VALUE_TYPE_DOUBLE_CNT"),
+    11: .same(proto: "VALUE_TYPE_INTEGER_CNT"),
+    12: .same(proto: "VALUE_TYPE_LONG_CNT"),
+    13: .same(proto: "VALUE_TYPE_DOUBLE_CNT"),
   ]
 }
 
@@ -1989,9 +1811,8 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     4: .same(proto: "remove"),
     5: .same(proto: "edit"),
     6: .same(proto: "select"),
-    7: .standard(proto: "rich_edit"),
-    8: .same(proto: "style"),
-    9: .same(proto: "increase"),
+    7: .same(proto: "style"),
+    8: .same(proto: "increase"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2079,19 +1900,6 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
         }
       }()
       case 7: try {
-        var v: Yorkie_V1_Operation.RichEdit?
-        var hadOneofValue = false
-        if let current = self.body {
-          hadOneofValue = true
-          if case .richEdit(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.body = .richEdit(v)
-        }
-      }()
-      case 8: try {
         var v: Yorkie_V1_Operation.Style?
         var hadOneofValue = false
         if let current = self.body {
@@ -2104,7 +1912,7 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
           self.body = .style(v)
         }
       }()
-      case 9: try {
+      case 8: try {
         var v: Yorkie_V1_Operation.Increase?
         var hadOneofValue = false
         if let current = self.body {
@@ -2152,17 +1960,13 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       guard case .select(let v)? = self.body else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     }()
-    case .richEdit?: try {
-      guard case .richEdit(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-    }()
     case .style?: try {
       guard case .style(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     }()
     case .increase?: try {
       guard case .increase(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
     }()
     case nil: break
     }
@@ -2471,6 +2275,7 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
     4: .standard(proto: "created_at_map_by_actor"),
     5: .same(proto: "content"),
     6: .standard(proto: "executed_at"),
+    7: .same(proto: "attributes"),
   ]
 
   fileprivate class _StorageClass {
@@ -2480,6 +2285,7 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
     var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
     var _content: String = String()
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _attributes: Dictionary<String,String> = [:]
 
     static let defaultInstance = _StorageClass()
 
@@ -2492,6 +2298,7 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
       _createdAtMapByActor = source._createdAtMapByActor
       _content = source._content
       _executedAt = source._executedAt
+      _attributes = source._attributes
     }
   }
 
@@ -2516,6 +2323,7 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
         case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: &_storage._createdAtMapByActor) }()
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._content) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 7: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
         default: break
         }
       }
@@ -2546,6 +2354,9 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
       } }()
+      if !_storage._attributes.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._attributes, fieldNumber: 7)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -2561,6 +2372,7 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
         if _storage._createdAtMapByActor != rhs_storage._createdAtMapByActor {return false}
         if _storage._content != rhs_storage._content {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._attributes != rhs_storage._attributes {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -2619,122 +2431,6 @@ extension Yorkie_V1_Operation.Select: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs._from != rhs._from {return false}
     if lhs._to != rhs._to {return false}
     if lhs._executedAt != rhs._executedAt {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_Operation.RichEdit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".RichEdit"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "parent_created_at"),
-    2: .same(proto: "from"),
-    3: .same(proto: "to"),
-    4: .standard(proto: "created_at_map_by_actor"),
-    5: .same(proto: "content"),
-    6: .same(proto: "attributes"),
-    7: .standard(proto: "executed_at"),
-  ]
-
-  fileprivate class _StorageClass {
-    var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
-    var _from: Yorkie_V1_TextNodePos? = nil
-    var _to: Yorkie_V1_TextNodePos? = nil
-    var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
-    var _content: String = String()
-    var _attributes: Dictionary<String,String> = [:]
-    var _executedAt: Yorkie_V1_TimeTicket? = nil
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _parentCreatedAt = source._parentCreatedAt
-      _from = source._from
-      _to = source._to
-      _createdAtMapByActor = source._createdAtMapByActor
-      _content = source._content
-      _attributes = source._attributes
-      _executedAt = source._executedAt
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._parentCreatedAt) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._from) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._to) }()
-        case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: &_storage._createdAtMapByActor) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._content) }()
-        case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._parentCreatedAt {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._from {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._to {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      if !_storage._createdAtMapByActor.isEmpty {
-        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: _storage._createdAtMapByActor, fieldNumber: 4)
-      }
-      if !_storage._content.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._content, fieldNumber: 5)
-      }
-      if !_storage._attributes.isEmpty {
-        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._attributes, fieldNumber: 6)
-      }
-      try { if let v = _storage._executedAt {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Yorkie_V1_Operation.RichEdit, rhs: Yorkie_V1_Operation.RichEdit) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._parentCreatedAt != rhs_storage._parentCreatedAt {return false}
-        if _storage._from != rhs_storage._from {return false}
-        if _storage._to != rhs_storage._to {return false}
-        if _storage._createdAtMapByActor != rhs_storage._createdAtMapByActor {return false}
-        if _storage._content != rhs_storage._content {return false}
-        if _storage._attributes != rhs_storage._attributes {return false}
-        if _storage._executedAt != rhs_storage._executedAt {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2990,8 +2686,7 @@ extension Yorkie_V1_JSONElement: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     1: .standard(proto: "json_object"),
     2: .standard(proto: "json_array"),
     3: .same(proto: "primitive"),
-    4: .same(proto: "text"),
-    5: .standard(proto: "rich_text"),
+    5: .same(proto: "text"),
     6: .same(proto: "counter"),
   ]
 
@@ -3040,7 +2735,7 @@ extension Yorkie_V1_JSONElement: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
           self.body = .primitive(v)
         }
       }()
-      case 4: try {
+      case 5: try {
         var v: Yorkie_V1_JSONElement.Text?
         var hadOneofValue = false
         if let current = self.body {
@@ -3051,19 +2746,6 @@ extension Yorkie_V1_JSONElement: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.body = .text(v)
-        }
-      }()
-      case 5: try {
-        var v: Yorkie_V1_JSONElement.RichText?
-        var hadOneofValue = false
-        if let current = self.body {
-          hadOneofValue = true
-          if case .richText(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.body = .richText(v)
         }
       }()
       case 6: try {
@@ -3104,10 +2786,6 @@ extension Yorkie_V1_JSONElement: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     }()
     case .text?: try {
       guard case .text(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    }()
-    case .richText?: try {
-      guard case .richText(let v)? = self.body else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     }()
     case .counter?: try {
@@ -3348,60 +3026,6 @@ extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension Yorkie_V1_JSONElement.RichText: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".RichText"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "nodes"),
-    2: .standard(proto: "created_at"),
-    3: .standard(proto: "moved_at"),
-    4: .standard(proto: "removed_at"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.nodes) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.nodes.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.nodes, fieldNumber: 1)
-    }
-    try { if let v = self._createdAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._movedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._removedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Yorkie_V1_JSONElement.RichText, rhs: Yorkie_V1_JSONElement.RichText) -> Bool {
-    if lhs.nodes != rhs.nodes {return false}
-    if lhs._createdAt != rhs._createdAt {return false}
-    if lhs._movedAt != rhs._movedAt {return false}
-    if lhs._removedAt != rhs._removedAt {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".Counter"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -3580,62 +3204,8 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension Yorkie_V1_TextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".TextNode"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "id"),
-    2: .same(proto: "value"),
-    3: .standard(proto: "removed_at"),
-    4: .standard(proto: "ins_prev_id"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.value) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._insPrevID) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._id {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.value.isEmpty {
-      try visitor.visitSingularStringField(value: self.value, fieldNumber: 2)
-    }
-    try { if let v = self._removedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._insPrevID {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Yorkie_V1_TextNode, rhs: Yorkie_V1_TextNode) -> Bool {
-    if lhs._id != rhs._id {return false}
-    if lhs.value != rhs.value {return false}
-    if lhs._removedAt != rhs._removedAt {return false}
-    if lhs._insPrevID != rhs._insPrevID {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_RichTextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RichTextNodeAttr"
+extension Yorkie_V1_TextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".TextNodeAttr"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "key"),
     2: .same(proto: "value"),
@@ -3673,7 +3243,7 @@ extension Yorkie_V1_RichTextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._Mess
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_RichTextNodeAttr, rhs: Yorkie_V1_RichTextNodeAttr) -> Bool {
+  static func ==(lhs: Yorkie_V1_TextNodeAttr, rhs: Yorkie_V1_TextNodeAttr) -> Bool {
     if lhs.key != rhs.key {return false}
     if lhs.value != rhs.value {return false}
     if lhs._updatedAt != rhs._updatedAt {return false}
@@ -3682,14 +3252,14 @@ extension Yorkie_V1_RichTextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension Yorkie_V1_RichTextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".RichTextNode"
+extension Yorkie_V1_TextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".TextNode"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "id"),
-    2: .same(proto: "attributes"),
-    3: .same(proto: "value"),
-    4: .standard(proto: "removed_at"),
-    5: .standard(proto: "ins_prev_id"),
+    2: .same(proto: "value"),
+    3: .standard(proto: "removed_at"),
+    4: .standard(proto: "ins_prev_id"),
+    5: .same(proto: "attributes"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3699,10 +3269,10 @@ extension Yorkie_V1_RichTextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_RichTextNodeAttr>.self, value: &self.attributes) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.value) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._insPrevID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.value) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._insPrevID) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TextNodeAttr>.self, value: &self.attributes) }()
       default: break
       }
     }
@@ -3716,27 +3286,27 @@ extension Yorkie_V1_RichTextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     try { if let v = self._id {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if !self.attributes.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_RichTextNodeAttr>.self, value: self.attributes, fieldNumber: 2)
-    }
     if !self.value.isEmpty {
-      try visitor.visitSingularStringField(value: self.value, fieldNumber: 3)
+      try visitor.visitSingularStringField(value: self.value, fieldNumber: 2)
     }
     try { if let v = self._removedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
     try { if let v = self._insPrevID {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
+    if !self.attributes.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TextNodeAttr>.self, value: self.attributes, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_RichTextNode, rhs: Yorkie_V1_RichTextNode) -> Bool {
+  static func ==(lhs: Yorkie_V1_TextNode, rhs: Yorkie_V1_TextNode) -> Bool {
     if lhs._id != rhs._id {return false}
-    if lhs.attributes != rhs.attributes {return false}
     if lhs.value != rhs.value {return false}
     if lhs._removedAt != rhs._removedAt {return false}
     if lhs._insPrevID != rhs._insPrevID {return false}
+    if lhs.attributes != rhs.attributes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

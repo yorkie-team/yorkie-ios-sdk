@@ -135,7 +135,7 @@ class RHTTests: XCTestCase {
         let result = rht.toObject()
 
         for (key, value) in testData {
-            XCTAssertEqual(result[key], value)
+            XCTAssertEqual(result[key]?.value, value)
         }
     }
 }

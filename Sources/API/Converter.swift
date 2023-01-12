@@ -128,7 +128,7 @@ extension Converter {
             if JSONSerialization.isValidJSONObject(value), let jsonData = try? JSONSerialization.data(withJSONObject: value) {
                 pbPresence.data[key] = String(bytes: jsonData, encoding: .utf8)
             } else {
-                // emulate JSON.stringfy() in JavaScript.
+                // emulate JSON.stringify() in JavaScript.
                 pbPresence.data[key] = value is String ? "\"\(value)\"" : "\(value)"
             }
         }
@@ -225,16 +225,15 @@ extension Converter {
     /**
      * `toElementSimple` converts the given model to Protobuf format.
      */
-    static func toElementSimple(_ element: CRDTElement) throws -> PbJSONElementSimple {
+    static func toElementSimple(_ element: CRDTElement) -> PbJSONElementSimple {
         var pbElementSimple = PbJSONElementSimple()
 
         if element is CRDTObject {
             pbElementSimple.type = .jsonObject
         } else if element is CRDTArray {
             pbElementSimple.type = .jsonArray
-            // TODO: CRDTText is not implemented!
         } else if element is CRDTText {
-            pbElementSimple.type = .richText
+            pbElementSimple.type = .text
         } else if let element = element as? Primitive {
             let primitive = element.value
             pbElementSimple.type = toValueType(primitive)
@@ -245,8 +244,6 @@ extension Converter {
         } else if let counter = element as? CRDTCounter<Int64> {
             pbElementSimple.type = .longCnt
             pbElementSimple.value = counter.toBytes()
-        } else {
-            throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
         }
 
         pbElementSimple.createdAt = toTimeTicket(element.createdAt)
@@ -263,10 +260,7 @@ extension Converter {
             return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .jsonArray:
             return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
-            // TODO: refactor TEXT
         case .text:
-            return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
-        case .richText:
             return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
             return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
@@ -340,16 +334,14 @@ extension Converter {
             var pbSetOperation = PbOperation.Set()
             pbSetOperation.parentCreatedAt = toTimeTicket(setOperation.parentCreatedAt)
             pbSetOperation.key = setOperation.key
-            // TODO: Remove try!
-            pbSetOperation.value = try! toElementSimple(setOperation.value)
+            pbSetOperation.value = toElementSimple(setOperation.value)
             pbSetOperation.executedAt = toTimeTicket(setOperation.executedAt)
             pbOperation.set = pbSetOperation
         } else if let addOperation = operation as? AddOperation {
             var pbAddOperation = PbOperation.Add()
             pbAddOperation.parentCreatedAt = toTimeTicket(addOperation.parentCreatedAt)
             pbAddOperation.prevCreatedAt = toTimeTicket(addOperation.previousCreatedAt)
-            // TODO: Remove try!
-            pbAddOperation.value = try! toElementSimple(addOperation.value)
+            pbAddOperation.value = toElementSimple(addOperation.value)
             pbAddOperation.executedAt = toTimeTicket(addOperation.executedAt)
             pbOperation.add = pbAddOperation
         } else if let moveOperation = operation as? MoveOperation {
@@ -365,7 +357,6 @@ extension Converter {
             pbRemoveOperation.createdAt = toTimeTicket(removeOperation.createdAt)
             pbRemoveOperation.executedAt =  toTimeTicket(removeOperation.executedAt)
             pbOperation.remove = pbRemoveOperation
-            // TODO: EditOperaion is not implemented!
         } else if let editOperation = operation as? EditOperation {
             var pbEditOperation = PbOperation.Edit()
             pbEditOperation.parentCreatedAt = toTimeTicket(editOperation.parentCreatedAt)
@@ -375,6 +366,9 @@ extension Converter {
                 pbEditOperation.createdAtMapByActor[$0.key] = toTimeTicket($0.value)
             }
             pbEditOperation.content = editOperation.content
+            editOperation.attributes?.forEach {
+                pbEditOperation.attributes[$0.key] = $0.value
+            }
             pbEditOperation.executedAt = toTimeTicket(editOperation.executedAt)
             pbOperation.edit = pbEditOperation
         } else if let selectOperaion = operation as? SelectOperation {
@@ -384,29 +378,12 @@ extension Converter {
             pbSelectOperation.to = toTextNodePos(pos: selectOperaion.toPos)
             pbSelectOperation.executedAt = toTimeTicket(selectOperaion.executedAt)
             pbOperation.select = pbSelectOperation
-            // TODO: RichEditOperation need to refactor!
-        } else if let richEditOperation = operation as? EditOperation {
-            var pbEditOperation = PbOperation.RichEdit()
-            pbEditOperation.parentCreatedAt = toTimeTicket(richEditOperation.parentCreatedAt)
-            pbEditOperation.from = toTextNodePos(pos: richEditOperation.fromPos)
-            pbEditOperation.to = toTextNodePos(pos: richEditOperation.toPos)
-            richEditOperation.maxCreatedAtMapByActor.forEach {
-                pbEditOperation.createdAtMapByActor[$0.key] = toTimeTicket($0.value)
-            }
-            pbEditOperation.content = richEditOperation.content
-            if let attributes = richEditOperation.attributes {
-                stringifyAttributes(attributes).forEach {
-                    pbEditOperation.attributes[$0.key] = $0.value
-                }
-            }
-            pbEditOperation.executedAt = toTimeTicket(richEditOperation.executedAt)
-            pbOperation.richEdit = pbEditOperation
         } else if let styleOperation = operation as? StyleOperation {
             var pbStyleOperation = PbOperation.Style()
             pbStyleOperation.parentCreatedAt = toTimeTicket(styleOperation.parentCreatedAt)
             pbStyleOperation.from = toTextNodePos(pos: styleOperation.fromPos)
             pbStyleOperation.to = toTextNodePos(pos: styleOperation.toPos)
-            stringifyAttributes(styleOperation.attributes).forEach {
+            styleOperation.attributes.forEach {
                 pbStyleOperation.attributes[$0.key] = $0.value
             }
             pbStyleOperation.executedAt = toTimeTicket(styleOperation.executedAt)
@@ -414,7 +391,7 @@ extension Converter {
         } else if let increaseOperation = operation as? IncreaseOperation {
             var pbIncreaseOperation = PbOperation.Increase()
             pbIncreaseOperation.parentCreatedAt = toTimeTicket(increaseOperation.parentCreatedAt)
-            pbIncreaseOperation.value = try toElementSimple(increaseOperation.value)
+            pbIncreaseOperation.value = toElementSimple(increaseOperation.value)
             pbIncreaseOperation.executedAt = toTimeTicket(increaseOperation.executedAt)
             pbOperation.increase = pbIncreaseOperation
         } else {
@@ -457,22 +434,7 @@ extension Converter {
                                        executedAt: fromTimeTicket(pbRemoveOperation.executedAt))
             } else if case let .edit(pbEditOperation) = pbOperation.body {
                 let createdAtMapByActor = pbEditOperation.createdAtMapByActor.mapValues { fromTimeTicket($0) }
-                
-                return EditOperation(parentCreatedAt: fromTimeTicket(pbEditOperation.parentCreatedAt),
-                                     fromPos: fromTextNodePos(pbEditOperation.from),
-                                     toPos: fromTextNodePos(pbEditOperation.to),
-                                     maxCreatedAtMapByActor: createdAtMapByActor,
-                                     content: pbEditOperation.content,
-                                     attributes: nil,
-                                     executedAt: fromTimeTicket(pbEditOperation.executedAt))
-            } else if case let .select(pbSelectOperation) = pbOperation.body {
-                return SelectOperation(parentCreatedAt: fromTimeTicket(pbSelectOperation.parentCreatedAt),
-                                       fromPos: fromTextNodePos(pbSelectOperation.from),
-                                       toPos: fromTextNodePos(pbSelectOperation.to),
-                                       executedAt: fromTimeTicket(pbSelectOperation.executedAt))
-            } else if case let .richEdit(pbEditOperation) = pbOperation.body {
-                let createdAtMapByActor = pbEditOperation.createdAtMapByActor.mapValues { fromTimeTicket($0) }
-
+                                
                 return EditOperation(parentCreatedAt: fromTimeTicket(pbEditOperation.parentCreatedAt),
                                      fromPos: fromTextNodePos(pbEditOperation.from),
                                      toPos: fromTextNodePos(pbEditOperation.to),
@@ -480,6 +442,11 @@ extension Converter {
                                      content: pbEditOperation.content,
                                      attributes: pbEditOperation.attributes,
                                      executedAt: fromTimeTicket(pbEditOperation.executedAt))
+            } else if case let .select(pbSelectOperation) = pbOperation.body {
+                return SelectOperation(parentCreatedAt: fromTimeTicket(pbSelectOperation.parentCreatedAt),
+                                       fromPos: fromTextNodePos(pbSelectOperation.from),
+                                       toPos: fromTextNodePos(pbSelectOperation.to),
+                                       executedAt: fromTimeTicket(pbSelectOperation.executedAt))
             } else if case let .style(pbStyleOperation) = pbOperation.body {
                 return StyleOperation(parentCreatedAt: fromTimeTicket(pbStyleOperation.parentCreatedAt),
                                       fromPos: fromTextNodePos(pbStyleOperation.from),
@@ -752,7 +719,6 @@ extension Converter {
             return toArray(element)
         } else if let element = element as? Primitive {
             return toPrimitive(element)
-            // TODO: CRDTText is not implemented!
         } else if let element = element as? CRDTText {
             return toText(element);
         } else if let element = element as? CRDTCounter<Int32> {
@@ -776,8 +742,6 @@ extension Converter {
             return try fromPrimitive(element)
         } else if case let .text(element) = pbElement.body {
             return fromText(element)
-        } else if case let .richText(element) = pbElement.body {
-            return fromRichText(element)
         } else if case let .counter(element) = pbElement.body {
             return try fromCounter(element)
         } else {
@@ -796,8 +760,14 @@ extension Converter {
         for textNode in rgaTreeSplit {
             var pbTextNode = PbTextNode()
             pbTextNode.id = toTextNodeID(id: textNode.id)
-            pbTextNode.value = String(describing: textNode.value)
-            
+            pbTextNode.value = String(describing: textNode.value.content)
+            textNode.value.getAttributes().forEach { key, value in
+                var attr = PbTextNodeAttr()
+                attr.key = key
+                attr.value = value.value
+                attr.updatedAt = toTimeTicket(value.updatedAt)
+                pbTextNode.attributes[key] = attr
+            }
             if let removedAt = textNode.removedAt {
                 pbTextNode.removedAt = toTimeTicket(removedAt)
             }
@@ -811,51 +781,15 @@ extension Converter {
      * `fromTextNode` converts the given Protobuf format to model format.
      */
     static func fromTextNode(_ pbTextNode: PbTextNode) -> RGATreeSplitNode<TextValue> {
-        let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), TextValue(pbTextNode.value))
-        textNode.remove(pbTextNode.hasRemovedAt ? Self.fromTimeTicket(pbTextNode.removedAt) : nil)
-        return textNode
-    }
-}
-
-// MARK: RichTextNode
-extension Converter {
-    /**
-     * `fromRichTextNode` converts the given Protobuf format to model format.
-     */
-    static func fromRichTextNode(_ pbTextNode: PbRichTextNode) -> RGATreeSplitNode<TextValue> {
-        let richTextValue = TextValue(pbTextNode.value)
+        let textValue = TextValue(pbTextNode.value)
         pbTextNode.attributes.forEach {
-            richTextValue.setAttr(key: $0.key, value: $0.value.value, updatedAt: fromTimeTicket($0.value.updatedAt))
+            textValue.setAttr(key: $0.key, value: $0.value.value, updatedAt: fromTimeTicket($0.value.updatedAt))
         }
-        let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), richTextValue)
+        let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), textValue)
         if  pbTextNode.hasRemovedAt {
             textNode.remove(fromTimeTicket(pbTextNode.removedAt))
         }
         return textNode
-    }
-
-    /**
-     * `fromRichText` converts the given Protobuf format to model format.
-     */
-    static func fromRichText(_ pbText: PbJSONElement.RichText) -> CRDTText {
-        let rgaTreeSplit = RGATreeSplit<TextValue>()
-
-        var prev = rgaTreeSplit.head
-        pbText.nodes.forEach { pbNode in
-            let current = rgaTreeSplit.insertAfter(prev, fromRichTextNode(pbNode))
-            if pbNode.hasInsPrevID {
-                current.setInsPrev(rgaTreeSplit.findNode(fromTextNodeID(pbNode.insPrevID)))
-            }
-            prev = current
-        }
-        let text = CRDTText(rgaTreeSplit: rgaTreeSplit, createdAt: fromTimeTicket(pbText.createdAt))
-        if pbText.hasMovedAt {
-            text.movedAt = fromTimeTicket(pbText.movedAt)
-        }
-        if pbText.hasRemovedAt {
-            text.removedAt = fromTimeTicket(pbText.removedAt)
-        }
-        return text
     }
 }
 

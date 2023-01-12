@@ -128,7 +128,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     /**
      * `getAttributes` returns the attributes of this value.
      */
-    public func getAttributes() -> [String: String] {
+    public func getAttributes() -> [String: (value: String, updatedAt: TimeTicket)] {
         self.attributes.toObject()
     }
 
@@ -171,9 +171,23 @@ final class CRDTText: CRDTTextElement {
                      _ attributes: TextAttributes? = nil,
                      _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> [String: TimeTicket]
     {
+        return try self.edit(range,
+                             content,
+                             editedAt,
+                             attributes != nil ? stringifyAttributes(attributes!) : nil,
+                             latestCreatedAtMapByActor)
+    }
+
+    @discardableResult
+    func edit(_ range: RGATreeSplitNodeRange,
+              _ content: String,
+              _ editedAt: TimeTicket,
+              _ attributes: [String: String]? = nil,
+              _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> [String: TimeTicket]
+    {
         let value = !content.isEmpty ? TextValue(content) : nil
         if !content.isEmpty, let attributes {
-            stringifyAttributes(attributes).forEach { key, jsonValue in
+            attributes.forEach { key, jsonValue in
                 value?.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
             }
         }
@@ -219,6 +233,13 @@ final class CRDTText: CRDTTextElement {
                          _ attributes: TextAttributes,
                          _ editedAt: TimeTicket) throws
     {
+        return try self.setStyle(range, stringifyAttributes(attributes), editedAt)
+    }
+
+    func setStyle(_ range: RGATreeSplitNodeRange,
+                  _ attributes: [String: String],
+                  _ editedAt: TimeTicket) throws
+    {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
         let fromRight = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt).1
@@ -239,7 +260,7 @@ final class CRDTText: CRDTTextElement {
                                       content: nil,
                                       attributes: attributes))
 
-            stringifyAttributes(attributes).forEach { key, jsonValue in
+            attributes.forEach { key, jsonValue in
                 node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
             }
         }
@@ -319,6 +340,10 @@ final class CRDTText: CRDTTextElement {
 
     public var plainText: String {
         self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value.toString }.joined(separator: "")
+    }
+
+    public var values: [TextValue]? {
+        self.rgaTreeSplit.compactMap { $0.value }
     }
 
     /**

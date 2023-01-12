@@ -98,10 +98,10 @@ class RHT {
     /**
      * `toObject` returns the object of this hashtable.
      */
-    func toObject() -> [String: String] {
-        var result = [String: String]()
+    func toObject() -> [String: (value: String, updatedAt: TimeTicket)] {
+        var result = [String: (String, TimeTicket)]()
         self.nodeMapByKey.forEach { (key: String, node: RHTNode) in
-            result[key] = node.value
+            result[key] = (node.value, node.updatedAt)
         }
 
         return result
