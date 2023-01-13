@@ -763,7 +763,6 @@ extension Converter {
             pbTextNode.value = String(describing: textNode.value.content)
             textNode.value.getAttributes().forEach { key, value in
                 var attr = PbTextNodeAttr()
-                attr.key = key
                 attr.value = value.value
                 attr.updatedAt = toTimeTicket(value.updatedAt)
                 pbTextNode.attributes[key] = attr

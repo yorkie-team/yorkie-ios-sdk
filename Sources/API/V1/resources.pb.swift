@@ -50,7 +50,6 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
   case text // = 10
   case integerCnt // = 11
   case longCnt // = 12
-  case doubleCnt // = 13
   case UNRECOGNIZED(Int)
 
   init() {
@@ -72,7 +71,6 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
     case 10: self = .text
     case 11: self = .integerCnt
     case 12: self = .longCnt
-    case 13: self = .doubleCnt
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -92,7 +90,6 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
     case .text: return 10
     case .integerCnt: return 11
     case .longCnt: return 12
-    case .doubleCnt: return 13
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -117,7 +114,6 @@ extension Yorkie_V1_ValueType: CaseIterable {
     .text,
     .integerCnt,
     .longCnt,
-    .doubleCnt,
   ]
 }
 
@@ -1184,8 +1180,6 @@ struct Yorkie_V1_TextNodeAttr {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var key: String = String()
-
   var value: String = String()
 
   var updatedAt: Yorkie_V1_TimeTicket {
@@ -1631,7 +1625,6 @@ extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
     10: .same(proto: "VALUE_TYPE_TEXT"),
     11: .same(proto: "VALUE_TYPE_INTEGER_CNT"),
     12: .same(proto: "VALUE_TYPE_LONG_CNT"),
-    13: .same(proto: "VALUE_TYPE_DOUBLE_CNT"),
   ]
 }
 
@@ -3207,9 +3200,8 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 extension Yorkie_V1_TextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".TextNodeAttr"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "key"),
-    2: .same(proto: "value"),
-    3: .standard(proto: "updated_at"),
+    1: .same(proto: "value"),
+    2: .standard(proto: "updated_at"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3218,9 +3210,8 @@ extension Yorkie_V1_TextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.value) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.value) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
       default: break
       }
     }
@@ -3231,20 +3222,16 @@ extension Yorkie_V1_TextNodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.key.isEmpty {
-      try visitor.visitSingularStringField(value: self.key, fieldNumber: 1)
-    }
     if !self.value.isEmpty {
-      try visitor.visitSingularStringField(value: self.value, fieldNumber: 2)
+      try visitor.visitSingularStringField(value: self.value, fieldNumber: 1)
     }
     try { if let v = self._updatedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_TextNodeAttr, rhs: Yorkie_V1_TextNodeAttr) -> Bool {
-    if lhs.key != rhs.key {return false}
     if lhs.value != rhs.value {return false}
     if lhs._updatedAt != rhs._updatedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
