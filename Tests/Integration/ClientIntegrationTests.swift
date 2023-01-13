@@ -128,11 +128,11 @@ final class ClientIntegrationTests: XCTestCase {
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
         var result = await d2.getRoot().get(key: "k1") as? String
-        XCTAssert(result == "v1")
+        XCTAssertEqual(result, "v1")
         result = await self.d2.getRoot().get(key: "k2") as? String
-        XCTAssert(result == "v2")
+        XCTAssertEqual(result, "v2")
         result = await self.d2.getRoot().get(key: "k3") as? String
-        XCTAssert(result == "v3")
+        XCTAssertEqual(result, "v3")
 
         await self.d1.update { root in
             root.integer = Int32.max
