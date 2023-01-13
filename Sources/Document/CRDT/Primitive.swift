@@ -65,6 +65,8 @@ class Primitive: CRDTElement {
             return .integer(casted)
         case let casted as Int64:
             return .long(casted)
+        case let casted as Int:
+            return .long(Int64(casted))
         case let casted as Double:
             return .double(casted)
         case let casted as String:

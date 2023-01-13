@@ -32,10 +32,8 @@ final class CounterIntegrationTests: XCTestCase {
         await doc.update { root in
             root.age = JSONCounter(value: Int32(1))
             root.length = JSONCounter(value: Int64(10))
-            do {
-                try (root.age as! JSONCounter<Int32>).increase(value: Int32(5))
-                try (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
-            } catch {}
+            (root.age as! JSONCounter<Int32>).increase(value: Int32(5))
+            (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
         }
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -48,10 +46,8 @@ final class CounterIntegrationTests: XCTestCase {
         XCTAssert(result == "{\"age\":6,\"length\":13}")
 
         await doc.update { root in
-            do {
-                try (root.age as! JSONCounter<Int32>).increase(value: Int32(1)).increase(value: Int32(1))
-                try (root.length as! JSONCounter<Int64>).increase(value: Int64(3)).increase(value: Int64(1))
-            } catch {}
+            (root.age as! JSONCounter<Int32>).increase(value: Int32(1)).increase(value: Int32(1))
+            (root.length as! JSONCounter<Int64>).increase(value: Int64(3)).increase(value: Int64(1))
         }
 
         try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -59,21 +55,11 @@ final class CounterIntegrationTests: XCTestCase {
         result = await doc.toSortedJSON()
         XCTAssert(result == "{\"age\":8,\"length\":17}")
 
-        let expectation = XCTestExpectation(description: "failed Test")
-        var failedTestResult = false
-
         await doc.update { root in
-            do {
-                try (root.age as! JSONCounter<Int32>).increase(value: Int64(1))
-            } catch {
-                failedTestResult = true
-                expectation.fulfill()
-            }
+            (root.age as! JSONCounter<Int32>).increase(value: Int64(1))
         }
-
-        wait(for: [expectation], timeout: 1)
-
-        XCTAssert(failedTestResult)
+        result = await doc.toSortedJSON()
+        XCTAssertEqual(result, "{\"age\":9,\"length\":17}")
     }
 
     func test_can_sync_counter() async throws {
@@ -110,10 +96,8 @@ final class CounterIntegrationTests: XCTestCase {
         XCTAssert(result1 == result2)
 
         await self.d1.update { root in
-            do {
-                try (root.age as! JSONCounter<Int32>).increase(value: Int32(5))
-                try (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
-            } catch {}
+            (root.age as! JSONCounter<Int32>).increase(value: Int32(5))
+            (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
         }
 
         try await Task.sleep(nanoseconds: 2_000_000_000)
@@ -165,10 +149,8 @@ final class CounterIntegrationTests: XCTestCase {
         XCTAssert(result1 == "{\"counts\":[1,10]}")
 
         await self.d1.update { root in
-            do {
-                try ((root.counts as! JSONArray)[0] as! JSONCounter<Int32>).increase(value: Int32(5))
-                try ((root.counts as! JSONArray)[1] as! JSONCounter<Int32>).increase(value: Int32(3))
-            } catch {}
+            ((root.counts as! JSONArray)[0] as! JSONCounter<Int32>).increase(value: Int32(5))
+            ((root.counts as! JSONArray)[1] as! JSONCounter<Int32>).increase(value: Int32(3))
         }
 
         try await Task.sleep(nanoseconds: 1_000_000_000)

@@ -59,28 +59,47 @@ public class JSONCounter<T: YorkieCountable> {
      * `increase` increases numeric data.
      */
     @discardableResult
-    public func increase<T: YorkieCountable>(value: T) throws -> Self {
+    public func increase(value: any BinaryInteger) -> Self {
         guard let context, let counter else {
             let log = "it is not initialized yet"
             Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+
+            return self
         }
 
         guard let primitiveValue = Primitive.type(of: value) else {
-            throw YorkieError.type(message: "Unsupported type of value: \(type(of: T.self))")
+            let log = "Unsupported type of value: \(type(of: T.self))"
+            Logger.critical(log)
+
+            return self
         }
 
         let ticket = context.issueTimeTicket()
         let primitive = Primitive(value: primitiveValue, createdAt: ticket)
 
         guard primitive.isNumericType else {
-            throw YorkieError.type(message: "Unsupported type of value: \(type(of: T.self))")
+            let log = "Unsupported type of value: \(type(of: T.self))"
+            Logger.critical(log)
+
+            return self
         }
 
-        try counter.increase(primitive)
+        do {
+            try counter.increase(primitive)
+        } catch {
+            let log = "catch error when increase counter: [\(error)]"
+            Logger.critical(log)
+
+            return self
+        }
 
         context.push(operation: IncreaseOperation(parentCreatedAt: counter.createdAt, value: primitive, executedAt: ticket))
 
         return self
+    }
+
+    @discardableResult
+    public func increase(value: any BinaryFloatingPoint) -> Self {
+        self.increase(value: T(value))
     }
 }

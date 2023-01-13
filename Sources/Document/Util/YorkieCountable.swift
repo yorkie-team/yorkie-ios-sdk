@@ -19,6 +19,7 @@ import Foundation
 public protocol YorkieCountable: BinaryInteger {
     var littleEndian: Self { get }
     func addingReportingOverflow(_ other: Self) -> (partialValue: Self, overflow: Bool)
+    static func &+= (lhs: inout Self, rhs: Self)
 }
 
 extension Int32: YorkieCountable {}

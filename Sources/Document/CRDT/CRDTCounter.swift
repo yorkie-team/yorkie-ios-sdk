@@ -60,17 +60,9 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
     public func increase(_ primitive: Primitive) throws -> CRDTCounter {
         switch primitive.value {
         case .integer(let int32Value):
-            guard let value = int32Value as? T else {
-                throw YorkieError.type(message: "Value Type mismatch: \(type(of: primitive)), \(T.self)")
-            }
-
-            self.value = self.value.addingReportingOverflow(value).partialValue
+            self.value &+= T(int32Value)
         case .long(let int64Value):
-            guard let value = int64Value as? T else {
-                throw YorkieError.type(message: "Value Type mismatch: \(type(of: primitive.value))")
-            }
-
-            self.value = self.value.addingReportingOverflow(value).partialValue
+            self.value &+= T(int64Value)
         default:
             throw YorkieError.type(message: "Unsupported type of value: \(type(of: primitive.value))")
         }
