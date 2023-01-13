@@ -964,4 +964,42 @@ class DocumentTests: XCTestCase {
                        {"data":["\\"hello\\"","\\n","\\b","\\t","\\f","\\r","\\\\"]}
                        """)
     }
+
+    func test_can_handle_counter_overflow() async throws {
+        let doc = Document(key: "test-doc")
+
+        await doc.update { root in
+            root.age = JSONCounter(value: Int32(2_147_483_647))
+            (root.age as? JSONCounter<Int32>)?.increase(value: 1)
+        }
+
+        var result = await doc.toSortedJSON()
+        XCTAssertEqual("{\"age\":-2147483648}", result)
+
+        await doc.update { root in
+            root.age = JSONCounter(value: Int64(9_223_372_036_854_775_807))
+            (root.age as? JSONCounter<Int64>)?.increase(value: 1)
+        }
+        result = await doc.toSortedJSON()
+        XCTAssertEqual("{\"age\":-9223372036854775808}", result)
+    }
+
+    func test_can_handle_counter_float_value() async throws {
+        let doc = Document(key: "test-doc")
+
+        await doc.update { root in
+            root.age = JSONCounter(value: Int32(10))
+            (root.age as? JSONCounter<Int32>)?.increase(value: 3.5)
+        }
+
+        var result = await doc.toSortedJSON()
+        XCTAssertEqual("{\"age\":13}", result)
+
+        await doc.update { root in
+            root.age = JSONCounter(value: Int64(0))
+            (root.age as? JSONCounter<Int64>)?.increase(value: -1.5)
+        }
+        result = await doc.toSortedJSON()
+        XCTAssertEqual("{\"age\":-1}", result)
+    }
 }
