@@ -128,7 +128,7 @@ extension Converter {
             if JSONSerialization.isValidJSONObject(value), let jsonData = try? JSONSerialization.data(withJSONObject: value) {
                 pbPresence.data[key] = String(bytes: jsonData, encoding: .utf8)
             } else {
-                // emulate JSON.stringfy() in JavaScript.
+                // emulate JSON.stringify() in JavaScript.
                 pbPresence.data[key] = value is String ? "\"\(value)\"" : "\(value)"
             }
         }
@@ -190,9 +190,9 @@ extension Converter {
      */
     static func toTimeTicket(_ ticket: TimeTicket) -> PbTimeTicket {
         var pbTimeTicket = PbTimeTicket()
-        pbTimeTicket.lamport = ticket.getLamport()
-        pbTimeTicket.delimiter = ticket.getDelimiter()
-        pbTimeTicket.actorID = ticket.getActorID()?.toData ?? Data()
+        pbTimeTicket.lamport = ticket.lamport
+        pbTimeTicket.delimiter = ticket.delimiter
+        pbTimeTicket.actorID = ticket.actorID?.toData ?? Data()
         return pbTimeTicket
     }
 
@@ -225,21 +225,15 @@ extension Converter {
     /**
      * `toElementSimple` converts the given model to Protobuf format.
      */
-    static func toElementSimple(_ element: CRDTElement) throws -> PbJSONElementSimple {
+    static func toElementSimple(_ element: CRDTElement) -> PbJSONElementSimple {
         var pbElementSimple = PbJSONElementSimple()
 
         if element is CRDTObject {
             pbElementSimple.type = .jsonObject
         } else if element is CRDTArray {
             pbElementSimple.type = .jsonArray
-            // TODO: CRDTText is not implemented!
-//        } else if let element = element as? CRDTText {
-//            pbElementSimple.setType(PbValueType.VALUE_TYPE_TEXT);
-//            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
-            // TODO: CRDTRichText is not implemented!
-//        } else if let element = element as? CRDTRichText {
-//            pbElementSimple.setType(PbValueType.VALUE_TYPE_RICH_TEXT);
-//            pbElementSimple.setCreatedAt(toTimeTicket(element.createdAt));
+        } else if element is CRDTText {
+            pbElementSimple.type = .text
         } else if let element = element as? Primitive {
             let primitive = element.value
             pbElementSimple.type = toValueType(primitive)
@@ -250,8 +244,6 @@ extension Converter {
         } else if let counter = element as? CRDTCounter<Int64> {
             pbElementSimple.type = .longCnt
             pbElementSimple.value = counter.toBytes()
-        } else {
-            throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
         }
 
         pbElementSimple.createdAt = toTimeTicket(element.createdAt)
@@ -269,19 +261,7 @@ extension Converter {
         case .jsonArray:
             return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .text:
-            // TODO: CRDTText is not implemented!
-            throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
-//            return CRDTText.create(
-//                RGATreeSplit.create(),
-//                fromTimeTicket(pbElementSimple.createdAt)!,
-//            );
-        case .richText:
-            // TODO: CRDTRichText is not implemented!
-            throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
-//            return new CRDTRichText(
-//                RGATreeSplit.create(),
-//                fromTimeTicket(pbElementSimple.createdAt)!,
-//            );
+            return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
             return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .integerCnt:
@@ -306,23 +286,19 @@ extension Converter {
     /**
      * `toTextNodeID` converts the given model to Protobuf format.
      */
-    // TODO: RGATreeSplitNodeID is not implemented!
-//    static func toTextNodeID(id: RGATreeSplitNodeID) -> PbTextNodeID {
-//        const pbTextNodeID = new PbTextNodeID();
-//        pbTextNodeID.setCreatedAt(toTimeTicket(id.createdAt));
-//        pbTextNodeID.setOffset(id.getOffset());
-//        return pbTextNodeID;
-//    }
+    static func toTextNodeID(id: RGATreeSplitNodeID) -> PbTextNodeID {
+        var pbTextNodeID = PbTextNodeID()
+        pbTextNodeID.createdAt = toTimeTicket(id.createdAt)
+        pbTextNodeID.offset = id.offset
+        return pbTextNodeID
+    }
 
     /**
      * `fromTextNodeID` converts the given Protobuf format to model format.
      */
-//    function fromTextNodeID(pbTextNodeID: PbTextNodeID): RGATreeSplitNodeID {
-//      return RGATreeSplitNodeID.of(
-//        fromTimeTicket(pbTextNodeID.createdAt)!,
-//        pbTextNodeID.getOffset(),
-//      );
-//    }
+    static func fromTextNodeID(_ pbTextNodeID: PbTextNodeID) -> RGATreeSplitNodeID {
+        RGATreeSplitNodeID(Self.fromTimeTicket(pbTextNodeID.createdAt), pbTextNodeID.offset)
+    }
 }
 
 // MARK: TextNodePos
@@ -330,27 +306,20 @@ extension Converter {
     /**
      * `toTextNodePos` converts the given model to Protobuf format.
      */
-    // TODO: RGATreeSplitNodePos is not implemented!
-//    static func toTextNodePos(pos: RGATreeSplitNodePos) -> PbTextNodePos {
-//        const pbTextNodePos = new PbTextNodePos();
-//        pbTextNodePos.setCreatedAt(toTimeTicket(pos.id.createdAt));
-//        pbTextNodePos.setOffset(pos.id.getOffset());
-//        pbTextNodePos.setRelativeOffset(pos.getRelativeOffset());
-//        return pbTextNodePos;
-//    }
+    static func toTextNodePos(pos: RGATreeSplitNodePos) -> PbTextNodePos {
+        var pbTextNodePos = PbTextNodePos()
+        pbTextNodePos.createdAt = toTimeTicket(pos.id.createdAt)
+        pbTextNodePos.offset = pos.id.offset
+        pbTextNodePos.relativeOffset = pos.relativeOffset
+        return pbTextNodePos
+    }
 
     /**
      * `fromTextNodePos` converts the given Protobuf format to model format.
      */
-//    function fromTextNodePos(pbTextNodePos: PbTextNodePos): RGATreeSplitNodePos {
-//      return RGATreeSplitNodePos.of(
-//        RGATreeSplitNodeID.of(
-//          fromTimeTicket(pbTextNodePos.createdAt)!,
-//          pbTextNodePos.getOffset(),
-//        ),
-//        pbTextNodePos.getRelativeOffset(),
-//      );
-//    }
+    static func fromTextNodePos(_ pbTextNodePos: PbTextNodePos) -> RGATreeSplitNodePos {
+        RGATreeSplitNodePos(RGATreeSplitNodeID(Self.fromTimeTicket(pbTextNodePos.createdAt), pbTextNodePos.offset), pbTextNodePos.relativeOffset)
+    }
 }
 
 // MARK: Operation
@@ -365,16 +334,14 @@ extension Converter {
             var pbSetOperation = PbOperation.Set()
             pbSetOperation.parentCreatedAt = toTimeTicket(setOperation.parentCreatedAt)
             pbSetOperation.key = setOperation.key
-            // TODO: Remove try!
-            pbSetOperation.value = try! toElementSimple(setOperation.value)
+            pbSetOperation.value = toElementSimple(setOperation.value)
             pbSetOperation.executedAt = toTimeTicket(setOperation.executedAt)
             pbOperation.set = pbSetOperation
         } else if let addOperation = operation as? AddOperation {
             var pbAddOperation = PbOperation.Add()
             pbAddOperation.parentCreatedAt = toTimeTicket(addOperation.parentCreatedAt)
             pbAddOperation.prevCreatedAt = toTimeTicket(addOperation.previousCreatedAt)
-            // TODO: Remove try!
-            pbAddOperation.value = try! toElementSimple(addOperation.value)
+            pbAddOperation.value = toElementSimple(addOperation.value)
             pbAddOperation.executedAt = toTimeTicket(addOperation.executedAt)
             pbOperation.add = pbAddOperation
         } else if let moveOperation = operation as? MoveOperation {
@@ -390,75 +357,41 @@ extension Converter {
             pbRemoveOperation.createdAt = toTimeTicket(removeOperation.createdAt)
             pbRemoveOperation.executedAt =  toTimeTicket(removeOperation.executedAt)
             pbOperation.remove = pbRemoveOperation
-            // TODO: EditOperaion is not implemented!
-//        } else if let editOperation = operation as? EditOperation {
-//            const pbEditOperation = new PbOperation.Edit();
-//            pbEditOperation.setParentCreatedAt(
-//                toTimeTicket(editOperation.parentCreatedAt),
-//            );
-//            pbEditOperation.setFrom(toTextNodePos(editOperation.getFromPos()));
-//            pbEditOperation.setTo(toTextNodePos(editOperation.getToPos()));
-//            const pbCreatedAtMapByActor = pbEditOperation.getCreatedAtMapByActorMap();
-//            for (const [key, value] of editOperation.getMaxCreatedAtMapByActor()) {
-//                pbCreatedAtMapByActor.set(key, toTimeTicket(value)!);
-//            }
-//            pbEditOperation.setContent(editOperation.getContent());
-//            pbEditOperation.setExecutedAt(toTimeTicket(editOperation.executedAt));
-//            pbOperation.setEdit(pbEditOperation);
-            // TODO: SelectOperation is not implemented!
-//        } else if let selectOperaion = operation as? SelectOperation {
-//            const pbSelectOperation = new PbOperation.Select();
-//            pbSelectOperation.setParentCreatedAt(
-//                toTimeTicket(selectOperation.parentCreatedAt),
-//            );
-//            pbSelectOperation.setFrom(toTextNodePos(selectOperation.getFromPos()));
-//            pbSelectOperation.setTo(toTextNodePos(selectOperation.getToPos()));
-//            pbSelectOperation.setExecutedAt(
-//                toTimeTicket(selectOperation.executedAt),
-//            );
-//            pbOperation.setSelect(pbSelectOperation);
-            // TODO: RichEditOperation is not implemented!
-//        } else if let richEditOperation = operation as? RichEditOperation {
-//            const pbRichEditOperation = new PbOperation.RichEdit();
-//            pbRichEditOperation.setParentCreatedAt(
-//                toTimeTicket(richEditOperation.parentCreatedAt),
-//            );
-//            pbRichEditOperation.setFrom(toTextNodePos(richEditOperation.getFromPos()));
-//            pbRichEditOperation.setTo(toTextNodePos(richEditOperation.getToPos()));
-//            const pbCreatedAtMapByActor =
-//            pbRichEditOperation.getCreatedAtMapByActorMap();
-//            for (const [key, value] of richEditOperation.getMaxCreatedAtMapByActor()) {
-//                pbCreatedAtMapByActor.set(key, toTimeTicket(value)!);
-//            }
-//            pbRichEditOperation.setContent(richEditOperation.getContent());
-//            const pbAttributes = pbRichEditOperation.getAttributesMap();
-//            for (const [key, value] of richEditOperation.getAttributes()) {
-//                pbAttributes.set(key, value);
-//            }
-//            pbRichEditOperation.setExecutedAt(
-//                toTimeTicket(richEditOperation.executedAt),
-//            );
-//            pbOperation.setRichEdit(pbRichEditOperation);
-            // TODO: StyleOperation is not implemented!
-//        } else if let styleOperation = operation as? StyleOperation {
-//            const pbStyleOperation = new PbOperation.Style();
-//            pbStyleOperation.setParentCreatedAt(
-//                toTimeTicket(styleOperation.parentCreatedAt),
-//            );
-//            pbStyleOperation.setFrom(toTextNodePos(styleOperation.getFromPos()));
-//            pbStyleOperation.setTo(toTextNodePos(styleOperation.getToPos()));
-//            const pbAttributes = pbStyleOperation.getAttributesMap();
-//            for (const [key, value] of styleOperation.getAttributes()) {
-//                pbAttributes.set(key, value);
-//            }
-//            pbStyleOperation.setExecutedAt(
-//                toTimeTicket(styleOperation.executedAt),
-//            );
-//            pbOperation.setStyle(pbStyleOperation);
+        } else if let editOperation = operation as? EditOperation {
+            var pbEditOperation = PbOperation.Edit()
+            pbEditOperation.parentCreatedAt = toTimeTicket(editOperation.parentCreatedAt)
+            pbEditOperation.from = toTextNodePos(pos: editOperation.fromPos)
+            pbEditOperation.to = toTextNodePos(pos: editOperation.toPos)
+            editOperation.maxCreatedAtMapByActor.forEach {
+                pbEditOperation.createdAtMapByActor[$0.key] = toTimeTicket($0.value)
+            }
+            pbEditOperation.content = editOperation.content
+            editOperation.attributes?.forEach {
+                pbEditOperation.attributes[$0.key] = $0.value
+            }
+            pbEditOperation.executedAt = toTimeTicket(editOperation.executedAt)
+            pbOperation.edit = pbEditOperation
+        } else if let selectOperaion = operation as? SelectOperation {
+            var pbSelectOperation = PbOperation.Select()
+            pbSelectOperation.parentCreatedAt = toTimeTicket(selectOperaion.parentCreatedAt)
+            pbSelectOperation.from = toTextNodePos(pos: selectOperaion.fromPos)
+            pbSelectOperation.to = toTextNodePos(pos: selectOperaion.toPos)
+            pbSelectOperation.executedAt = toTimeTicket(selectOperaion.executedAt)
+            pbOperation.select = pbSelectOperation
+        } else if let styleOperation = operation as? StyleOperation {
+            var pbStyleOperation = PbOperation.Style()
+            pbStyleOperation.parentCreatedAt = toTimeTicket(styleOperation.parentCreatedAt)
+            pbStyleOperation.from = toTextNodePos(pos: styleOperation.fromPos)
+            pbStyleOperation.to = toTextNodePos(pos: styleOperation.toPos)
+            styleOperation.attributes.forEach {
+                pbStyleOperation.attributes[$0.key] = $0.value
+            }
+            pbStyleOperation.executedAt = toTimeTicket(styleOperation.executedAt)
+            pbOperation.style = pbStyleOperation
         } else if let increaseOperation = operation as? IncreaseOperation {
             var pbIncreaseOperation = PbOperation.Increase()
             pbIncreaseOperation.parentCreatedAt = toTimeTicket(increaseOperation.parentCreatedAt)
-            pbIncreaseOperation.value = try toElementSimple(increaseOperation.value)
+            pbIncreaseOperation.value = toElementSimple(increaseOperation.value)
             pbIncreaseOperation.executedAt = toTimeTicket(increaseOperation.executedAt)
             pbOperation.increase = pbIncreaseOperation
         } else {
@@ -500,62 +433,26 @@ extension Converter {
                                        createdAt: fromTimeTicket(pbRemoveOperation.createdAt),
                                        executedAt: fromTimeTicket(pbRemoveOperation.executedAt))
             } else if case let .edit(pbEditOperation) = pbOperation.body {
-                // TODO: EditOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
-                //                let createdAtMapByActor = pbEditOperation.createdAtMapByActor.map { (key, value) in
-                //                    fromTimeTicket(value)
-                //                }
-                //                operation = EditOperation.create(
-                //                    fromTimeTicket(pbEditOperation!.parentCreatedAt)!,
-                //                    fromTextNodePos(pbEditOperation!.getFrom()!),
-                //                    fromTextNodePos(pbEditOperation!.getTo()!),
-                //                    createdAtMapByActor,
-                //                    pbEditOperation!.getContent(),
-                //                    fromTimeTicket(pbEditOperation!.executedAt)!,
-                //                );
+                let createdAtMapByActor = pbEditOperation.createdAtMapByActor.mapValues { fromTimeTicket($0) }
+                                
+                return EditOperation(parentCreatedAt: fromTimeTicket(pbEditOperation.parentCreatedAt),
+                                     fromPos: fromTextNodePos(pbEditOperation.from),
+                                     toPos: fromTextNodePos(pbEditOperation.to),
+                                     maxCreatedAtMapByActor: createdAtMapByActor,
+                                     content: pbEditOperation.content,
+                                     attributes: pbEditOperation.attributes,
+                                     executedAt: fromTimeTicket(pbEditOperation.executedAt))
             } else if case let .select(pbSelectOperation) = pbOperation.body {
-                // TODO: SelectOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
-                //                operation = SelectOperation.create(
-                //                    fromTimeTicket(pbSelectOperation!.parentCreatedAt)!,
-                //                    fromTextNodePos(pbSelectOperation!.getFrom()!),
-                //                    fromTextNodePos(pbSelectOperation!.getTo()!),
-                //                    fromTimeTicket(pbSelectOperation!.executedAt)!,
-                //                );
-            } else if case let .richEdit(pbEditOperation) = pbOperation.body {
-                // TODO: RichEditOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
-                //                const createdAtMapByActor = new Map();
-                //                pbEditOperation!.getCreatedAtMapByActorMap().forEach((value, key) => {
-                //                    createdAtMapByActor.set(key, fromTimeTicket(value));
-                //                });
-                //                const attributes = new Map();
-                //                pbEditOperation!.getAttributesMap().forEach((value, key) => {
-                //                    attributes.set(key, value);
-                //                });
-                //                operation = RichEditOperation.create(
-                //                    fromTimeTicket(pbEditOperation!.parentCreatedAt)!,
-                //                    fromTextNodePos(pbEditOperation!.getFrom()!),
-                //                    fromTextNodePos(pbEditOperation!.getTo()!),
-                //                    createdAtMapByActor,
-                //                    pbEditOperation!.getContent(),
-                //                    attributes,
-                //                    fromTimeTicket(pbEditOperation!.executedAt)!,
-                //                );
+                return SelectOperation(parentCreatedAt: fromTimeTicket(pbSelectOperation.parentCreatedAt),
+                                       fromPos: fromTextNodePos(pbSelectOperation.from),
+                                       toPos: fromTextNodePos(pbSelectOperation.to),
+                                       executedAt: fromTimeTicket(pbSelectOperation.executedAt))
             } else if case let .style(pbStyleOperation) = pbOperation.body {
-                // TODO: StyleOperation is not implemented!
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
-                //                const attributes = new Map();
-                //                pbStyleOperation!.getAttributesMap().forEach((value, key) => {
-                //                    attributes.set(key, value);
-                //                });
-                //                operation = StyleOperation.create(
-                //                    fromTimeTicket(pbStyleOperation!.parentCreatedAt)!,
-                //                    fromTextNodePos(pbStyleOperation!.getFrom()!),
-                //                    fromTextNodePos(pbStyleOperation!.getTo()!),
-                //                    attributes,
-                //                    fromTimeTicket(pbStyleOperation!.executedAt)!,
-                //                );
+                return StyleOperation(parentCreatedAt: fromTimeTicket(pbStyleOperation.parentCreatedAt),
+                                      fromPos: fromTextNodePos(pbStyleOperation.from),
+                                      toPos: fromTextNodePos(pbStyleOperation.to),
+                                      attributes: pbStyleOperation.attributes,
+                                      executedAt: fromTimeTicket(pbStyleOperation.executedAt))
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {
                 return IncreaseOperation(parentCreatedAt: fromTimeTicket(pbIncreaseOperation.parentCreatedAt),
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
@@ -721,44 +618,42 @@ extension Converter {
     /**
      * `toText` converts the given model to Protobuf format.
      */
-    // TODO: CRDTText is not implemented!
-//    static func toText(text: CRDTText) -> PbJSONElement {
-//        var pbText = PbJSONElement.Text()
-//        pbText.nodes = toTextNodes(text.getRGATreeSplit())
-//        pbText.createdAt = toTimeTicket(text.createdAt)
-//        pbText.movedAt = toTimeTicket(text.getMovedAt())
-//        pbText.removedAt = toTimeTicket(text.removedAt)
-//
-//        var pbElement = PbJSONElement();
-//        pbElement.text = pbText
-//        return pbElement;
-//    }
+    static func toText(_ text: CRDTText) -> PbJSONElement {
+        var pbText = PbJSONElement.Text()
+        pbText.nodes = toTextNodes(text.rgaTreeSplit)
+        pbText.createdAt = toTimeTicket(text.createdAt)
+        if let ticket = text.movedAt {
+            pbText.movedAt = toTimeTicket(ticket)
+        }
+        if let ticket = text.removedAt {
+            pbText.removedAt = toTimeTicket(ticket)
+        }
+
+        var pbElement = PbJSONElement()
+        pbElement.text = pbText
+        return pbElement;
+    }
 
     /**
      * `fromText` converts the given Protobuf format to model format.
      */
-//    function fromText(pbText: PbJSONElement.Text): CRDTText {
-//        const rgaTreeSplit = new RGATreeSplit<string>();
-//
-//        let prev = rgaTreeSplit.getHead();
-//        for (const pbNode of pbText.getNodesList()) {
-//            const current = rgaTreeSplit.insertAfter(prev, fromTextNode(pbNode));
-//            if (pbNode.hasInsPrevId()) {
-//                current.setInsPrev(
-//                    rgaTreeSplit.findNode(fromTextNodeID(pbNode.getInsPrevId()!)),
-//                );
-//            }
-//            prev = current;
-//        }
-//
-//        const text = CRDTText.create(
-//            rgaTreeSplit,
-//            fromTimeTicket(pbText.createdAt)!,
-//        );
-//        text.setMovedAt(fromTimeTicket(pbText.getMovedAt()));
-//        text.removedAt = fromTimeTicket(pbText.removedAt));
-//        return text;
-//    }
+    static func fromText(_ pbText: PbJSONElement.Text) -> CRDTText {
+        let rgaTreeSplit = RGATreeSplit<TextValue>()
+
+        var prev = rgaTreeSplit.head
+        pbText.nodes.forEach { pbNode in
+            let current = rgaTreeSplit.insertAfter(prev, fromTextNode(pbNode))
+            if pbNode.hasInsPrevID {
+                current.setInsPrev(rgaTreeSplit.findNode(fromTextNodeID(pbNode.insPrevID)))
+            }
+            prev = current
+        }
+
+        let text = CRDTText(rgaTreeSplit: rgaTreeSplit, createdAt: fromTimeTicket(pbText.createdAt))
+        text.movedAt = fromTimeTicket(pbText.movedAt)
+        text.removedAt = pbText.hasRemovedAt ? fromTimeTicket(pbText.removedAt) : nil
+        return text
+    }
 
     /**
      * `toCounter` converts the given model to Protobuf format.
@@ -824,9 +719,8 @@ extension Converter {
             return toArray(element)
         } else if let element = element as? Primitive {
             return toPrimitive(element)
-            // TODO: CRDTText is not implemented!
-//        } else if let element = element as? CRDTText {
-//            return toText(element);
+        } else if let element = element as? CRDTText {
+            return toText(element);
         } else if let element = element as? CRDTCounter<Int32> {
             return toCounter(element)
         } else if let element = element as? CRDTCounter<Int64> {
@@ -847,13 +741,7 @@ extension Converter {
         } else if case let .primitive(element) = pbElement.body {
             return try fromPrimitive(element)
         } else if case let .text(element) = pbElement.body {
-            throw YorkieError.unimplemented(message: "unimplemented element: \(pbElement)")
-            // TODO: fromText is not implemented!
-//            return fromText(element)
-        } else if case let .richText(element) = pbElement.body {
-            // TODO: fromRichText is not implemented!
-            throw YorkieError.unimplemented(message: "unimplemented element: \(pbElement)")
-//            return fromRichText(element)
+            return fromText(element)
         } else if case let .counter(element) = pbElement.body {
             return try fromCounter(element)
         } else {
@@ -867,82 +755,42 @@ extension Converter {
     /**
      * `toTextNodes` converts the given model to Protobuf format.
      */
-    // TODO: RGATreeSplit is not implemented
-//    static func toTextNodes(rgaTreeSplit: RGATreeSplit<string>) -> [PbTextNode] {
-//        const pbTextNodes = [];
-//        for (const textNode of rgaTreeSplit) {
-//            const pbTextNode = new PbTextNode();
-//            pbTextNode.setId(toTextNodeID(textNode.id));
-//            pbTextNode.setValue(textNode.value);
-//            pbTextNode.removedAt = toTimeTicket(textNode.removedAt));
-//
-//            pbTextNodes.push(pbTextNode);
-//        }
-//
-//        return pbTextNodes;
-//    }
+    static func toTextNodes(_ rgaTreeSplit: RGATreeSplit<TextValue>) -> [PbTextNode] {
+        var pbTextNodes = [PbTextNode]()
+        for textNode in rgaTreeSplit {
+            var pbTextNode = PbTextNode()
+            pbTextNode.id = toTextNodeID(id: textNode.id)
+            pbTextNode.value = String(describing: textNode.value.content)
+            textNode.value.getAttributes().forEach { key, value in
+                var attr = PbTextNodeAttr()
+                attr.key = key
+                attr.value = value.value
+                attr.updatedAt = toTimeTicket(value.updatedAt)
+                pbTextNode.attributes[key] = attr
+            }
+            if let removedAt = textNode.removedAt {
+                pbTextNode.removedAt = toTimeTicket(removedAt)
+            }
+            pbTextNodes.append(pbTextNode)
+        }
+
+        return pbTextNodes
+    }
 
     /**
      * `fromTextNode` converts the given Protobuf format to model format.
      */
-//    function fromTextNode(pbTextNode: PbTextNode): RGATreeSplitNode<string> {
-//        const textNode = RGATreeSplitNode.create(
-//            fromTextNodeID(pbTextNode.getId()!),
-//            pbTextNode.value,
-//        );
-//        textNode.remove(fromTimeTicket(pbTextNode.removedAt));
-//        return textNode;
-//    }
-}
-
-// MARK: RichTextNode
-extension Converter {
-    /**
-     * `fromRichTextNode` converts the given Protobuf format to model format.
-     */
-    // TODO: RGATreeSplitNode is not implemented
-//    static func fromRichTextNode(_ pbTextNode: PbRichTextNode) -> RGATreeSplitNode<RichTextValue> {
-//        const richTextValue = RichTextValue.create(pbTextNode.value);
-//        pbTextNode.getAttributesMap().forEach((value) => {
-//            richTextValue.setAttr(
-//                value.key,
-//                value.value,
-//                fromTimeTicket(value.getUpdatedAt())!,
-//            );
-//        });
-//
-//        const textNode = RGATreeSplitNode.create(
-//            fromTextNodeID(pbTextNode.getId()!),
-//            richTextValue,
-//        );
-//        textNode.remove(fromTimeTicket(pbTextNode.removedAt));
-//        return textNode;
-//    }
-
-    /**
-     * `fromRichText` converts the given Protobuf format to model format.
-     */
-//    function fromRichText<A>(pbText: PbJSONElement.RichText): CRDTRichText<A> {
-//        const rgaTreeSplit = new RGATreeSplit<RichTextValue>();
-//
-//        let prev = rgaTreeSplit.getHead();
-//        for (const pbNode of pbText.getNodesList()) {
-//            const current = rgaTreeSplit.insertAfter(prev, fromRichTextNode(pbNode));
-//            if (pbNode.hasInsPrevId()) {
-//                current.setInsPrev(
-//                    rgaTreeSplit.findNode(fromTextNodeID(pbNode.getInsPrevId()!)),
-//                );
-//            }
-//            prev = current;
-//        }
-//        const text = new CRDTRichText<A>(
-//            rgaTreeSplit,
-//            fromTimeTicket(pbText.createdAt)!,
-//        );
-//        text.setMovedAt(fromTimeTicket(pbText.getMovedAt()));
-//        text.removedAt = fromTimeTicket(pbText.removedAt));
-//        return text;
-//    }
+    static func fromTextNode(_ pbTextNode: PbTextNode) -> RGATreeSplitNode<TextValue> {
+        let textValue = TextValue(pbTextNode.value)
+        pbTextNode.attributes.forEach {
+            textValue.setAttr(key: $0.key, value: $0.value.value, updatedAt: fromTimeTicket($0.value.updatedAt))
+        }
+        let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), textValue)
+        if  pbTextNode.hasRemovedAt {
+            textNode.remove(fromTimeTicket(pbTextNode.removedAt))
+        }
+        return textNode
+    }
 }
 
 // MARK: ChangePack

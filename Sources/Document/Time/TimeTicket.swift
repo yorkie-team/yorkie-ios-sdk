@@ -30,9 +30,20 @@ public struct TimeTicket: Comparable {
     public static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
     static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
 
-    private let lamport: Int64
-    private let delimiter: UInt32
-    private var actorID: ActorID?
+    /**
+     * `lamport` returns the lamport int64.
+     */
+    public let lamport: Int64
+
+    /**
+     * `delimiter` returns delimiter.
+     */
+    public let delimiter: UInt32
+
+    /**
+     * `actorID` returns actorID.
+     */
+    private(set) var actorID: ActorID?
 
     init(lamport: Int64, delimiter: UInt32, actorID: ActorID?) {
         self.lamport = lamport
@@ -58,7 +69,17 @@ public struct TimeTicket: Comparable {
         guard let actorID = self.actorID else {
             return "\(self.lamport):nil:\(self.delimiter)"
         }
-        return "\(self.lamport):\(actorID):\(self.delimiter)"
+
+        // If aactorID is digit display last two charactors.
+        let formatedActorID: String
+
+        if actorID.count >= 2, CharacterSet(charactersIn: actorID).isSubset(of: .decimalDigits) {
+            formatedActorID = actorID.substring(from: actorID.count - 2, to: actorID.count - 1)
+        } else {
+            formatedActorID = actorID
+        }
+
+        return "\(self.lamport):\(formatedActorID):\(self.delimiter)"
     }
 
     /**
@@ -69,38 +90,17 @@ public struct TimeTicket: Comparable {
     }
 
     /**
-     * `getLamport` returns the lamport int64.
+     * `lamportAsString` returns the lamport string.
      */
-    func getLamport() -> Int64 {
-        return self.lamport
-    }
-
-    /**
-     * `getLamportAsString` returns the lamport string.
-     */
-    func getLamportAsString() -> String {
-        return "\(self.lamport)"
-    }
-
-    /**
-     * `getDelimiter` returns delimiter.
-     */
-    func getDelimiter() -> UInt32 {
-        return self.delimiter
-    }
-
-    /**
-     * `getActorID` returns actorID.
-     */
-    func getActorID() -> ActorID? {
-        return self.actorID
+    var lamportAsString: String {
+        "\(self.lamport)"
     }
 
     /**
      * `after` returns whether the given ticket was created later.
      */
     func after(_ other: TimeTicket) -> Bool {
-        return self > other
+        self > other
     }
 
     public static func < (lhs: TimeTicket, rhs: TimeTicket) -> Bool {

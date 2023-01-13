@@ -61,7 +61,12 @@ enum ElementConverter {
             let counter = JSONCounter(value: value.value)
             counter.initialize(context: context, counter: value)
             return counter
+        } else if let value = value as? CRDTText {
+            let text = JSONText(context: context, text: value)
+            text.initialize(context: context, text: value)
+            return text
         } else {
+            assertionFailure()
             return nil
         }
     }

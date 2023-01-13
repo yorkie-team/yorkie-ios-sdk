@@ -17,7 +17,7 @@
 import XCTest
 @testable import Yorkie
 
-class RedBlackTreeTests: XCTestCase {
+class LLRBTreeTests: XCTestCase {
     private let sources = [
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
         [8, 5, 7, 9, 1, 3, 6, 0, 4, 2],
@@ -30,9 +30,9 @@ class RedBlackTreeTests: XCTestCase {
 
     func test_can_put_and_remove_while_keeping_order() {
         for array in self.sources {
-            let target = RedBlackTree<Int, Int>()
+            let target = LLRBTree<Int, Int>()
             for value in array {
-                target.insert(key: value, value: value)
+                target.insert(value, value)
             }
 
             XCTAssertEqual(target.minValue(), 0)
@@ -40,31 +40,59 @@ class RedBlackTreeTests: XCTestCase {
 
             XCTAssertEqual(target.allValues(), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
-            target.delete(key: 8)
+            target.delete(8)
             XCTAssertEqual(target.allValues(), [0, 1, 2, 3, 4, 5, 6, 7, 9])
 
-            target.delete(key: 2)
+            target.delete(2)
             XCTAssertEqual(target.allValues(), [0, 1, 3, 4, 5, 6, 7, 9])
 
-            target.delete(key: 5)
+            target.delete(5)
             XCTAssertEqual(target.allValues(), [0, 1, 3, 4, 6, 7, 9])
         }
     }
 
     func test_can_query_floor_entry() {
         for array in self.sources {
-            let target = RedBlackTree<Int, Int>()
+            let target = LLRBTree<Int, Int>()
             for value in array {
-                target.insert(key: value, value: value)
+                target.insert(value, value)
             }
 
-            XCTAssertEqual(target.floorEntry(input: 8), 8)
+            XCTAssert(target.floorEntry(-1) == nil)
 
-            target.delete(key: 8)
-            XCTAssertEqual(target.floorEntry(input: 8), 7)
+            for index in 0 ..< 9 {
+                XCTAssertEqual(target.floorEntry(index)!.1, index)
+            }
 
-            target.delete(key: 7)
-            XCTAssertEqual(target.floorEntry(input: 8), 6)
+            XCTAssertEqual(target.floorEntry(8)!.1, 8)
+
+            target.delete(8)
+            XCTAssertEqual(target.floorEntry(8)!.1, 7)
+
+            target.delete(7)
+            XCTAssertEqual(target.floorEntry(8)!.1, 6)
+
+            target.delete(6)
+            target.delete(4)
+            XCTAssertEqual(target.floorEntry(8)!.1, 5)
+
+            XCTAssertEqual(target.floorEntry(5)!.1, 5)
+
+            XCTAssertEqual(target.floorEntry(4)!.1, 3)
+
+            target.insert(4, 4)
+            XCTAssertEqual(target.floorEntry(4)!.1, 4)
+        }
+    }
+
+    func test_insert() {
+        for array in self.sources {
+            let target = LLRBTree<Int, Int>()
+            for value in array {
+                target.insert(value, value)
+            }
+
+            target.printNode()
         }
     }
 }

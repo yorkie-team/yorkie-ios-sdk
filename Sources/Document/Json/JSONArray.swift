@@ -334,6 +334,19 @@ public class JSONArray {
             self.context.push(operation: operation)
 
             return counter
+        } else if let element = value as? JSONText {
+            let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: ticket)
+            element.initialize(context: self.context, text: text)
+
+            let clone = text.deepcopy()
+
+            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: text, executedAt: ticket)
+            self.context.push(operation: operation)
+
+            return text
         }
 
         throw YorkieError.unimplemented(message: "Unsupported type of value: \(type(of: value))")

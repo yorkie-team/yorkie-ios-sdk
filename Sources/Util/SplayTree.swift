@@ -20,7 +20,7 @@ import Foundation
  * `SplayNode` is a node of SplayTree.
  */
 class SplayNode<V> {
-    private(set) var value: V
+    internal var value: V
 
     fileprivate var left: SplayNode<V>?
     fileprivate var right: SplayNode<V>?
@@ -143,7 +143,7 @@ class SplayTree<V> {
     /**
      * `find` returns the Node and offset of the given index.
      */
-    func find(position: Int) -> (node: SplayNode<V>?, offset: Int) {
+    func find(_ position: Int) -> (node: SplayNode<V>?, offset: Int) {
         guard let root = self.root, position >= 0 else {
             return (nil, 0)
         }
@@ -346,7 +346,7 @@ class SplayTree<V> {
      * but rightBoundary can be nil means range to delete includes the end of tree.
      * Refer to the design document in https://github.com/yorkie-team/yorkie/tree/main/design
      */
-    func removeRange(leftBoundary: SplayNode<V>, rightBoundary: SplayNode<V>? = nil) {
+    func removeRange(_ leftBoundary: SplayNode<V>, _ rightBoundary: SplayNode<V>? = nil) {
         guard let rightBoundary else {
             self.splayNode(leftBoundary)
             self.cutOffRight(root: leftBoundary)
