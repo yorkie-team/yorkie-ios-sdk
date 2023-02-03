@@ -24,7 +24,7 @@ public class JSONCounter<T: YorkieCountable> {
     private var context: ChangeContext?
     private var counter: CRDTCounter<T>?
 
-    init(value: T) {
+    public init(value: T) {
         self._value = value
     }
 
