@@ -119,17 +119,13 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        // Since attach's response doesn't wait for the watch ready,
-        // We need to wait here until the threshold.
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-
         await self.d1.update { root in
             root.k1 = "v1"
             root.k2 = "v2"
             root.k3 = "v3"
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         var result = await d2.getRoot().get(key: "k1") as? String
         XCTAssert(result == "v1")
@@ -144,7 +140,7 @@ final class ClientIntegrationTests: XCTestCase {
             root.double = Double.pi
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let resultInteger = await self.d2.getRoot().get(key: "integer") as? Int32
         XCTAssert(resultInteger == Int32.max)
@@ -161,7 +157,7 @@ final class ClientIntegrationTests: XCTestCase {
             root.date = curr
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let resultTrue = await self.d2.getRoot().get(key: "true") as? Bool
         XCTAssert(resultTrue == true)
@@ -231,14 +227,10 @@ final class ClientIntegrationTests: XCTestCase {
             }
         }.store(in: &self.cancellables)
 
-        // Since attach's response doesn't wait for the watch ready,
-        // We need to wait here until the threshold.
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-
         c1Name = "c1+"
         try await c1.updatePresence("name", c1Name)
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let presence1: PresenceType = self.decodePresence(await c2.getPeers(key: d2.getKey())[c1.id!]!)!
 
@@ -247,7 +239,7 @@ final class ClientIntegrationTests: XCTestCase {
         c2Name = "c2+"
         try await c2.updatePresence("name", c2Name)
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let presence2: PresenceType = self.decodePresence(await c1.getPeers(key: d1.getKey())[c2.id!]!)!
 

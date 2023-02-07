@@ -41,15 +41,13 @@ final class TextIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-
         await self.d1.update { root in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "Hello")
             (root.text as? JSONText)?.edit(1, 3, "12")
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let result = (await d2.getRoot().text as? JSONText)?.plainText
 
@@ -72,7 +70,7 @@ final class TextIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         await self.d1.update { root in
             root.text = JSONText()
@@ -81,13 +79,13 @@ final class TextIntegrationTests: XCTestCase {
             (root.text as? JSONText)?.setStyle(fromIdx: 1, toIdx: 3, attributes: ["italic": true])
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         await self.d2.update { root in
             (root.text as? JSONText)?.setStyle(fromIdx: 1, toIdx: 3, attributes: ["italic": true])
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let resultD1 = (await d1.getRoot().text as? JSONText)?.values?.compactMap {
             $0.toJSON
