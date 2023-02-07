@@ -39,7 +39,7 @@ protocol RGATreeSplitValue {
 /**
  * `RGATreeSplitNodeID` is an ID of RGATreeSplitNode.
  */
-class RGATreeSplitNodeID: Equatable, Comparable {
+class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     static let initial = RGATreeSplitNodeID(TimeTicket.initial, 0)
 
     /**
@@ -91,6 +91,10 @@ class RGATreeSplitNodeID: Equatable, Comparable {
      */
     public var structureAsString: String {
         "\(self.createdAt.structureAsString):\(self.offset)"
+    }
+    
+    var debugDescription: String {
+        structureAsString
     }
 }
 
@@ -322,8 +326,8 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
 
     private func splitValue(_ offset: Int32) -> T {
         let value = self.value
-        self.value = value.substring(from: 0, to: Int(offset - 1))
-        return value.substring(from: Int(offset), to: value.count - 1)
+        self.value = value.substring(from: 0, to: Int(offset))
+        return value.substring(from: Int(offset), to: value.count)
     }
 }
 
@@ -347,7 +351,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         self.treeByIndex = SplayTree()
         self.treeByID = LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>>()
         self.treeByIndex.insert(self.head)
-        self.treeByID.insert(self.head.id, self.head)
+        self.treeByID.put(self.head.id, self.head)
     }
 
     /**
@@ -531,7 +535,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             next!.setPrev(newNode)
         }
 
-        self.treeByID.insert(newNode.id, newNode)
+        self.treeByID.put(newNode.id, newNode)
         self.treeByIndex.insert(previousNode: prevNode, newNode: newNode)
 
         return newNode
@@ -777,10 +781,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var count = 0
 
         for (_, node) in self.removedNodeMap {
-            if let removedAt = node.removedAt, ticket > removedAt {
+            if let removedAt = node.removedAt, ticket >= removedAt {
                 self.treeByIndex.delete(node)
                 self.purge(node)
-                self.treeByID.delete(node.id)
+                self.treeByID.remove(node.id)
                 self.removedNodeMap.removeValue(forKey: node.id.structureAsString)
                 count += 1
             }

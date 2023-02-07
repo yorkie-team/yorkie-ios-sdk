@@ -53,7 +53,7 @@ public class TextChange {
     }
 
     public let type: TextChangeType
-    private let actor: ActorID
+    public let actor: ActorID
     public let from: Int
     public let to: Int
     public var content: String?
@@ -82,25 +82,25 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     /**
      * `content` returns content.
      */
-    private(set) var content: String
+    private(set) var content: NSString
 
     init(_ content: String, _ attributes: RHT = RHT()) {
         self.attributes = attributes
-        self.content = content
+        self.content = content as NSString
     }
 
     /**
      * `length` returns the length of content.
      */
     public var count: Int {
-        return self.content.count
+        return self.content.length
     }
 
     /**
      * `substring` returns a sub-string value of the given range.
      */
     public func substring(from indexStart: Int, to indexEnd: Int) -> TextValue {
-        let value = TextValue(String(self.content.substring(from: indexStart, to: indexEnd)), self.attributes.deepcopy())
+        let value = TextValue(self.content.substring(with: NSRange(location: indexStart, length: indexEnd - indexStart)), self.attributes.deepcopy())
         return value
     }
 
@@ -115,14 +115,14 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
      * `toString` returns content.
      */
     public var toString: String {
-        self.content
+        self.content as String
     }
 
     /**
      * `toJSON` returns the JSON encoding of this .
      */
     public var toJSON: String {
-        return "{\"attrs\":\(self.attributes.toJSON()),\"val\":\"\(self.content.escaped())\"}"
+        return "{\"attrs\":\(self.attributes.toJSON()),\"val\":\"\(self.toString.escaped())\"}"
     }
 
     /**
@@ -133,7 +133,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     public var description: String {
-        self.content
+        self.content as String
     }
 }
 

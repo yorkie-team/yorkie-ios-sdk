@@ -19,7 +19,7 @@ import Foundation
 /**
  * `SplayNode` is a node of SplayTree.
  */
-class SplayNode<V> {
+class SplayNode<V>: CustomDebugStringConvertible {
     internal var value: V
 
     fileprivate var left: SplayNode<V>?
@@ -34,13 +34,6 @@ class SplayNode<V> {
 
     var length: Int {
         fatalError("Must be implemented.")
-    }
-
-    /**
-     * `getNodeString` returns a string of weight and value of this node.
-     */
-    private var nodeString: String {
-        return "\(self.weight)\(self.value)"
     }
 
     /**
@@ -114,6 +107,10 @@ class SplayNode<V> {
      */
     fileprivate func initWeight() {
         self.weight = self.length
+    }
+    
+    var debugDescription: String {
+        "[\(weight):\(length) \(value)]"
     }
 }
 
@@ -273,10 +270,7 @@ class SplayTree<V> {
                 // zig-zag
                 self.rotateLeft(node)
                 self.rotateRight(node)
-            } else if
-                self.isRightChild(node.parent),
-                self.isLeftChild(node)
-            {
+            } else if self.isRightChild(node.parent), self.isLeftChild(node) {
                 // zig-zag
                 self.rotateRight(node)
                 self.rotateLeft(node)
@@ -284,10 +278,7 @@ class SplayTree<V> {
                 // zig-zig
                 self.rotateRight(node.parent!)
                 self.rotateRight(node)
-            } else if
-                self.isRightChild(node.parent),
-                self.isRightChild(node)
-            {
+            } else if self.isRightChild(node.parent), self.isRightChild(node) {
                 // zig-zig
                 self.rotateLeft(node.parent!)
                 self.rotateLeft(node)
@@ -320,12 +311,12 @@ class SplayTree<V> {
             root.parent = nil
         }
 
-        if let leftTreeRoot = leftTree.root {
+        if leftTree.root != nil {
             let maxNode = leftTree.getMaximum()
             leftTree.splayNode(maxNode)
-            leftTreeRoot.right = rightTree.root
-            if let rightTreeRoot = rightTree.root {
-                rightTreeRoot.parent = leftTree.root
+            leftTree.root!.right = rightTree.root
+            if rightTree.root != nil {
+                rightTree.root!.parent = leftTree.root
             }
             self.root = leftTree.root
         } else {
@@ -492,5 +483,29 @@ class SplayTree<V> {
             return node.parent?.right === node
         }
         return false
+    }
+
+    func printNode() {
+        print(">>>>>>>>>>>>>>>>>>")
+        self.print2DUtil(self.root, 0, "-")
+        print("<<<<<<<<<<<<<<<<<<")
+    }
+
+    func print2DUtil(_ node: SplayNode<V>?, _ space: Int, _ dir: String) {
+        if node == nil {
+            return
+        }
+
+        let newSpace = space + 10
+
+        self.print2DUtil(node?.right, newSpace, "/")
+
+        var message = ""
+        for _ in 0 ..< space {
+            message += " "
+        }
+        print("\(message)\(dir)[\(node!.weight):\(node!.length) \(node!.value)]")
+
+        self.print2DUtil(node?.left, newSpace, "\\")
     }
 }

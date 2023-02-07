@@ -198,4 +198,48 @@ class SplayTreeTests: XCTestCase {
         let (node, _) = tree.find(6)
         XCTAssertEqual(node?.value, "C234")
     }
+
+    func test_delete_middle_node() {
+        let tree = SplayTree<String>()
+
+        let root = StringNode.create("")
+        let nodeA = StringNode.create("A")
+        let nodeB = StringNode.create("B")
+        let nodeC = StringNode.create("C")
+        let nodeD = StringNode.create("D")
+        let nodeE = StringNode.create("E")
+
+        self.removeNodes([nodeE], from: 0, to: 0)
+        self.removeNodes([nodeD], from: 0, to: 0)
+        self.removeNodes([nodeB], from: 0, to: 0)
+        self.removeNodes([nodeA], from: 0, to: 0)
+
+        tree.insert(root)
+
+        tree.insert(nodeA)
+        tree.insert(nodeB)
+        tree.insert(nodeC)
+        tree.insert(nodeD)
+        tree.insert(nodeE)
+
+        tree.removeRange(nodeE)
+        tree.removeRange(nodeC, nodeE)
+        tree.removeRange(nodeA, nodeC)
+        tree.removeRange(root, nodeB)
+
+        tree.delete(nodeE)
+        XCTAssertEqual(tree.structureAsString, "[0,0][0,0]A[0,0]B[1,1]C[1,0]D")
+
+        tree.delete(nodeD)
+        XCTAssertEqual(tree.structureAsString, "[0,0][0,0]A[0,0]B[1,1]C")
+
+        tree.delete(nodeB)
+        XCTAssertEqual(tree.structureAsString, "[0,0][1,0]A[1,1]C")
+
+        tree.delete(nodeA)
+        XCTAssertEqual(tree.structureAsString, "[1,0][1,1]C")
+
+        tree.delete(nodeC)
+        XCTAssertEqual(tree.structureAsString, "[0,0]")
+    }
 }

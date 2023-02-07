@@ -89,11 +89,8 @@ public actor Document {
         }
 
         // 01. Remove local changes applied to server.
-        while self.localChanges.isEmpty == false {
-            let change = self.localChanges.removeFirst()
-            if change.id.getClientSeq() > pack.getCheckpoint().getClientSeq() {
-                break
-            }
+        while let change = self.localChanges.first, change.id.getClientSeq() <= pack.getCheckpoint().getClientSeq() {
+            self.localChanges.removeFirst()
         }
 
         // 02. Update the checkpoint.

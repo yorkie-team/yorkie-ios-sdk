@@ -32,22 +32,22 @@ class LLRBTreeTests: XCTestCase {
         for array in self.sources {
             let target = LLRBTree<Int, Int>()
             for value in array {
-                target.insert(value, value)
+                target.put(value, value)
             }
 
-            XCTAssertEqual(target.minValue(), 0)
-            XCTAssertEqual(target.maxValue(), 9)
+            XCTAssertEqual(target.minValue, 0)
+            XCTAssertEqual(target.maxValue, 9)
 
-            XCTAssertEqual(target.allValues(), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+            XCTAssertEqual(target.values, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 
-            target.delete(8)
-            XCTAssertEqual(target.allValues(), [0, 1, 2, 3, 4, 5, 6, 7, 9])
+            target.remove(8)
+            XCTAssertEqual(target.values, [0, 1, 2, 3, 4, 5, 6, 7, 9])
 
-            target.delete(2)
-            XCTAssertEqual(target.allValues(), [0, 1, 3, 4, 5, 6, 7, 9])
+            target.remove(2)
+            XCTAssertEqual(target.values, [0, 1, 3, 4, 5, 6, 7, 9])
 
-            target.delete(5)
-            XCTAssertEqual(target.allValues(), [0, 1, 3, 4, 6, 7, 9])
+            target.remove(5)
+            XCTAssertEqual(target.values, [0, 1, 3, 4, 6, 7, 9])
         }
     }
 
@@ -55,7 +55,7 @@ class LLRBTreeTests: XCTestCase {
         for array in self.sources {
             let target = LLRBTree<Int, Int>()
             for value in array {
-                target.insert(value, value)
+                target.put(value, value)
             }
 
             XCTAssert(target.floorEntry(-1) == nil)
@@ -66,21 +66,21 @@ class LLRBTreeTests: XCTestCase {
 
             XCTAssertEqual(target.floorEntry(8)!.1, 8)
 
-            target.delete(8)
+            target.remove(8)
             XCTAssertEqual(target.floorEntry(8)!.1, 7)
 
-            target.delete(7)
+            target.remove(7)
             XCTAssertEqual(target.floorEntry(8)!.1, 6)
 
-            target.delete(6)
-            target.delete(4)
+            target.remove(6)
+            target.remove(4)
             XCTAssertEqual(target.floorEntry(8)!.1, 5)
 
             XCTAssertEqual(target.floorEntry(5)!.1, 5)
 
             XCTAssertEqual(target.floorEntry(4)!.1, 3)
 
-            target.insert(4, 4)
+            target.put(4, 4)
             XCTAssertEqual(target.floorEntry(4)!.1, 4)
         }
     }
@@ -89,7 +89,7 @@ class LLRBTreeTests: XCTestCase {
         for array in self.sources {
             let target = LLRBTree<Int, Int>()
             for value in array {
-                target.insert(value, value)
+                target.put(value, value)
             }
 
             target.printNode()

@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9A15BB13298BDA130072612B /* TextViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A15BB12298BDA130072612B /* TextViewModel.swift */; };
+		9A15C90F2995DFF800E7EAE7 /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 9A15C90E2995DFF800E7EAE7 /* Yorkie */; };
 		9AEA80EC297134A1000672FC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80EB297134A1000672FC /* AppDelegate.swift */; };
 		9AEA80EE297134A1000672FC /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80ED297134A1000672FC /* SceneDelegate.swift */; };
 		9AEA80F0297134A1000672FC /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80EF297134A1000672FC /* ViewController.swift */; };
@@ -17,6 +19,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		9A15BB12298BDA130072612B /* TextViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewModel.swift; sourceTree = "<group>"; };
+		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
 		9AEA80E8297134A1000672FC /* TextEditorApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TextEditorApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AEA80EB297134A1000672FC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		9AEA80ED297134A1000672FC /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -33,17 +37,35 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9A15C90F2995DFF800E7EAE7 /* Yorkie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		9AC7CB93298CFEA60040D504 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		9AC7CB95298CFEC90040D504 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		9AEA80DF297134A1000672FC = {
 			isa = PBXGroup;
 			children = (
+				9AC7CB93298CFEA60040D504 /* Packages */,
 				9AEA80EA297134A1000672FC /* TextEditorApp */,
 				9AEA80E9297134A1000672FC /* Products */,
+				9AC7CB95298CFEC90040D504 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -74,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				9AEA810029713D73000672FC /* View */,
+				9A15BB12298BDA130072612B /* TextViewModel.swift */,
 			);
 			path = TextEditor;
 			sourceTree = "<group>";
@@ -102,6 +125,9 @@
 			dependencies = (
 			);
 			name = TextEditorApp;
+			packageProductDependencies = (
+				9A15C90E2995DFF800E7EAE7 /* Yorkie */,
+			);
 			productName = TextEditorApp;
 			productReference = 9AEA80E8297134A1000672FC /* TextEditorApp.app */;
 			productType = "com.apple.product-type.application";
@@ -130,6 +156,8 @@
 				Base,
 			);
 			mainGroup = 9AEA80DF297134A1000672FC;
+			packageReferences = (
+			);
 			productRefGroup = 9AEA80E9297134A1000672FC /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -160,6 +188,7 @@
 				9AEA810229713DBB000672FC /* TextEditorViewController.swift in Sources */,
 				9AEA80F0297134A1000672FC /* ViewController.swift in Sources */,
 				9AEA80EC297134A1000672FC /* AppDelegate.swift in Sources */,
+				9A15BB13298BDA130072612B /* TextViewModel.swift in Sources */,
 				9AEA80EE297134A1000672FC /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -378,6 +407,13 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9A15C90E2995DFF800E7EAE7 /* Yorkie */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Yorkie;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9AEA80E0297134A1000672FC /* Project object */;
 }

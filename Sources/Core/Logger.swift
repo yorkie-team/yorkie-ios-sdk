@@ -51,6 +51,7 @@ enum Logger {
     }
 
     static func critical(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        assertionFailure()
         self.log(level: .critical, message, error: error, filename: filename, function: function, line: line)
     }
 

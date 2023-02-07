@@ -598,8 +598,6 @@ public actor Client {
                 semaphoresForInitialzation[docID]?.signal()
             }
 
-            self.semaphore.signal()
-
             let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
             self.eventStream.send(event)
         case .event(let pbWatchEvent):

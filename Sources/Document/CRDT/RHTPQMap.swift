@@ -173,7 +173,7 @@ class RHTPQMap {
     func get(key: String) throws -> CRDTElement {
         guard let heap = elementQueueMapByKey[key], let node = heap.peek() else {
             let log = "can't find the given node: \(key)"
-            Logger.critical(log)
+            Logger.error(log)
             throw YorkieError.unexpected(message: log)
         }
 
