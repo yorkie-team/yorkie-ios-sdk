@@ -297,6 +297,11 @@ public actor Client {
         attachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
+            let docKey = doc.getKey()
+            let semaphore = DispatchSemaphore(value: 0)
+
+            self.semaphoresForInitialzation[docKey] = semaphore
+
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
@@ -308,8 +313,10 @@ public actor Client {
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
 
             if isManualSync == false {
-                try await self.waitForInitialization(doc)
+                try await self.waitForInitialization(semaphore, docKey)
             }
+
+            self.semaphoresForInitialzation.removeValue(forKey: docKey)
 
             return doc
         } catch {
@@ -559,24 +566,16 @@ public actor Client {
         self.doWatchLoop()
     }
 
-    private func waitForInitialization(_ doc: Document) async throws {
-        let semaphore = DispatchSemaphore(value: 0)
-
-        self.semaphoresForInitialzation[doc.getKey()] = semaphore
-
-        defer {
-            semaphoresForInitialzation.removeValue(forKey: doc.getKey())
-        }
-
+    private func waitForInitialization(_ semaphore: DispatchSemaphore, _ docKey: String) async throws {
         _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             DispatchQueue.global().async {
                 if semaphore.wait(timeout: DispatchTime.now() + DispatchTimeInterval.milliseconds(self.maximumAttachmentTimeout)) == .timedOut {
-                    let message = "[AD] Time out for Initialization. d:\"\(doc.getKey())\""
+                    let message = "[AD] Time out for Initialization. d:\"\(docKey)\""
                     Logger.warning(message)
                     continuation.resume(throwing: YorkieError.timeout(message: message))
                 } else {
-                    Logger.info("[AD] got Initialization. d:\"\(doc.getKey())\"")
-                    continuation.resume(returning: doc.getKey())
+                    Logger.info("[AD] got Initialization. d:\"\(docKey)\"")
+                    continuation.resume(returning: docKey)
                 }
             }
         }
