@@ -22,4 +22,5 @@ enum YorkieError: Error {
     case clientNotActive(message: String)
     case type(message: String)
     case noSuchElement(message: String)
+    case timeout(message: String)
 }

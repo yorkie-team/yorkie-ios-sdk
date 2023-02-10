@@ -90,16 +90,12 @@ class JSONObjectTests: XCTestCase {
     func test_can_set_with_dictionary() async {
         let target = Document(key: "doc1")
         await target.update { root in
-            root.set([
-                "boolean": true,
-                "integer": Int32(111),
-                "long": Int64(9_999_999),
-                "double": Double(1.2222222),
-                "string": "abc",
-                "compB": ["id": "b",
-                          "compC": ["id": "c",
-                                    "compD": ["id": "d-1"]]]
-            ])
+            root.set(["boolean": true,
+                      "integer": Int32(111),
+                      "long": Int64(9_999_999),
+                      "double": Double(1.2222222),
+                      "string": "abc",
+                      "compB": ["id": "b", "compC": ["id": "c", "compD": ["id": "d-1"]]]])
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -124,16 +120,13 @@ class JSONObjectTests: XCTestCase {
     func test_can_set_with_key_and_dictionary() async {
         let target = Document(key: "doc1")
         await target.update { root in
-            root.set(key: "top", value: [
-                "boolean": true,
-                "integer": Int32(111),
-                "long": Int64(9_999_999),
-                "double": Double(1.2222222),
-                "string": "abc",
-                "compB": ["id": "b",
-                          "compC": ["id": "c",
-                                    "compD": ["id": "d-1"]]]
-            ])
+            root.set(key: "top",
+                     value: ["boolean": true,
+                             "integer": Int32(111),
+                             "long": Int64(9_999_999),
+                             "double": Double(1.2222222),
+                             "string": "abc",
+                             "compB": ["id": "b", "compC": ["id": "c", "compD": ["id": "d-1"]]]])
 
             XCTAssertEqual(root.debugDescription,
                            """

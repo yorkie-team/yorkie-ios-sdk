@@ -138,7 +138,7 @@ class ClientTests: XCTestCase {
             XCTFail(error.localizedDescription)
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+//        try await Task.sleep(nanoseconds: 1_000_000_000)
 
         do {
             try await target.detach(doc)

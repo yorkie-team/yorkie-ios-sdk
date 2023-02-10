@@ -71,6 +71,7 @@ public struct ClientOptions {
     private enum DefaultClientOptions {
         static let syncLoopDuration = 50
         static let reconnectStreamDelay = 1000 // 1000 millisecond
+        static let maximumAttachmentTimeout = 5000 // millisecond
     }
 
     /**
@@ -112,12 +113,19 @@ public struct ClientOptions {
      */
     var reconnectStreamDelay: Int
 
-    public init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int? = nil, reconnectStreamDelay: Int? = nil) {
+    /**
+     * `maximumAttachmentTimeout` is the latest time to wait for a initialization of attached document.
+     * The default value is `5000`(ms).
+     */
+    var maximumAttachmentTimeout: Int
+
+    public init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int? = nil, reconnectStreamDelay: Int? = nil, attachTimeout: Int? = nil) {
         self.key = key
         self.apiKey = apiKey
         self.token = token
         self.syncLoopDuration = syncLoopDuration ?? DefaultClientOptions.syncLoopDuration
         self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
+        self.maximumAttachmentTimeout = attachTimeout ?? DefaultClientOptions.maximumAttachmentTimeout
     }
 }
 
@@ -147,12 +155,15 @@ public actor Client {
     private var attachmentMap: [String: Attachment]
     private let syncLoopDuration: Int
     private let reconnectStreamDelay: Int
+    private let maximumAttachmentTimeout: Int
 
     private let rpcClient: YorkieServiceAsyncClient
     private var watchLoopReconnectTimer: Timer?
     private var watchLoopTask: Task<Void, Never>?
 
     private let group: EventLoopGroup
+
+    private var semaphoresForInitialzation = [String: DispatchSemaphore]()
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -174,6 +185,7 @@ public actor Client {
         self.attachmentMap = [String: Attachment]()
         self.syncLoopDuration = options.syncLoopDuration
         self.reconnectStreamDelay = options.reconnectStreamDelay
+        self.maximumAttachmentTimeout = options.maximumAttachmentTimeout
 
         self.group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
 
@@ -285,6 +297,11 @@ public actor Client {
         attachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
+            let docKey = doc.getKey()
+            let semaphore = DispatchSemaphore(value: 0)
+
+            self.semaphoresForInitialzation[docKey] = semaphore
+
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
@@ -294,6 +311,12 @@ public actor Client {
             self.runWatchLoop()
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
+
+            if isManualSync == false {
+                try await self.waitForInitialization(semaphore, docKey)
+            }
+
+            self.semaphoresForInitialzation.removeValue(forKey: docKey)
 
             return doc
         } catch {
@@ -543,6 +566,21 @@ public actor Client {
         self.doWatchLoop()
     }
 
+    private func waitForInitialization(_ semaphore: DispatchSemaphore, _ docKey: String) async throws {
+        _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            DispatchQueue.global().async {
+                if semaphore.wait(timeout: DispatchTime.now() + DispatchTimeInterval.milliseconds(self.maximumAttachmentTimeout)) == .timedOut {
+                    let message = "[AD] Time out for Initialization. d:\"\(docKey)\""
+                    Logger.warning(message)
+                    continuation.resume(throwing: YorkieError.timeout(message: message))
+                } else {
+                    Logger.info("[AD] got Initialization. d:\"\(docKey)\"")
+                    continuation.resume(returning: docKey)
+                }
+            }
+        }
+    }
+
     private func handleWatchDocumentsResponse(keys: [String], response: WatchDocumentsResponse) {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
@@ -556,6 +594,8 @@ public actor Client {
                 for pbClient in pbPeers.clients {
                     self.attachmentMap[docID]?.peerPresenceMap[pbClient.id.toHexString] = Converter.fromPresence(pbPresence: pbClient.presence)
                 }
+
+                semaphoresForInitialzation[docID]?.signal()
             }
 
             let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
