@@ -127,34 +127,35 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
-        print("#### Compareing")
-
         var result = await d2.getRoot().get(key: "k1") as? String
-        XCTAssertEqual(result, "v1")
+        XCTAssert(result == "v1")
         result = await self.d2.getRoot().get(key: "k2") as? String
-        XCTAssertEqual(result, "v2")
+        XCTAssert(result == "v2")
         result = await self.d2.getRoot().get(key: "k3") as? String
-        XCTAssertEqual(result, "v3")
-        /*
-         await self.d1.update { root in
-             root.integer = Int32.max
-             root.long = Int64.max
-             root.double = Double.pi
-         }
+        XCTAssert(result == "v3")
 
-         try await Task.sleep(nanoseconds: 1_000_000_000)
+        await self.d1.update { root in
+            root.integer = Int32.max
+            root.long = Int64.max
+            root.double = Double.pi
+        }
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
-         let curr = Date()
+        let resultInteger = await self.d2.getRoot().get(key: "integer") as? Int32
+        XCTAssert(resultInteger == Int32.max)
+        let resultLong = await self.d2.getRoot().get(key: "long") as? Int64
+        XCTAssert(resultLong == Int64.max)
+        let resultDouble = await self.d2.getRoot().get(key: "double") as? Double
+        XCTAssert(resultDouble == Double.pi)
 
-         await self.d1.update { root in
-             root.true = true
-             root.false = false
-             root.date = curr
-         }
+        let curr = Date()
 
-         try await Task.sleep(nanoseconds: 1_000_000_000)
+        await self.d1.update { root in
+            root.true = true
+            root.false = false
+            root.date = curr
+        }
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
