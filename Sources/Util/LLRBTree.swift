@@ -47,7 +47,7 @@ public class LLRBTree<K: Comparable, V> {
         }
 
         var debugDescription: String {
-            "[\(self.key)]: \(self.value) (\(isRed ? "R" : "B"))"
+            "[\(self.key)]: \(self.value) (\(self.isRed ? "R" : "B"))"
         }
 
         var isLeaf: Bool {
@@ -61,7 +61,7 @@ public class LLRBTree<K: Comparable, V> {
 
     private var root: Node<K, V>?
     private var counter: Int = 0
-    
+
     /**
      * `put` puts the value of the given key.
      */
@@ -69,10 +69,10 @@ public class LLRBTree<K: Comparable, V> {
     public func put(_ key: K, _ value: V) -> V {
         self.root = self.putInternal(key, value, self.root)
         self.root?.isRed = false
-        
+
         return value
     }
-    
+
     /**
      * `get` gets a value of the given key.
      */
@@ -87,13 +87,13 @@ public class LLRBTree<K: Comparable, V> {
         guard let root else {
             return
         }
-    
+
         if self.isRed(root.left), !self.isRed(root.right) {
             self.root?.isRed = true
         }
 
         self.root = self.removeInternal(root, key)
-        
+
         self.root?.isRed = false
     }
 
@@ -104,7 +104,7 @@ public class LLRBTree<K: Comparable, V> {
 
         return result
     }
-    
+
     private func traverseInorder(_ node: Node<K, V>?, _ result: inout [V]) {
         guard let node else {
             return
@@ -120,8 +120,8 @@ public class LLRBTree<K: Comparable, V> {
      *  given key. If there is no such key, returns `undefined`.
      */
     public func floorEntry(_ key: K) -> Entry<K, V>? {
-      var node = self.root
-        
+        var node = self.root
+
         while node != nil {
             if key > node!.key {
                 if node!.right != nil {
@@ -141,7 +141,7 @@ public class LLRBTree<K: Comparable, V> {
                         childNode = parent
                         parent = parent!.parent
                     }
-                    
+
                     return parent?.entry
                 }
             } else {
@@ -158,7 +158,7 @@ public class LLRBTree<K: Comparable, V> {
         if self.root == nil {
             return nil
         }
-        
+
         var node = self.root
         while node?.right != nil {
             node = node?.right
@@ -170,14 +170,14 @@ public class LLRBTree<K: Comparable, V> {
      * `size` is a size of LLRBTree.
      */
     public var size: Int {
-        counter
+        self.counter
     }
 
     /**
      * `isEmpty` checks if size is empty.
      */
     public var isEmpty: Bool {
-        counter == 0
+        self.counter == 0
     }
 
     public var minValue: V? {
@@ -187,19 +187,18 @@ public class LLRBTree<K: Comparable, V> {
 
         return self.min(root).value
     }
-    
+
     public var maxValue: V? {
         guard let root else {
             return nil
         }
-        
+
         return self.max(root).value
     }
 
-    
     private func getInternal(_ key: K, _ node: Node<K, V>?) -> Node<K, V>? {
         var node = node
-        
+
         while node != nil {
             if key == node!.key {
                 return node
@@ -209,7 +208,7 @@ public class LLRBTree<K: Comparable, V> {
                 node = node?.right
             }
         }
-        
+
         return nil
     }
 
@@ -220,7 +219,7 @@ public class LLRBTree<K: Comparable, V> {
             self.counter += 1
             return Node(key, value, true)
         }
-        
+
         if key < node!.key {
             node?.left = self.putInternal(key, value, node!.left)
         } else if key > node!.key {
@@ -228,46 +227,46 @@ public class LLRBTree<K: Comparable, V> {
         } else {
             node?.value = value
         }
-        
+
         if self.isRed(node?.right), !self.isRed(node?.left) {
             node = self.rotateLeft(node!)
         }
-        
+
         if self.isRed(node?.left), self.isRed(node?.left?.left) {
             node = self.rotateRight(node!)
         }
-        
+
         if self.isRed(node?.left), self.isRed(node?.right) {
             self.flipColors(&node!)
         }
-        
+
         return node!
     }
 
     private func removeInternal(_ node: Node<K, V>, _ key: K) -> Node<K, V>? {
         var node = node
-        
+
         if key < node.key {
             if !self.isRed(node.left), !self.isRed(node.left?.left) {
                 node = self.moveRedLeft(node)
             }
-            node.left = self.removeInternal(node.left!, key);
+            node.left = self.removeInternal(node.left!, key)
         } else {
             if self.isRed(node.left) {
                 node = self.rotateRight(node)
             }
-            
+
             if key == node.key, node.right == nil {
                 self.counter -= 1
                 return nil
             }
-            
+
             if !self.isRed(node.right), !self.isRed(node.right?.left) {
                 node = self.moveRedRight(node)
             }
-            
+
             if key == node.key {
-                self.counter -= 1;
+                self.counter -= 1
                 let smallest = self.min(node.right!)
                 node.value = smallest.value
                 node.key = smallest.key
@@ -276,10 +275,10 @@ public class LLRBTree<K: Comparable, V> {
                 node.right = self.removeInternal(node.right!, key)
             }
         }
-        
+
         return self.fixUp(node)
     }
-    
+
     private func min(_ node: Node<K, V>) -> Node<K, V> {
         if node.left == nil {
             return node
@@ -298,41 +297,41 @@ public class LLRBTree<K: Comparable, V> {
 
     private func removeMin(_ node: Node<K, V>) -> Node<K, V>? {
         var node = node
-        
+
         if node.left == nil {
             return nil
         }
-        
+
         if !self.isRed(node.left), !self.isRed(node.left?.left) {
             node = self.moveRedLeft(node)
         }
-        
+
         node.left = self.removeMin(node.left!)
-        
+
         return self.fixUp(node)
     }
 
     private func fixUp(_ node: Node<K, V>) -> Node<K, V> {
         var node = node
-        
+
         if self.isRed(node.right) {
             node = self.rotateLeft(node)
         }
-        
+
         if self.isRed(node.left), self.isRed(node.left?.left) {
             node = self.rotateRight(node)
         }
-        
+
         if self.isRed(node.left), self.isRed(node.right) {
             self.flipColors(&node)
         }
-        
+
         return node
     }
 
     private func moveRedLeft(_ node: Node<K, V>) -> Node<K, V> {
         var node = node
-        
+
         self.flipColors(&node)
         if self.isRed(node.right?.left) {
             node.right = self.rotateRight(node.right!)
@@ -344,7 +343,7 @@ public class LLRBTree<K: Comparable, V> {
 
     private func moveRedRight(_ node: Node<K, V>) -> Node<K, V> {
         var node = node
-        
+
         self.flipColors(&node)
         if self.isRed(node.left?.left) {
             node = self.rotateRight(node)
@@ -358,23 +357,23 @@ public class LLRBTree<K: Comparable, V> {
     }
 
     private func rotateLeft(_ node: Node<K, V>) -> Node<K, V> {
-        let x = node.right!
-        node.right = x.left
-        x.left = node
-        x.isRed = x.left?.isRed ?? false
-        x.left?.isRed = true
-        return x
+        let nodeX = node.right!
+        node.right = nodeX.left
+        nodeX.left = node
+        nodeX.isRed = nodeX.left?.isRed ?? false
+        nodeX.left?.isRed = true
+        return nodeX
     }
 
     private func rotateRight(_ node: Node<K, V>) -> Node<K, V> {
-        let x = node.left!
-        node.left = x.right
-        x.right = node
-        x.isRed = x.right?.isRed ?? false
-        x.right?.isRed = true
-        return x
+        let nodeX = node.left!
+        node.left = nodeX.right
+        nodeX.right = node
+        nodeX.isRed = nodeX.right?.isRed ?? false
+        nodeX.right?.isRed = true
+        return nodeX
     }
-    
+
     private func flipColors(_ node: inout Node<K, V>) {
         node.isRed = !node.isRed
         node.left!.isRed = !node.left!.isRed

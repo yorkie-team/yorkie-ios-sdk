@@ -92,9 +92,9 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     public var structureAsString: String {
         "\(self.createdAt.structureAsString):\(self.offset)"
     }
-    
+
     var debugDescription: String {
-        structureAsString
+        self.structureAsString
     }
 }
 

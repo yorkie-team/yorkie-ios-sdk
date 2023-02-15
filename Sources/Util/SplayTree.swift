@@ -108,9 +108,9 @@ class SplayNode<V>: CustomDebugStringConvertible {
     fileprivate func initWeight() {
         self.weight = self.length
     }
-    
+
     var debugDescription: String {
-        "[\(weight):\(length) \(value)]"
+        "[\(self.weight):\(self.length) \(self.value)]"
     }
 }
 
