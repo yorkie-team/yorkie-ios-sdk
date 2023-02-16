@@ -98,7 +98,7 @@ class TextViewModel {
         let range = NSRange(location: 0, length: self.storage?.length ?? 0)
         let context = (await self.document.getRoot().content as? JSONText)?.plainText ?? ""
 
-        updateText(range, context)
+        self.updateText(range, context)
     }
 
     @MainActor
