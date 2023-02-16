@@ -15,9 +15,11 @@
  */
 
 import UIKit
+import Combine
 
 @MainActor
 class TextEditorViewController: UIViewController {
+    private let defaultFont = UIFont.preferredFont(forTextStyle: .body)
     private let textView: UITextView = {
         let view = UITextView(frame: .zero)
 
@@ -28,15 +30,14 @@ class TextEditorViewController: UIViewController {
 
         return view
     }()
+    
+    private var cancellables = Set<AnyCancellable>()
+    private var model: TextViewModel?
 
-    var model: TextViewModel?
+    private var isTyping = false
+    private var editOperations: [TextEditOperation] = []
 
-    var isTyping = false
-    var editOperations: [(NSRange, String)] = []
-
-    let defaultFont = UIFont.preferredFont(forTextStyle: .body)
-
-    var doneEditButton: UIBarButtonItem?
+    private var doneEditButton: UIBarButtonItem?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -69,9 +70,67 @@ class TextEditorViewController: UIViewController {
         self.navigationItem.rightBarButtonItem = button
         self.doneEditButton = button
 
-        self.model = TextViewModel(self.textView.textStorage, self.defaultFont)
+        // Receive events from TextView Model.
+        let subject = PassthroughSubject<[TextEditOperation], Never>()
+        
+        subject.sink { elements in
+            Task {
+                await MainActor.run { [weak self] in
+                    self?.updateText(elements)
+                }
+            }
+        }.store(in: &self.cancellables)
+        
+        self.model = TextViewModel(subject)
     }
 
+    func updateText(_ elements: [TextEditOperation]) {
+        guard elements.isEmpty == false else {
+            return
+        }
+
+        let storage = self.textView.textStorage
+        
+        var selection = self.textView.isFirstResponder ? self.textView.selectedTextRange : nil
+
+        storage.beginEditing()
+
+        elements.forEach { element in
+            let range = element.range ?? NSRange(location: 0, length: storage.length)
+            
+            storage.replaceCharacters(in: range, with: element.content)
+            
+            if element.content.isEmpty == false {
+                let attrRange = NSRange(location: range.location, length: element.content.count)
+                
+                storage.addAttributes([.font: self.defaultFont], range: attrRange)
+                storage.fixAttributes(in: attrRange)
+            }
+            
+            // Correct cursor positon.
+            if let prev = selection {
+                let prevStartIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: prev.start)
+                
+                let delta = element.content.isEmpty ? -range.length : element.content.count - range.length
+                
+                print("#### cursor \(prev), \(delta) \(prevStartIndex)")
+                
+                if let newPosStart = self.textView.position(from: prev.start, offset: delta), let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
+                    selection = self.textView.textRange(from: newPosStart, to: newPosEnd)
+                } else {
+                    selection = nil
+                }
+            }
+        }
+
+        storage.endEditing()
+        
+        // Must change selectedTextRange after endEditing()
+        if let selection {
+            self.textView.selectedTextRange = selection
+        }
+    }
+    
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
 
@@ -95,9 +154,12 @@ extension TextEditorViewController: UITextViewDelegate {
     func textViewDidChange(_: UITextView) {
         self.isTyping = false
 
-        self.model?.edit(self.editOperations)
-
+        let operations = self.editOperations
         self.editOperations = []
+        
+        Task { [weak self] in
+            await self?.model?.edit(operations)
+        }
     }
 
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
@@ -120,35 +182,12 @@ extension TextEditorViewController: NSTextStorageDelegate {
         let changedString = textStorage.mutableString.substring(with: editedRange)
 
         if editedMask.contains(.editedCharacters) {
-            print("char changed...")
-
             if self.isTyping {
-                let rangeParameter: NSRange
+                let rangeParameter = NSRange(location: editedRange.location, length: delta < 0 ? -delta: changedString.count - delta)
 
-                if delta < 0 {
-                    rangeParameter = NSRange(location: editedRange.location, length: -delta)
-                } else {
-                    rangeParameter = NSRange(location: editedRange.location, length: changedString.count - delta)
-                }
+                print("Char changed ... \(rangeParameter) [\(changedString)]")
 
-                print("Char changed 2... \(rangeParameter) [\(changedString)]")
-
-                self.editOperations.append((rangeParameter, changedString))
-
-            } else {
-                // Correct cursor positon.
-                if let prev = self.textView.selectedTextRange {
-                    let prevIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: prev.start)
-
-                    print("#### cursor \(prev), \(delta) \(prevIndex)")
-
-                    if editedRange.location <= prevIndex,
-                       let newPosStart = self.textView.position(from: prev.start, offset: delta),
-                       let newPosEnd = self.textView.position(from: prev.end, offset: delta)
-                    {
-                        self.textView.selectedTextRange = self.textView.textRange(from: newPosStart, to: newPosEnd)
-                    }
-                }
+                self.editOperations.append(TextEditOperation(range: rangeParameter, content: changedString))
             }
         }
 

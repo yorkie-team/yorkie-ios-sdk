@@ -19,20 +19,21 @@ import Foundation
 import UIKit
 import Yorkie
 
+struct TextEditOperation {
+    let range: NSRange?
+    let content: String
+}
+
 class TextViewModel {
     private var cancellables = Set<AnyCancellable>()
-
     private var client: Client
-
     private let document: Document
-    private weak var storage: NSTextStorage?
-    private let defaultFont: UIFont
+    private var textEventStream = PassthroughSubject<[TextChange], Never>()
 
-    private var textEvent = PassthroughSubject<[TextChange], Never>()
+    weak private var operationSubject: PassthroughSubject<[TextEditOperation], Never>?
 
-    init(_ storage: NSTextStorage, _ defaultFont: UIFont) {
-        self.storage = storage
-        self.defaultFont = defaultFont
+    init(_ operationSubject: PassthroughSubject<[TextEditOperation], Never>) {
+        self.operationSubject = operationSubject
 
         // create client with RPCAddress.
         self.client = Client(rpcAddress: RPCAddress(host: "localhost", port: 8080),
@@ -68,54 +69,37 @@ class TextViewModel {
             }.store(in: &self.cancellables)
 
             // define event handler that apply remote changes to local
-            textEvent.sink { [weak self] events in
+            textEventStream.sink { [weak self] events in
+                var textChanges = [TextEditOperation]()
+                
                 events.filter { $0.actor != clientID }.forEach {
                     switch $0.type {
                     case .content:
                         let range = NSRange(location: $0.from, length: $0.to - $0.from)
                         let content = $0.content ?? ""
-                        Task { [weak self] in
-                            print("#### text event range: \(range), context: \(content)")
-
-                            await self?.updateText(range, content)
-                        }
+                        
+                        textChanges.append(TextEditOperation(range: range, content: content))
                     case .style:
                         break
                     case .selection:
                         break
                     }
                 }
+
+                self?.operationSubject?.send(textChanges)
+
             }.store(in: &self.cancellables)
 
-            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: textEvent)
+            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: textEventStream)
 
             await self.syncText()
         }
     }
 
-    @MainActor
     func syncText() async {
-        let range = NSRange(location: 0, length: self.storage?.length ?? 0)
         let context = (await self.document.getRoot().content as? JSONText)?.plainText ?? ""
 
-        self.updateText(range, context)
-    }
-
-    @MainActor
-    func updateText(_ range: NSRange, _ context: String) {
-        print("#### updateText: \(range), \(context)")
-
-        self.storage?.beginEditing()
-
-        self.storage?.replaceCharacters(in: range, with: context)
-        if context.isEmpty == false {
-            let attrRange = NSRange(location: range.location, length: context.count)
-
-            self.storage?.addAttributes([.font: self.defaultFont], range: attrRange)
-            self.storage?.fixAttributes(in: attrRange)
-        }
-
-        self.storage?.endEditing()
+        operationSubject?.send([TextEditOperation(range: nil, content: context)])
     }
 
     func cleanup() async {
@@ -123,17 +107,19 @@ class TextViewModel {
         try! await self.client.deactivate()
     }
 
-    func edit(_ operaitions: [(range: NSRange, content: String)]) {
-        Task {
-            await self.document.update { root in
-                for oper in operaitions {
-                    let toIdx = oper.range.location + oper.range.length
-
-                    print("#### edit : from: \(oper.range.location), to: \(toIdx) context: \(oper.content)")
-
-                    if let content = root.content as? JSONText {
-                        content.edit(oper.range.location, toIdx, oper.content)
-                    }
+    func edit(_ operaitions: [TextEditOperation]) async {
+        await self.document.update { root in
+            for oper in operaitions {
+                guard let range = oper.range else {
+                    return
+                }
+                
+                let toIdx = range.location + range.length
+                
+                print("#### edit : from: \(range.location), to: \(toIdx) context: \(oper.content)")
+                
+                if let content = root.content as? JSONText {
+                    content.edit(range.location, toIdx, oper.content)
                 }
             }
         }
