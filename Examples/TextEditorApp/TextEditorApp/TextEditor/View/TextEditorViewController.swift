@@ -137,10 +137,17 @@ extension TextEditorViewController: NSTextStorageDelegate {
 
             } else {
                 // Correct cursor positon.
-                let prev = self.textView.selectedRange
+                if let prev = self.textView.selectedTextRange {
+                                        
+                    let prevIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: prev.start)
+                    
+                    print("#### cursor \(prev), \(delta) \(prevIndex)")
 
-                if editedRange.location <= prev.location {
-                    self.textView.selectedRange = NSRange(location: prev.location + delta, length: prev.length)
+                    if editedRange.location <= prevIndex,
+                       let newPosStart = self.textView.position(from: prev.start, offset: delta),
+                       let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
+                        self.textView.selectedTextRange = self.textView.textRange(from: newPosStart, to: newPosEnd)
+                    }
                 }
             }
         }

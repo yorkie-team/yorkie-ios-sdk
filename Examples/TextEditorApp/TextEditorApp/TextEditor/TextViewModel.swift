@@ -93,13 +93,12 @@ class TextViewModel {
         }
     }
 
+    @MainActor
     func syncText() async {
         let range = NSRange(location: 0, length: self.storage?.length ?? 0)
         let context = (await self.document.getRoot().content as? JSONText)?.plainText ?? ""
 
-        Task {
-            await updateText(range, context)
-        }
+        updateText(range, context)
     }
 
     @MainActor
