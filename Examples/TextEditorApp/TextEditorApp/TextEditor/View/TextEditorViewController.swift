@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import UIKit
 import Combine
+import UIKit
 
 @MainActor
 class TextEditorViewController: UIViewController {
@@ -30,7 +30,7 @@ class TextEditorViewController: UIViewController {
 
         return view
     }()
-    
+
     private var cancellables = Set<AnyCancellable>()
     private var model: TextViewModel?
 
@@ -72,7 +72,7 @@ class TextEditorViewController: UIViewController {
 
         // Receive events from TextView Model.
         let subject = PassthroughSubject<[TextEditOperation], Never>()
-        
+
         subject.sink { elements in
             Task {
                 await MainActor.run { [weak self] in
@@ -80,7 +80,7 @@ class TextEditorViewController: UIViewController {
                 }
             }
         }.store(in: &self.cancellables)
-        
+
         self.model = TextViewModel(subject)
     }
 
@@ -90,31 +90,31 @@ class TextEditorViewController: UIViewController {
         }
 
         let storage = self.textView.textStorage
-        
+
         var selection = self.textView.isFirstResponder ? self.textView.selectedTextRange : nil
 
         storage.beginEditing()
 
         elements.forEach { element in
             let range = element.range ?? NSRange(location: 0, length: storage.length)
-            
+
             storage.replaceCharacters(in: range, with: element.content)
-            
+
             if element.content.isEmpty == false {
                 let attrRange = NSRange(location: range.location, length: element.content.count)
-                
+
                 storage.addAttributes([.font: self.defaultFont], range: attrRange)
                 storage.fixAttributes(in: attrRange)
             }
-            
+
             // Correct cursor positon.
             if let prev = selection {
                 let prevStartIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: prev.start)
-                
+
                 let delta = element.content.isEmpty ? -range.length : element.content.count - range.length
-                
+
                 print("#### cursor \(prev), \(delta) \(prevStartIndex)")
-                
+
                 if let newPosStart = self.textView.position(from: prev.start, offset: delta), let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
                     selection = self.textView.textRange(from: newPosStart, to: newPosEnd)
                 } else {
@@ -124,13 +124,13 @@ class TextEditorViewController: UIViewController {
         }
 
         storage.endEditing()
-        
+
         // Must change selectedTextRange after endEditing()
         if let selection {
             self.textView.selectedTextRange = selection
         }
     }
-    
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
 
@@ -156,7 +156,7 @@ extension TextEditorViewController: UITextViewDelegate {
 
         let operations = self.editOperations
         self.editOperations = []
-        
+
         Task { [weak self] in
             await self?.model?.edit(operations)
         }
@@ -183,7 +183,7 @@ extension TextEditorViewController: NSTextStorageDelegate {
 
         if editedMask.contains(.editedCharacters) {
             if self.isTyping {
-                let rangeParameter = NSRange(location: editedRange.location, length: delta < 0 ? -delta: changedString.count - delta)
+                let rangeParameter = NSRange(location: editedRange.location, length: delta < 0 ? -delta : changedString.count - delta)
 
                 print("Char changed ... \(rangeParameter) [\(changedString)]")
 

@@ -30,7 +30,7 @@ class TextViewModel {
     private let document: Document
     private var textEventStream = PassthroughSubject<[TextChange], Never>()
 
-    weak private var operationSubject: PassthroughSubject<[TextEditOperation], Never>?
+    private weak var operationSubject: PassthroughSubject<[TextEditOperation], Never>?
 
     init(_ operationSubject: PassthroughSubject<[TextEditOperation], Never>) {
         self.operationSubject = operationSubject
@@ -71,13 +71,13 @@ class TextViewModel {
             // define event handler that apply remote changes to local
             textEventStream.sink { [weak self] events in
                 var textChanges = [TextEditOperation]()
-                
+
                 events.filter { $0.actor != clientID }.forEach {
                     switch $0.type {
                     case .content:
                         let range = NSRange(location: $0.from, length: $0.to - $0.from)
                         let content = $0.content ?? ""
-                        
+
                         textChanges.append(TextEditOperation(range: range, content: content))
                     case .style:
                         break
@@ -99,7 +99,7 @@ class TextViewModel {
     func syncText() async {
         let context = (await self.document.getRoot().content as? JSONText)?.plainText ?? ""
 
-        operationSubject?.send([TextEditOperation(range: nil, content: context)])
+        self.operationSubject?.send([TextEditOperation(range: nil, content: context)])
     }
 
     func cleanup() async {
@@ -113,11 +113,11 @@ class TextViewModel {
                 guard let range = oper.range else {
                     return
                 }
-                
+
                 let toIdx = range.location + range.length
-                
+
                 print("#### edit : from: \(range.location), to: \(toIdx) context: \(oper.content)")
-                
+
                 if let content = root.content as? JSONText {
                     content.edit(range.location, toIdx, oper.content)
                 }
