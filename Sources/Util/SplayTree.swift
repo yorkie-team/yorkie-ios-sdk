@@ -171,7 +171,7 @@ class SplayTree<V> {
      * - Returns: the index of given node
      */
     func indexOf(_ node: SplayNode<V>) -> Int {
-        guard node.hasLinks else {
+        if node !== self.root, node.hasLinks == false {
             return -1
         }
 

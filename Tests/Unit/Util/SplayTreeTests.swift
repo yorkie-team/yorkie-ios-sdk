@@ -242,4 +242,13 @@ class SplayTreeTests: XCTestCase {
         tree.delete(nodeC)
         XCTAssertEqual(tree.structureAsString, "[0,0]")
     }
+
+    func test_single_node_index_test() {
+        let tree = SplayTree<String>()
+
+        let node = tree.insert(StringNode("A"))
+        XCTAssertEqual(tree.indexOf(node), 0)
+        tree.delete(node)
+        XCTAssertEqual(tree.indexOf(node), -1)
+    }
 }
