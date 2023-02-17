@@ -202,9 +202,9 @@ public actor Client {
 
         let channel = builder.connect(host: rpcAddress.host, port: rpcAddress.port)
 
-        let authInterceptors: AuthInterceptors?
+        let authInterceptors: AuthClientInterceptors?
         if options.apiKey != nil || options.token != nil {
-            authInterceptors = AuthInterceptors(apiKey: options.apiKey, token: options.token)
+            authInterceptors = AuthClientInterceptors(apiKey: options.apiKey, token: options.token)
         } else {
             authInterceptors = nil
         }

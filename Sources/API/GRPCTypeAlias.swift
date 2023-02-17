@@ -21,7 +21,7 @@ import Foundation
 typealias YorkieServiceNIOClient = Yorkie_V1_YorkieServiceNIOClient
 typealias YorkieServiceAsyncClient = Yorkie_V1_YorkieServiceAsyncClient
 
-typealias InterceptorFactoryProtocol = Yorkie_V1_YorkieServiceClientInterceptorFactoryProtocol
+typealias YorkieServiceClientInterceptorFactoryProtocol = Yorkie_V1_YorkieServiceClientInterceptorFactoryProtocol
 
 typealias ActivateClientRequest = Yorkie_V1_ActivateClientRequest
 typealias ActivateClientResponse = Yorkie_V1_ActivateClientResponse

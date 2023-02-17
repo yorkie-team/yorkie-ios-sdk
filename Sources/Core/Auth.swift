@@ -18,7 +18,7 @@ import Foundation
 import GRPC
 import NIOCore
 
-class ActivateClientInterceptor<Request, Response>: ClientInterceptor<Request, Response> {
+class AuthClientInterceptor<Request, Response>: ClientInterceptor<Request, Response> {
     let apiKey: String?
     let token: String?
 
@@ -49,7 +49,7 @@ class ActivateClientInterceptor<Request, Response>: ClientInterceptor<Request, R
     }
 }
 
-final class AuthInterceptors: InterceptorFactoryProtocol {
+final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtocol {
     let apiKey: String?
     let token: String?
 
@@ -59,30 +59,30 @@ final class AuthInterceptors: InterceptorFactoryProtocol {
     }
 
     func makeActivateClientInterceptors() -> [GRPC.ClientInterceptor<ActivateClientRequest, ActivateClientResponse>] {
-        [ActivateClientInterceptor<ActivateClientRequest, ActivateClientResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<ActivateClientRequest, ActivateClientResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
     func makeDeactivateClientInterceptors() -> [GRPC.ClientInterceptor<DeactivateClientRequest, DeactivateClientResponse>] {
-        [ActivateClientInterceptor<DeactivateClientRequest, DeactivateClientResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<DeactivateClientRequest, DeactivateClientResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
     func makeUpdatePresenceInterceptors() -> [GRPC.ClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>] {
-        [ActivateClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
     func makeAttachDocumentInterceptors() -> [GRPC.ClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>] {
-        [ActivateClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
     func makeDetachDocumentInterceptors() -> [GRPC.ClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>] {
-        [ActivateClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
     func makeWatchDocumentsInterceptors() -> [GRPC.ClientInterceptor<WatchDocumentsRequest, WatchDocumentsResponse>] {
-        [ActivateClientInterceptor<WatchDocumentsRequest, WatchDocumentsResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<WatchDocumentsRequest, WatchDocumentsResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
     func makePushPullInterceptors() -> [GRPC.ClientInterceptor<PushPullRequest, PushPullResponse>] {
-        [ActivateClientInterceptor<PushPullRequest, PushPullResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<PushPullRequest, PushPullResponse>(apiKey: self.apiKey, token: self.token)]
     }
 }
