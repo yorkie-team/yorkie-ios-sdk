@@ -762,7 +762,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             let rightBoundary = boundaries[index + 1]
             // If there is no node to delete between boundaries, do notting.
             if leftBoundary != nil, leftBoundary!.next !== rightBoundary {
-                self.treeByIndex.removeRange(leftBoundary!, rightBoundary)
+                self.treeByIndex.cutOffRange(leftBoundary!, rightBoundary)
             }
         }
     }
