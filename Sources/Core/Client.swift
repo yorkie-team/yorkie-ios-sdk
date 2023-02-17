@@ -202,7 +202,14 @@ public actor Client {
 
         let channel = builder.connect(host: rpcAddress.host, port: rpcAddress.port)
 
-        self.rpcClient = YorkieServiceAsyncClient(channel: channel)
+        let authInterceptors: AuthInterceptors?
+        if options.apiKey != nil || options.token != nil {
+            authInterceptors = AuthInterceptors(apiKey: options.apiKey, token: options.token)
+        } else {
+            authInterceptors = nil
+        }
+
+        self.rpcClient = YorkieServiceAsyncClient(channel: channel, interceptors: authInterceptors)
         self.eventStream = PassthroughSubject()
     }
 

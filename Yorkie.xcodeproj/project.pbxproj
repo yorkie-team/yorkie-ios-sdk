@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
+		9A20CE86299F61CD00E4CE7E /* Auth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A20CE85299F61CD00E4CE7E /* Auth.swift */; };
 		9A30D40429514F150036F732 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		9A3CF3E9296583050024E3DD /* StyleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3E8296583050024E3DD /* StyleOperation.swift */; };
 		9A3CF3EB29658C840024E3DD /* SelectOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3EA29658C840024E3DD /* SelectOperation.swift */; };
@@ -127,6 +128,7 @@
 		96DA808B28C5B7B400E2C1DA /* YorkieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YorkieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A20CE85299F61CD00E4CE7E /* Auth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Auth.swift; sourceTree = "<group>"; };
 		9A3CF3E8296583050024E3DD /* StyleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleOperation.swift; sourceTree = "<group>"; };
 		9A3CF3EA29658C840024E3DD /* SelectOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectOperation.swift; sourceTree = "<group>"; };
 		9A3CF3EC29666AB30024E3DD /* JSONTextTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTextTest.swift; sourceTree = "<group>"; };
@@ -415,6 +417,7 @@
 			children = (
 				9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */,
 				CE8C230428C9F1BD00432DE5 /* Client.swift */,
+				9A20CE85299F61CD00E4CE7E /* Auth.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -759,6 +762,7 @@
 				CE9557CD2907523A00DF4DFA /* JSONArray.swift in Sources */,
 				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
 				CE9557CF2908B6BA00DF4DFA /* JSONDatable.swift in Sources */,
+				9A20CE86299F61CD00E4CE7E /* Auth.swift in Sources */,
 				CE3EC96928D30FEF009471BC /* ActorID.swift in Sources */,
 				CE6BD03C28E6BA9C00E97B8C /* RHTPQMap.swift in Sources */,
 				9A3CF3E9296583050024E3DD /* StyleOperation.swift in Sources */,
