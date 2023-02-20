@@ -115,7 +115,9 @@ class TextEditorViewController: UIViewController {
 
                 print("#### cursor \(prev), \(delta) \(prevStartIndex)")
 
-                if let newPosStart = self.textView.position(from: prev.start, offset: delta), let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
+                if prevStartIndex >= range.location,
+                   let newPosStart = self.textView.position(from: prev.start, offset: delta),
+                   let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
                     selection = self.textView.textRange(from: newPosStart, to: newPosEnd)
                 } else {
                     selection = nil
