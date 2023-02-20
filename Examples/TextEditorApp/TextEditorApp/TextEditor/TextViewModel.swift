@@ -116,8 +116,6 @@ class TextViewModel {
 
                 let toIdx = range.location + range.length
 
-                print("#### edit : from: \(range.location), to: \(toIdx) context: \(oper.content)")
-
                 if let content = root.content as? JSONText {
                     content.edit(range.location, toIdx, oper.content)
                 }

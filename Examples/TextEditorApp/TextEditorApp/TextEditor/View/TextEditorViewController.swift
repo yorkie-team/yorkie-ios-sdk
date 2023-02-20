@@ -69,7 +69,11 @@ class TextEditorViewController: UIViewController {
         button.isEnabled = false
         self.navigationItem.rightBarButtonItem = button
         self.doneEditButton = button
+    }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
         // Receive events from TextView Model.
         let subject = PassthroughSubject<[TextEditOperation], Never>()
 
@@ -82,6 +86,14 @@ class TextEditorViewController: UIViewController {
         }.store(in: &self.cancellables)
 
         self.model = TextViewModel(subject)
+    }
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        
+        Task {
+            await self.model?.cleanup()
+            self.model = nil
+        }
     }
 
     func updateText(_ elements: [TextEditOperation]) {
@@ -113,8 +125,6 @@ class TextEditorViewController: UIViewController {
 
                 let delta = element.content.isEmpty ? -range.length : element.content.count - range.length
 
-                print("#### cursor \(prev), \(delta) \(prevStartIndex)")
-
                 if prevStartIndex >= range.location,
                    let newPosStart = self.textView.position(from: prev.start, offset: delta),
                    let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
@@ -130,16 +140,6 @@ class TextEditorViewController: UIViewController {
         // Must change selectedTextRange after endEditing()
         if let selection {
             self.textView.selectedTextRange = selection
-        }
-    }
-
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-
-        if isBeingDismissed {
-            Task {
-                await self.model?.cleanup()
-            }
         }
     }
 }
@@ -165,8 +165,6 @@ extension TextEditorViewController: UITextViewDelegate {
     }
 
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-        print("#### textView shouldChangeTextIn called. \(range), \(text), \((text as NSString).length)")
-
         self.isTyping = true
 
         return true
