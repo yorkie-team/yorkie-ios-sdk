@@ -73,7 +73,7 @@ class TextEditorViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
+
         // Receive events from TextView Model.
         let subject = PassthroughSubject<[TextEditOperation], Never>()
 
@@ -87,9 +87,10 @@ class TextEditorViewController: UIViewController {
 
         self.model = TextViewModel(subject)
     }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        
+
         Task {
             await self.model?.cleanup()
             self.model = nil
@@ -127,7 +128,8 @@ class TextEditorViewController: UIViewController {
 
                 if prevStartIndex >= range.location,
                    let newPosStart = self.textView.position(from: prev.start, offset: delta),
-                   let newPosEnd = self.textView.position(from: prev.end, offset: delta) {
+                   let newPosEnd = self.textView.position(from: prev.end, offset: delta)
+                {
                     selection = self.textView.textRange(from: newPosStart, to: newPosEnd)
                 } else {
                     selection = nil
