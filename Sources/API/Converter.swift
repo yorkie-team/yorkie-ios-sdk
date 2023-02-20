@@ -469,14 +469,14 @@ extension Converter {
     /**
      * `toRHTNodes` converts the given model to Protobuf format.
      */
-    static func toRHTNodes(rht: RHTPQMap) -> [PbRHTNode] {
+    static func toRHTNodes(rht: ElementRHT) -> [PbRHTNode] {
         rht.compactMap {
-            guard let element = try? toElement($0.rhtValue) else {
+            guard let element = try? toElement($0.value) else {
                 return nil
             }
 
             var pbRHTNode = PbRHTNode()
-            pbRHTNode.key = $0.rhtKey
+            pbRHTNode.key = $0.key
             pbRHTNode.element = element
 
             return pbRHTNode
@@ -532,7 +532,7 @@ extension Converter {
      * `fromObject` converts the given Protobuf format to model format.
      */
     static func fromObject(_ pbObject: PbJSONElement.JSONObject) throws -> CRDTObject {
-        let rht = RHTPQMap()
+        let rht = ElementRHT()
         try pbObject.nodes.forEach { pbRHTNode in
             rht.set(key: pbRHTNode.key, value: try fromElement(pbElement: pbRHTNode.element))
         }

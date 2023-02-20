@@ -17,10 +17,10 @@
 import XCTest
 @testable import Yorkie
 
-class RHTPQMapTests: XCTestCase {
+class ElementRHTTests: XCTestCase {
     private let actorId = "actor-1"
     func test_set_value_by_key_is_new() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)
@@ -38,7 +38,7 @@ class RHTPQMapTests: XCTestCase {
     }
 
     func test_set_value_by_key_is_used_alreay() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)
@@ -53,7 +53,7 @@ class RHTPQMapTests: XCTestCase {
     }
 
     func test_remove_by_createdAt() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)
@@ -70,7 +70,7 @@ class RHTPQMapTests: XCTestCase {
     }
 
     func test_remove_by_key() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)
@@ -87,7 +87,7 @@ class RHTPQMapTests: XCTestCase {
     }
 
     func test_subPath() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)
@@ -100,7 +100,7 @@ class RHTPQMapTests: XCTestCase {
     }
 
     func test_delete() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)
@@ -115,7 +115,7 @@ class RHTPQMapTests: XCTestCase {
     }
 
     func test_has() throws {
-        let target = RHTPQMap()
+        let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a1)

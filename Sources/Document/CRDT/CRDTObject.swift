@@ -23,9 +23,9 @@ class CRDTObject: CRDTContainer {
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
-    private var memberNodes: RHTPQMap
+    private var memberNodes: ElementRHT
 
-    init(createdAt: TimeTicket, memberNodes: RHTPQMap = RHTPQMap()) {
+    init(createdAt: TimeTicket, memberNodes: ElementRHT = ElementRHT()) {
         self.createdAt = createdAt
         self.memberNodes = memberNodes
     }
@@ -71,7 +71,7 @@ class CRDTObject: CRDTContainer {
     /**
      * `rht` RHTNodes returns the RHTPQMap nodes.
      */
-    var rht: RHTPQMap {
+    var rht: ElementRHT {
         return self.memberNodes
     }
 }
@@ -112,7 +112,7 @@ extension CRDTObject {
     func deepcopy() -> CRDTElement {
         let clone = CRDTObject(createdAt: self.createdAt)
         self.memberNodes.forEach {
-            clone.memberNodes.set(key: $0.rhtKey, value: $0.rhtValue.deepcopy())
+            clone.memberNodes.set(key: $0.key, value: $0.value.deepcopy())
         }
 
         clone.remove(self.removedAt)
@@ -145,7 +145,7 @@ extension CRDTObject {
      */
     func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool) {
         for node in self.memberNodes {
-            let element = node.rhtValue
+            let element = node.value
             if callback(element, self) {
                 return
             }
@@ -167,10 +167,10 @@ extension CRDTObject: Sequence {
 
 class CRDTObjectIterator: IteratorProtocol {
     private var keys = Set<String>()
-    private var nodes: [RHTPQMapNode]
+    private var nodes: [ElementRHTNode]
     private var iteratorNext: Int = 0
 
-    init(_ rhtPqMap: RHTPQMap) {
+    init(_ rhtPqMap: ElementRHT) {
         self.nodes = rhtPqMap.filter { $0.isRemoved == false }
     }
 
@@ -182,12 +182,12 @@ class CRDTObjectIterator: IteratorProtocol {
         while self.iteratorNext < self.nodes.count {
             let node = self.nodes[self.iteratorNext]
 
-            if self.keys.contains(node.rhtKey) {
+            if self.keys.contains(node.key) {
                 self.iteratorNext += 1
                 continue
             } else {
-                self.keys.insert(node.rhtKey)
-                return (key: node.rhtKey, value: node.rhtValue)
+                self.keys.insert(node.key)
+                return (key: node.key, value: node.value)
             }
         }
 
