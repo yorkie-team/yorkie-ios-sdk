@@ -25,7 +25,7 @@ class RHTTests: XCTestCase {
 
         let rht = RHT()
 
-        XCTAssertEqual(rht.toJSON(), "{}")
+        XCTAssertEqual(rht.toJSON(), "")
 
         rht.set(key: testKey, value: testValue, executedAt: TimeTicket.initial)
 
@@ -43,7 +43,7 @@ class RHTTests: XCTestCase {
 
         let rht = RHT()
 
-        XCTAssertEqual(rht.toJSON(), "{}")
+        XCTAssertEqual(rht.toJSON(), "")
 
         rht.set(key: testKey,
                 value: testValue,
@@ -66,7 +66,7 @@ class RHTTests: XCTestCase {
         let rht = RHT()
 
         // Check if a rht object is constructed well.
-        XCTAssertEqual(rht.toJSON(), "{}")
+        XCTAssertEqual(rht.toJSON(), "")
 
         let notExistsValue = try? rht.get(key: notExistsKey)
         XCTAssertEqual(notExistsValue, nil)
@@ -79,7 +79,7 @@ class RHTTests: XCTestCase {
         let rht = RHT()
 
         // Check if a rht object is constructed well.
-        XCTAssertEqual(rht.toJSON(), "{}")
+        XCTAssertEqual(rht.toJSON(), "")
 
         rht.set(key: testKey, value: testValue, executedAt: TimeTicket.initial)
 

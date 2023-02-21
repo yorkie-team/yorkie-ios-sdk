@@ -76,13 +76,13 @@ final class TextIntegrationTests: XCTestCase {
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "Hello", ["bold": true])
             (root.text as? JSONText)?.edit(1, 3, "12")
-            (root.text as? JSONText)?.setStyle(fromIdx: 1, toIdx: 3, attributes: ["italic": true])
+            (root.text as? JSONText)?.setStyle(1, 3, ["italic": true])
         }
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
         await self.d2.update { root in
-            (root.text as? JSONText)?.setStyle(fromIdx: 1, toIdx: 3, attributes: ["italic": true])
+            (root.text as? JSONText)?.setStyle(1, 3, ["italic": true])
         }
 
         try await Task.sleep(nanoseconds: 1_500_000_000)

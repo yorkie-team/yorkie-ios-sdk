@@ -94,7 +94,7 @@ public class JSONText {
      * `setStyle` styles this text with the given attributes.
      */
     @discardableResult
-    public func setStyle(fromIdx: Int, toIdx: Int, attributes: TextAttributes) -> Bool {
+    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: TextAttributes) -> Bool {
         guard let context, let text else {
             Logger.critical("it is not initialized yet")
             return false

@@ -122,7 +122,15 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
      * `toJSON` returns the JSON encoding of this .
      */
     public var toJSON: String {
-        return "{\"attrs\":\(self.attributes.toJSON()),\"val\":\"\(self.toString.escaped())\"}"
+        let attrs = self.attributes.toJSON()
+        let attrsString = attrs.isEmpty ? "" : "\"attrs\":\(self.attributes.toJSON()),"
+        let valString = self.toString.escaped()
+
+        if attrs.isEmpty && valString.isEmpty {
+            return ""
+        } else {
+            return "{\(attrsString)\"val\":\"\(valString)\"}"
+        }
     }
 
     /**
@@ -316,7 +324,10 @@ final class CRDTText: CRDTTextElement {
 
         self.rgaTreeSplit.forEach {
             if !$0.isRemoved {
-                json.append($0.value.toJSON)
+                let nodeValue = $0.value.toJSON
+                if nodeValue.isEmpty == false {
+                    json.append(nodeValue)
+                }
             }
         }
 

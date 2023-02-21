@@ -92,7 +92,7 @@ class RHT {
             result.append("\"\(key)\":\"\(node.value.escaped())\"")
         }
 
-        return "{\(result.joined(separator: ","))}"
+        return result.isEmpty ? "" : "{\(result.joined(separator: ","))}"
     }
 
     /**
