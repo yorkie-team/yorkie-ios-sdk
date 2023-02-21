@@ -57,7 +57,7 @@ final class JSONTextTest: XCTestCase {
 
         docContent = await doc.toSortedJSON()
 
-        XCTAssertEqual("{\"k1\":[{\"attrs\":{},\"val\":\"\"},{\"attrs\":{},\"val\":\"A\"},{\"attrs\":{},\"val\":\"12\"},{\"attrs\":{},\"val\":\"D\"}]}", docContent)
+        XCTAssertEqual("{\"k1\":[{\"val\":\"A\"},{\"val\":\"12\"},{\"val\":\"D\"}]}", docContent)
     }
 
     func test_should_handle_edit_operations2() async throws {
@@ -83,7 +83,7 @@ final class JSONTextTest: XCTestCase {
         }
 
         docContent = await doc.toSortedJSON()
-        XCTAssertEqual("{\"k1\":[{\"attrs\":{},\"val\":\"\"},{\"attrs\":{},\"val\":\"ABC\"},{\"attrs\":{},\"val\":\"\\n\"},{\"attrs\":{},\"val\":\"D\"}]}", docContent)
+        XCTAssertEqual("{\"k1\":[{\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"val\":\"D\"}]}", docContent)
     }
 
     func test_should_handle_type_하늘() async throws {
@@ -103,7 +103,7 @@ final class JSONTextTest: XCTestCase {
         }
 
         docContent = await doc.toSortedJSON()
-        XCTAssertEqual("{\"k1\":[{\"attrs\":{},\"val\":\"\"},{\"attrs\":{},\"val\":\"하\"},{\"attrs\":{},\"val\":\"늘\"}]}", docContent)
+        XCTAssertEqual("{\"k1\":[{\"val\":\"하\"},{\"val\":\"늘\"}]}", docContent)
     }
 
     func test_should_handle_deletion_of_nested_nodes() async throws {
@@ -254,7 +254,7 @@ final class JSONTextTest: XCTestCase {
         }
 
         docContent = await doc.toSortedJSON()
-        XCTAssertEqual("{\"k1\":[{\"attrs\":{},\"val\":\"\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"ABC\"},{\"attrs\":{},\"val\":\"\\n\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"D\"}]}",
+        XCTAssertEqual("{\"k1\":[{\"attrs\":{\"b\":\"1\"},\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"D\"}]}",
                        docContent)
     }
 }
