@@ -194,7 +194,7 @@ extension TextEditorViewController: NSTextStorageDelegate {
         }
 
         if editedMask.contains(.editedAttributes) {
-            // TODO:
+            // TODO(humdrum): Implement attributes editing
         }
     }
 }
