@@ -21,6 +21,10 @@ public class JSONText {
     private var context: ChangeContext?
     private var text: CRDTText?
 
+    public convenience init() {
+        self.init(context: nil, text: nil)
+    }
+
     init(context: ChangeContext? = nil, text: CRDTText? = nil) {
         self.context = context
         self.text = text

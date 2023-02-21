@@ -13,7 +13,7 @@
 		9603ABBD291114DF00696E1A /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9603ABBB291114DF00696E1A /* Main.storyboard */; };
 		9603ABBF291114E200696E1A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9603ABBE291114E200696E1A /* Assets.xcassets */; };
 		9603ABC2291114E200696E1A /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 9603ABC0291114E200696E1A /* LaunchScreen.storyboard */; };
-		9A6399A4294B0BE700BF27F5 /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A3294B0BE700BF27F5 /* Yorkie */; };
+		9A5899A3299CF9FA00099E90 /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 9A5899A2299CF9FA00099E90 /* Yorkie */; };
 		CE79C52629135EB400D5DE3F /* KanbanViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52529135EB400D5DE3F /* KanbanViewController.swift */; };
 		CE79C52929135F7B00D5DE3F /* KanbanColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52829135F7B00D5DE3F /* KanbanColumn.swift */; };
 		CE79C52B291360FE00D5DE3F /* KanbanCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE79C52A291360FE00D5DE3F /* KanbanCard.swift */; };
@@ -48,6 +48,7 @@
 		9603ABBE291114E200696E1A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9603ABC1291114E200696E1A /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		9603ABC3291114E200696E1A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9A15C90D2995DF7100E7EAE7 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
 		CE79C52529135EB400D5DE3F /* KanbanViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanViewController.swift; sourceTree = "<group>"; };
 		CE79C52829135F7B00D5DE3F /* KanbanColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanColumn.swift; sourceTree = "<group>"; };
 		CE79C52A291360FE00D5DE3F /* KanbanCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KanbanCard.swift; sourceTree = "<group>"; };
@@ -65,7 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9A6399A4294B0BE700BF27F5 /* Yorkie in Frameworks */,
+				9A5899A3299CF9FA00099E90 /* Yorkie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +76,7 @@
 		9603ABA9291114DF00696E1A = {
 			isa = PBXGroup;
 			children = (
+				9A15C90C2995DF7100E7EAE7 /* Packages */,
 				9603ABB4291114DF00696E1A /* KanbanApp */,
 				9603ABB3291114DF00696E1A /* Products */,
 				CE95E41429113593005076C8 /* Frameworks */,
@@ -103,6 +105,14 @@
 				9603ABC3291114E200696E1A /* Info.plist */,
 			);
 			path = KanbanApp;
+			sourceTree = "<group>";
+		};
+		9A15C90C2995DF7100E7EAE7 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9A15C90D2995DF7100E7EAE7 /* yorkie-ios-sdk */,
+			);
+			name = Packages;
 			sourceTree = "<group>";
 		};
 		CE79C52729135F3700D5DE3F /* Kanban */ = {
@@ -162,7 +172,7 @@
 			);
 			name = KanbanApp;
 			packageProductDependencies = (
-				9A6399A3294B0BE700BF27F5 /* Yorkie */,
+				9A5899A2299CF9FA00099E90 /* Yorkie */,
 			);
 			productName = ExampleApp;
 			productReference = 9603ABB2291114DF00696E1A /* KanbanApp.app */;
@@ -193,7 +203,6 @@
 			);
 			mainGroup = 9603ABA9291114DF00696E1A;
 			packageReferences = (
-				9A566BF6294B0B800032E242 /* XCRemoteSwiftPackageReference "yorkie-ios-sdk" */,
 			);
 			productRefGroup = 9603ABB3291114DF00696E1A /* Products */;
 			projectDirPath = "";
@@ -459,21 +468,9 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		9A566BF6294B0B800032E242 /* XCRemoteSwiftPackageReference "yorkie-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/yorkie-team/yorkie-ios-sdk.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
-		9A6399A3294B0BE700BF27F5 /* Yorkie */ = {
+		9A5899A2299CF9FA00099E90 /* Yorkie */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 9A566BF6294B0B800032E242 /* XCRemoteSwiftPackageReference "yorkie-ios-sdk" */;
 			productName = Yorkie;
 		};
 /* End XCSwiftPackageProductDependency section */

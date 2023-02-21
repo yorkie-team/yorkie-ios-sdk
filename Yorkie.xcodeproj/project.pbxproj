@@ -25,7 +25,6 @@
 		9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A6294C7E1E00BF27F5 /* Logging */; };
 		9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */; };
 		9A66B1A02955833E00D10B94 /* LLRBTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19F2955833E00D10B94 /* LLRBTree.swift */; };
-		9A69B9FF29641117006CCD75 /* RGATreeSplitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A69B9FE29641117006CCD75 /* RGATreeSplitTests.swift */; };
 		9A8150522967FCD700DFADFB /* Helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8150512967FCD700DFADFB /* Helper.swift */; };
 		9ADAEE56296571D8007E9F9F /* CRDTText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5329654377007E9F9F /* CRDTText.swift */; };
 		9ADAEE5829657696007E9F9F /* JSONText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5729657696007E9F9F /* JSONText.swift */; };
@@ -139,7 +138,6 @@
 		9A4DC744292DD82500C89478 /* YorkieCountable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieCountable.swift; sourceTree = "<group>"; };
 		9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGATreeSplit.swift; sourceTree = "<group>"; };
 		9A66B19F2955833E00D10B94 /* LLRBTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLRBTree.swift; sourceTree = "<group>"; };
-		9A69B9FE29641117006CCD75 /* RGATreeSplitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RGATreeSplitTests.swift; sourceTree = "<group>"; };
 		9A8150512967FCD700DFADFB /* Helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Helper.swift; sourceTree = "<group>"; };
 		9ADAEE5329654377007E9F9F /* CRDTText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTText.swift; sourceTree = "<group>"; };
 		9ADAEE5729657696007E9F9F /* JSONText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONText.swift; sourceTree = "<group>"; };
@@ -348,7 +346,6 @@
 				CE3EC97128D4042D009471BC /* CRDTElementTests.swift */,
 				CE7B997128E1750000D56198 /* PrimitiveTests.swift */,
 				CE7B997B28E2DB5000D56198 /* RGATreeListTests.swift */,
-				9A69B9FE29641117006CCD75 /* RGATreeSplitTests.swift */,
 				CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */,
 				CE7B998528E520D600D56198 /* CRDTArrayTests.swift */,
 				CE7B998A28E694FC00D56198 /* ElementRHTTests.swift */,
@@ -844,7 +841,6 @@
 				9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */,
 				9A3CF3ED29666AB30024E3DD /* JSONTextTest.swift in Sources */,
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,
-				9A69B9FF29641117006CCD75 /* RGATreeSplitTests.swift in Sources */,
 				9AEA80DC296FE38D000672FC /* TextIntegrationTests.swift in Sources */,
 				CE9557C02902025600DF4DFA /* JSONObjectTests.swift in Sources */,
 				CE3EC96E28D3FFF0009471BC /* TimeTicketTests.swift in Sources */,

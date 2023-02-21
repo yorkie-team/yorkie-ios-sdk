@@ -73,7 +73,7 @@ public struct TimeTicket: Comparable {
         // If aactorID is digit display last two charactors.
         let formatedActorID: String
 
-        if actorID.count >= 2, CharacterSet(charactersIn: actorID).isSubset(of: .decimalDigits) {
+        if actorID.count >= 2, CharacterSet(charactersIn: actorID).isSubset(of: CharacterSet(charactersIn: "0123456789abcdef")) {
             formatedActorID = actorID.substring(from: actorID.count - 2, to: actorID.count - 1)
         } else {
             formatedActorID = actorID

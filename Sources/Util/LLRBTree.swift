@@ -35,18 +35,19 @@ public class LLRBTree<K: Comparable, V> {
     class Node<K, V>: CustomDebugStringConvertible {
         public var key: K
         public var value: V
+        public var parent: Node<K, V>?
         public var left: Node<K, V>?
         public var right: Node<K, V>?
         public var isRed: Bool
 
-        init(_ key: K, _ value: V) {
+        init(_ key: K, _ value: V, _ isRed: Bool) {
             self.key = key
             self.value = value
-            self.isRed = true // new nodes are always red
+            self.isRed = isRed
         }
 
         var debugDescription: String {
-            "[Key: \(self.key)]: [Value: \(self.value)], isRed:\(self.isRed)"
+            "[\(self.key)]: \(self.value) (\(self.isRed ? "R" : "B"))"
         }
 
         var isLeaf: Bool {
@@ -59,87 +60,49 @@ public class LLRBTree<K: Comparable, V> {
     }
 
     private var root: Node<K, V>?
+    private var counter: Int = 0
 
-    public func search(_ key: K) -> V? {
-        var nodeX = self.root
-
-        while nodeX != nil {
-            if key == nodeX!.key {
-                return nodeX!.value
-            } else if key < nodeX!.key {
-                nodeX = nodeX!.left
-            } else if key > nodeX!.key {
-                nodeX = nodeX!.right
-            }
-        }
-
-        return nil
-    }
-
-    public func insert(_ key: K, _ value: V) {
-        self.root = self.insert(self.root, key, value)
+    /**
+     * `put` puts the value of the given key.
+     */
+    @discardableResult
+    public func put(_ key: K, _ value: V) -> V {
+        self.root = self.putInternal(key, value, self.root)
         self.root?.isRed = false
+
+        return value
     }
 
-    public func delete(_ key: K) {
-        guard self.root != nil else {
+    /**
+     * `get` gets a value of the given key.
+     */
+    public func get(_ key: K) -> V? {
+        self.getInternal(key, self.root)?.value
+    }
+
+    /**
+     * `remove` removes a element of key.
+     */
+    public func remove(_ key: K) {
+        guard let root else {
             return
         }
 
-        self.root = self.delete(self.root!, key)
+        if self.isRed(root.left), !self.isRed(root.right) {
+            self.root?.isRed = true
+        }
+
+        self.root = self.removeInternal(root, key)
+
         self.root?.isRed = false
     }
 
-    /*
-     * Returns the minimum key value of the whole tree
-     */
-    public func minValue() -> V? {
-        guard let root else {
-            return nil
-        }
-
-        return self.min(root).value
-    }
-
-    /*
-     * Returns the maximum key value of the whole tree
-     */
-    public func maxValue() -> V? {
-        guard let root else {
-            return nil
-        }
-
-        return self.max(root).value
-    }
-
-    public func allValues() -> [V] {
+    public var values: [V] {
         var result = [V]()
 
         self.traverseInorder(self.root, &result)
 
         return result
-    }
-
-    /**
-     * `floorEntry` returns the entry for the greatest key less than or equal to the
-     *  given key. If there is no such key, returns `nil`.
-     */
-    public func floorEntry(_ key: K) -> Entry<K, V>? {
-        return self.floorEntry(self.root, key)
-    }
-
-    private func floorEntry(_ node: Node<K, V>?, _ key: K) -> Entry<K, V>? {
-        guard let node else {
-            return nil
-        }
-
-        if node.key == key {
-            return node.entry
-        } else if node.key > key {
-            return self.floorEntry(node.left, key)
-        } else {
-            return self.floorEntry(node.right, key) ?? node.entry
-        }
     }
 
     private func traverseInorder(_ node: Node<K, V>?, _ result: inout [V]) {
@@ -152,195 +115,292 @@ public class LLRBTree<K: Comparable, V> {
         self.traverseInorder(node.right, &result)
     }
 
-    private func insert(_ nodeH: Node<K, V>?, _ key: K, _ value: V) -> Node<K, V> {
-        guard nodeH != nil else {
-            return Node(key, value)
-        }
+    /**
+     * `floorEntry` returns the entry for the greatest key less than or equal to the
+     *  given key. If there is no such key, returns `undefined`.
+     */
+    public func floorEntry(_ key: K) -> Entry<K, V>? {
+        var node = self.root
 
-        guard var newNodeH = nodeH else {
-            fatalError()
-        }
+        while node != nil {
+            if key > node!.key {
+                if node!.right != nil {
+                    node?.right?.parent = node
+                    node = node?.right
+                } else {
+                    return node?.entry
+                }
+            } else if key < node!.key {
+                if node!.left != nil {
+                    node?.left?.parent = node
+                    node = node?.left
+                } else {
+                    var parent = node?.parent
+                    var childNode = node
+                    while parent != nil, childNode === parent?.left {
+                        childNode = parent
+                        parent = parent!.parent
+                    }
 
-        if self.isRed(newNodeH.left), self.isRed(newNodeH.right) {
-            self.flipColors(&newNodeH)
-        }
-
-        if key == newNodeH.key {
-            newNodeH.value = value
-        } else if key < newNodeH.key {
-            newNodeH.left = self.insert(newNodeH.left, key, value)
-        } else if key > nodeH!.key {
-            newNodeH.right = self.insert(newNodeH.right, key, value)
-        }
-
-        if self.isRed(newNodeH.right), !self.isRed(newNodeH.left) {
-            newNodeH = self.rotateLeft(newNodeH)
-        }
-        if self.isRed(newNodeH.left), self.isRed(newNodeH.left?.left) {
-            newNodeH = self.rotateRight(newNodeH)
-        }
-
-        return newNodeH
-    }
-
-    private func rotateLeft(_ nodeH: Node<K, V>) -> Node<K, V> {
-        let nodeX = nodeH.right!
-
-        nodeH.right = nodeX.left
-        nodeX.left = nodeH
-        nodeX.isRed = nodeH.isRed
-        nodeH.isRed = true
-
-        return nodeX
-    }
-
-    private func rotateRight(_ nodeH: Node<K, V>) -> Node<K, V> {
-        let nodeX = nodeH.left!
-
-        nodeH.left = nodeX.right
-        nodeX.right = nodeH
-        nodeX.isRed = nodeH.isRed
-        nodeH.isRed = true
-
-        return nodeX
-    }
-
-    private func flipColors(_ nodeH: inout Node<K, V>) {
-        nodeH.isRed = !nodeH.isRed
-        nodeH.left?.isRed = !nodeH.left!.isRed
-        nodeH.right?.isRed = !nodeH.right!.isRed
-    }
-
-    private func delete(_ nodeH: Node<K, V>, _ key: K) -> Node<K, V>? {
-        var newNodeH = nodeH
-
-        if key < newNodeH.key {
-            if !self.isRed(newNodeH.left), !self.isRed(newNodeH.left?.left) {
-                newNodeH = self.moveRedLeft(newNodeH)
-            }
-            newNodeH.left = self.delete(newNodeH.left!, key)
-        } else {
-            if self.isRed(newNodeH.left) {
-                newNodeH = self.rotateRight(newNodeH)
-            }
-            if key == newNodeH.key, newNodeH.right == nil {
-                return nil
-            }
-            if !self.isRed(newNodeH.right), !self.isRed(newNodeH.right?.left) {
-                newNodeH = self.moveRedRight(newNodeH)
-            }
-            if key == newNodeH.key {
-                let minNode = self.min(newNodeH.right!)
-                newNodeH.value = minNode.value
-                newNodeH.key = minNode.key
-                newNodeH.right = self.deleteMin(newNodeH.right!)
+                    return parent?.entry
+                }
             } else {
-                newNodeH.right = self.delete(newNodeH.right!, key)
+                return node?.entry
             }
         }
-
-        return self.fixUp(newNodeH)
+        return nil
     }
 
-    private func min(_ nodeH: Node<K, V>) -> Node<K, V> {
-        if nodeH.left == nil {
-            return nodeH
-        }
-
-        return self.min(nodeH.left!)
-    }
-
-    private func max(_ nodeH: Node<K, V>) -> Node<K, V> {
-        if nodeH.right == nil {
-            return nodeH
-        }
-
-        return self.max(nodeH.right!)
-    }
-
-    private func deleteMin(_ nodeH: Node<K, V>) -> Node<K, V>? {
-        if nodeH.left == nil {
+    /**
+     * `lastEntry` returns last entry of LLRBTree.
+     */
+    public func lastEntry() -> Entry<K, V>? {
+        if self.root == nil {
             return nil
         }
 
-        var newNodeH = nodeH
-
-        if !self.isRed(newNodeH.left), !self.isRed(newNodeH.left?.left) {
-            newNodeH = self.moveRedLeft(newNodeH)
+        var node = self.root
+        while node?.right != nil {
+            node = node?.right
         }
-
-        newNodeH.left = self.deleteMin(newNodeH.left!)
-
-        return self.fixUp(newNodeH)
+        return node?.entry
     }
 
-    private func moveRedLeft(_ nodeH: Node<K, V>) -> Node<K, V> {
-        var newNodeH = nodeH
-
-        self.flipColors(&newNodeH)
-        if self.isRed(newNodeH.right?.left) {
-            newNodeH.right = self.rotateRight(newNodeH.right!)
-            newNodeH = self.rotateLeft(newNodeH)
-            self.flipColors(&newNodeH)
-        }
-
-        return newNodeH
+    /**
+     * `size` is a size of LLRBTree.
+     */
+    public var size: Int {
+        self.counter
     }
 
-    private func moveRedRight(_ nodeH: Node<K, V>) -> Node<K, V> {
-        var newNodeH = nodeH
-
-        self.flipColors(&newNodeH)
-        if self.isRed(newNodeH.left?.left) {
-            newNodeH = self.rotateRight(newNodeH)
-            self.flipColors(&newNodeH)
-        }
-
-        return newNodeH
+    /**
+     * `isEmpty` checks if size is empty.
+     */
+    public var isEmpty: Bool {
+        self.counter == 0
     }
 
-    private func isRed(_ nodeH: Node<K, V>?) -> Bool {
-        nodeH?.isRed ?? false
+    public var minValue: V? {
+        guard let root else {
+            return nil
+        }
+
+        return self.min(root).value
     }
 
-    private func fixUp(_ nodeH: Node<K, V>) -> Node<K, V> {
-        var newNodeH = nodeH
-        if self.isRed(newNodeH.right) {
-            newNodeH = self.rotateLeft(newNodeH)
+    public var maxValue: V? {
+        guard let root else {
+            return nil
         }
 
-        if self.isRed(nodeH.left), self.isRed(nodeH.left?.left) {
-            newNodeH = self.rotateRight(newNodeH)
+        return self.max(root).value
+    }
+
+    private func getInternal(_ key: K, _ node: Node<K, V>?) -> Node<K, V>? {
+        var node = node
+
+        while node != nil {
+            if key == node!.key {
+                return node
+            } else if key < node!.key {
+                node = node?.left
+            } else if key > node!.key {
+                node = node?.right
+            }
         }
 
-        if self.isRed(newNodeH.left), self.isRed(newNodeH.right) {
-            self.flipColors(&newNodeH)
+        return nil
+    }
+
+    private func putInternal(_ key: K, _ value: V, _ node: Node<K, V>?) -> Node<K, V> {
+        var node = node
+
+        if node == nil {
+            self.counter += 1
+            return Node(key, value, true)
         }
 
-        return newNodeH
+        if key < node!.key {
+            node?.left = self.putInternal(key, value, node!.left)
+        } else if key > node!.key {
+            node?.right = self.putInternal(key, value, node!.right)
+        } else {
+            node?.value = value
+        }
+
+        if self.isRed(node?.right), !self.isRed(node?.left) {
+            node = self.rotateLeft(node!)
+        }
+
+        if self.isRed(node?.left), self.isRed(node?.left?.left) {
+            node = self.rotateRight(node!)
+        }
+
+        if self.isRed(node?.left), self.isRed(node?.right) {
+            self.flipColors(&node!)
+        }
+
+        return node!
+    }
+
+    private func removeInternal(_ node: Node<K, V>, _ key: K) -> Node<K, V>? {
+        var node = node
+
+        if key < node.key {
+            if !self.isRed(node.left), !self.isRed(node.left?.left) {
+                node = self.moveRedLeft(node)
+            }
+            node.left = self.removeInternal(node.left!, key)
+        } else {
+            if self.isRed(node.left) {
+                node = self.rotateRight(node)
+            }
+
+            if key == node.key, node.right == nil {
+                self.counter -= 1
+                return nil
+            }
+
+            if !self.isRed(node.right), !self.isRed(node.right?.left) {
+                node = self.moveRedRight(node)
+            }
+
+            if key == node.key {
+                self.counter -= 1
+                let smallest = self.min(node.right!)
+                node.value = smallest.value
+                node.key = smallest.key
+                node.right = self.removeMin(node.right!)
+            } else {
+                node.right = self.removeInternal(node.right!, key)
+            }
+        }
+
+        return self.fixUp(node)
+    }
+
+    private func min(_ node: Node<K, V>) -> Node<K, V> {
+        if node.left == nil {
+            return node
+        } else {
+            return self.min(node.left!)
+        }
+    }
+
+    private func max(_ node: Node<K, V>) -> Node<K, V> {
+        if node.right == nil {
+            return node
+        } else {
+            return self.max(node.right!)
+        }
+    }
+
+    private func removeMin(_ node: Node<K, V>) -> Node<K, V>? {
+        var node = node
+
+        if node.left == nil {
+            return nil
+        }
+
+        if !self.isRed(node.left), !self.isRed(node.left?.left) {
+            node = self.moveRedLeft(node)
+        }
+
+        node.left = self.removeMin(node.left!)
+
+        return self.fixUp(node)
+    }
+
+    private func fixUp(_ node: Node<K, V>) -> Node<K, V> {
+        var node = node
+
+        if self.isRed(node.right) {
+            node = self.rotateLeft(node)
+        }
+
+        if self.isRed(node.left), self.isRed(node.left?.left) {
+            node = self.rotateRight(node)
+        }
+
+        if self.isRed(node.left), self.isRed(node.right) {
+            self.flipColors(&node)
+        }
+
+        return node
+    }
+
+    private func moveRedLeft(_ node: Node<K, V>) -> Node<K, V> {
+        var node = node
+
+        self.flipColors(&node)
+        if self.isRed(node.right?.left) {
+            node.right = self.rotateRight(node.right!)
+            node = self.rotateLeft(node)
+            self.flipColors(&node)
+        }
+        return node
+    }
+
+    private func moveRedRight(_ node: Node<K, V>) -> Node<K, V> {
+        var node = node
+
+        self.flipColors(&node)
+        if self.isRed(node.left?.left) {
+            node = self.rotateRight(node)
+            self.flipColors(&node)
+        }
+        return node
+    }
+
+    private func isRed(_ node: Node<K, V>?) -> Bool {
+        node?.isRed ?? false
+    }
+
+    private func rotateLeft(_ node: Node<K, V>) -> Node<K, V> {
+        let nodeX = node.right!
+        node.right = nodeX.left
+        nodeX.left = node
+        nodeX.isRed = nodeX.left?.isRed ?? false
+        nodeX.left?.isRed = true
+        return nodeX
+    }
+
+    private func rotateRight(_ node: Node<K, V>) -> Node<K, V> {
+        let nodeX = node.left!
+        node.left = nodeX.right
+        nodeX.right = node
+        nodeX.isRed = nodeX.right?.isRed ?? false
+        nodeX.right?.isRed = true
+        return nodeX
+    }
+
+    private func flipColors(_ node: inout Node<K, V>) {
+        node.isRed = !node.isRed
+        node.left!.isRed = !node.left!.isRed
+        node.right!.isRed = !node.right!.isRed
     }
 
     func printNode() {
         print(">>>>>>>>>>>>>>>>>>")
-        self.print2DUtil(self.root, 0)
+        self.print2DUtil(self.root, 0, "-")
         print("<<<<<<<<<<<<<<<<<<")
     }
 
-    func print2DUtil(_ node: Node<K, V>?, _ space: Int) {
+    func print2DUtil(_ node: Node<K, V>?, _ space: Int, _ dir: String) {
         if node == nil {
             return
         }
 
         let newSpace = space + 10
 
-        self.print2DUtil(node?.right, newSpace)
+        self.print2DUtil(node?.right, newSpace, "/")
 
         var message = ""
         for _ in 0 ..< space {
             message += " "
         }
-        print("\(message)\(node.debugDescription)")
+        print("\(message)\(dir)\(node?.debugDescription ?? "")")
 
-        self.print2DUtil(node?.left, newSpace)
+        self.print2DUtil(node?.left, newSpace, "\\")
     }
 }
