@@ -36,8 +36,6 @@ final class CounterIntegrationTests: XCTestCase {
             (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
         }
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
         let age = await doc.getRoot().age as? JSONCounter<Int32>
 
         XCTAssert(age!.value == 6)
@@ -49,8 +47,6 @@ final class CounterIntegrationTests: XCTestCase {
             (root.age as! JSONCounter<Int32>).increase(value: Int32(1)).increase(value: Int32(1))
             (root.length as! JSONCounter<Int64>).increase(value: Int64(3)).increase(value: Int64(1))
         }
-
-        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         result = await doc.toSortedJSON()
         XCTAssert(result == "{\"age\":8,\"length\":17}")
@@ -75,8 +71,8 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, false)
-        try await self.c2.attach(self.d2, false)
+        try await self.c1.attach(self.d1, true)
+        try await self.c2.attach(self.d2, true)
 
         await self.d1.update { root in
             root.age = JSONCounter(value: Int32(1))
@@ -86,7 +82,9 @@ final class CounterIntegrationTests: XCTestCase {
             root.length = JSONCounter(value: Int64(10))
         }
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        try await self.c1.sync()
+        try await self.c2.sync()
+        try await self.c1.sync()
 
         var result1 = await self.d1.toSortedJSON()
         var result2 = await self.d2.toSortedJSON()
@@ -98,12 +96,13 @@ final class CounterIntegrationTests: XCTestCase {
             (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
         }
 
-        try await Task.sleep(nanoseconds: 2_000_000_000)
+        try await self.c1.sync()
+        try await self.c2.sync()
 
         result1 = await self.d1.toSortedJSON()
         result2 = await self.d2.toSortedJSON()
 
-        XCTAssert(result1 == result2)
+        XCTAssertEqual(result1, result2)
 
         try await self.c1.detach(self.d1)
         try await self.c2.detach(self.d2)
@@ -136,7 +135,8 @@ final class CounterIntegrationTests: XCTestCase {
             (root.counts as! JSONArray).append(JSONCounter(value: Int32(10)))
         }
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        try await self.c1.sync()
+        try await self.c2.sync()
 
         var result1 = await self.d1.toSortedJSON()
         var result2 = await self.d2.toSortedJSON()
@@ -149,7 +149,8 @@ final class CounterIntegrationTests: XCTestCase {
             ((root.counts as! JSONArray)[1] as! JSONCounter<Int32>).increase(value: Int32(3))
         }
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        try await self.c1.sync()
+        try await self.c2.sync()
 
         result1 = await self.d1.toSortedJSON()
         result2 = await self.d2.toSortedJSON()
