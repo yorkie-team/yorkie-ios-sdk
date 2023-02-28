@@ -60,7 +60,7 @@ final class CounterIntegrationTests: XCTestCase {
 
     func test_can_sync_counter() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
@@ -113,7 +113,7 @@ final class CounterIntegrationTests: XCTestCase {
 
     func test_can_sync_counter_with_array() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)

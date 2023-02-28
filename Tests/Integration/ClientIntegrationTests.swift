@@ -30,7 +30,7 @@ final class ClientIntegrationTests: XCTestCase {
 
     func test_can_handle_sync() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
@@ -94,7 +94,7 @@ final class ClientIntegrationTests: XCTestCase {
 
     func test_can_handle_sync_auto() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
@@ -201,7 +201,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
 
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)

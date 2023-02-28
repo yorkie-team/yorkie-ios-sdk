@@ -30,4 +30,11 @@ extension String {
 
         return String(self[range])
     }
+
+    var toDocKey: String {
+        let lower = self.lowercased()
+        let regex = try? NSRegularExpression(pattern: "[^a-z0-9-]")
+
+        return regex?.stringByReplacingMatches(in: lower, options: [], range: NSRange(0 ..< lower.count), withTemplate: "-").substring(from: 0, to: 120) ?? ""
+    }
 }
