@@ -176,6 +176,10 @@ public class JSONText {
         self.text?.plainText ?? ""
     }
 
+    public var count: Int {
+        self.plainText.count
+    }
+
     /**
      * `values` returns values of this text.
      */
