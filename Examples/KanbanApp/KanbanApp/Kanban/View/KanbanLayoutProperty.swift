@@ -20,8 +20,8 @@ enum KanbanLayoutProperty {
     static let background: UIColor = .init(hex: "#3b5998")
     static let columnBackground: UIColor = .init(hex: "#f7f7f7")
     static let cellSidePadding: CGFloat = 10
-    static let columnTitleFont: UIFont = UIFont.boldSystemFont(ofSize: 17)
-    static let labelFont: UIFont = UIFont.systemFont(ofSize: 15)
+    static let columnTitleFont: UIFont = .boldSystemFont(ofSize: 17)
+    static let labelFont: UIFont = .systemFont(ofSize: 15)
     static let labelHeight: CGFloat = 50
     static let labelPadding: CGFloat = 10
     static let trashButtonWidth: CGFloat = 30
