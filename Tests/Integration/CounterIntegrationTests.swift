@@ -71,8 +71,8 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, true)
-        try await self.c2.attach(self.d2, true)
+        try await self.c1.attach(self.d1, false)
+        try await self.c2.attach(self.d2, false)
 
         await self.d1.update { root in
             root.age = JSONCounter(value: Int32(1))

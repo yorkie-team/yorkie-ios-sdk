@@ -137,9 +137,21 @@ class TextViewModel {
                     let fromIdx = range.location
                     let toIdx = range.location + range.length
 
+                    guard content.plainText.count > fromIdx, content.plainText.count > toIdx else {
+                        return
+                    }
+
                     content.select(fromIdx, toIdx)
                 }
             }
         }
+    }
+
+    func pause() async {
+        try! await self.client.pause(self.document)
+    }
+
+    func resume() async {
+        try! await self.client.resume(self.document)
     }
 }
