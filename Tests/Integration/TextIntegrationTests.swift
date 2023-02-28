@@ -141,8 +141,8 @@ final class TextIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        var result1 = await d1.toSortedJSON()
-        var result2 = await d2.toSortedJSON()
+        let result1 = await d1.toSortedJSON()
+        let result2 = await d2.toSortedJSON()
 
         XCTAssertEqual(result1, "{\"text\":[{\"val\":\"1\"},{\"val\":\"-\"},{\"val\":\"a\"},{\"val\":\"-\"},{\"val\":\"b\"}]}")
         XCTAssertEqual(result1, result2)
