@@ -30,7 +30,7 @@ final class TextIntegrationTests: XCTestCase {
 
     func test_can_be_edit_plain_text() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
@@ -66,7 +66,7 @@ final class TextIntegrationTests: XCTestCase {
 
     func test_can_be_edit_attributed_text() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
@@ -115,7 +115,7 @@ final class TextIntegrationTests: XCTestCase {
 
     func test_should_return_correct_changes_from_remote_selection() async throws {
         let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)"
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
