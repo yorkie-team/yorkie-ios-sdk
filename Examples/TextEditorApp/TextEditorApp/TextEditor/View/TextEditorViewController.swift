@@ -21,7 +21,14 @@ import UIKit
 class TextEditorViewController: UIViewController {
     private let defaultFont = UIFont.preferredFont(forTextStyle: .body)
     private let textView: UITextView = {
-        let view = UITextView(frame: .zero)
+        let textStorage = NSTextStorage()
+        let textContainer = NSTextContainer(size: .zero)
+        textContainer.widthTracksTextView = true
+        let layoutManager = PeerSelectionDisplayLayoutManager()
+        layoutManager.addTextContainer(textContainer)
+        textStorage.addLayoutManager(layoutManager)
+
+        let view = UITextView(frame: .zero, textContainer: textContainer)
 
         view.contentInsetAdjustmentBehavior = .automatic
         view.textAlignment = .justified
@@ -35,7 +42,9 @@ class TextEditorViewController: UIViewController {
     private var model: TextViewModel?
 
     private var isTyping = false
-    private var editOperations: [TextEditOperation] = []
+
+    private var editOperations: [TextOperation] = []
+    private var peerSelection: [String: (NSRange, UIColor)] = [:]
 
     private var doneEditButton: UIBarButtonItem?
 
@@ -58,7 +67,6 @@ class TextEditorViewController: UIViewController {
         self.textView.textStorage.delegate = self
         self.textView.delegate = self
 
-        self.textView.allowsEditingTextAttributes = true
         self.textView.typingAttributes = [.font: self.defaultFont]
 
         let doneAction = UIAction { [weak self] _ in
@@ -75,12 +83,12 @@ class TextEditorViewController: UIViewController {
         super.viewWillAppear(animated)
 
         // Receive events from TextView Model.
-        let subject = PassthroughSubject<[TextEditOperation], Never>()
+        let subject = PassthroughSubject<[TextOperation], Never>()
 
         subject.sink { elements in
             Task {
                 await MainActor.run { [weak self] in
-                    self?.updateText(elements)
+                    self?.updateTextStorage(elements)
                 }
             }
         }.store(in: &self.cancellables)
@@ -97,51 +105,108 @@ class TextEditorViewController: UIViewController {
         }
     }
 
-    func updateText(_ elements: [TextEditOperation]) {
+    func updateTextStorage(_ elements: [TextOperation]) {
+        print("#### updateTextStorage \(elements)")
+
         guard elements.isEmpty == false else {
             return
         }
 
         let storage = self.textView.textStorage
-
         var selection = self.textView.isFirstResponder ? self.textView.selectedTextRange : nil
 
         storage.beginEditing()
 
         elements.forEach { element in
-            let range = element.range ?? NSRange(location: 0, length: storage.length)
+            switch element {
+            case .edit(range: let range, content: let content):
+                let range = range ?? NSRange(location: 0, length: storage.length)
 
-            storage.replaceCharacters(in: range, with: element.content)
+                storage.replaceCharacters(in: range, with: content)
 
-            if element.content.isEmpty == false {
-                let attrRange = NSRange(location: range.location, length: element.content.count)
+                if content.isEmpty == false {
+                    let attrRange = NSRange(location: range.location, length: content.count)
 
-                storage.addAttributes([.font: self.defaultFont], range: attrRange)
-                storage.fixAttributes(in: attrRange)
-            }
+                    storage.addAttributes([.font: self.defaultFont], range: attrRange)
+                    storage.fixAttributes(in: attrRange)
+                }
 
-            // Correct cursor positon.
-            if let prev = selection {
-                let prevStartIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: prev.start)
+                let delta = content.isEmpty ? -range.length : content.count - range.length
 
-                let delta = element.content.isEmpty ? -range.length : element.content.count - range.length
+                // Correct cursor positon.
+                if let prev = selection {
+                    let prevStartIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: prev.start)
 
-                if prevStartIndex >= range.location,
-                   let newPosStart = self.textView.position(from: prev.start, offset: delta),
-                   let newPosEnd = self.textView.position(from: prev.end, offset: delta)
-                {
-                    selection = self.textView.textRange(from: newPosStart, to: newPosEnd)
+                    if prevStartIndex >= range.location,
+                       let newPosStart = self.textView.position(from: prev.start, offset: delta),
+                       let newPosEnd = self.textView.position(from: prev.end, offset: delta)
+                    {
+                        selection = self.textView.textRange(from: newPosStart, to: newPosEnd)
+                    } else {
+                        selection = nil
+                    }
+                }
+
+                // Correct peer selection position.
+                peerSelection.forEach { selection in
+                    var prevSelectRange = selection.value.0
+                    let newDocEnd = storage.length
+
+                    if newDocEnd < prevSelectRange.location {
+                        prevSelectRange = NSRange(location: 0, length: 0)
+                    } else {
+                        if prevSelectRange.location > range.location {
+                            prevSelectRange = NSRange(location: prevSelectRange.location + delta, length: prevSelectRange.length)
+                        }
+
+                        if prevSelectRange.location + prevSelectRange.length > range.location {
+                            prevSelectRange = NSRange(location: prevSelectRange.location, length: prevSelectRange.length + delta)
+                        }
+                    }
+
+                    peerSelection[selection.key] = (prevSelectRange, selection.value.1)
+                }
+
+                peerSelection = peerSelection.filter { $0.value.0.length > 0 }
+
+            case .select(let range, let actorID):
+
+                print("#### select \(range) \(self.textView.textStorage.length)")
+
+                let newColor = UIColor(red: CGFloat.random(in: 0 ... 1), green: CGFloat.random(in: 0 ... 1), blue: CGFloat.random(in: 0 ... 1), alpha: 0.2)
+
+                if let color = peerSelection[actorID]?.1 {
+                    peerSelection[actorID] = (range, color)
                 } else {
-                    selection = nil
+                    peerSelection[actorID] = (range, newColor)
                 }
             }
         }
+
+        self.redrawPeerSelections()
 
         storage.endEditing()
 
         // Must change selectedTextRange after endEditing()
         if let selection {
             self.textView.selectedTextRange = selection
+        }
+    }
+
+    func redrawPeerSelections() {
+        let storage = self.textView.textStorage
+
+        self.peerSelection.forEach { key, value in
+            let key = PeerSelectionDisplayLayoutManager.createKey(key)
+            let allRange = NSRange(location: 0, length: storage.length)
+
+            // The local value may be different from the value of the peer.
+            let newRange = NSIntersectionRange(allRange, value.0)
+
+            print("#### newRange \(newRange), \(value.0), \(storage.length)")
+
+            storage.removeAttribute(key, range: allRange)
+            storage.addAttribute(key, value: value.1, range: newRange)
         }
     }
 }
@@ -171,6 +236,19 @@ extension TextEditorViewController: UITextViewDelegate {
 
         return true
     }
+
+    func textViewDidChangeSelection(_ textView: UITextView) {
+        if let selectedTextRange = textView.selectedTextRange {
+            let fromIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: selectedTextRange.start)
+            let toIndex = self.textView.offset(from: self.textView.beginningOfDocument, to: selectedTextRange.end)
+
+            print("#### \(fromIndex), \(toIndex)")
+
+            Task { [weak self] in
+                await self?.model?.edit([.select(range: NSRange(location: fromIndex, length: toIndex - fromIndex), actorID: "")])
+            }
+        }
+    }
 }
 
 extension TextEditorViewController: NSTextStorageDelegate {
@@ -189,7 +267,7 @@ extension TextEditorViewController: NSTextStorageDelegate {
 
                 print("Char changed ... \(rangeParameter) [\(changedString)]")
 
-                self.editOperations.append(TextEditOperation(range: rangeParameter, content: changedString))
+                self.editOperations.append(.edit(range: rangeParameter, content: changedString))
             }
         }
 

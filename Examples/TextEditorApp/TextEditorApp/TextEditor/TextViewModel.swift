@@ -19,9 +19,9 @@ import Foundation
 import UIKit
 import Yorkie
 
-struct TextEditOperation {
-    let range: NSRange?
-    let content: String
+enum TextOperation {
+    case edit(range: NSRange?, content: String)
+    case select(range: NSRange, actorID: String)
 }
 
 class TextViewModel {
@@ -30,9 +30,9 @@ class TextViewModel {
     private let document: Document
     private var textEventStream = PassthroughSubject<[TextChange], Never>()
 
-    private weak var operationSubject: PassthroughSubject<[TextEditOperation], Never>?
+    private weak var operationSubject: PassthroughSubject<[TextOperation], Never>?
 
-    init(_ operationSubject: PassthroughSubject<[TextEditOperation], Never>) {
+    init(_ operationSubject: PassthroughSubject<[TextOperation], Never>) {
         self.operationSubject = operationSubject
 
         // create client with RPCAddress.
@@ -70,7 +70,7 @@ class TextViewModel {
 
             // define event handler that apply remote changes to local
             textEventStream.sink { [weak self] events in
-                var textChanges = [TextEditOperation]()
+                var textChanges = [TextOperation]()
 
                 events.filter { $0.actor != clientID }.forEach {
                     switch $0.type {
@@ -78,15 +78,25 @@ class TextViewModel {
                         let range = NSRange(location: $0.from, length: $0.to - $0.from)
                         let content = $0.content ?? ""
 
-                        textChanges.append(TextEditOperation(range: range, content: content))
+                        textChanges.append(.edit(range: range, content: content))
                     case .style:
                         break
                     case .selection:
-                        break
+                        let range: NSRange
+
+                        if $0.from <= $0.to {
+                            range = NSRange(location: $0.from, length: $0.to - $0.from)
+                        } else {
+                            range = NSRange(location: $0.to, length: $0.from - $0.to)
+                        }
+
+                        textChanges.append(.select(range: range, actorID: $0.actor))
                     }
                 }
 
-                self?.operationSubject?.send(textChanges)
+                if textChanges.isEmpty == false {
+                    self?.operationSubject?.send(textChanges)
+                }
 
             }.store(in: &self.cancellables)
 
@@ -99,7 +109,7 @@ class TextViewModel {
     func syncText() async {
         let context = (await self.document.getRoot().content as? JSONText)?.plainText ?? ""
 
-        self.operationSubject?.send([TextEditOperation(range: nil, content: context)])
+        self.operationSubject?.send([.edit(range: nil, content: context)])
     }
 
     func cleanup() async {
@@ -107,17 +117,27 @@ class TextViewModel {
         try! await self.client.deactivate()
     }
 
-    func edit(_ operaitions: [TextEditOperation]) async {
+    func edit(_ operaitions: [TextOperation]) async {
         await self.document.update { root in
-            for oper in operaitions {
-                guard let range = oper.range else {
-                    return
-                }
+            guard let content = root.content as? JSONText else {
+                return
+            }
 
-                let toIdx = range.location + range.length
+            for operation in operaitions {
+                switch operation {
+                case .edit(let range, let contentString):
+                    guard let range = range else {
+                        return
+                    }
 
-                if let content = root.content as? JSONText {
-                    content.edit(range.location, toIdx, oper.content)
+                    let toIdx = range.location + range.length
+
+                    content.edit(range.location, toIdx, contentString)
+                case .select(let range, _):
+                    let fromIdx = range.location
+                    let toIdx = range.location + range.length
+
+                    content.select(fromIdx, toIdx)
                 }
             }
         }

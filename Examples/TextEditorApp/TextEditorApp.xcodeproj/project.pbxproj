@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		9A15BB13298BDA130072612B /* TextViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A15BB12298BDA130072612B /* TextViewModel.swift */; };
 		9A15C90F2995DFF800E7EAE7 /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 9A15C90E2995DFF800E7EAE7 /* Yorkie */; };
+		9A636A2F29A6F4FB006C1A23 /* PeerSelectionDisplayLayoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A636A2E29A6F4FB006C1A23 /* PeerSelectionDisplayLayoutManager.swift */; };
 		9AEA80EC297134A1000672FC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80EB297134A1000672FC /* AppDelegate.swift */; };
 		9AEA80EE297134A1000672FC /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80ED297134A1000672FC /* SceneDelegate.swift */; };
 		9AEA80F0297134A1000672FC /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80EF297134A1000672FC /* ViewController.swift */; };
@@ -20,6 +21,7 @@
 
 /* Begin PBXFileReference section */
 		9A15BB12298BDA130072612B /* TextViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewModel.swift; sourceTree = "<group>"; };
+		9A636A2E29A6F4FB006C1A23 /* PeerSelectionDisplayLayoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerSelectionDisplayLayoutManager.swift; sourceTree = "<group>"; };
 		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
 		9AEA80E8297134A1000672FC /* TextEditorApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TextEditorApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9AEA80EB297134A1000672FC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				9AEA810129713DBB000672FC /* TextEditorViewController.swift */,
+				9A636A2E29A6F4FB006C1A23 /* PeerSelectionDisplayLayoutManager.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -186,6 +189,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9AEA810229713DBB000672FC /* TextEditorViewController.swift in Sources */,
+				9A636A2F29A6F4FB006C1A23 /* PeerSelectionDisplayLayoutManager.swift in Sources */,
 				9AEA80F0297134A1000672FC /* ViewController.swift in Sources */,
 				9AEA80EC297134A1000672FC /* AppDelegate.swift in Sources */,
 				9A15BB13298BDA130072612B /* TextViewModel.swift in Sources */,
