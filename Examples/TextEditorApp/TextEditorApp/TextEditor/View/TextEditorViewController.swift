@@ -42,12 +42,12 @@ class TextEditorViewController: UIViewController {
     private var model: TextViewModel?
 
     private var isTyping = false
-    private var isHangulJamo = false
-    private var isComposition = false {
+    private var isHangulJamoTyping = false
+    private var isCompositioning = false {
         didSet {
-            if oldValue != self.isComposition {
+            if oldValue != self.isCompositioning {
                 Task {
-                    if isComposition {
+                    if isCompositioning {
                         await model?.pause()
                     } else {
                         await model?.resume()
@@ -229,18 +229,18 @@ class TextEditorViewController: UIViewController {
 extension TextEditorViewController: UITextViewDelegate {
     func textViewDidBeginEditing(_: UITextView) {
         self.doneEditButton?.isEnabled = true
-        self.isComposition = false
+        self.isCompositioning = false
     }
 
     func textViewDidEndEditing(_: UITextView) {
         self.doneEditButton?.isEnabled = false
-        self.isComposition = false
+        self.isCompositioning = false
     }
 
     func textViewDidChange(_: UITextView) {
-        let isMultiStage = self.textView.markedTextRange != nil
+        let isMultiStageInput = self.textView.markedTextRange != nil
 
-        self.isComposition = (self.isHangulJamo || isMultiStage)
+        self.isCompositioning = (self.isHangulJamoTyping || isMultiStageInput)
 
         self.isTyping = false
 
@@ -256,15 +256,14 @@ extension TextEditorViewController: UITextViewDelegate {
         let str = text as NSString
 
         self.isTyping = true
-        self.isHangulJamo = false
+        self.isHangulJamoTyping = false
 
-        for index in 0 ..< str.length {
-            let oneCode = str.character(at: index)
+        if str.length == 1 {
+            let firstCharacter = str.character(at: 0)
 
             // Hangul Compatibility Jamo
-            if oneCode >= 0x3131 && oneCode <= 0x318F {
-                self.isHangulJamo = true
-                break
+            if firstCharacter > 0x3130 && firstCharacter < 0x318F {
+                self.isHangulJamoTyping = true
             }
         }
 
@@ -304,12 +303,12 @@ extension TextEditorViewController: NSTextStorageDelegate {
                 self.editOperations.append(.edit(range: rangeParameter, content: changedString))
 
                 if changedString.isEmpty == false {
-                    let oneCode = (changedString as NSString).character(at: 0)
+                    let firstCharacter = (changedString as NSString).character(at: 0)
                     // Hangul Compatibility vowels.
-                    if oneCode >= 0x314F && oneCode <= 0x3163 ||
-                        oneCode >= 0x3187 && oneCode <= 0x318E
+                    if firstCharacter >= 0x314F && firstCharacter <= 0x3163 ||
+                        firstCharacter >= 0x3187 && firstCharacter <= 0x318E
                     {
-                        self.isHangulJamo = false
+                        self.isHangulJamoTyping = false
                     }
                 }
             }
@@ -325,7 +324,7 @@ extension TextEditorViewController: UITextInputDelegate {
     func selectionWillChange(_: UITextInput?) {}
 
     func selectionDidChange(_: UITextInput?) {
-        self.isComposition = false
+        self.isCompositioning = false
     }
 
     func textWillChange(_: UITextInput?) {}
