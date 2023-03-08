@@ -42,6 +42,20 @@ class TextEditorViewController: UIViewController {
     private var model: TextViewModel?
 
     private var isTyping = false
+    private var isHangulJamoTyping = false
+    private var isCompositioning = false {
+        didSet {
+            if oldValue != self.isCompositioning {
+                Task {
+                    if isCompositioning {
+                        await model?.pause()
+                    } else {
+                        await model?.resume()
+                    }
+                }
+            }
+        }
+    }
 
     private var editOperations: [TextOperation] = []
     private var peerSelection: [String: (NSRange, UIColor)] = [:]
@@ -66,6 +80,7 @@ class TextEditorViewController: UIViewController {
 
         self.textView.textStorage.delegate = self
         self.textView.delegate = self
+        self.textView.inputDelegate = self
 
         self.textView.typingAttributes = [.font: self.defaultFont]
 
@@ -214,13 +229,19 @@ class TextEditorViewController: UIViewController {
 extension TextEditorViewController: UITextViewDelegate {
     func textViewDidBeginEditing(_: UITextView) {
         self.doneEditButton?.isEnabled = true
+        self.isCompositioning = false
     }
 
     func textViewDidEndEditing(_: UITextView) {
         self.doneEditButton?.isEnabled = false
+        self.isCompositioning = false
     }
 
     func textViewDidChange(_: UITextView) {
+        let isMultiStageInput = self.textView.markedTextRange != nil
+
+        self.isCompositioning = (self.isHangulJamoTyping || isMultiStageInput)
+
         self.isTyping = false
 
         let operations = self.editOperations
@@ -232,7 +253,19 @@ extension TextEditorViewController: UITextViewDelegate {
     }
 
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        let str = text as NSString
+
         self.isTyping = true
+        self.isHangulJamoTyping = false
+
+        if str.length == 1 {
+            let firstCharacter = str.character(at: 0)
+
+            // Hangul Compatibility Jamo
+            if firstCharacter > 0x3130 && firstCharacter < 0x318F {
+                self.isHangulJamoTyping = true
+            }
+        }
 
         return true
     }
@@ -268,6 +301,16 @@ extension TextEditorViewController: NSTextStorageDelegate {
                 print("Char changed ... \(rangeParameter) [\(changedString)]")
 
                 self.editOperations.append(.edit(range: rangeParameter, content: changedString))
+
+                if changedString.isEmpty == false {
+                    let firstCharacter = (changedString as NSString).character(at: 0)
+                    // Hangul Compatibility vowels.
+                    if firstCharacter >= 0x314F && firstCharacter <= 0x3163 ||
+                        firstCharacter >= 0x3187 && firstCharacter <= 0x318E
+                    {
+                        self.isHangulJamoTyping = false
+                    }
+                }
             }
         }
 
@@ -275,4 +318,16 @@ extension TextEditorViewController: NSTextStorageDelegate {
             // TODO(humdrum): Implement attributes editing
         }
     }
+}
+
+extension TextEditorViewController: UITextInputDelegate {
+    func selectionWillChange(_: UITextInput?) {}
+
+    func selectionDidChange(_: UITextInput?) {
+        self.isCompositioning = false
+    }
+
+    func textWillChange(_: UITextInput?) {}
+
+    func textDidChange(_: UITextInput?) {}
 }

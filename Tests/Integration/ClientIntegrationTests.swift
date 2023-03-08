@@ -52,8 +52,8 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, true)
-        try await self.c2.attach(self.d2, true)
+        try await self.c1.attach(self.d1, false)
+        try await self.c2.attach(self.d2, false)
 
         await self.d1.update { root in
             root.k1 = "v1"
@@ -125,8 +125,7 @@ final class ClientIntegrationTests: XCTestCase {
             root.k3 = "v3"
         }
 
-        try await self.c1.sync()
-        try await self.c2.sync()
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         var result = await d2.getRoot().get(key: "k1") as? String
         XCTAssert(result == "v1")
@@ -141,8 +140,7 @@ final class ClientIntegrationTests: XCTestCase {
             root.double = Double.pi
         }
 
-        try await self.c1.sync()
-        try await self.c2.sync()
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let resultInteger = await self.d2.getRoot().get(key: "integer") as? Int32
         XCTAssert(resultInteger == Int32.max)
@@ -159,8 +157,7 @@ final class ClientIntegrationTests: XCTestCase {
             root.date = curr
         }
 
-        try await self.c1.sync()
-        try await self.c2.sync()
+        try await Task.sleep(nanoseconds: 1_500_000_000)
 
         let resultTrue = await self.d2.getRoot().get(key: "true") as? Bool
         XCTAssert(resultTrue == true)

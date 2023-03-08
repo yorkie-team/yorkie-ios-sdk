@@ -53,7 +53,7 @@ struct Attachment {
     var doc: Document
     var isRealtimeSync: Bool
     var peerPresenceMap: [String: PresenceInfo]
-    var remoteChangeEventReceived: Bool?
+    var remoteChangeEventReceived: Bool
 }
 
 /**
@@ -288,7 +288,7 @@ public actor Client {
      *   the client will synchronize the given document.
      */
     @discardableResult
-    public func attach(_ doc: Document, _ isManualSync: Bool = false) async throws -> Document {
+    public func attach(_ doc: Document, _ isRealtimeSync: Bool = true) async throws -> Document {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -314,12 +314,12 @@ public actor Client {
             let pack = try Converter.fromChangePack(result.changePack)
             try await doc.applyChangePack(pack: pack)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, isRealtimeSync: !isManualSync, peerPresenceMap: [String: PresenceInfo]())
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, isRealtimeSync: isRealtimeSync, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
             self.runWatchLoop()
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
 
-            if isManualSync == false {
+            if isRealtimeSync {
                 try await self.waitForInitialization(semaphore, docKey)
             }
 
@@ -371,6 +371,32 @@ public actor Client {
             Logger.error("Failed to request detach document(\(self.key)).", error: error)
             throw error
         }
+    }
+
+    /**
+     * `pause` pause the realtime syncronization of the given document.
+     */
+    public func pause(_ doc: Document) throws {
+        try self.changeRealtimeSyncSetting(doc, false)
+    }
+
+    /**
+     * `resume` resume the realtime syncronization of the given document.
+     */
+    public func resume(_ doc: Document) throws {
+        try self.changeRealtimeSyncSetting(doc, true)
+    }
+
+    private func changeRealtimeSyncSetting(_ doc: Document, _ isRealtimeSync: Bool) throws {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        guard self.attachmentMap[doc.getKey()] != nil else {
+            throw YorkieError.unexpected(message: "Can't find attachment by docKey! [\(doc.getKey())]")
+        }
+
+        self.attachmentMap[doc.getKey()]?.isRealtimeSync = isRealtimeSync
     }
 
     /**
@@ -495,7 +521,7 @@ public actor Client {
                 for (key, attachment) in self.attachmentMap where attachment.isRealtimeSync {
                     let docChanged = await attachment.doc.hasLocalChanges()
 
-                    if docChanged || attachment.remoteChangeEventReceived ?? false {
+                    if docChanged || attachment.remoteChangeEventReceived {
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
                             try await self.syncInternal(attachment.doc)
