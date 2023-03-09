@@ -221,12 +221,14 @@ final class ClientIntegrationTests: XCTestCase {
             PeersChangedValue(type: .initialized, peers: [docKey: [c1ActorID: PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary,
                                                                    c2ActorID: PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
             PeersChangedValue(type: .presenceChanged, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
-            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c2ActorID: PresenceType(name: "c2+", cursor: Cursor(x: 1, y: 1)).createdDictionary]])
+            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c2ActorID: PresenceType(name: "c2+", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
+            PeersChangedValue(type: .unwatched, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]])
         ]
 
         c1.eventStream.sink { event in
             switch event {
             case let event as PeerChangedEvent:
+                print("#### c1 \(event)")
                 XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
                 c1NumberOfEvents += 1
             default:
@@ -237,6 +239,7 @@ final class ClientIntegrationTests: XCTestCase {
         c2.eventStream.sink { event in
             switch event {
             case let event as PeerChangedEvent:
+                print("#### c2 \(event)")
                 XCTAssertEqual(event.value, c2ExpectedValues[c2NumberOfEvents])
                 c2NumberOfEvents += 1
 
@@ -274,6 +277,10 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssert(c1Peer.isEqual(to: c2Peer))
 
         try await c1.detach(d1)
+
+        // Keep the watchLoop of c2 for catch the detach event of c1.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
         try await c2.detach(d2)
 
         try await c1.deactivate()
