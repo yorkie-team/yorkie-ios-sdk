@@ -655,8 +655,7 @@ public actor Client {
                     }
                 } catch {
                     if let status = error as? GRPCStatus, status.code == .cancelled {
-                        // End.
-                        print("Done.")
+                        // Canceled by Client by detach. so there is No need to reconnect.
                     } else {
                         Logger.warning("[WL] c:\"\(self.key)\" has Error \(error)")
 
