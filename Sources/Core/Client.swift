@@ -162,7 +162,7 @@ public actor Client {
 
     private let rpcClient: YorkieServiceAsyncClient
     private var watchLoopReconnectTimer: Timer?
-    private var watchLoopTask: Task<Void, Never>?
+    private var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentsRequest, WatchDocumentsResponse>?
 
     private let group: EventLoopGroup
 
@@ -261,8 +261,9 @@ public actor Client {
             return
         }
 
-        self.watchLoopTask?.cancel()
-        self.watchLoopTask = nil
+        if self.remoteWatchStream != nil {
+            self.disconnectWatchStream()
+        }
 
         var deactivateRequest = DeactivateClientRequest()
 
@@ -568,7 +569,7 @@ public actor Client {
     }
 
     private func setSyncTimer(_ reconnect: Bool) {
-        let syncLoopDuration = (reconnect || self.watchLoopTask == nil) ? self.reconnectStreamDelay : self.syncLoopDuration
+        let syncLoopDuration = (reconnect || self.remoteWatchStream == nil) ? self.reconnectStreamDelay : self.syncLoopDuration
 
         let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
             Task {
@@ -618,8 +619,7 @@ public actor Client {
     }
 
     private func doWatchLoop() {
-        self.watchLoopTask?.cancel()
-        self.watchLoopTask = nil
+        self.disconnectWatchStream()
 
         self.watchLoopReconnectTimer?.invalidate()
         self.watchLoopReconnectTimer = nil
@@ -642,24 +642,26 @@ public actor Client {
         request.client = Converter.toClient(id: id, presence: self.presenceInfo)
         request.documentKeys = realtimeSyncDocKeys
 
-        let stream = self.rpcClient.watchDocuments(request)
+        self.remoteWatchStream = self.rpcClient.makeWatchDocumentsCall(request)
 
         let event = StreamConnectionStatusChangedEvent(value: .connected)
         self.eventStream.send(event)
 
-        self.watchLoopTask = Task {
-            do {
-                for try await response in stream {
-                    self.handleWatchDocumentsResponse(docKeys: realtimeSyncDocKeys, response: response)
-                }
-            } catch {
-                switch error {
-                case is CancellationError:
-                    break
-                default:
-                    Logger.warning("[WL] c:\"\(self.key)\" has Error \(error)")
+        Task {
+            if let stream = remoteWatchStream?.responseStream {
+                do {
+                    for try await response in stream {
+                        self.handleWatchDocumentsResponse(docKeys: realtimeSyncDocKeys, response: response)
+                    }
+                } catch {
+                    if let status = error as? GRPCStatus, status.code == .cancelled {
+                        // End.
+                        print("Done.")
+                    } else {
+                        Logger.warning("[WL] c:\"\(self.key)\" has Error \(error)")
 
-                    self.onStreamDisconnect()
+                        self.onStreamDisconnect()
+                    }
                 }
             }
         }
@@ -709,37 +711,32 @@ public actor Client {
             let publisher = pbWatchEvent.publisher.id.toHexString
             let presence = Converter.fromPresence(pbPresence: pbWatchEvent.publisher.presence)
 
-            for key in responseKeys {
+            for docKey in responseKeys {
                 switch pbWatchEvent.type {
                 case .documentsWatched:
-                    self.attachmentMap[key]?.peerPresenceMap[publisher] = presence
+                    self.attachmentMap[docKey]?.peerPresenceMap[publisher] = presence
+
+                    self.sendPeerChangeEvent(.watched, responseKeys, publisher)
                 case .documentsUnwatched:
-                    self.attachmentMap[key]?.peerPresenceMap.removeValue(forKey: publisher)
+                    self.sendPeerChangeEvent(.unwatched, responseKeys, publisher)
+
+                    self.attachmentMap[docKey]?.peerPresenceMap.removeValue(forKey: publisher)
                 case .documentsChanged:
-                    self.attachmentMap[key]?.remoteChangeEventReceived = true
+                    self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+
+                    let event = DocumentsChangedEvent(value: responseKeys)
+                    self.eventStream.send(event)
                 case .presenceChanged:
-                    if let peerPresence = self.attachmentMap[key]?.peerPresenceMap[publisher], peerPresence.clock > presence.clock {
+                    if let peerPresence = self.attachmentMap[docKey]?.peerPresenceMap[publisher], peerPresence.clock > presence.clock {
                         break
                     }
 
-                    self.attachmentMap[key]?.peerPresenceMap[publisher] = presence
+                    self.attachmentMap[docKey]?.peerPresenceMap[publisher] = presence
+
+                    self.sendPeerChangeEvent(.presenceChanged, responseKeys, publisher)
                 case .UNRECOGNIZED:
                     break
                 }
-            }
-
-            switch pbWatchEvent.type {
-            case .documentsChanged:
-                let event = DocumentsChangedEvent(value: responseKeys)
-                self.eventStream.send(event)
-            case .documentsWatched:
-                self.sendPeerChangeEvent(.watched, responseKeys, publisher)
-            case .documentsUnwatched:
-                self.sendPeerChangeEvent(.unwatched, responseKeys, publisher)
-            case .presenceChanged:
-                self.sendPeerChangeEvent(.presenceChanged, responseKeys, publisher)
-            case .UNRECOGNIZED:
-                break
             }
         }
     }
@@ -753,9 +750,18 @@ public actor Client {
         self.eventStream.send(event)
     }
 
+    private func disconnectWatchStream() {
+        self.remoteWatchStream?.cancel()
+        self.remoteWatchStream = nil
+
+        Logger.debug("[WD] c:\"\(self.key)\" unwatches")
+
+        let event = StreamConnectionStatusChangedEvent(value: .disconnected)
+        self.eventStream.send(event)
+    }
+
     private func onStreamDisconnect() {
-        self.watchLoopTask?.cancel()
-        self.watchLoopTask = nil
+        self.disconnectWatchStream()
 
         self.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
             Task {
@@ -766,9 +772,6 @@ public actor Client {
         if let watchLoopReconnectTimer = self.watchLoopReconnectTimer {
             RunLoop.main.add(watchLoopReconnectTimer, forMode: .common)
         }
-
-        let event = StreamConnectionStatusChangedEvent(value: .disconnected)
-        self.eventStream.send(event)
     }
 
     @discardableResult
