@@ -200,19 +200,35 @@ final class ClientIntegrationTests: XCTestCase {
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
+        let c1ActorID = await c1.id!
+        let c2ActorID = await c2.id!
+
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
-
-        try await c1.attach(d1)
-        try await c2.attach(d2)
 
         var c1Name = "c1"
         var c2Name = "c2"
 
+        var c1NumberOfEvents = 0
+        var c2NumberOfEvents = 0
+        let c1ExpectedValues = [
+            PeersChangedValue(type: .initialized, peers: [docKey: [c1ActorID: PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
+            PeersChangedValue(type: .watched, peers: [docKey: [c2ActorID: PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
+            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
+            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c2ActorID: PresenceType(name: "c2+", cursor: Cursor(x: 1, y: 1)).createdDictionary]])
+        ]
+        let c2ExpectedValues = [
+            PeersChangedValue(type: .initialized, peers: [docKey: [c1ActorID: PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary,
+                                                                   c2ActorID: PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
+            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
+            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c2ActorID: PresenceType(name: "c2+", cursor: Cursor(x: 1, y: 1)).createdDictionary]])
+        ]
+
         c1.eventStream.sink { event in
             switch event {
             case let event as PeerChangedEvent:
-                print("#### c1 \(event)")
+                XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
+                c1NumberOfEvents += 1
             default:
                 break
             }
@@ -221,11 +237,16 @@ final class ClientIntegrationTests: XCTestCase {
         c2.eventStream.sink { event in
             switch event {
             case let event as PeerChangedEvent:
-                print("#### c2 \(event)")
+                XCTAssertEqual(event.value, c2ExpectedValues[c2NumberOfEvents])
+                c2NumberOfEvents += 1
+
             default:
                 break
             }
         }.store(in: &self.cancellables)
+
+        try await c1.attach(d1)
+        try await c2.attach(d2)
 
         c1Name = "c1+"
         try await c1.updatePresence("name", c1Name)
