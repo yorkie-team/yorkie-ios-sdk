@@ -691,7 +691,7 @@ public actor Client {
                     self.attachmentMap[docID]?.peerPresenceMap[pbClient.id.toHexString] = Converter.fromPresence(pbPresence: pbClient.presence)
                 }
 
-                semaphoresForInitialzation[docID]?.signal()
+                self.semaphoresForInitialzation[docID]?.signal()
             }
 
             let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))

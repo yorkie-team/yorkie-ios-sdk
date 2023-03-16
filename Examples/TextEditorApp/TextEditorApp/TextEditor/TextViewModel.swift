@@ -49,7 +49,7 @@ class TextViewModel {
             // attach the document into the client.
             try! await self.client.attach(self.document)
 
-            await self.document.update { root in
+            try await self.document.update { root in
                 var text = root.content as? JSONText
                 if text == nil {
                     root.content = JSONText()
@@ -69,7 +69,7 @@ class TextViewModel {
             }.store(in: &self.cancellables)
 
             // define event handler that apply remote changes to local
-            textEventStream.sink { [weak self] events in
+            self.textEventStream.sink { [weak self] events in
                 var textChanges = [TextOperation]()
 
                 events.filter { $0.actor != clientID }.forEach {
@@ -100,7 +100,7 @@ class TextViewModel {
 
             }.store(in: &self.cancellables)
 
-            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: textEventStream)
+            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: self.textEventStream)
 
             await self.syncText()
         }
@@ -118,7 +118,7 @@ class TextViewModel {
     }
 
     func edit(_ operaitions: [TextOperation]) async {
-        await self.document.update { root in
+        try? await self.document.update { root in
             guard let content = root.content as? JSONText else {
                 return
             }

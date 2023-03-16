@@ -30,7 +30,7 @@ class PeerSelectionDisplayLayoutManager: NSLayoutManager {
             let colors = Array(attrs.filter { $0.key.rawValue.starts(with: Self.AttributeKeyPrefix) }.compactMapValues { $0 as? UIColor }.values)
 
             let tokenGlypeRange = glyphRange(forCharacterRange: subrange, actualCharacterRange: nil)
-            drawBackground(forGlyphRange: tokenGlypeRange, at: origin, colors: colors)
+            self.drawBackground(forGlyphRange: tokenGlypeRange, at: origin, colors: colors)
         }
 
         super.drawGlyphs(forGlyphRange: glyphsToShow, at: origin)

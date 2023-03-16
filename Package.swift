@@ -25,7 +25,8 @@ let package = Package(
                            .product(name: "Logging", package: "swift-log")],
             path: "Sources",
             exclude: ["Info.plist",
-                      "API/V1/Protos"]
+                      "API/V1/yorkie/v1/resources.proto",
+                      "API/V1/yorkie/v1/yorkie.proto"]
         ),
         .testTarget(
             name: "YorkieUnitTests",

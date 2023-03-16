@@ -313,7 +313,7 @@ final class CRDTText: CRDTTextElement {
             return (fromPos, fromPos)
         }
 
-        return (fromPos, try self.rgaTreeSplit.findNodePos(toIdx))
+        return try (fromPos, self.rgaTreeSplit.findNodePos(toIdx))
     }
 
     /**

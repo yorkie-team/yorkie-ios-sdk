@@ -47,10 +47,10 @@ class TextEditorViewController: UIViewController {
         didSet {
             if oldValue != self.isCompositioning {
                 Task {
-                    if isCompositioning {
-                        await model?.pause()
+                    if self.isCompositioning {
+                        await self.model?.pause()
                     } else {
-                        await model?.resume()
+                        await self.model?.resume()
                     }
                 }
             }
@@ -163,7 +163,7 @@ class TextEditorViewController: UIViewController {
                 }
 
                 // Correct peer selection position.
-                peerSelection.forEach { selection in
+                self.peerSelection.forEach { selection in
                     var prevSelectRange = selection.value.0
                     let newDocEnd = storage.length
 
@@ -179,10 +179,10 @@ class TextEditorViewController: UIViewController {
                         }
                     }
 
-                    peerSelection[selection.key] = (prevSelectRange, selection.value.1)
+                    self.peerSelection[selection.key] = (prevSelectRange, selection.value.1)
                 }
 
-                peerSelection = peerSelection.filter { $0.value.0.length > 0 }
+                self.peerSelection = self.peerSelection.filter { $0.value.0.length > 0 }
 
             case .select(let range, let actorID):
 
@@ -191,9 +191,9 @@ class TextEditorViewController: UIViewController {
                 let newColor = UIColor(red: CGFloat.random(in: 0 ... 1), green: CGFloat.random(in: 0 ... 1), blue: CGFloat.random(in: 0 ... 1), alpha: 0.2)
 
                 if let color = peerSelection[actorID]?.1 {
-                    peerSelection[actorID] = (range, color)
+                    self.peerSelection[actorID] = (range, color)
                 } else {
-                    peerSelection[actorID] = (range, newColor)
+                    self.peerSelection[actorID] = (range, newColor)
                 }
             }
         }
