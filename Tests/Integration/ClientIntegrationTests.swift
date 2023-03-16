@@ -36,14 +36,14 @@ final class ClientIntegrationTests: XCTestCase {
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
         self.d1 = Document(key: docKey)
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
         }
 
         self.d2 = Document(key: docKey)
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
@@ -55,7 +55,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k1 = "v1"
         }
 
@@ -65,7 +65,7 @@ final class ClientIntegrationTests: XCTestCase {
         var result = await d2.getRoot().get(key: "k1") as? String
         XCTAssert(result == "v1")
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k2 = "v2"
         }
 
@@ -75,7 +75,7 @@ final class ClientIntegrationTests: XCTestCase {
         result = await self.d2.getRoot().get(key: "k2") as? String
         XCTAssert(result == "v2")
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k3 = "v3"
         }
 
@@ -100,14 +100,14 @@ final class ClientIntegrationTests: XCTestCase {
         self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
         self.d1 = Document(key: docKey)
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
         }
 
         self.d2 = Document(key: docKey)
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
@@ -119,7 +119,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, true)
         try await self.c2.attach(self.d2, true)
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.k1 = "v1"
             root.k2 = "v2"
             root.k3 = "v3"
@@ -134,7 +134,7 @@ final class ClientIntegrationTests: XCTestCase {
         result = await self.d2.getRoot().get(key: "k3") as? String
         XCTAssert(result == "v3")
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.integer = Int32.max
             root.long = Int64.max
             root.double = Double.pi
@@ -151,7 +151,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         let curr = Date()
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.true = true
             root.false = false
             root.date = curr

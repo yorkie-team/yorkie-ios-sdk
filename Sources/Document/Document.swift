@@ -18,6 +18,29 @@ import Combine
 import Foundation
 
 /**
+ * `DocumentStatus` represents the status of the document.
+ */
+public enum DocumentStatus: String {
+    /**
+     * Detached means that the document is not attached to the client.
+     * The actor of the ticket is created without being assigned.
+     */
+    case detached
+
+    /**
+     * Attached means that this document is attached to the client.
+     * The actor of the ticket is created with being assigned by the client.
+     */
+    case attached
+
+    /**
+     * Removed means that this document is removed. If the document is removed,
+     * it cannot be edited.
+     */
+    case removed
+}
+
+/**
  * Presence key, value dictionary
  * Similar to an Indexable in JS SDK
  */
@@ -28,8 +51,9 @@ public typealias Presence = [String: Any]
  * of the application. And we can edit it even while offline.
  *
  */
-public actor Document {
+public actor Document: CustomDebugStringConvertible {
     private let key: String
+    private(set) var status: DocumentStatus
     private var root: CRDTRoot
     private var clone: CRDTRoot?
     private var changeID: ChangeID
@@ -40,6 +64,7 @@ public actor Document {
 
     public init(key: String) {
         self.key = key
+        self.status = .detached
         self.root = CRDTRoot()
         self.changeID = ChangeID.initial
         self.checkpoint = Checkpoint.initial
@@ -50,7 +75,11 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) {
+    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) throws {
+        guard self.status != .removed else {
+            throw YorkieError.documentRemoved(message: "\(self) is removed.")
+        }
+
         let clone = self.cloned
         let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
 
@@ -101,6 +130,11 @@ public actor Document {
             self.garbageCollect(lessThanOrEqualTo: ticket)
         }
 
+        // 04. Update the status.
+        if pack.isRemoved {
+            self.setStatus(.removed)
+        }
+
         Logger.trace("\(self.root.toJSON())")
     }
 
@@ -133,7 +167,7 @@ public actor Document {
     func createChangePack() -> ChangePack {
         let changes = self.localChanges
         let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
-        return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes)
+        return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes, isRemoved: self.status == .removed)
     }
 
     /**
@@ -287,5 +321,13 @@ public actor Document {
             }
         }
         return pathTrie.findPrefixes().map { $0.joined(separator: ".") }
+    }
+
+    public func setStatus(_ status: DocumentStatus) {
+        self.status = status
+    }
+
+    public nonisolated var debugDescription: String {
+        "[\(self.key)]"
     }
 }

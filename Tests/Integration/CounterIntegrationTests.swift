@@ -29,7 +29,7 @@ final class CounterIntegrationTests: XCTestCase {
     func test_can_be_increased_by_Counter_type() async throws {
         let doc = Document(key: "test-doc")
 
-        await doc.update { root in
+        try await doc.update { root in
             root.age = JSONCounter(value: Int32(1))
             root.length = JSONCounter(value: Int64(10))
             (root.age as! JSONCounter<Int32>).increase(value: Int32(5))
@@ -43,7 +43,7 @@ final class CounterIntegrationTests: XCTestCase {
         var result = await doc.toSortedJSON()
         XCTAssert(result == "{\"age\":6,\"length\":13}")
 
-        await doc.update { root in
+        try await doc.update { root in
             (root.age as! JSONCounter<Int32>).increase(value: Int32(1)).increase(value: Int32(1))
             (root.length as! JSONCounter<Int64>).increase(value: Int64(3)).increase(value: Int64(1))
         }
@@ -51,7 +51,7 @@ final class CounterIntegrationTests: XCTestCase {
         result = await doc.toSortedJSON()
         XCTAssert(result == "{\"age\":8,\"length\":17}")
 
-        await doc.update { root in
+        try await doc.update { root in
             (root.age as! JSONCounter<Int32>).increase(value: Int64(1))
         }
         result = await doc.toSortedJSON()
@@ -74,11 +74,11 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.age = JSONCounter(value: Int32(1))
         }
 
-        await self.d2.update { root in
+        try await self.d2.update { root in
             root.length = JSONCounter(value: Int64(10))
         }
 
@@ -91,7 +91,7 @@ final class CounterIntegrationTests: XCTestCase {
 
         XCTAssert(result1 == result2)
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             (root.age as! JSONCounter<Int32>).increase(value: Int32(5))
             (root.length as! JSONCounter<Int64>).increase(value: Int64(3))
         }
@@ -127,11 +127,11 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c1.attach(self.d1, false)
         try await self.c2.attach(self.d2, false)
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             root.counts = [JSONCounter(value: Int32(1))]
         }
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             (root.counts as! JSONArray).append(JSONCounter(value: Int32(10)))
         }
 
@@ -144,7 +144,7 @@ final class CounterIntegrationTests: XCTestCase {
         XCTAssert(result1 == result2)
         XCTAssert(result1 == "{\"counts\":[1,10]}")
 
-        await self.d1.update { root in
+        try await self.d1.update { root in
             ((root.counts as! JSONArray)[0] as! JSONCounter<Int32>).increase(value: Int32(5))
             ((root.counts as! JSONArray)[1] as! JSONCounter<Int32>).increase(value: Int32(3))
         }

@@ -31,12 +31,14 @@ typealias AttachDocumentRequest = Yorkie_V1_AttachDocumentRequest
 typealias AttachDocumentResponse = Yorkie_V1_AttachDocumentResponse
 typealias DetachDocumentRequest = Yorkie_V1_DetachDocumentRequest
 typealias DetachDocumentResponse = Yorkie_V1_DetachDocumentResponse
-typealias PushPullRequest = Yorkie_V1_PushPullRequest
-typealias PushPullResponse = Yorkie_V1_PushPullResponse
+typealias PushPullChangeRequest = Yorkie_V1_PushPullChangesRequest
+typealias PushPullChangeResponse = Yorkie_V1_PushPullChangesResponse
 typealias WatchDocumentsRequest = Yorkie_V1_WatchDocumentsRequest
 typealias WatchDocumentsResponse = Yorkie_V1_WatchDocumentsResponse
 typealias UpdatePresenceRequest = Yorkie_V1_UpdatePresenceRequest
 typealias UpdatePresenceResponse = Yorkie_V1_UpdatePresenceResponse
+typealias RemoveDocumentRequest = Yorkie_V1_RemoveDocumentRequest
+typealias RemoveDocumentResponse = Yorkie_V1_RemoveDocumentResponse
 
 typealias PbChange = Yorkie_V1_Change
 typealias PbChangeID = Yorkie_V1_ChangeID

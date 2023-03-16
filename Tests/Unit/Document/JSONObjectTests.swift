@@ -20,7 +20,7 @@ import XCTest
 class JSONObjectTests: XCTestCase {
     func test_can_set() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.set(key: "boolean", value: true)
             root.set(key: "integer", value: Int32(111))
             root.set(key: "long", value: Int64(9_999_999))
@@ -52,9 +52,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_removes() async {
+    func test_can_removes() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.boolean = true
             root.integer = Int32(111)
             root.long = Int64(9_999_999)
@@ -87,9 +87,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_set_with_dictionary() async {
+    func test_can_set_with_dictionary() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.set(["boolean": true,
                       "integer": Int32(111),
                       "long": Int64(9_999_999),
@@ -117,9 +117,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_set_with_key_and_dictionary() async {
+    func test_can_set_with_key_and_dictionary() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.set(key: "top",
                      value: ["boolean": true,
                              "integer": Int32(111),
@@ -164,9 +164,9 @@ class JSONObjectTests: XCTestCase {
         var id: Int64 = 200
     }
 
-    func test_can_insert_obejct() async {
+    func test_can_insert_obejct() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.object = JsonObejctTestType()
 
             XCTAssertEqual(root.debugDescription,
@@ -176,9 +176,9 @@ class JSONObjectTests: XCTestCase {
         }
     }
 
-    func test_can_get_by_keyPath() async {
+    func test_can_get_by_keyPath() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.object = JsonObejctTestType()
 
             XCTAssertEqual(root.debugDescription,
@@ -212,9 +212,9 @@ class JSONObjectTests: XCTestCase {
         let value: String
     }
 
-    func test_can_get_by_long_keyPath() async {
+    func test_can_get_by_long_keyPath() async throws {
         let target = Document(key: "doc1")
-        await target.update { root in
+        try await target.update { root in
             root.object = JSONObject0(first: JSONObject1(second: JSONObject2(third: JSONObject3(value: "initial"))))
 
             XCTAssertEqual(root.debugDescription,

@@ -808,6 +808,7 @@ extension Converter {
         } else {
             pbChangePack.clearMinSyncedTicket()
         }
+        pbChangePack.isRemoved = pack.isRemoved
         return pbChangePack
     }
 
@@ -819,7 +820,8 @@ extension Converter {
                    checkpoint: fromCheckpoint(pbPack.checkpoint),
                    changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
-                   minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil)
+                   minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil,
+                   isRemoved: pbPack.isRemoved)
     }
 
 }

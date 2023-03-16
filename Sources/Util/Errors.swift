@@ -23,4 +23,7 @@ enum YorkieError: Error {
     case type(message: String)
     case noSuchElement(message: String)
     case timeout(message: String)
+    case documentNotAttached(message: String)
+    case documentNotDetached(message: String)
+    case documentRemoved(message: String)
 }

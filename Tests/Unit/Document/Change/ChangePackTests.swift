@@ -23,7 +23,8 @@ class ChangePackTests: XCTestCase {
                                 checkpoint: Checkpoint(serverSeq: 1, clientSeq: 10),
                                 changes: [],
                                 snapshot: nil,
-                                minSyncedTicket: nil)
+                                minSyncedTicket: nil,
+                                isRemoved: false)
 
         XCTAssertEqual(target.getDocumentKey(), "documentKey-1")
         XCTAssertEqual(target.getCheckpoint().structureAsString, "serverSeq=1, clientSeq=10")
@@ -41,7 +42,8 @@ class ChangePackTests: XCTestCase {
                                 checkpoint: Checkpoint(serverSeq: 1, clientSeq: 10),
                                 changes: [change1, change2],
                                 snapshot: nil,
-                                minSyncedTicket: nil)
+                                minSyncedTicket: nil,
+                                isRemoved: false)
 
         XCTAssertTrue(target.hasChanges())
         XCTAssertEqual(target.getChangeSize(), 2)

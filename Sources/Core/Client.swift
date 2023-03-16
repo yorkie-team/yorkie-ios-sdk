@@ -51,6 +51,7 @@ enum StreamConnectionStatus {
 
 struct Attachment {
     var doc: Document
+    var docID: String
     var isRealtimeSync: Bool
     var peerPresenceMap: [String: PresenceInfo]
     var remoteChangeEventReceived: Bool
@@ -297,6 +298,10 @@ public actor Client {
             throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
+        guard await doc.status == .detached else {
+            throw YorkieError.documentNotDetached(message: "\(doc) is not detached.")
+        }
+
         await doc.setActor(clientID)
 
         var attachDocumentRequest = AttachDocumentRequest()
@@ -314,7 +319,13 @@ public actor Client {
             let pack = try Converter.fromChangePack(result.changePack)
             try await doc.applyChangePack(pack: pack)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, isRealtimeSync: isRealtimeSync, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
+            if await doc.status == .removed {
+                return doc
+            }
+
+            await doc.setStatus(.attached)
+
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, isRealtimeSync: isRealtimeSync, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
             self.runWatchLoop()
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
@@ -350,8 +361,13 @@ public actor Client {
             throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
+        guard let attachment = attachmentMap[doc.getKey()] else {
+            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
+        }
+
         var detachDocumentRequest = DetachDocumentRequest()
         detachDocumentRequest.clientID = clientIDData
+        detachDocumentRequest.documentID = attachment.docID
         detachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
@@ -359,6 +375,10 @@ public actor Client {
 
             let pack = try Converter.fromChangePack(result.changePack)
             try await doc.applyChangePack(pack: pack)
+
+            if await doc.status != .removed {
+                await doc.setStatus(.detached)
+            }
 
             self.attachmentMap.removeValue(forKey: doc.getKey())
 
@@ -387,6 +407,49 @@ public actor Client {
         try self.changeRealtimeSyncSetting(doc, true)
     }
 
+    /**
+     * `remove` mrevoes the given document.
+     */
+    @discardableResult
+    public func remove(_ doc: Document) async throws -> Document {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id, let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard let attachment = attachmentMap[doc.getKey()] else {
+            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
+        }
+
+        await doc.setStatus(.removed)
+
+        var removeDocumentRequest = RemoveDocumentRequest()
+        removeDocumentRequest.clientID = clientIDData
+        removeDocumentRequest.documentID = attachment.docID
+        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
+
+        do {
+            let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
+
+            let pack = try Converter.fromChangePack(result.changePack)
+            try await doc.applyChangePack(pack: pack)
+
+            self.attachmentMap.removeValue(forKey: doc.getKey())
+
+            self.runWatchLoop()
+
+            Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
+
+            return doc
+        } catch {
+            Logger.error("Failed to request remove document(\(self.key)).", error: error)
+            throw error
+        }
+    }
+
     private func changeRealtimeSyncSetting(_ doc: Document, _ isRealtimeSync: Bool) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
@@ -406,20 +469,20 @@ public actor Client {
      */
     @discardableResult
     public func sync() async throws -> [Document] {
-        let documents = self.attachmentMap.values.compactMap { $0.doc }
+        let attachments = self.attachmentMap.values
 
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
-                documents.forEach { document in
+                attachments.forEach { attachment in
                     group.addTask {
-                        try await self.syncInternal(document)
+                        try await self.syncInternal(attachment)
                     }
                 }
 
                 try await group.waitForAll()
             }
 
-            return documents
+            return attachments.compactMap { $0.doc }
         } catch {
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
@@ -524,7 +587,7 @@ public actor Client {
                     if docChanged || attachment.remoteChangeEventReceived {
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
-                            try await self.syncInternal(attachment.doc)
+                            try await self.syncInternal(attachment)
                         }
                     }
                 }
@@ -689,24 +752,30 @@ public actor Client {
     }
 
     @discardableResult
-    private func syncInternal(_ doc: Document) async throws -> Document {
+    private func syncInternal(_ attachment: Attachment) async throws -> Document {
         guard let clientID = self.id, let clientIDData = clientID.toData else {
             throw YorkieError.unexpected(message: "Invalid Client ID!")
         }
 
-        var pushPullRequest = PushPullRequest()
+        var pushPullRequest = PushPullChangeRequest()
         pushPullRequest.clientID = clientIDData
 
+        let doc = attachment.doc
         let requestPack = await doc.createChangePack()
         let localSize = requestPack.getChangeSize()
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
+        pushPullRequest.documentID = attachment.docID
 
         do {
-            let response = try await self.rpcClient.pushPull(pushPullRequest)
+            let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
             try await doc.applyChangePack(pack: responsePack)
+
+            if await doc.status == .removed {
+                self.attachmentMap.removeValue(forKey: doc.getKey())
+            }
 
             let event = DocumentSyncedEvent(value: .synced)
             self.eventStream.send(event)

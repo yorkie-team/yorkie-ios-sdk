@@ -115,6 +115,8 @@ struct Yorkie_V1_AttachDocumentResponse {
 
   var clientID: Data = Data()
 
+  var documentID: String = String()
+
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
@@ -137,6 +139,8 @@ struct Yorkie_V1_DetachDocumentRequest {
   // methods supported on all messages.
 
   var clientID: Data = Data()
+
+  var documentID: String = String()
 
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
@@ -264,12 +268,14 @@ struct Yorkie_V1_WatchDocumentsResponse {
   init() {}
 }
 
-struct Yorkie_V1_PushPullRequest {
+struct Yorkie_V1_RemoveDocumentRequest {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var clientID: Data = Data()
+
+  var documentID: String = String()
 
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
@@ -287,7 +293,55 @@ struct Yorkie_V1_PushPullRequest {
   fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
 }
 
-struct Yorkie_V1_PushPullResponse {
+struct Yorkie_V1_RemoveDocumentResponse {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var clientKey: String = String()
+
+  var changePack: Yorkie_V1_ChangePack {
+    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    set {_changePack = newValue}
+  }
+  /// Returns true if `changePack` has been explicitly set.
+  var hasChangePack: Bool {return self._changePack != nil}
+  /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
+  mutating func clearChangePack() {self._changePack = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
+}
+
+struct Yorkie_V1_PushPullChangesRequest {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var clientID: Data = Data()
+
+  var documentID: String = String()
+
+  var changePack: Yorkie_V1_ChangePack {
+    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    set {_changePack = newValue}
+  }
+  /// Returns true if `changePack` has been explicitly set.
+  var hasChangePack: Bool {return self._changePack != nil}
+  /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
+  mutating func clearChangePack() {self._changePack = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
+}
+
+struct Yorkie_V1_PushPullChangesResponse {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -356,8 +410,10 @@ extension Yorkie_V1_WatchDocumentsRequest: @unchecked Sendable {}
 extension Yorkie_V1_WatchDocumentsResponse: @unchecked Sendable {}
 extension Yorkie_V1_WatchDocumentsResponse.OneOf_Body: @unchecked Sendable {}
 extension Yorkie_V1_WatchDocumentsResponse.Initialization: @unchecked Sendable {}
-extension Yorkie_V1_PushPullRequest: @unchecked Sendable {}
-extension Yorkie_V1_PushPullResponse: @unchecked Sendable {}
+extension Yorkie_V1_RemoveDocumentRequest: @unchecked Sendable {}
+extension Yorkie_V1_RemoveDocumentResponse: @unchecked Sendable {}
+extension Yorkie_V1_PushPullChangesRequest: @unchecked Sendable {}
+extension Yorkie_V1_PushPullChangesResponse: @unchecked Sendable {}
 extension Yorkie_V1_UpdatePresenceRequest: @unchecked Sendable {}
 extension Yorkie_V1_UpdatePresenceResponse: @unchecked Sendable {}
 #endif  // swift(>=5.5) && canImport(_Concurrency)
@@ -546,7 +602,8 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
   static let protoMessageName: String = _protobuf_package + ".AttachDocumentResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "client_id"),
-    2: .standard(proto: "change_pack"),
+    2: .standard(proto: "document_id"),
+    3: .standard(proto: "change_pack"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -556,7 +613,8 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
     }
@@ -570,14 +628,18 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     if !self.clientID.isEmpty {
       try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
     }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    }
     try { if let v = self._changePack {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_AttachDocumentResponse, rhs: Yorkie_V1_AttachDocumentResponse) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -588,7 +650,8 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
   static let protoMessageName: String = _protobuf_package + ".DetachDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "client_id"),
-    2: .standard(proto: "change_pack"),
+    2: .standard(proto: "document_id"),
+    3: .standard(proto: "change_pack"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -598,7 +661,8 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
     }
@@ -612,14 +676,18 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if !self.clientID.isEmpty {
       try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
     }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    }
     try { if let v = self._changePack {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_DetachDocumentRequest, rhs: Yorkie_V1_DetachDocumentRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -812,11 +880,12 @@ extension Yorkie_V1_WatchDocumentsResponse.Initialization: SwiftProtobuf.Message
   }
 }
 
-extension Yorkie_V1_PushPullRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".PushPullRequest"
+extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".RemoveDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "client_id"),
-    2: .standard(proto: "change_pack"),
+    2: .standard(proto: "document_id"),
+    3: .standard(proto: "change_pack"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -826,7 +895,8 @@ extension Yorkie_V1_PushPullRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
     }
@@ -840,22 +910,116 @@ extension Yorkie_V1_PushPullRequest: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if !self.clientID.isEmpty {
       try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
     }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    }
     try { if let v = self._changePack {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_PushPullRequest, rhs: Yorkie_V1_PushPullRequest) -> Bool {
+  static func ==(lhs: Yorkie_V1_RemoveDocumentRequest, rhs: Yorkie_V1_RemoveDocumentRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_PushPullResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".PushPullResponse"
+extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".RemoveDocumentResponse"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .standard(proto: "client_key"),
+    2: .standard(proto: "change_pack"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 1)
+    }
+    try { if let v = self._changePack {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Yorkie_V1_RemoveDocumentResponse, rhs: Yorkie_V1_RemoveDocumentResponse) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
+    if lhs._changePack != rhs._changePack {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".PushPullChangesRequest"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .standard(proto: "client_id"),
+    2: .standard(proto: "document_id"),
+    3: .standard(proto: "change_pack"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.clientID.isEmpty {
+      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+    }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    }
+    try { if let v = self._changePack {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Yorkie_V1_PushPullChangesRequest, rhs: Yorkie_V1_PushPullChangesRequest) -> Bool {
+    if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentID != rhs.documentID {return false}
+    if lhs._changePack != rhs._changePack {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".PushPullChangesResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "client_id"),
     2: .standard(proto: "change_pack"),
@@ -888,7 +1052,7 @@ extension Yorkie_V1_PushPullResponse: SwiftProtobuf.Message, SwiftProtobuf._Mess
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_PushPullResponse, rhs: Yorkie_V1_PushPullResponse) -> Bool {
+  static func ==(lhs: Yorkie_V1_PushPullChangesResponse, rhs: Yorkie_V1_PushPullChangesResponse) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
