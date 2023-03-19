@@ -426,7 +426,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      */
     public func findIndexesFromRange(_ range: RGATreeSplitNodeRange) throws -> (Int, Int) {
         let (fromPos, toPos) = range
-        return (try self.findIdxFromNodePos(fromPos, false), try self.findIdxFromNodePos(toPos, true))
+        if fromPos == toPos {
+            let idx = try self.findIdxFromNodePos(fromPos, true)
+            return (idx, idx)
+        }
+
+        return (try self.findIdxFromNodePos(fromPos, true), try self.findIdxFromNodePos(toPos, true))
     }
 
     /**
