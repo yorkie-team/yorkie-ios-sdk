@@ -21,20 +21,20 @@ final class CRDTTextTests: XCTestCase {
     func test_should_handle_edit_operations_with_case1() throws {
         let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: TimeTicket.initial)
 
-        try text.edit(try text.createRange(0, 0), "ABCD", TimeTicket.initial)
+        try text.edit(text.createRange(0, 0), "ABCD", TimeTicket.initial)
         XCTAssertEqual("[{\"val\":\"ABCD\"}]", text.toJSON())
 
-        try text.edit(try text.createRange(1, 3), "12", TimeTicket.initial)
+        try text.edit(text.createRange(1, 3), "12", TimeTicket.initial)
         XCTAssertEqual("[{\"val\":\"A\"},{\"val\":\"12\"},{\"val\":\"D\"}]", text.toJSON())
     }
 
     func test_should_handle_edit_operations_with_case2() throws {
         let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: TimeTicket.initial)
 
-        try text.edit(try text.createRange(0, 0), "ABCD", TimeTicket.initial)
+        try text.edit(text.createRange(0, 0), "ABCD", TimeTicket.initial)
         XCTAssertEqual("[{\"val\":\"ABCD\"}]", text.toJSON())
 
-        try text.edit(try text.createRange(3, 3), "\n", TimeTicket.initial)
+        try text.edit(text.createRange(3, 3), "\n", TimeTicket.initial)
         XCTAssertEqual("[{\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"val\":\"D\"}]", text.toJSON())
     }
 }

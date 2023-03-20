@@ -148,7 +148,7 @@ public class JSONArray {
 
     func push(values: [Any]) {
         values.forEach { value in
-            push(value)
+            self.push(value)
         }
     }
 
@@ -622,7 +622,7 @@ public class JSONArrayIterator: IteratorProtocol {
         self.context = context
         self.values = []
         crdtArray.forEach { element in
-            values.append(element)
+            self.values.append(element)
         }
     }
 

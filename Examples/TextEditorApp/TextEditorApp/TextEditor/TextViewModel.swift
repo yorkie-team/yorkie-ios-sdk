@@ -69,7 +69,7 @@ class TextViewModel {
             }.store(in: &self.cancellables)
 
             // define event handler that apply remote changes to local
-            textEventStream.sink { [weak self] events in
+            self.textEventStream.sink { [weak self] events in
                 var textChanges = [TextOperation]()
 
                 events.filter { $0.actor != clientID }.forEach {
@@ -100,7 +100,7 @@ class TextViewModel {
 
             }.store(in: &self.cancellables)
 
-            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: textEventStream)
+            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: self.textEventStream)
 
             await self.syncText()
         }
