@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/grpc/grpc-swift.git",
       "state" : {
-        "revision" : "6bf35472cb8621481e59e6d1450b19627db81cea",
-        "version" : "1.13.1"
+        "revision" : "f09cfb4d36315e2b48dbba1359179abf3cb2e6ac",
+        "version" : "1.14.2"
       }
     },
     {
@@ -32,7 +32,16 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-docc-plugin",
       "state" : {
-        "revision" : "3303b164430d9a7055ba484c8ead67a52f7b74f6",
+        "revision" : "9b1258905c21fc1b97bf03d1b4ca12c4ec4e5fda",
+        "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swift-docc-symbolkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-docc-symbolkit",
+      "state" : {
+        "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
         "version" : "1.0.0"
       }
     },
@@ -41,8 +50,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "6fe203dc33195667ce1759bf0182975e4653ba1c",
-        "version" : "1.4.4"
+        "revision" : "32e8d724467f8fe623624570367e3d50c5638e46",
+        "version" : "1.5.2"
       }
     },
     {
@@ -50,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "e855380cb5234e96b760d93e0bfdc403e381e928",
-        "version" : "2.45.0"
+        "revision" : "45167b8006448c79dda4b7bd604e07a034c15c49",
+        "version" : "2.48.0"
       }
     },
     {
@@ -59,8 +68,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-extras.git",
       "state" : {
-        "revision" : "91dd2d61fb772e1311bb5f13b59266b579d77e42",
-        "version" : "1.15.0"
+        "revision" : "d75ed708d00353acf173ca23018b6bd46f949464",
+        "version" : "1.17.0"
       }
     },
     {
@@ -68,8 +77,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-http2.git",
       "state" : {
-        "revision" : "d6656967f33ed8b368b38e4b198631fc7c484a40",
-        "version" : "1.23.1"
+        "revision" : "38feec96bcd929028939107684073554bf01abeb",
+        "version" : "1.25.2"
       }
     },
     {
@@ -95,8 +104,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-protobuf.git",
       "state" : {
-        "revision" : "ab3a58b7209a17d781c0d1dbb3e1ff3da306bae8",
-        "version" : "1.20.3"
+        "revision" : "0af9125c4eae12a4973fb66574c53a54962a9e1e",
+        "version" : "1.21.0"
       }
     }
   ],
