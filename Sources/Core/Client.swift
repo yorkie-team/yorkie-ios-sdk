@@ -750,6 +750,10 @@ public actor Client {
     }
 
     private func disconnectWatchStream() {
+        guard self.remoteWatchStream != nil else {
+            return
+        }
+
         self.remoteWatchStream?.cancel()
         self.remoteWatchStream = nil
 

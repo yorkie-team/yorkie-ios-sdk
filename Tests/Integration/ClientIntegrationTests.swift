@@ -173,6 +173,47 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
+    func test_stream_connection_evnts() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+
+        let connectedExpectation = XCTestExpectation(description: "connected")
+        let disconnectedExpectation = XCTestExpectation(description: "disconnected")
+
+        var eventCount = 0
+
+        c1.eventStream.sink { event in
+            switch event {
+            case let event as StreamConnectionStatusChangedEvent:
+                eventCount += 1
+                switch event.value {
+                case .connected:
+                    connectedExpectation.fulfill()
+                case .disconnected:
+                    disconnectedExpectation.fulfill()
+                }
+            default:
+                break
+            }
+        }.store(in: &self.cancellables)
+
+        try await c1.activate()
+
+        let d1 = Document(key: docKey)
+
+        try await c1.attach(d1)
+
+        wait(for: [connectedExpectation], timeout: 2)
+
+        try await c1.detach(d1)
+        try await c1.deactivate()
+
+        wait(for: [disconnectedExpectation], timeout: 2)
+
+        XCTAssertEqual(eventCount, 2)
+    }
+
     // swiftlint: disable force_cast
     func test_send_peer_changed_event_to_the_user_who_updated_presence() async throws {
         struct Cursor: Codable {
