@@ -638,7 +638,7 @@ public actor Client {
                     self.attachmentMap[docID]?.peerPresenceMap[pbClient.id.toHexString] = Converter.fromPresence(pbPresence: pbClient.presence)
                 }
 
-                semaphoresForInitialzation[docID]?.signal()
+                self.semaphoresForInitialzation[docID]?.signal()
             }
 
             self.sendPeerChangeEvent(.initialized, docKeys)
@@ -687,6 +687,10 @@ public actor Client {
     }
 
     private func disconnectWatchStream() {
+        guard self.remoteWatchStream != nil else {
+            return
+        }
+
         self.remoteWatchStream?.cancel()
         self.remoteWatchStream = nil
 
