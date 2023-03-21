@@ -173,13 +173,10 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
-    func skip_test_stream_connection_evnts() async throws {
+    func test_stream_connection_evnts() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-
-        let connectedExpectation = XCTestExpectation(description: "connected")
-        let disconnectedExpectation = XCTestExpectation(description: "disconnected")
 
         var eventCount = 0
 
@@ -189,9 +186,9 @@ final class ClientIntegrationTests: XCTestCase {
                 eventCount += 1
                 switch event.value {
                 case .connected:
-                    connectedExpectation.fulfill()
+                    XCTAssertEqual(eventCount, 1)
                 case .disconnected:
-                    disconnectedExpectation.fulfill()
+                    XCTAssertEqual(eventCount, 2)
                 }
             default:
                 break
@@ -204,12 +201,8 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await c1.attach(d1)
 
-        wait(for: [connectedExpectation], timeout: 2)
-
         try await c1.detach(d1)
         try await c1.deactivate()
-
-        wait(for: [disconnectedExpectation], timeout: 2)
 
         XCTAssertEqual(eventCount, 2)
     }
