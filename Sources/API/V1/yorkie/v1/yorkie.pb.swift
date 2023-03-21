@@ -181,7 +181,7 @@ struct Yorkie_V1_DetachDocumentResponse {
   fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
 }
 
-struct Yorkie_V1_WatchDocumentsRequest {
+struct Yorkie_V1_WatchDocumentRequest {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -195,7 +195,7 @@ struct Yorkie_V1_WatchDocumentsRequest {
   /// Clears the value of `client`. Subsequent reads from it will return its default value.
   mutating func clearClient() {self._client = nil}
 
-  var documentKeys: [String] = []
+  var documentID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -204,17 +204,17 @@ struct Yorkie_V1_WatchDocumentsRequest {
   fileprivate var _client: Yorkie_V1_Client? = nil
 }
 
-struct Yorkie_V1_WatchDocumentsResponse {
+struct Yorkie_V1_WatchDocumentResponse {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var body: Yorkie_V1_WatchDocumentsResponse.OneOf_Body? = nil
+  var body: Yorkie_V1_WatchDocumentResponse.OneOf_Body? = nil
 
-  var initialization: Yorkie_V1_WatchDocumentsResponse.Initialization {
+  var initialization: Yorkie_V1_WatchDocumentResponse.Initialization {
     get {
       if case .initialization(let v)? = body {return v}
-      return Yorkie_V1_WatchDocumentsResponse.Initialization()
+      return Yorkie_V1_WatchDocumentResponse.Initialization()
     }
     set {body = .initialization(newValue)}
   }
@@ -230,11 +230,11 @@ struct Yorkie_V1_WatchDocumentsResponse {
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum OneOf_Body: Equatable {
-    case initialization(Yorkie_V1_WatchDocumentsResponse.Initialization)
+    case initialization(Yorkie_V1_WatchDocumentResponse.Initialization)
     case event(Yorkie_V1_DocEvent)
 
   #if !swift(>=4.1)
-    static func ==(lhs: Yorkie_V1_WatchDocumentsResponse.OneOf_Body, rhs: Yorkie_V1_WatchDocumentsResponse.OneOf_Body) -> Bool {
+    static func ==(lhs: Yorkie_V1_WatchDocumentResponse.OneOf_Body, rhs: Yorkie_V1_WatchDocumentResponse.OneOf_Body) -> Bool {
       // The use of inline closures is to circumvent an issue where the compiler
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
@@ -258,7 +258,7 @@ struct Yorkie_V1_WatchDocumentsResponse {
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    var peersMapByDoc: Dictionary<String,Yorkie_V1_Clients> = [:]
+    var peers: [Yorkie_V1_Client] = []
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -378,7 +378,7 @@ struct Yorkie_V1_UpdatePresenceRequest {
   /// Clears the value of `client`. Subsequent reads from it will return its default value.
   mutating func clearClient() {self._client = nil}
 
-  var documentKeys: [String] = []
+  var documentID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -406,10 +406,10 @@ extension Yorkie_V1_AttachDocumentRequest: @unchecked Sendable {}
 extension Yorkie_V1_AttachDocumentResponse: @unchecked Sendable {}
 extension Yorkie_V1_DetachDocumentRequest: @unchecked Sendable {}
 extension Yorkie_V1_DetachDocumentResponse: @unchecked Sendable {}
-extension Yorkie_V1_WatchDocumentsRequest: @unchecked Sendable {}
-extension Yorkie_V1_WatchDocumentsResponse: @unchecked Sendable {}
-extension Yorkie_V1_WatchDocumentsResponse.OneOf_Body: @unchecked Sendable {}
-extension Yorkie_V1_WatchDocumentsResponse.Initialization: @unchecked Sendable {}
+extension Yorkie_V1_WatchDocumentRequest: @unchecked Sendable {}
+extension Yorkie_V1_WatchDocumentResponse: @unchecked Sendable {}
+extension Yorkie_V1_WatchDocumentResponse.OneOf_Body: @unchecked Sendable {}
+extension Yorkie_V1_WatchDocumentResponse.Initialization: @unchecked Sendable {}
 extension Yorkie_V1_RemoveDocumentRequest: @unchecked Sendable {}
 extension Yorkie_V1_RemoveDocumentResponse: @unchecked Sendable {}
 extension Yorkie_V1_PushPullChangesRequest: @unchecked Sendable {}
@@ -736,11 +736,11 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
   }
 }
 
-extension Yorkie_V1_WatchDocumentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".WatchDocumentsRequest"
+extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WatchDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "client"),
-    2: .standard(proto: "document_keys"),
+    2: .standard(proto: "document_id"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -750,7 +750,7 @@ extension Yorkie_V1_WatchDocumentsRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._client) }()
-      case 2: try { try decoder.decodeRepeatedStringField(value: &self.documentKeys) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       default: break
       }
     }
@@ -764,22 +764,22 @@ extension Yorkie_V1_WatchDocumentsRequest: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._client {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if !self.documentKeys.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.documentKeys, fieldNumber: 2)
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_WatchDocumentsRequest, rhs: Yorkie_V1_WatchDocumentsRequest) -> Bool {
+  static func ==(lhs: Yorkie_V1_WatchDocumentRequest, rhs: Yorkie_V1_WatchDocumentRequest) -> Bool {
     if lhs._client != rhs._client {return false}
-    if lhs.documentKeys != rhs.documentKeys {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchDocumentsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".WatchDocumentsResponse"
+extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".WatchDocumentResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "initialization"),
     2: .same(proto: "event"),
@@ -792,7 +792,7 @@ extension Yorkie_V1_WatchDocumentsResponse: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try {
-        var v: Yorkie_V1_WatchDocumentsResponse.Initialization?
+        var v: Yorkie_V1_WatchDocumentResponse.Initialization?
         var hadOneofValue = false
         if let current = self.body {
           hadOneofValue = true
@@ -841,17 +841,17 @@ extension Yorkie_V1_WatchDocumentsResponse: SwiftProtobuf.Message, SwiftProtobuf
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_WatchDocumentsResponse, rhs: Yorkie_V1_WatchDocumentsResponse) -> Bool {
+  static func ==(lhs: Yorkie_V1_WatchDocumentResponse, rhs: Yorkie_V1_WatchDocumentResponse) -> Bool {
     if lhs.body != rhs.body {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchDocumentsResponse.Initialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = Yorkie_V1_WatchDocumentsResponse.protoMessageName + ".Initialization"
+extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = Yorkie_V1_WatchDocumentResponse.protoMessageName + ".Initialization"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "peers_map_by_doc"),
+    1: .same(proto: "peers"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -860,21 +860,21 @@ extension Yorkie_V1_WatchDocumentsResponse.Initialization: SwiftProtobuf.Message
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_Clients>.self, value: &self.peersMapByDoc) }()
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.peers) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.peersMapByDoc.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_Clients>.self, value: self.peersMapByDoc, fieldNumber: 1)
+    if !self.peers.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.peers, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_WatchDocumentsResponse.Initialization, rhs: Yorkie_V1_WatchDocumentsResponse.Initialization) -> Bool {
-    if lhs.peersMapByDoc != rhs.peersMapByDoc {return false}
+  static func ==(lhs: Yorkie_V1_WatchDocumentResponse.Initialization, rhs: Yorkie_V1_WatchDocumentResponse.Initialization) -> Bool {
+    if lhs.peers != rhs.peers {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1064,7 +1064,7 @@ extension Yorkie_V1_UpdatePresenceRequest: SwiftProtobuf.Message, SwiftProtobuf.
   static let protoMessageName: String = _protobuf_package + ".UpdatePresenceRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "client"),
-    2: .standard(proto: "document_keys"),
+    2: .standard(proto: "document_id"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -1074,7 +1074,7 @@ extension Yorkie_V1_UpdatePresenceRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._client) }()
-      case 2: try { try decoder.decodeRepeatedStringField(value: &self.documentKeys) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       default: break
       }
     }
@@ -1088,15 +1088,15 @@ extension Yorkie_V1_UpdatePresenceRequest: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._client {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if !self.documentKeys.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.documentKeys, fieldNumber: 2)
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_UpdatePresenceRequest, rhs: Yorkie_V1_UpdatePresenceRequest) -> Bool {
     if lhs._client != rhs._client {return false}
-    if lhs.documentKeys != rhs.documentKeys {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

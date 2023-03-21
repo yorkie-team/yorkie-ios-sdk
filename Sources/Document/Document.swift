@@ -47,12 +47,14 @@ public enum DocumentStatus: String {
 public typealias Presence = [String: Any]
 
 public typealias DocumentKey = String
+public typealias DocumentID = String
 
 /**
  * A CRDT-based data type. We can representing the model
  * of the application. And we can edit it even while offline.
  *
  */
+public actor Document {
     private let key: DocumentKey
     private(set) var status: DocumentStatus
     private var root: CRDTRoot

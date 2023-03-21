@@ -57,6 +57,8 @@ struct Attachment {
     var isRealtimeSync: Bool
     var peerPresenceMap: [ActorID: PresenceInfo]
     var remoteChangeEventReceived: Bool
+    var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
+    var watchLoopReconnectTimer: Timer?
 }
 
 /**
@@ -161,8 +163,6 @@ public actor Client {
     private let maximumAttachmentTimeout: Int
 
     private let rpcClient: YorkieServiceAsyncClient
-    private var watchLoopReconnectTimer: Timer?
-    private var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentsRequest, WatchDocumentsResponse>?
 
     private let group: EventLoopGroup
 
@@ -241,7 +241,6 @@ public actor Client {
 
             self.status = .activated
             await self.runSyncLoop()
-            self.runWatchLoop()
 
             let changeEvent = StatusChangedEvent(value: self.status)
             self.eventStream.send(changeEvent)
@@ -261,8 +260,8 @@ public actor Client {
             return
         }
 
-        if self.remoteWatchStream != nil {
-            self.disconnectWatchStream()
+        try self.attachmentMap.forEach {
+            try self.disconnectWatchStream($0.key)
         }
 
         var deactivateRequest = DeactivateClientRequest()
@@ -329,7 +328,7 @@ public actor Client {
             await doc.setStatus(.attached)
 
             self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, isRealtimeSync: isRealtimeSync, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
-            self.runWatchLoop()
+            try self.runWatchLoop(docKey)
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
 
@@ -383,9 +382,9 @@ public actor Client {
                 await doc.setStatus(.detached)
             }
 
-            self.attachmentMap.removeValue(forKey: doc.getKey())
+            try self.disconnectWatchStream(doc.getKey())
 
-            self.runWatchLoop()
+            self.attachmentMap.removeValue(forKey: doc.getKey())
 
             Logger.info("[DD] c:\"\(self.key)\" detaches d:\"\(doc.getKey())\"")
 
@@ -440,9 +439,9 @@ public actor Client {
             let pack = try Converter.fromChangePack(result.changePack)
             try await doc.applyChangePack(pack: pack)
 
-            self.attachmentMap.removeValue(forKey: doc.getKey())
+            try self.disconnectWatchStream(doc.getKey())
 
-            self.runWatchLoop()
+            self.attachmentMap.removeValue(forKey: doc.getKey())
 
             Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
 
@@ -509,29 +508,25 @@ public actor Client {
             return
         }
 
-        var docKeys = [DocumentKey]()
-
-        for (key, attachment) in self.attachmentMap {
+        for (docKey, attachment) in self.attachmentMap {
             if attachment.isRealtimeSync == false {
                 continue
             }
 
-            self.attachmentMap[key]?.peerPresenceMap[id] = self.presenceInfo
+            self.attachmentMap[docKey]?.peerPresenceMap[id] = self.presenceInfo
 
-            docKeys.append(attachment.doc.getKey())
-        }
+            var updatePresenceRequest = UpdatePresenceRequest()
+            updatePresenceRequest.client = Converter.toClient(id: id, presence: self.presenceInfo)
+            updatePresenceRequest.documentID = attachment.docID
 
-        var updatePresenceRequest = UpdatePresenceRequest()
-        updatePresenceRequest.client = Converter.toClient(id: id, presence: self.presenceInfo)
-        updatePresenceRequest.documentKeys = docKeys
+            self.sendPeerChangeEvent(.presenceChanged, [docKey], id)
 
-        self.sendPeerChangeEvent(.presenceChanged, docKeys, id)
-
-        do {
-            _ = try await self.rpcClient.updatePresence(updatePresenceRequest)
-            Logger.info("[UM] c\"\(self.key)\" updated")
-        } catch {
-            Logger.error("[UM] c\"\(self.key)\" err : \(error)")
+            do {
+                _ = try await self.rpcClient.updatePresence(updatePresenceRequest)
+                Logger.info("[UM] c\"\(self.key)\" updated")
+            } catch {
+                Logger.error("[UM] c\"\(self.key)\" err : \(error)")
+            }
         }
     }
 
@@ -569,7 +564,8 @@ public actor Client {
     }
 
     private func setSyncTimer(_ reconnect: Bool) {
-        let syncLoopDuration = (reconnect || self.remoteWatchStream == nil) ? self.reconnectStreamDelay : self.syncLoopDuration
+        let isDisconnectedWatchStream = self.attachmentMap.values.first(where: { $0.remoteWatchStream == nil }) != nil
+        let syncLoopDuration = (reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration
 
         let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
             Task {
@@ -618,40 +614,34 @@ public actor Client {
         await self.doSyncLoop()
     }
 
-    private func doWatchLoop() {
-        self.disconnectWatchStream()
-
-        self.watchLoopReconnectTimer?.invalidate()
-        self.watchLoopReconnectTimer = nil
+    private func doWatchLoop(_ docKey: DocumentKey) throws {
+        self.attachmentMap[docKey]?.watchLoopReconnectTimer?.invalidate()
+        self.attachmentMap[docKey]?.watchLoopReconnectTimer = nil
 
         guard self.isActive, let id = self.id else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
             return
         }
 
-        let realtimeSyncDocKeys = self.attachmentMap.values
-            .filter { $0.isRealtimeSync }
-            .compactMap { $0.doc.getKey() }
-
-        if realtimeSyncDocKeys.isEmpty {
+        guard self.attachmentMap[docKey]?.isRealtimeSync ?? false, let docID = self.attachmentMap[docKey]?.docID else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
             return
         }
 
-        var request = WatchDocumentsRequest()
+        var request = WatchDocumentRequest()
         request.client = Converter.toClient(id: id, presence: self.presenceInfo)
-        request.documentKeys = realtimeSyncDocKeys
+        request.documentID = docID
 
-        self.remoteWatchStream = self.rpcClient.makeWatchDocumentsCall(request)
+        self.attachmentMap[docKey]?.remoteWatchStream = self.rpcClient.makeWatchDocumentCall(request)
 
         let event = StreamConnectionStatusChangedEvent(value: .connected)
         self.eventStream.send(event)
 
         Task {
-            if let stream = remoteWatchStream?.responseStream {
+            if let stream = self.attachmentMap[docKey]?.remoteWatchStream?.responseStream {
                 do {
                     for try await response in stream {
-                        self.handleWatchDocumentsResponse(docKeys: realtimeSyncDocKeys, response: response)
+                        self.handleWatchDocumentsResponse(docKey: docKey, response: response)
                     }
                 } catch {
                     if let status = error as? GRPCStatus, status.code == .cancelled {
@@ -659,17 +649,17 @@ public actor Client {
                     } else {
                         Logger.warning("[WL] c:\"\(self.key)\" has Error \(error)")
 
-                        self.onStreamDisconnect()
+                        try self.onStreamDisconnect(docKey)
                     }
                 }
             }
         }
     }
 
-    private func runWatchLoop() {
+    private func runWatchLoop(_ docKey: DocumentKey) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
 
-        self.doWatchLoop()
+        try self.doWatchLoop(docKey)
     }
 
     private func waitForInitialization(_ semaphore: DispatchSemaphore, _ docKey: String) async throws {
@@ -687,7 +677,7 @@ public actor Client {
         }
     }
 
-    private func handleWatchDocumentsResponse(docKeys: [DocumentKey], response: WatchDocumentsResponse) {
+    private func handleWatchDocumentsResponse(docKey: DocumentKey, response: WatchDocumentResponse) {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
         guard let body = response.body else {
@@ -696,46 +686,41 @@ public actor Client {
 
         switch body {
         case .initialization(let initialization):
-            initialization.peersMapByDoc.forEach { docID, pbPeers in
-                for pbClient in pbPeers.clients {
-                    self.attachmentMap[docID]?.peerPresenceMap[pbClient.id.toHexString] = Converter.fromPresence(pbPresence: pbClient.presence)
-                }
+            initialization.peers.forEach { pbClient in
+                self.attachmentMap[docKey]?.peerPresenceMap[pbClient.id.toHexString] = Converter.fromPresence(pbPresence: pbClient.presence)
 
-                self.semaphoresForInitialzation[docID]?.signal()
+                self.semaphoresForInitialzation[docKey]?.signal()
             }
 
-            self.sendPeerChangeEvent(.initialized, docKeys)
+            self.sendPeerChangeEvent(.initialized, [docKey])
         case .event(let pbWatchEvent):
-            let responseKeys = pbWatchEvent.documentKeys
             let publisher = pbWatchEvent.publisher.id.toHexString
             let presence = Converter.fromPresence(pbPresence: pbWatchEvent.publisher.presence)
 
-            for docKey in responseKeys {
-                switch pbWatchEvent.type {
-                case .documentsWatched:
-                    self.attachmentMap[docKey]?.peerPresenceMap[publisher] = presence
+            switch pbWatchEvent.type {
+            case .documentsWatched:
+                self.attachmentMap[docKey]?.peerPresenceMap[publisher] = presence
 
-                    self.sendPeerChangeEvent(.watched, responseKeys, publisher)
-                case .documentsUnwatched:
-                    self.sendPeerChangeEvent(.unwatched, responseKeys, publisher)
+                self.sendPeerChangeEvent(.watched, [docKey], publisher)
+            case .documentsUnwatched:
+                self.sendPeerChangeEvent(.unwatched, [docKey], publisher)
 
-                    self.attachmentMap[docKey]?.peerPresenceMap.removeValue(forKey: publisher)
-                case .documentsChanged:
-                    self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+                self.attachmentMap[docKey]?.peerPresenceMap.removeValue(forKey: publisher)
+            case .documentsChanged:
+                self.attachmentMap[docKey]?.remoteChangeEventReceived = true
 
-                    let event = DocumentsChangedEvent(value: responseKeys)
-                    self.eventStream.send(event)
-                case .presenceChanged:
-                    if let peerPresence = self.attachmentMap[docKey]?.peerPresenceMap[publisher], peerPresence.clock > presence.clock {
-                        break
-                    }
-
-                    self.attachmentMap[docKey]?.peerPresenceMap[publisher] = presence
-
-                    self.sendPeerChangeEvent(.presenceChanged, responseKeys, publisher)
-                case .UNRECOGNIZED:
+                let event = DocumentsChangedEvent(value: [docKey])
+                self.eventStream.send(event)
+            case .presenceChanged:
+                if let peerPresence = self.attachmentMap[docKey]?.peerPresenceMap[publisher], peerPresence.clock > presence.clock {
                     break
                 }
+
+                self.attachmentMap[docKey]?.peerPresenceMap[publisher] = presence
+
+                self.sendPeerChangeEvent(.presenceChanged, [docKey], publisher)
+            case .UNRECOGNIZED:
+                break
             }
         }
     }
@@ -749,13 +734,17 @@ public actor Client {
         self.eventStream.send(event)
     }
 
-    private func disconnectWatchStream() {
-        guard self.remoteWatchStream != nil else {
+    private func disconnectWatchStream(_ docKey: DocumentKey) throws {
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached.")
+        }
+
+        guard self.attachmentMap[docKey]?.remoteWatchStream != nil else {
             return
         }
 
-        self.remoteWatchStream?.cancel()
-        self.remoteWatchStream = nil
+        self.attachmentMap[docKey]?.remoteWatchStream?.cancel()
+        self.attachmentMap[docKey]?.remoteWatchStream = nil
 
         Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
@@ -763,16 +752,16 @@ public actor Client {
         self.eventStream.send(event)
     }
 
-    private func onStreamDisconnect() {
-        self.disconnectWatchStream()
+    private func onStreamDisconnect(_ docKey: DocumentKey) throws {
+        try self.disconnectWatchStream(docKey)
 
-        self.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+        self.attachmentMap[docKey]?.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
             Task {
-                await self.doWatchLoop()
+                try await self.doWatchLoop(docKey)
             }
         }
 
-        if let watchLoopReconnectTimer = self.watchLoopReconnectTimer {
+        if let watchLoopReconnectTimer = self.attachmentMap[docKey]?.watchLoopReconnectTimer {
             RunLoop.main.add(watchLoopReconnectTimer, forMode: .common)
         }
     }

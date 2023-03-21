@@ -68,11 +68,11 @@ internal protocol Yorkie_V1_YorkieServiceClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> UnaryCall<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>
 
-  func watchDocuments(
-    _ request: Yorkie_V1_WatchDocumentsRequest,
+  func watchDocument(
+    _ request: Yorkie_V1_WatchDocumentRequest,
     callOptions: CallOptions?,
-    handler: @escaping (Yorkie_V1_WatchDocumentsResponse) -> Void
-  ) -> ServerStreamingCall<Yorkie_V1_WatchDocumentsRequest, Yorkie_V1_WatchDocumentsResponse>
+    handler: @escaping (Yorkie_V1_WatchDocumentResponse) -> Void
+  ) -> ServerStreamingCall<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
 }
 
 extension Yorkie_V1_YorkieServiceClientProtocol {
@@ -206,23 +206,23 @@ extension Yorkie_V1_YorkieServiceClientProtocol {
     )
   }
 
-  /// Server streaming call to WatchDocuments
+  /// Server streaming call to WatchDocument
   ///
   /// - Parameters:
-  ///   - request: Request to send to WatchDocuments.
+  ///   - request: Request to send to WatchDocument.
   ///   - callOptions: Call options.
   ///   - handler: A closure called when each response is received from the server.
   /// - Returns: A `ServerStreamingCall` with futures for the metadata and status.
-  internal func watchDocuments(
-    _ request: Yorkie_V1_WatchDocumentsRequest,
+  internal func watchDocument(
+    _ request: Yorkie_V1_WatchDocumentRequest,
     callOptions: CallOptions? = nil,
-    handler: @escaping (Yorkie_V1_WatchDocumentsResponse) -> Void
-  ) -> ServerStreamingCall<Yorkie_V1_WatchDocumentsRequest, Yorkie_V1_WatchDocumentsResponse> {
+    handler: @escaping (Yorkie_V1_WatchDocumentResponse) -> Void
+  ) -> ServerStreamingCall<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse> {
     return self.makeServerStreamingCall(
-      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocuments.path,
+      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocument.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makeWatchDocumentsInterceptors() ?? [],
+      interceptors: self.interceptors?.makeWatchDocumentInterceptors() ?? [],
       handler: handler
     )
   }
@@ -329,10 +329,10 @@ internal protocol Yorkie_V1_YorkieServiceAsyncClientProtocol: GRPCClient {
     callOptions: CallOptions?
   ) -> GRPCAsyncUnaryCall<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>
 
-  func makeWatchDocumentsCall(
-    _ request: Yorkie_V1_WatchDocumentsRequest,
+  func makeWatchDocumentCall(
+    _ request: Yorkie_V1_WatchDocumentRequest,
     callOptions: CallOptions?
-  ) -> GRPCAsyncServerStreamingCall<Yorkie_V1_WatchDocumentsRequest, Yorkie_V1_WatchDocumentsResponse>
+  ) -> GRPCAsyncServerStreamingCall<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -429,15 +429,15 @@ extension Yorkie_V1_YorkieServiceAsyncClientProtocol {
     )
   }
 
-  internal func makeWatchDocumentsCall(
-    _ request: Yorkie_V1_WatchDocumentsRequest,
+  internal func makeWatchDocumentCall(
+    _ request: Yorkie_V1_WatchDocumentRequest,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncServerStreamingCall<Yorkie_V1_WatchDocumentsRequest, Yorkie_V1_WatchDocumentsResponse> {
+  ) -> GRPCAsyncServerStreamingCall<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse> {
     return self.makeAsyncServerStreamingCall(
-      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocuments.path,
+      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocument.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makeWatchDocumentsInterceptors() ?? []
+      interceptors: self.interceptors?.makeWatchDocumentInterceptors() ?? []
     )
   }
 }
@@ -528,15 +528,15 @@ extension Yorkie_V1_YorkieServiceAsyncClientProtocol {
     )
   }
 
-  internal func watchDocuments(
-    _ request: Yorkie_V1_WatchDocumentsRequest,
+  internal func watchDocument(
+    _ request: Yorkie_V1_WatchDocumentRequest,
     callOptions: CallOptions? = nil
-  ) -> GRPCAsyncResponseStream<Yorkie_V1_WatchDocumentsResponse> {
+  ) -> GRPCAsyncResponseStream<Yorkie_V1_WatchDocumentResponse> {
     return self.performAsyncServerStreamingCall(
-      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocuments.path,
+      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocument.path,
       request: request,
       callOptions: callOptions ?? self.defaultCallOptions,
-      interceptors: self.interceptors?.makeWatchDocumentsInterceptors() ?? []
+      interceptors: self.interceptors?.makeWatchDocumentInterceptors() ?? []
     )
   }
 }
@@ -583,8 +583,8 @@ internal protocol Yorkie_V1_YorkieServiceClientInterceptorFactoryProtocol: GRPCS
   /// - Returns: Interceptors to use when invoking 'pushPullChanges'.
   func makePushPullChangesInterceptors() -> [ClientInterceptor<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>]
 
-  /// - Returns: Interceptors to use when invoking 'watchDocuments'.
-  func makeWatchDocumentsInterceptors() -> [ClientInterceptor<Yorkie_V1_WatchDocumentsRequest, Yorkie_V1_WatchDocumentsResponse>]
+  /// - Returns: Interceptors to use when invoking 'watchDocument'.
+  func makeWatchDocumentInterceptors() -> [ClientInterceptor<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>]
 }
 
 internal enum Yorkie_V1_YorkieServiceClientMetadata {
@@ -599,7 +599,7 @@ internal enum Yorkie_V1_YorkieServiceClientMetadata {
       Yorkie_V1_YorkieServiceClientMetadata.Methods.detachDocument,
       Yorkie_V1_YorkieServiceClientMetadata.Methods.removeDocument,
       Yorkie_V1_YorkieServiceClientMetadata.Methods.pushPullChanges,
-      Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocuments,
+      Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocument,
     ]
   )
 
@@ -646,9 +646,9 @@ internal enum Yorkie_V1_YorkieServiceClientMetadata {
       type: GRPCCallType.unary
     )
 
-    internal static let watchDocuments = GRPCMethodDescriptor(
-      name: "WatchDocuments",
-      path: "/yorkie.v1.YorkieService/WatchDocuments",
+    internal static let watchDocument = GRPCMethodDescriptor(
+      name: "WatchDocument",
+      path: "/yorkie.v1.YorkieService/WatchDocument",
       type: GRPCCallType.serverStreaming
     )
   }

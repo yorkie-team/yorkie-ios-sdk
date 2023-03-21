@@ -1487,18 +1487,6 @@ struct Yorkie_V1_Client {
   fileprivate var _presence: Yorkie_V1_Presence? = nil
 }
 
-struct Yorkie_V1_Clients {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var clients: [Yorkie_V1_Client] = []
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-}
-
 struct Yorkie_V1_Checkpoint {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1570,7 +1558,7 @@ struct Yorkie_V1_DocEvent {
   /// Clears the value of `publisher`. Subsequent reads from it will return its default value.
   mutating func clearPublisher() {self._publisher = nil}
 
-  var documentKeys: [String] = []
+  var documentID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1615,7 +1603,6 @@ extension Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods: @unchecked Sendab
 extension Yorkie_V1_DocumentSummary: @unchecked Sendable {}
 extension Yorkie_V1_Presence: @unchecked Sendable {}
 extension Yorkie_V1_Client: @unchecked Sendable {}
-extension Yorkie_V1_Clients: @unchecked Sendable {}
 extension Yorkie_V1_Checkpoint: @unchecked Sendable {}
 extension Yorkie_V1_TextNodePos: @unchecked Sendable {}
 extension Yorkie_V1_TimeTicket: @unchecked Sendable {}
@@ -3727,38 +3714,6 @@ extension Yorkie_V1_Client: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension Yorkie_V1_Clients: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".Clients"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "clients"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.clients) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.clients.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.clients, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Yorkie_V1_Clients, rhs: Yorkie_V1_Clients) -> Bool {
-    if lhs.clients != rhs.clients {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension Yorkie_V1_Checkpoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".Checkpoint"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -3894,7 +3849,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "type"),
     2: .same(proto: "publisher"),
-    3: .standard(proto: "document_keys"),
+    3: .standard(proto: "document_id"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3905,7 +3860,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._publisher) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.documentKeys) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       default: break
       }
     }
@@ -3922,8 +3877,8 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     try { if let v = self._publisher {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if !self.documentKeys.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.documentKeys, fieldNumber: 3)
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3931,7 +3886,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   static func ==(lhs: Yorkie_V1_DocEvent, rhs: Yorkie_V1_DocEvent) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs._publisher != rhs._publisher {return false}
-    if lhs.documentKeys != rhs.documentKeys {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
