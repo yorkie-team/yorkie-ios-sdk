@@ -76,6 +76,29 @@ struct DocumentsChangedEvent: BaseClientEvent {
 }
 
 /**
+ * `PeersChangedValue` represents the value of the PeersChanged event.
+ */
+struct PeersChangedValue: Equatable {
+    enum `Type`: String {
+        case initialized
+        case watched
+        case unwatched
+        case presenceChanged = "presence-changed"
+    }
+
+    let type: `Type`
+    let peers: [DocumentKey: PresenceMap]
+
+    static func == (lhs: Yorkie.PeersChangedValue, rhs: Yorkie.PeersChangedValue) -> Bool {
+        if lhs.type == rhs.type {
+            return NSDictionary(dictionary: lhs.peers).isEqual(to: rhs.peers)
+        }
+
+        return false
+    }
+}
+
+/**
  * `PeersChangedEvent` is an event that occurs when the states of another peers
  * of the attached documents changes.
  */
@@ -88,7 +111,7 @@ struct PeerChangedEvent: BaseClientEvent {
     /**
      * `PeersChangedEvent` value
      */
-    var value: [String: [String: Presence]]
+    var value: PeersChangedValue
 }
 
 /**

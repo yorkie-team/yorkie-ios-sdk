@@ -20,6 +20,8 @@ import GRPC
 import Logging
 import NIO
 
+public typealias PresenceMap = [ActorID: Presence]
+
 /**
  * `ClientStatus` represents the status of the client.
  */
@@ -53,7 +55,7 @@ struct Attachment {
     var doc: Document
     var docID: String
     var isRealtimeSync: Bool
-    var peerPresenceMap: [String: PresenceInfo]
+    var peerPresenceMap: [ActorID: PresenceInfo]
     var remoteChangeEventReceived: Bool
 }
 
@@ -153,7 +155,7 @@ public struct RPCAddress {
  */
 public actor Client {
     private var presenceInfo: PresenceInfo
-    private var attachmentMap: [String: Attachment]
+    private var attachmentMap: [DocumentKey: Attachment]
     private let syncLoopDuration: Int
     private let reconnectStreamDelay: Int
     private let maximumAttachmentTimeout: Int
@@ -164,7 +166,7 @@ public actor Client {
 
     private let group: EventLoopGroup
 
-    private var semaphoresForInitialzation = [String: DispatchSemaphore]()
+    private var semaphoresForInitialzation = [DocumentKey: DispatchSemaphore]()
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -506,7 +508,7 @@ public actor Client {
             return
         }
 
-        var keys = [String]()
+        var docKeys = [DocumentKey]()
 
         for (key, attachment) in self.attachmentMap {
             if attachment.isRealtimeSync == false {
@@ -515,15 +517,14 @@ public actor Client {
 
             self.attachmentMap[key]?.peerPresenceMap[id] = self.presenceInfo
 
-            keys.append(attachment.doc.getKey())
+            docKeys.append(attachment.doc.getKey())
         }
 
         var updatePresenceRequest = UpdatePresenceRequest()
         updatePresenceRequest.client = Converter.toClient(id: id, presence: self.presenceInfo)
-        updatePresenceRequest.documentKeys = keys
+        updatePresenceRequest.documentKeys = docKeys
 
-        let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
-        self.eventStream.send(event)
+        self.sendPeerChangeEvent(.presenceChanged, docKeys, id)
 
         do {
             _ = try await self.rpcClient.updatePresence(updatePresenceRequest)
@@ -536,8 +537,8 @@ public actor Client {
     /**
      * `getPeers` returns the peers of the given document.
      */
-    public func getPeers(key: String) -> [String: Presence] {
-        var peers = [String: Presence]()
+    public func getPeers(key: String) -> PresenceMap {
+        var peers = PresenceMap()
         self.attachmentMap[key]?.peerPresenceMap.forEach {
             peers[$0.key] = $0.value.data
         }
@@ -547,18 +548,23 @@ public actor Client {
     /**
      * `getPeersWithDocKey` returns the peers of the given document wrapped in an object.
      */
-    private func getPeersWithDocKey(peersMap: [String: [String: Presence]], key: String) -> [String: [String: Presence]] {
+    private func getPeersWithDocKey(peersMap: [DocumentKey: PresenceMap], docKey: DocumentKey, actorID: ActorID?) -> [DocumentKey: PresenceMap] {
         var newPeerMap = peersMap
-        var peers = [String: Presence]()
-        self.attachmentMap[key]?.peerPresenceMap.forEach {
-            peers[$0.key] = $0.value.data
+        var peers = PresenceMap()
+
+        if let actorID, let value = self.attachmentMap[docKey]?.peerPresenceMap[actorID] {
+            peers[actorID] = value.data
+        } else {
+            self.attachmentMap[docKey]?.peerPresenceMap.forEach {
+                peers[$0.key] = $0.value.data
+            }
         }
-        newPeerMap[key] = peers
+        newPeerMap[docKey] = peers
         return newPeerMap
     }
 
-    private func clearAttachmentRemoteChangeEventReceived(_ key: String) {
-        self.attachmentMap[key]?.remoteChangeEventReceived = false
+    private func clearAttachmentRemoteChangeEventReceived(_ docKey: DocumentKey) {
+        self.attachmentMap[docKey]?.remoteChangeEventReceived = false
     }
 
     private func setSyncTimer(_ reconnect: Bool) {
@@ -638,10 +644,13 @@ public actor Client {
 
         let stream = self.rpcClient.watchDocuments(request)
 
+        let event = StreamConnectionStatusChangedEvent(value: .connected)
+        self.eventStream.send(event)
+
         self.watchLoopTask = Task {
             do {
                 for try await response in stream {
-                    self.handleWatchDocumentsResponse(keys: realtimeSyncDocKeys, response: response)
+                    self.handleWatchDocumentsResponse(docKeys: realtimeSyncDocKeys, response: response)
                 }
             } catch {
                 switch error {
@@ -677,7 +686,7 @@ public actor Client {
         }
     }
 
-    private func handleWatchDocumentsResponse(keys: [String], response: WatchDocumentsResponse) {
+    private func handleWatchDocumentsResponse(docKeys: [DocumentKey], response: WatchDocumentsResponse) {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
         guard let body = response.body else {
@@ -694,8 +703,7 @@ public actor Client {
                 self.semaphoresForInitialzation[docID]?.signal()
             }
 
-            let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
-            self.eventStream.send(event)
+            self.sendPeerChangeEvent(.initialized, docKeys)
         case .event(let pbWatchEvent):
             let responseKeys = pbWatchEvent.documentKeys
             let publisher = pbWatchEvent.publisher.id.toHexString
@@ -724,13 +732,25 @@ public actor Client {
             case .documentsChanged:
                 let event = DocumentsChangedEvent(value: responseKeys)
                 self.eventStream.send(event)
-            case .documentsWatched, .documentsUnwatched, .presenceChanged:
-                let event = PeerChangedEvent(value: keys.reduce([String: [String: Presence]](), self.getPeersWithDocKey(peersMap:key:)))
-                self.eventStream.send(event)
+            case .documentsWatched:
+                self.sendPeerChangeEvent(.watched, responseKeys, publisher)
+            case .documentsUnwatched:
+                self.sendPeerChangeEvent(.unwatched, responseKeys, publisher)
+            case .presenceChanged:
+                self.sendPeerChangeEvent(.presenceChanged, responseKeys, publisher)
             case .UNRECOGNIZED:
                 break
             }
         }
+    }
+
+    private func sendPeerChangeEvent(_ type: PeersChangedValue.`Type`, _ keys: [DocumentKey], _ actorID: ActorID? = nil) {
+        let value = PeersChangedValue(type: type, peers: keys.reduce([DocumentKey: PresenceMap]()) {
+            self.getPeersWithDocKey(peersMap: $0, docKey: $1, actorID: actorID)
+        })
+        let event = PeerChangedEvent(value: value)
+
+        self.eventStream.send(event)
     }
 
     private func onStreamDisconnect() {
