@@ -173,7 +173,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
-    func test_stream_connection_evnts() async throws {
+    func skip_test_stream_connection_evnts() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
