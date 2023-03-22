@@ -353,7 +353,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.resume(d1)
 
         try await c1.detach(d1)
-        
+
         try await c1.deactivate()
     }
 
