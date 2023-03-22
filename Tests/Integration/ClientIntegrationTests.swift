@@ -23,103 +23,98 @@ final class ClientIntegrationTests: XCTestCase {
 
     let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
-    var c1: Client!
-    var c2: Client!
-    var d1: Document!
-    var d2: Document!
-
     func test_can_handle_sync() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        let c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        let c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
-        self.d1 = Document(key: docKey)
-        try await self.d1.update { root in
+        let d1 = Document(key: docKey)
+        try await d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
         }
 
-        self.d2 = Document(key: docKey)
-        try await self.d1.update { root in
+        let d2 = Document(key: docKey)
+        try await d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
         }
 
-        try await self.c1.activate()
-        try await self.c2.activate()
+        try await c1.activate()
+        try await c2.activate()
 
-        try await self.c1.attach(self.d1, false)
-        try await self.c2.attach(self.d2, false)
+        try await c1.attach(d1, false)
+        try await c2.attach(d2, false)
 
-        try await self.d1.update { root in
+        try await d1.update { root in
             root.k1 = "v1"
         }
 
-        try await self.c1.sync()
-        try await self.c2.sync()
+        try await c1.sync()
+        try await c2.sync()
 
         var result = await d2.getRoot().get(key: "k1") as? String
         XCTAssert(result == "v1")
 
-        try await self.d1.update { root in
+        try await d1.update { root in
             root.k2 = "v2"
         }
 
-        try await self.c1.sync()
-        try await self.c2.sync()
+        try await c1.sync()
+        try await c2.sync()
 
-        result = await self.d2.getRoot().get(key: "k2") as? String
+        result = await d2.getRoot().get(key: "k2") as? String
         XCTAssert(result == "v2")
 
-        try await self.d1.update { root in
+        try await d1.update { root in
             root.k3 = "v3"
         }
 
-        try await self.c1.sync()
-        try await self.c2.sync()
+        try await c1.sync()
+        try await c2.sync()
 
-        result = await self.d2.getRoot().get(key: "k3") as? String
+        result = await d2.getRoot().get(key: "k3") as? String
         XCTAssert(result == "v3")
 
-        try await self.c1.detach(self.d1)
-        try await self.c2.detach(self.d2)
+        try await c1.detach(d1)
+        try await c2.detach(d2)
 
-        try await self.c1.deactivate()
-        try await self.c2.deactivate()
+        try await c1.deactivate()
+        try await c2.deactivate()
     }
 
     func test_can_handle_sync_auto() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        let c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        let c2 = Client(rpcAddress: self.rpcAddress, options: options)
 
-        self.d1 = Document(key: docKey)
-        try await self.d1.update { root in
+        let d1 = Document(key: docKey)
+        try await d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
         }
 
-        self.d2 = Document(key: docKey)
-        try await self.d1.update { root in
+        let d2 = Document(key: docKey)
+        try await d1.update { root in
             root.k1 = ""
             root.k2 = ""
             root.k3 = ""
         }
 
-        try await self.c1.activate()
-        try await self.c2.activate()
+        try await c1.activate()
+        try await c2.activate()
 
-        try await self.c1.attach(self.d1, true)
-        try await self.c2.attach(self.d2, true)
+        try await c1.attach(d1, true)
+        try await c2.attach(d2, true)
 
-        try await self.d1.update { root in
+        try await d1.update { root in
             root.k1 = "v1"
             root.k2 = "v2"
             root.k3 = "v3"
@@ -129,12 +124,12 @@ final class ClientIntegrationTests: XCTestCase {
 
         var result = await d2.getRoot().get(key: "k1") as? String
         XCTAssert(result == "v1")
-        result = await self.d2.getRoot().get(key: "k2") as? String
+        result = await d2.getRoot().get(key: "k2") as? String
         XCTAssert(result == "v2")
-        result = await self.d2.getRoot().get(key: "k3") as? String
+        result = await d2.getRoot().get(key: "k3") as? String
         XCTAssert(result == "v3")
 
-        try await self.d1.update { root in
+        try await d1.update { root in
             root.integer = Int32.max
             root.long = Int64.max
             root.double = Double.pi
@@ -142,16 +137,16 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
-        let resultInteger = await self.d2.getRoot().get(key: "integer") as? Int32
+        let resultInteger = await d2.getRoot().get(key: "integer") as? Int32
         XCTAssert(resultInteger == Int32.max)
-        let resultLong = await self.d2.getRoot().get(key: "long") as? Int64
+        let resultLong = await d2.getRoot().get(key: "long") as? Int64
         XCTAssert(resultLong == Int64.max)
-        let resultDouble = await self.d2.getRoot().get(key: "double") as? Double
+        let resultDouble = await d2.getRoot().get(key: "double") as? Double
         XCTAssert(resultDouble == Double.pi)
 
         let curr = Date()
 
-        try await self.d1.update { root in
+        try await d1.update { root in
             root.true = true
             root.false = false
             root.date = curr
@@ -159,18 +154,18 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
-        let resultTrue = await self.d2.getRoot().get(key: "true") as? Bool
+        let resultTrue = await d2.getRoot().get(key: "true") as? Bool
         XCTAssert(resultTrue == true)
-        let resultFalse = await self.d2.getRoot().get(key: "false") as? Bool
+        let resultFalse = await d2.getRoot().get(key: "false") as? Bool
         XCTAssert(resultFalse == false)
-        let resultDate = await self.d2.getRoot().get(key: "date") as? Date
+        let resultDate = await d2.getRoot().get(key: "date") as? Date
         XCTAssert(resultDate?.trimedLessThanMilliseconds == curr.trimedLessThanMilliseconds)
 
-        try await self.c1.detach(self.d1)
-        try await self.c2.detach(self.d2)
+        try await c1.detach(d1)
+        try await c2.detach(d2)
 
-        try await self.c1.deactivate()
-        try await self.c2.deactivate()
+        try await c1.deactivate()
+        try await c2.deactivate()
     }
 
     func test_stream_connection_evnts() async throws {
@@ -322,6 +317,44 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await c1.deactivate()
         try await c2.deactivate()
+    }
+
+    func test_client_pause_resume() async throws {
+        let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+
+        try await c1.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let d1 = Document(key: docKey)
+
+        var c1NumberOfEvents = 0
+        let c1ExpectedValues = [
+            StreamConnectionStatus.connected,
+            StreamConnectionStatus.disconnected,
+            StreamConnectionStatus.connected,
+            StreamConnectionStatus.disconnected
+        ]
+
+        c1.eventStream.sink { event in
+            switch event {
+            case let event as StreamConnectionStatusChangedEvent:
+                XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
+                c1NumberOfEvents += 1
+            default:
+                break
+            }
+        }.store(in: &self.cancellables)
+
+        try await c1.attach(d1)
+
+        try await c1.pause(d1)
+
+        try await c1.resume(d1)
+
+        try await c1.detach(d1)
+        
+        try await c1.deactivate()
     }
 
     private func decodePresence<T: Decodable>(_ dictionary: [String: Any]) -> T? {

@@ -261,7 +261,7 @@ public actor Client {
         }
 
         try self.attachmentMap.forEach {
-            try self.disconnectWatchStream($0.key)
+            try self.stopWatchLoop($0.key)
         }
 
         var deactivateRequest = DeactivateClientRequest()
@@ -382,7 +382,7 @@ public actor Client {
                 await doc.setStatus(.detached)
             }
 
-            try self.disconnectWatchStream(doc.getKey())
+            try self.stopWatchLoop(doc.getKey())
 
             self.attachmentMap.removeValue(forKey: doc.getKey())
 
@@ -439,7 +439,7 @@ public actor Client {
             let pack = try Converter.fromChangePack(result.changePack)
             try await doc.applyChangePack(pack: pack)
 
-            try self.disconnectWatchStream(doc.getKey())
+            try self.stopWatchLoop(doc.getKey())
 
             self.attachmentMap.removeValue(forKey: doc.getKey())
 
@@ -457,11 +457,19 @@ public actor Client {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
 
-        guard self.attachmentMap[doc.getKey()] != nil else {
-            throw YorkieError.unexpected(message: "Can't find attachment by docKey! [\(doc.getKey())]")
+        let docKey = doc.getKey()
+
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.unexpected(message: "Can't find attachment by docKey! [\(docKey)]")
         }
 
-        self.attachmentMap[doc.getKey()]?.isRealtimeSync = isRealtimeSync
+        self.attachmentMap[docKey]?.isRealtimeSync = isRealtimeSync
+
+        if isRealtimeSync {
+            try self.runWatchLoop(docKey)
+        } else {
+            try self.stopWatchLoop(docKey)
+        }
     }
 
     /**
@@ -660,6 +668,10 @@ public actor Client {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
 
         try self.doWatchLoop(docKey)
+    }
+
+    private func stopWatchLoop(_ docKey: DocumentKey) throws {
+        try self.disconnectWatchStream(docKey)
     }
 
     private func waitForInitialization(_ semaphore: DispatchSemaphore, _ docKey: String) async throws {
