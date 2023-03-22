@@ -756,6 +756,9 @@ public actor Client {
         self.attachmentMap[docKey]?.remoteWatchStream?.cancel()
         self.attachmentMap[docKey]?.remoteWatchStream = nil
 
+        self.attachmentMap[docKey]?.watchLoopReconnectTimer?.invalidate()
+        self.attachmentMap[docKey]?.watchLoopReconnectTimer = nil
+
         Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
         let event = StreamConnectionStatusChangedEvent(value: .disconnected)
