@@ -426,12 +426,10 @@ public actor Client {
             throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
         }
 
-        await doc.setStatus(.removed)
-
         var removeDocumentRequest = RemoveDocumentRequest()
         removeDocumentRequest.clientID = clientIDData
         removeDocumentRequest.documentID = attachment.docID
-        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
+        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
 
         do {
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)

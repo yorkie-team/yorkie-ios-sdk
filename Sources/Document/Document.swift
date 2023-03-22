@@ -167,10 +167,10 @@ public actor Document {
      * remote server.
      *
      */
-    func createChangePack() -> ChangePack {
+    func createChangePack(_ forceToRemoved: Bool = false) -> ChangePack {
         let changes = self.localChanges
         let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
-        return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes, isRemoved: self.status == .removed)
+        return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes, isRemoved: forceToRemoved ? true : self.status == .removed)
     }
 
     /**
