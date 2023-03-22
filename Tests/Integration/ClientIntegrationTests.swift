@@ -285,6 +285,9 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.attach(d1)
         try await c2.attach(d2)
 
+        // To catch the watched event first.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
         c1Name = "c1+"
         try await c1.updatePresence("name", c1Name)
 
