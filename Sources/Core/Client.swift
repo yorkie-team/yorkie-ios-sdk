@@ -322,7 +322,7 @@ public actor Client {
             try await doc.applyChangePack(pack: pack)
 
             if await doc.status == .removed {
-                return doc
+                throw YorkieError.documentRemoved(message: "\(doc) is removed.")
             }
 
             await doc.setStatus(.attached)
