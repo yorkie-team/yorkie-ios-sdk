@@ -334,6 +334,8 @@ struct Yorkie_V1_PushPullChangesRequest {
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   mutating func clearChangePack() {self._changePack = nil}
 
+  var pushOnly: Bool = false
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -976,6 +978,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     1: .standard(proto: "client_id"),
     2: .standard(proto: "document_id"),
     3: .standard(proto: "change_pack"),
+    4: .standard(proto: "push_only"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -987,6 +990,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
       case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.pushOnly) }()
       default: break
       }
     }
@@ -1006,6 +1010,9 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
+    if self.pushOnly != false {
+      try visitor.visitSingularBoolField(value: self.pushOnly, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1013,6 +1020,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     if lhs.clientID != rhs.clientID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
+    if lhs.pushOnly != rhs.pushOnly {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
