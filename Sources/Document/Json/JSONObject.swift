@@ -40,7 +40,7 @@ public class JSONObject {
 
     func set(_ values: [String: Any]) {
         values.forEach { (key: String, value: Any) in
-            set(key: key, value: value)
+            self.set(key: key, value: value)
         }
     }
 

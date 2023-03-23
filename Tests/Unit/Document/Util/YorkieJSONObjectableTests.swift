@@ -28,7 +28,7 @@ struct KanbanCard: JSONObjectable {
 }
 
 class YorkieJSONObjectableTests: XCTestCase {
-    func test_can_inject_data_as_types_directly() async {
+    func test_can_inject_data_as_types_directly() async throws {
         let lists: [KanbanColumn] = [
             KanbanColumn(title: "a", cards: [
                 KanbanCard(title: "a-1"),
@@ -41,7 +41,7 @@ class YorkieJSONObjectableTests: XCTestCase {
         ]
 
         let doc = Document(key: "test")
-        await doc.update { root in
+        try await doc.update { root in
             root.lists = lists
 
             XCTAssertEqual(root.debugDescription,

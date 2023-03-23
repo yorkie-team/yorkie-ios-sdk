@@ -77,7 +77,7 @@ class KanbanViewModel: ObservableObject {
 
     func addColumn(title: String) {
         Task {
-            await self.document.update { root in
+            try? await self.document.update { root in
                 var lists = root.lists as? JSONArray
                 if lists == nil {
                     root.lists = []
@@ -92,7 +92,7 @@ class KanbanViewModel: ObservableObject {
 
     func deleteColumn(_ column: KanbanColumn) {
         Task {
-            await self.document.update { root in
+            try? await self.document.update { root in
                 guard let lists = root.lists as? JSONArray else { return }
                 lists.remove(byID: column.id)
             }
@@ -101,7 +101,7 @@ class KanbanViewModel: ObservableObject {
 
     func addCard(title: String, columnId: TimeTicket) {
         Task {
-            await self.document.update { root in
+            try? await self.document.update { root in
                 guard let lists = root.lists as? JSONArray,
                       let column = lists.getElement(byID: columnId) as? JSONObject,
                       let cards = column.cards as? JSONArray
@@ -117,7 +117,7 @@ class KanbanViewModel: ObservableObject {
 
     func deleteCard(_ card: KanbanCard) {
         Task {
-            await self.document.update { root in
+            try? await self.document.update { root in
                 guard let lists = root.lists as? JSONArray,
                       let column = lists.getElement(byID: card.columnId) as? JSONObject,
                       let cards = column.cards as? JSONArray

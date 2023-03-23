@@ -44,12 +44,18 @@ struct ChangePack {
      */
     private let minSyncedTicket: TimeTicket?
 
-    init(key: String, checkpoint: Checkpoint, changes: [Change], snapshot: Data? = nil, minSyncedTicket: TimeTicket? = nil) {
+    /**
+     * `IsRemoved` is a flag that indicates whether the document is removed.
+     */
+    let isRemoved: Bool
+
+    init(key: String, checkpoint: Checkpoint, changes: [Change], snapshot: Data? = nil, minSyncedTicket: TimeTicket? = nil, isRemoved: Bool) {
         self.documentKey = key
         self.checkpoint = checkpoint
         self.changes = changes
         self.snapshot = snapshot
         self.minSyncedTicket = minSyncedTicket
+        self.isRemoved = isRemoved
     }
 
     /**

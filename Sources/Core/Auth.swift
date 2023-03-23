@@ -78,11 +78,15 @@ final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtoco
         [AuthClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
-    func makeWatchDocumentsInterceptors() -> [GRPC.ClientInterceptor<WatchDocumentsRequest, WatchDocumentsResponse>] {
-        [AuthClientInterceptor<WatchDocumentsRequest, WatchDocumentsResponse>(apiKey: self.apiKey, token: self.token)]
+    func makeWatchDocumentInterceptors() -> [GRPC.ClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>] {
+        [AuthClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
-    func makePushPullInterceptors() -> [GRPC.ClientInterceptor<PushPullRequest, PushPullResponse>] {
-        [AuthClientInterceptor<PushPullRequest, PushPullResponse>(apiKey: self.apiKey, token: self.token)]
+    func makeRemoveDocumentInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_RemoveDocumentRequest, Yorkie_V1_RemoveDocumentResponse>] {
+        [AuthClientInterceptor<RemoveDocumentRequest, RemoveDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+    }
+
+    func makePushPullChangesInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>] {
+        [AuthClientInterceptor<PushPullChangeRequest, PushPullChangeResponse>(apiKey: self.apiKey, token: self.token)]
     }
 }

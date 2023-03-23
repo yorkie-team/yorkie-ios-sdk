@@ -244,10 +244,12 @@ class RGATreeListTests: XCTestCase {
         let e3 = Primitive(value: .string("C123"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         try target.insert(e3)
 
-        XCTAssertEqual("\(try target.getPreviousCreatedAt(ofCreatedAt: e1.createdAt))",
+        var result = try target.getPreviousCreatedAt(ofCreatedAt: e1.createdAt)
+        XCTAssertEqual("\(result)",
                        "0:000000000000000000000000:0")
 
-        XCTAssertEqual("\(try target.getPreviousCreatedAt(ofCreatedAt: e2.createdAt))",
+        result = try target.getPreviousCreatedAt(ofCreatedAt: e2.createdAt)
+        XCTAssertEqual("\(result)",
                        "1:999:0")
     }
 

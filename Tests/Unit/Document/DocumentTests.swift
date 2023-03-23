@@ -19,15 +19,15 @@ import XCTest
 @testable import Yorkie
 
 class DocumentTests: XCTestCase {
-    func test_doesnt_return_error_when_trying_to_delete_a_missing_key() async {
+    func test_doesnt_return_error_when_trying_to_delete_a_missing_key() async throws {
         let target = Document(key: "doc-1")
-        await target.update { root in
+        try await target.update { root in
             root.k1 = "1"
             root.k2 = "2"
             root.k3 = [1, 2]
         }
 
-        await target.update { root in
+        try await target.update { root in
             root.remove(key: "k1")
             (root.k3 as? JSONArray)?.remove(index: 0)
             root.remove(key: "k4") // missing key
@@ -37,7 +37,7 @@ class DocumentTests: XCTestCase {
 
     func test_can_input_nil() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = ["": nil, "null": nil]
         }
 
@@ -50,7 +50,7 @@ class DocumentTests: XCTestCase {
 
     func test_delete_elements_of_array_test() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
             XCTAssertEqual(root.debugDescription,
                            """
@@ -67,7 +67,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             (root.data as? JSONArray)?.remove(index: 0)
         }
 
@@ -80,7 +80,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 2)
 
-        await target.update { root in
+        try await target.update { root in
             (root.data as? JSONArray)?.remove(index: 1)
         }
 
@@ -93,7 +93,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 1)
 
-        await target.update { root in
+        try await target.update { root in
             (root.data as? JSONArray)?.remove(index: 0)
         }
 
@@ -110,14 +110,14 @@ class DocumentTests: XCTestCase {
     // swiftlint: disable function_body_length
     func test_splice_array_with_number() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.list = [Int64(0), Int64(1), Int64(2), Int64(3), Int64(4), Int64(5), Int64(6), Int64(7), Int64(8), Int64(9)]
         }
 
         var result = await target.toSortedJSON()
         XCTAssertEqual(result, "{\"list\":[0,1,2,3,4,5,6,7,8,9]}")
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: 1) as? [Int64]
             XCTAssertEqual(removeds, [Int64(1)])
         }
@@ -125,7 +125,7 @@ class DocumentTests: XCTestCase {
         result = await target.toSortedJSON()
         XCTAssertEqual(result, "{\"list\":[0,2,3,4,5,6,7,8,9]}")
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: 2) as? [Int64]
             XCTAssertEqual(removeds, [Int64(2), Int64(3)])
         }
@@ -136,7 +136,7 @@ class DocumentTests: XCTestCase {
                        {"list":[0,4,5,6,7,8,9]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 3) as? [Int64]
             XCTAssertEqual(removeds, [Int64(6), Int64(7), Int64(8), Int64(9)])
         }
@@ -147,7 +147,7 @@ class DocumentTests: XCTestCase {
                        {"list":[0,4,5]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: 200) as? [Int64]
             XCTAssertEqual(removeds, [Int64(4), Int64(5)])
         }
@@ -158,7 +158,7 @@ class DocumentTests: XCTestCase {
                        {"list":[0]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 0, deleteCount: 0, items: Int64(1), Int64(2), Int64(3)) as? [Int64]
             XCTAssertEqual(removeds, [])
         }
@@ -169,7 +169,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,2,3,0]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: 2, items: Int64(4)) as? [Int64]
             XCTAssertEqual(removeds, [Int64(2), Int64(3)])
         }
@@ -180,7 +180,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,4,0]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 2, deleteCount: 200, items: Int64(2)) as? [Int64]
             XCTAssertEqual(removeds, [Int64(0)])
         }
@@ -191,7 +191,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,4,2]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 2, deleteCount: 0, items: Int64(3)) as? [Int64]
             XCTAssertEqual(removeds, [])
         }
@@ -202,7 +202,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,4,3,2]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 5, deleteCount: 10, items: Int64(1), Int64(2)) as? [Int64]
             XCTAssertEqual(removeds, [])
         }
@@ -213,7 +213,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,4,3,2,1,2]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: -3, items: Int64(5)) as? [Int64]
             XCTAssertEqual(removeds, [])
         }
@@ -224,7 +224,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,5,4,3,2,1,2]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: -2, deleteCount: -11, items: Int64(5), Int64(6)) as? [Int64]
             XCTAssertEqual(removeds, [])
         }
@@ -235,7 +235,7 @@ class DocumentTests: XCTestCase {
                        {"list":[1,5,4,3,2,5,6,1,2]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: -11, deleteCount: 2, items: Int64(7), Int64(8)) as? [Int64]
             XCTAssertEqual(removeds, [Int64(1), Int64(5)])
         }
@@ -249,7 +249,7 @@ class DocumentTests: XCTestCase {
 
     func test_splice_array_with_string() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.list = ["a", "b", "c"]
         }
 
@@ -259,7 +259,7 @@ class DocumentTests: XCTestCase {
                        {"list":["a","b","c"]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: 1) as? [String]
             XCTAssertEqual(removeds, ["b"])
         }
@@ -272,7 +272,7 @@ class DocumentTests: XCTestCase {
 
     func test_splice_array_with_object() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.list = [["id": Int64(1)], ["id": Int64(2)]]
         }
         var result = await target.toSortedJSON()
@@ -281,7 +281,7 @@ class DocumentTests: XCTestCase {
                        {"list":[{"id":1},{"id":2}]}
                        """)
 
-        await target.update { root in
+        try await target.update { root in
             let removeds = try? (root.list as? JSONArray)?.splice(start: 1, deleteCount: 1) as? [JSONObject]
             XCTAssertEqual(removeds?[0].debugDescription, "{\"id\":2}")
         }
@@ -297,7 +297,7 @@ class DocumentTests: XCTestCase {
 
     func test_concat() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.list = [Int64(1), Int64(2), Int64(3)]
         }
 
@@ -309,9 +309,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(array + [Int64(4), Int64(5), Int64(6)], [Int64(1), Int64(2), Int64(3), Int64(4), Int64(5), Int64(6)])
     }
 
-    func test_indexOf() async {
+    func test_indexOf() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.list = [Int64(1), Int64(2), Int64(3), Int64(3)]
         }
 
@@ -326,9 +326,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(list.indexOf(Int64(3), fromIndex: -3), 1)
     }
 
-    func test_indexOf_with_objects() async {
+    func test_indexOf_with_objects() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.objects = [["id": "first"], ["id": "second"]]
         }
 
@@ -340,9 +340,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(objects.indexOf(objects[1]!), 1)
     }
 
-    func test_lastIndexOf() async {
+    func test_lastIndexOf() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.list = [Int64(1), Int64(2), Int64(3), Int64(3)]
         }
 
@@ -358,9 +358,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(list.lastIndexOf(Int64(3), fromIndex: -1), 3)
     }
 
-    func test_lastIndexOf_with_objects() async {
+    func test_lastIndexOf_with_objects() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.objects = [["id": "first"], ["id": "second"]]
         }
 
@@ -373,13 +373,13 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(result, 1)
     }
 
-    func test_should_allow_mutation_of_objects_returned_from_readonly_list_methods() async {
+    func test_should_allow_mutation_of_objects_returned_from_readonly_list_methods() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.objects = [["id": "first"], ["id": "second"]]
         }
 
-        await target.update { root in
+        try await target.update { root in
             ((root.objects as? JSONArray)?[0] as? JSONObject)?.id = "FIRST"
         }
 
@@ -390,9 +390,9 @@ class DocumentTests: XCTestCase {
                        """)
     }
 
-    func test_move_elements_before_a_specific_node_of_array() async {
+    func test_move_elements_before_a_specific_node_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -404,7 +404,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
             let two = data?.getElement(byIndex: 2) as? CRDTElement
@@ -419,7 +419,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
@@ -440,9 +440,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_simple_move_elements_before_a_specific_node_of_array() async {
+    func test_simple_move_elements_before_a_specific_node_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -455,7 +455,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
@@ -476,9 +476,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_move_elements_after_a_specific_node_of_array() async {
+    func test_move_elements_after_a_specific_node_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -491,7 +491,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
             let two = data?.getElement(byIndex: 2) as? CRDTElement
@@ -507,7 +507,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
@@ -529,9 +529,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_simple_move_elements_after_a_specific_node_of_array() async {
+    func test_simple_move_elements_after_a_specific_node_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -543,7 +543,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
@@ -564,9 +564,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_move_elements_at_the_first_of_array() async {
+    func test_move_elements_at_the_first_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -578,7 +578,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let two = data?.getElement(byIndex: 2) as? CRDTElement
             try? data?.moveFront(id: two!.id)
@@ -591,7 +591,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let three = data?.getElement(byIndex: 3) as? CRDTElement
@@ -607,9 +607,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_simple_move_elements_at_the_first_of_array() async {
+    func test_simple_move_elements_at_the_first_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -621,7 +621,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
@@ -641,9 +641,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_move_elements_at_the_last_of_array() async {
+    func test_move_elements_at_the_last_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -655,7 +655,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let two = data?.getElement(byIndex: 2) as? CRDTElement
             try? data?.moveLast(id: two!.id)
@@ -669,7 +669,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let two = data?.getElement(byIndex: 2) as? CRDTElement
@@ -689,9 +689,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    func test_simple_move_elements_at_the_last_of_array() async {
+    func test_simple_move_elements_at_the_last_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -703,7 +703,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             data?.append(Int64(3))
             let one = data?.getElement(byIndex: 1) as? CRDTElement
@@ -725,7 +725,7 @@ class DocumentTests: XCTestCase {
 
     private var cancellables = Set<AnyCancellable>()
 
-    func test_change_paths_test_for_object() async {
+    func test_change_paths_test_for_object() async throws {
         let target = Document(key: "test-doc")
 
         await target.eventStream.sink { event in
@@ -733,7 +733,7 @@ class DocumentTests: XCTestCase {
             XCTAssertEqual((event as? LocalChangeEvent)?.value[0].paths, ["$."])
         }.store(in: &self.cancellables)
 
-        await target.update { root in
+        try await target.update { root in
             root[""] = [:]
 
             XCTAssertEqual(root.debugDescription,
@@ -787,7 +787,7 @@ class DocumentTests: XCTestCase {
         }
     }
 
-    func test_change_paths_test_for_array() async {
+    func test_change_paths_test_for_array() async throws {
         let target = Document(key: "test-doc")
 
         await target.eventStream.sink { event in
@@ -796,7 +796,7 @@ class DocumentTests: XCTestCase {
             XCTAssertEqual((event as? LocalChangeEvent)?.value[0].paths.sorted(), ["$.arr", "$.\\$\\$\\.\\.\\.hello"].sorted())
         }.store(in: &self.cancellables)
 
-        await target.update { root in
+        try await target.update { root in
             root.arr = []
             let arr = root.arr as? JSONArray
             arr?.append(Int64(0))
@@ -813,9 +813,9 @@ class DocumentTests: XCTestCase {
         }
     }
 
-    func test_insert_elements_before_a_specific_node_of_array() async {
+    func test_insert_elements_before_a_specific_node_of_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -827,7 +827,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
             _ = try? data?.insertBefore(nextID: zero!.id, value: Int64(3))
@@ -840,7 +840,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 4)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let one = data?.getElement(byIndex: 2) as? CRDTElement
             _ = try? data?.insertBefore(nextID: one!.id, value: Int64(4))
@@ -853,7 +853,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 5)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let two = data?.getElement(byIndex: 4) as? CRDTElement
             _ = try? data?.insertBefore(nextID: two!.id, value: Int64(5))
@@ -867,9 +867,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 6)
     }
 
-    func test_can_insert_an_element_before_specific_position_after_delete_operation() async {
+    func test_can_insert_an_element_before_specific_position_after_delete_operation() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = [Int64(0), Int64(1), Int64(2)]
         }
 
@@ -881,7 +881,7 @@ class DocumentTests: XCTestCase {
         var length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let zero = data?.getElement(byIndex: 0) as? CRDTElement
             _ = data?.remove(byID: zero!.id)
@@ -898,7 +898,7 @@ class DocumentTests: XCTestCase {
         length = await(target.getRoot().data as? JSONArray)?.length()
         XCTAssertEqual(length, 3)
 
-        await target.update { root in
+        try await target.update { root in
             let data = root.data as? JSONArray
             let one = data?.getElement(byIndex: 1) as? CRDTElement
             _ = data?.remove(byID: one!.id)
@@ -916,9 +916,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 3)
     }
 
-    func test_should_remove_previously_inserted_elements_in_heap_when_running_GC() async {
+    func test_should_remove_previously_inserted_elements_in_heap_when_running_GC() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.a = Int64(1)
             root.a = Int64(2)
             root.remove(key: "a")
@@ -939,9 +939,9 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 0)
     }
 
-    func test_escapes_string_for_object() async {
+    func test_escapes_string_for_object() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.a = "\"hello\"\n\r\t\\"
         }
 
@@ -952,9 +952,9 @@ class DocumentTests: XCTestCase {
                        """)
     }
 
-    func test_escapes_string_for_elements_in_array() async {
+    func test_escapes_string_for_elements_in_array() async throws {
         let target = Document(key: "test-doc")
-        await target.update { root in
+        try await target.update { root in
             root.data = ["\"hello\"", "\n", "\u{0008}", "\t", "\u{000C}", "\r", "\\"]
         }
 
@@ -968,7 +968,7 @@ class DocumentTests: XCTestCase {
     func test_can_handle_counter_overflow() async throws {
         let doc = Document(key: "test-doc")
 
-        await doc.update { root in
+        try await doc.update { root in
             root.age = JSONCounter(value: Int32(2_147_483_647))
             (root.age as? JSONCounter<Int32>)?.increase(value: 1)
         }
@@ -976,7 +976,7 @@ class DocumentTests: XCTestCase {
         var result = await doc.toSortedJSON()
         XCTAssertEqual("{\"age\":-2147483648}", result)
 
-        await doc.update { root in
+        try await doc.update { root in
             root.age = JSONCounter(value: Int64(9_223_372_036_854_775_807))
             (root.age as? JSONCounter<Int64>)?.increase(value: 1)
         }
@@ -987,7 +987,7 @@ class DocumentTests: XCTestCase {
     func test_can_handle_counter_float_value() async throws {
         let doc = Document(key: "test-doc")
 
-        await doc.update { root in
+        try await doc.update { root in
             root.age = JSONCounter(value: Int32(10))
             (root.age as? JSONCounter<Int32>)?.increase(value: 3.5)
         }
@@ -995,7 +995,7 @@ class DocumentTests: XCTestCase {
         var result = await doc.toSortedJSON()
         XCTAssertEqual("{\"age\":13}", result)
 
-        await doc.update { root in
+        try await doc.update { root in
             root.age = JSONCounter(value: Int64(0))
             (root.age as? JSONCounter<Int64>)?.increase(value: -1.5)
         }
