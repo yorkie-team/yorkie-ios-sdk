@@ -51,7 +51,7 @@ enum StreamConnectionStatus {
     case disconnected
 }
 
-public enum AttachmentSyncMode {
+public enum RealtimeSyncMode {
     case pushPull
     case pushOnly
     case pullOnly
@@ -61,11 +61,15 @@ struct Attachment {
     var doc: Document
     var docID: String
     var isRealtimeSync: Bool
-    var syncMode: AttachmentSyncMode
+    var realtimeSyncMode: RealtimeSyncMode
     var peerPresenceMap: [ActorID: PresenceInfo]
     var remoteChangeEventReceived: Bool
     var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
     var watchLoopReconnectTimer: Timer?
+
+    var pushPullMode: RealtimeSyncMode {
+        self.isRealtimeSync ? self.realtimeSyncMode : .pushPull
+    }
 }
 
 /**
@@ -334,7 +338,7 @@ public actor Client {
 
             await doc.setStatus(.attached)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, isRealtimeSync: isRealtimeSync, syncMode: .pushPull, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, isRealtimeSync: isRealtimeSync, realtimeSyncMode: .pushPull, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
             try self.runWatchLoop(docKey)
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
@@ -457,8 +461,8 @@ public actor Client {
         }
     }
 
-    public func changeSyncMode(_ doc: Document, _ mode: AttachmentSyncMode) {
-        self.attachmentMap[doc.getKey()]?.syncMode = mode
+    public func changeRealtimeSyncMode(_ doc: Document, _ mode: RealtimeSyncMode) {
+        self.attachmentMap[doc.getKey()]?.realtimeSyncMode = mode
     }
 
     private func changeRealtimeSyncSetting(_ doc: Document, _ isRealtimeSync: Bool) throws {
@@ -604,7 +608,7 @@ public actor Client {
                 for (key, attachment) in self.attachmentMap where attachment.isRealtimeSync {
                     let docChanged = await attachment.doc.hasLocalChanges()
 
-                    if docChanged || (attachment.remoteChangeEventReceived && attachment.syncMode != .pullOnly) {
+                    if docChanged || (attachment.remoteChangeEventReceived && attachment.pushPullMode != .pullOnly) {
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
                             try await self.syncInternal(attachment)
@@ -800,18 +804,18 @@ public actor Client {
         pushPullRequest.clientID = clientIDData
 
         let doc = attachment.doc
-        let requestPack = await doc.createChangePack(attachment.syncMode)
+        let requestPack = await doc.createChangePack(attachment.pushPullMode)
         let localSize = requestPack.getChangeSize()
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.docID
-        pushPullRequest.pushOnly = attachment.syncMode == .pushOnly
+        pushPullRequest.pushOnly = attachment.pushPullMode == .pushOnly
 
         do {
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
-            try await doc.applyChangePack(pack: responsePack, syncMode: attachment.syncMode, clientID: clientID)
+            try await doc.applyChangePack(pack: responsePack, syncMode: attachment.pushPullMode, clientID: clientID)
 
             if await doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: doc.getKey())

@@ -113,7 +113,7 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(pack: ChangePack, syncMode: AttachmentSyncMode = .pushPull, clientID: ActorID) throws {
+    func applyChangePack(pack: ChangePack, syncMode: RealtimeSyncMode = .pushPull, clientID: ActorID) throws {
         var serverSeq: Int64
 
         if syncMode != .pushOnly {
@@ -179,7 +179,7 @@ public actor Document {
      * remote server.
      *
      */
-    func createChangePack(_ syncMode: AttachmentSyncMode = .pushPull, _ forceToRemoved: Bool = false) -> ChangePack {
+    func createChangePack(_ syncMode: RealtimeSyncMode = .pushPull, _ forceToRemoved: Bool = false) -> ChangePack {
         let changes = syncMode == .pullOnly ? [] : self.localChanges
         let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
         return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes, isRemoved: forceToRemoved ? true : self.status == .removed)
