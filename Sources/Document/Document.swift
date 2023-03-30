@@ -332,7 +332,7 @@ public actor Document {
             newServerSeq = serverSeq
 
             // Skip already processed opertaions by local changes.
-            if change.id.getActorID() != clientID {
+            if change.id.getActorID() != clientID || change.id.getClientSeq() > self.checkpoint.getClientSeq() {
                 try change.execute(root: clone)
                 try change.execute(root: self.root)
             }
