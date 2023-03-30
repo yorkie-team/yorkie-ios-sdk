@@ -22,6 +22,7 @@ import Yorkie
 enum TextOperation {
     case edit(range: NSRange?, content: String)
     case select(range: NSRange, actorID: String)
+    case documentCorrupted
 }
 
 class TextViewModel {
@@ -61,10 +62,15 @@ class TextViewModel {
             let clientID = await self.client.id
 
             await self.document.eventStream.sink { [weak self] event in
-                if event.type == .snapshot {
+                switch event.type {
+                case .snapshot:
                     Task { [weak self] in
                         await self?.syncText()
                     }
+                case .corrupted:
+                    self?.operationSubject?.send([TextOperation.documentCorrupted])
+                default:
+                    break
                 }
             }.store(in: &self.cancellables)
 
@@ -113,8 +119,8 @@ class TextViewModel {
     }
 
     func cleanup() async {
-        try! await self.client.detach(self.document)
-        try! await self.client.deactivate()
+        _ = try? await self.client.detach(self.document)
+        try? await self.client.deactivate()
     }
 
     func edit(_ operaitions: [TextOperation]) async {
@@ -142,6 +148,8 @@ class TextViewModel {
                     }
 
                     content.select(fromIdx, toIdx)
+                default:
+                    break
                 }
             }
         }

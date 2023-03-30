@@ -113,11 +113,33 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(pack: ChangePack) throws {
+    func applyChangePack(pack: ChangePack, clientID: ActorID) throws {
+        // 0. Check Sequences.
+        
+        let minClientSequence = self.localChanges.first?.id.getClientSeq() ?? self.checkpoint.getClientSeq()
+        let maxClientSequence = self.localChanges.last?.id.getClientSeq() ?? self.checkpoint.getClientSeq()
+
+        guard (minClientSequence...maxClientSequence).contains(pack.getCheckpoint().getClientSeq()) else {
+            let event = CorruptedEvent()
+            self.eventStream.send(event)
+
+            throw YorkieError.sequenceCorrupted(message: "Local changes are missing. Can't recover Client sequence!")
+        }
+
+        // Increent server sequence by actual data from the server.
+        var serverSeq = self.checkpoint.getServerSeq()
+
         if let snapshot = pack.getSnapshot() {
             try self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: snapshot)
+            serverSeq = pack.getCheckpoint().getServerSeq()
         } else if pack.hasChanges() {
-            try self.applyChanges(changes: pack.getChanges())
+            serverSeq = try self.applyChanges(changes: pack.getChanges(), clientID: clientID)
+            
+            // The server does not apply changes sent by pushPull request to changes of pushPull response.
+            // So add size of local changes.
+            if pack.getCheckpoint().getClientSeq() > self.checkpoint.getClientSeq() {
+                serverSeq += Int64(pack.getCheckpoint().getClientSeq() - self.checkpoint.getClientSeq())
+            }
         }
 
         // 01. Remove local changes applied to server.
@@ -126,7 +148,7 @@ public actor Document {
         }
 
         // 02. Update the checkpoint.
-        self.checkpoint.forward(other: pack.getCheckpoint())
+        self.checkpoint.forward(other: Checkpoint(serverSeq: serverSeq, clientSeq: pack.getCheckpoint().getClientSeq()))
 
         // 03. Do Garbage collection.
         if let ticket = pack.getMinSyncedTicket() {
@@ -278,7 +300,7 @@ public actor Document {
     /**
      * `applyChanges` applies the given changes into this document.
      */
-    func applyChanges(changes: [Change]) throws {
+    func applyChanges(changes: [Change], clientID: ActorID) throws -> Int64 {
         Logger.debug(
             """
             trying to apply \(changes.count) remote changes.
@@ -289,13 +311,33 @@ public actor Document {
         Logger.trace(changes.map { "\($0.id.structureAsString)\t\($0.structureAsString)" }.joined(separator: "\n"))
 
         let clone = self.cloned
-        try changes.forEach {
-            try $0.execute(root: clone)
-        }
 
-        try changes.forEach {
-            try $0.execute(root: self.root)
-            self.changeID.syncLamport(with: $0.id.getLamport())
+        var newServerSeq = self.checkpoint.getServerSeq()
+
+        for change in changes {
+            // Validate server sequence number.
+            guard let serverSeq = change.id.getServerSeq() else {
+                throw YorkieError.unexpected(message: "No server seq in the change!!!")
+            }
+            
+            guard newServerSeq > serverSeq else {
+                // Skip already processed change.
+                continue
+            }
+            
+            guard newServerSeq + 1 == serverSeq else {
+                throw YorkieError.sequenceCorrupted(message: "Bad Server Sequence! expected seq: \(newServerSeq + 1), actual seq : \(String(describing: change.id.getServerSeq()))")
+            }
+
+            newServerSeq = serverSeq
+
+            // Skip already processed opertaions by local changes.
+            if change.id.getActorID() != clientID {
+                try change.execute(root: clone)
+                try change.execute(root: self.root)
+            }
+            
+            self.changeID.syncLamport(with: change.id.getLamport())
         }
 
         let changeInfos = changes.map {
@@ -312,6 +354,8 @@ public actor Document {
             removeds:\(self.root.removedElementSetSize)
             """
         )
+
+        return newServerSeq
     }
 
     private func createPaths(change: Change) -> [String] {

@@ -76,7 +76,7 @@ class TextEditorViewController: UIViewController {
         self.textView.topAnchor.constraint(equalTo: view.layoutMarginsGuide.topAnchor).isActive = true
         self.textView.leftAnchor.constraint(equalTo: view.layoutMarginsGuide.leftAnchor).isActive = true
         self.textView.rightAnchor.constraint(equalTo: view.layoutMarginsGuide.rightAnchor).isActive = true
-        self.textView.bottomAnchor.constraint(equalTo: view.layoutMarginsGuide.bottomAnchor).isActive = true
+        self.textView.keyboardLayoutGuide.topAnchor.constraint(equalToSystemSpacingBelow: self.textView.bottomAnchor, multiplier: 1).isActive = true
 
         self.textView.textStorage.delegate = self
         self.textView.delegate = self
@@ -195,6 +195,12 @@ class TextEditorViewController: UIViewController {
                 } else {
                     self.peerSelection[actorID] = (range, newColor)
                 }
+            case .documentCorrupted:
+                let alert = UIAlertController(title: "Error", message: "A serious error has occurred in the document. Close Document.", preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "Close", style: .default, handler: { _ in
+                    self.navigationController?.popViewController(animated: true)
+                }))
+                self.present(alert, animated: true, completion: nil)
             }
         }
 

@@ -32,6 +32,10 @@ public enum DocEventType: String {
      * remote document change event type
      */
     case remoteChange = "remote-change"
+    /**
+     * document corrupted event type
+     */
+    case corrupted
 }
 
 /**
@@ -97,4 +101,11 @@ struct RemoteChangeEvent: DocEvent {
      * RemoteChangeEvent type
      */
     var value: [ChangeInfo]
+}
+
+struct CorruptedEvent: DocEvent {
+    /**
+     * ``DocEventType/corrupted``
+     */
+    let type: DocEventType = .corrupted
 }

@@ -179,7 +179,8 @@ extension Converter {
     static func fromChangeID(_ pbChangeID: PbChangeID) -> ChangeID {
         ChangeID(clientSeq: pbChangeID.clientSeq,
                  lamport: pbChangeID.lamport,
-                 actor: pbChangeID.actorID.toHexString)
+                 actor: pbChangeID.actorID.toHexString,
+                 serverSeq: pbChangeID.serverSeq)
     }
 }
 

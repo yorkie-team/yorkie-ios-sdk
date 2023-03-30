@@ -319,7 +319,7 @@ public actor Client {
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack: pack, clientID: clientID)
 
             if await doc.status == .removed {
                 throw YorkieError.documentRemoved(message: "\(doc) is removed.")
@@ -376,7 +376,7 @@ public actor Client {
             let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack: pack, clientID: clientID)
 
             if await doc.status != .removed {
                 await doc.setStatus(.detached)
@@ -435,7 +435,7 @@ public actor Client {
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack: pack, clientID: clientID)
 
             try self.stopWatchLoop(doc.getKey())
 
@@ -799,7 +799,7 @@ public actor Client {
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
-            try await doc.applyChangePack(pack: responsePack)
+            try await doc.applyChangePack(pack: responsePack, clientID: clientID)
 
             if await doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: doc.getKey())
@@ -813,6 +813,10 @@ public actor Client {
             Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().structureAsString)")
 
             return doc
+        } catch YorkieError.sequenceCorrupted(let message) {
+            try pause(doc)
+
+            throw YorkieError.sequenceCorrupted(message: message)
         } catch {
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 
