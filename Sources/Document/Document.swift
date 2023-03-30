@@ -320,7 +320,7 @@ public actor Document {
                 throw YorkieError.unexpected(message: "No server seq in the change!!!")
             }
 
-            guard newServerSeq > serverSeq else {
+            guard newServerSeq < serverSeq else {
                 // Skip already processed change.
                 continue
             }
