@@ -137,7 +137,7 @@ public actor Document {
 
             // The server does not apply changes sent by pushPull request to changes of pushPull response.
             // So add size of local changes.
-            if pack.getCheckpoint().getClientSeq() > self.checkpoint.getClientSeq() {
+            if serverSeq < pack.getCheckpoint().getClientSeq(), pack.getCheckpoint().getClientSeq() > self.checkpoint.getClientSeq() {
                 serverSeq += Int64(pack.getCheckpoint().getClientSeq() - self.checkpoint.getClientSeq())
             }
         }
