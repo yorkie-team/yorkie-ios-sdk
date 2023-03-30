@@ -115,11 +115,11 @@ public actor Document {
      */
     func applyChangePack(pack: ChangePack, clientID: ActorID) throws {
         // 0. Check Sequences.
-        
+
         let minClientSequence = self.localChanges.first?.id.getClientSeq() ?? self.checkpoint.getClientSeq()
         let maxClientSequence = self.localChanges.last?.id.getClientSeq() ?? self.checkpoint.getClientSeq()
 
-        guard (minClientSequence...maxClientSequence).contains(pack.getCheckpoint().getClientSeq()) else {
+        guard (minClientSequence ... maxClientSequence).contains(pack.getCheckpoint().getClientSeq()) else {
             let event = CorruptedEvent()
             self.eventStream.send(event)
 
@@ -134,7 +134,7 @@ public actor Document {
             serverSeq = pack.getCheckpoint().getServerSeq()
         } else if pack.hasChanges() {
             serverSeq = try self.applyChanges(changes: pack.getChanges(), clientID: clientID)
-            
+
             // The server does not apply changes sent by pushPull request to changes of pushPull response.
             // So add size of local changes.
             if pack.getCheckpoint().getClientSeq() > self.checkpoint.getClientSeq() {
@@ -319,12 +319,12 @@ public actor Document {
             guard let serverSeq = change.id.getServerSeq() else {
                 throw YorkieError.unexpected(message: "No server seq in the change!!!")
             }
-            
+
             guard newServerSeq > serverSeq else {
                 // Skip already processed change.
                 continue
             }
-            
+
             guard newServerSeq + 1 == serverSeq else {
                 throw YorkieError.sequenceCorrupted(message: "Bad Server Sequence! expected seq: \(newServerSeq + 1), actual seq : \(String(describing: change.id.getServerSeq()))")
             }
@@ -336,7 +336,7 @@ public actor Document {
                 try change.execute(root: clone)
                 try change.execute(root: self.root)
             }
-            
+
             self.changeID.syncLamport(with: change.id.getLamport())
         }
 
