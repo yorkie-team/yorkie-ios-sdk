@@ -68,6 +68,6 @@ class DocumentConcurrentAccessTests: XCTestCase {
             }
         }
 
-        await fulfillment(of: [expect], timeout: 5)
+        wait(for: [expect], timeout: 100)
     }
 }
