@@ -155,7 +155,7 @@ class ClientTests: XCTestCase {
         XCTAssertFalse(isActive)
         XCTAssert(status == .deactivated)
     }
-    
+
     func test_sync_option_with_multiple_clients() async throws {
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
         let docKey = "\(self.description)-\(Date().description)".toDocKey
@@ -175,7 +175,7 @@ class ClientTests: XCTestCase {
         try await c2.attach(d2, false)
         let d3 = Document(key: docKey)
         try await c3.attach(d3, false)
-        
+
         // 02. c1, c2 sync with push-pull mode.
         try await d1.update { root in
             root.c1 = Int64(0)
@@ -188,23 +188,23 @@ class ClientTests: XCTestCase {
         try await c1.sync()
         try await c2.sync()
         try await c1.sync()
-        
+
         var result1 = await d1.getRoot().debugDescription
         var result2 = await d2.getRoot().debugDescription
 
         XCTAssertEqual(result1, result2)
-        
+
         // 03. c1 and c2 sync with push-only mode. So, the changes of c1 and c2
         // are not reflected to each other.
         // But, c3 can get the changes of c1 and c2, because c3 sync with pull-pull mode.
-        try await d1.update{ root in
+        try await d1.update { root in
             root.c1 = Int64(1)
         }
 
-        try await d2.update{ root in
+        try await d2.update { root in
             root.c2 = Int64(1)
         }
-        
+
         try await c1.sync([docKey: .pushOnly])
         try await c2.sync([docKey: .pushOnly])
         try await c3.sync()
@@ -213,11 +213,11 @@ class ClientTests: XCTestCase {
         result2 = await d2.getRoot().debugDescription
 
         XCTAssertNotEqual(result1, result2)
-        
+
         let result3 = await d3.getRoot().debugDescription
-        
+
         XCTAssertEqual(result3, "{\"c1\":1,\"c2\":1}")
-        
+
         // 04. c1 and c2 sync with push-pull mode.
         try await c1.sync()
         try await c2.sync()
@@ -227,16 +227,16 @@ class ClientTests: XCTestCase {
 
         XCTAssertEqual(result1, result3)
         XCTAssertEqual(result2, result3)
-        
+
         try await c1.detach(d1)
         try await c2.detach(d2)
         try await c3.detach(d3)
-        
+
         try await c1.deactivate()
         try await c2.deactivate()
         try await c3.deactivate()
     }
-    
+
     func test_sync_option_with_mixed_mode() async throws {
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
         let docKey = "\(self.description)-\(Date().description)".toDocKey
@@ -248,16 +248,16 @@ class ClientTests: XCTestCase {
         // 01. cli attach to the same document having counter.
         let d1 = Document(key: docKey)
         try await c1.attach(d1, false)
-        
+
         // 02. cli update the document with creating a counter
         //     and sync with push-pull mode: CP(0, 0) -> CP(1, 1)
         try await d1.update { root in
             root.counter = JSONCounter(value: Int64(0))
         }
-        
+
         var checkpoint = await d1.checkpoint
         XCTAssertEqual(Checkpoint(serverSeq: 0, clientSeq: 0), checkpoint)
-        
+
         try await c1.sync()
 
         checkpoint = await d1.checkpoint
@@ -268,11 +268,11 @@ class ClientTests: XCTestCase {
         try await d1.update { root in
             (root.counter as? JSONCounter<Int64>)!.increase(value: 1)
         }
-        
+
         var changePack = await d1.createChangePack()
-        
+
         XCTAssertEqual(changePack.getChanges().count, 1)
-        
+
         try await c1.sync([docKey: .pushOnly])
 
         checkpoint = await d1.checkpoint
@@ -283,7 +283,7 @@ class ClientTests: XCTestCase {
         try await d1.update { root in
             (root.counter as? JSONCounter<Int64>)!.increase(value: 1)
         }
-        
+
         // The previous increase(0 -> 1) is already pushed to the server,
         // so the ChangePack of the request only has the increase(1 -> 2).
         changePack = await d1.createChangePack()
@@ -291,12 +291,12 @@ class ClientTests: XCTestCase {
         XCTAssertEqual(changePack.getChanges().count, 1)
 
         try await c1.sync()
-        
+
         checkpoint = await d1.checkpoint
         XCTAssertEqual(Checkpoint(serverSeq: 3, clientSeq: 3), checkpoint)
 
-        let counter = await (d1.getRoot().get(key: "counter") as? JSONCounter<Int64>)!
-        
+        let counter = await(d1.getRoot().get(key: "counter") as? JSONCounter<Int64>)!
+
         XCTAssertEqual(2, counter.value)
     }
 }
