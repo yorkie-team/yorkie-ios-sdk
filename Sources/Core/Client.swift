@@ -51,7 +51,7 @@ enum StreamConnectionStatus {
     case disconnected
 }
 
-public enum RealtimeSyncMode {
+public enum SyncMode {
     case pushPull
     case pushOnly
     case pullOnly
@@ -61,15 +61,11 @@ struct Attachment {
     var doc: Document
     var docID: String
     var isRealtimeSync: Bool
-    var realtimeSyncMode: RealtimeSyncMode
+    var realtimeSyncMode: SyncMode
     var peerPresenceMap: [ActorID: PresenceInfo]
     var remoteChangeEventReceived: Bool
     var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
     var watchLoopReconnectTimer: Timer?
-
-    var pushPullMode: RealtimeSyncMode {
-        self.isRealtimeSync ? self.realtimeSyncMode : .pushPull
-    }
 }
 
 /**
@@ -461,7 +457,7 @@ public actor Client {
         }
     }
 
-    public func changeRealtimeSyncMode(_ doc: Document, _ mode: RealtimeSyncMode) {
+    public func changeRealtimeSyncMode(_ doc: Document, _ mode: SyncMode) {
         self.attachmentMap[doc.getKey()]?.realtimeSyncMode = mode
     }
 
@@ -491,14 +487,14 @@ public actor Client {
      * local documents.
      */
     @discardableResult
-    public func sync() async throws -> [Document] {
+    public func sync(_ syncModes: [DocumentKey: SyncMode] = [:]) async throws -> [Document] {
         let attachments = self.attachmentMap.values
 
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 attachments.forEach { attachment in
                     group.addTask {
-                        try await self.syncInternal(attachment)
+                        try await self.syncInternal(attachment, syncModes[attachment.doc.getKey()] ?? .pushPull)
                     }
                 }
 
@@ -608,10 +604,10 @@ public actor Client {
                 for (key, attachment) in self.attachmentMap where attachment.isRealtimeSync {
                     let docChanged = await attachment.doc.hasLocalChanges()
 
-                    if docChanged || (attachment.remoteChangeEventReceived && attachment.pushPullMode != .pullOnly) {
+                    if docChanged || (attachment.remoteChangeEventReceived && attachment.realtimeSyncMode != .pullOnly) {
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
-                            try await self.syncInternal(attachment)
+                            try await self.syncInternal(attachment, attachment.realtimeSyncMode)
                         }
                     }
                 }
@@ -795,7 +791,7 @@ public actor Client {
     }
 
     @discardableResult
-    private func syncInternal(_ attachment: Attachment) async throws -> Document {
+    private func syncInternal(_ attachment: Attachment, _ syncMode: SyncMode) async throws -> Document {
         guard let clientID = self.id, let clientIDData = clientID.toData else {
             throw YorkieError.unexpected(message: "Invalid Client ID!")
         }
@@ -804,18 +800,18 @@ public actor Client {
         pushPullRequest.clientID = clientIDData
 
         let doc = attachment.doc
-        let requestPack = await doc.createChangePack(attachment.pushPullMode)
+        let requestPack = await doc.createChangePack(syncMode)
         let localSize = requestPack.getChangeSize()
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.docID
-        pushPullRequest.pushOnly = attachment.pushPullMode == .pushOnly
+        pushPullRequest.pushOnly = syncMode == .pushOnly
 
         do {
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
-            try await doc.applyChangePack(pack: responsePack, syncMode: attachment.pushPullMode, clientID: clientID)
+            try await doc.applyChangePack(pack: responsePack, syncMode: syncMode, clientID: clientID)
 
             if await doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: doc.getKey())

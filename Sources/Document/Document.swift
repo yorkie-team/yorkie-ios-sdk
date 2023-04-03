@@ -60,7 +60,7 @@ public actor Document {
     private var root: CRDTRoot
     private var clone: CRDTRoot?
     private var changeID: ChangeID
-    private var checkpoint: Checkpoint
+    internal var checkpoint: Checkpoint
     private var localChanges: [Change]
 
     public let eventStream: PassthroughSubject<DocEvent, Never>
@@ -113,7 +113,7 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(pack: ChangePack, syncMode: RealtimeSyncMode = .pushPull, clientID: ActorID) throws {
+    func applyChangePack(pack: ChangePack, syncMode: SyncMode = .pushPull, clientID: ActorID) throws {
         var serverSeq: Int64
 
         if syncMode != .pushOnly {
@@ -179,7 +179,7 @@ public actor Document {
      * remote server.
      *
      */
-    func createChangePack(_ syncMode: RealtimeSyncMode = .pushPull, _ forceToRemoved: Bool = false) -> ChangePack {
+    func createChangePack(_ syncMode: SyncMode = .pushPull, _ forceToRemoved: Bool = false) -> ChangePack {
         let changes = syncMode == .pullOnly ? [] : self.localChanges
         let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
         return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes, isRemoved: forceToRemoved ? true : self.status == .removed)
