@@ -95,7 +95,7 @@ class JSONObjectTests: XCTestCase {
                       "long": Int64(9_999_999),
                       "double": Double(1.2222222),
                       "string": "abc",
-                      "compB": ["id": "b", "compC": ["id": "c", "compD": ["id": "d-1"]]]])
+                      "compB": ["id": "b", "compC": ["id": "c", "compD": ["id": "d-1"]] as [String: Any]] as [String: Any]])
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -126,7 +126,7 @@ class JSONObjectTests: XCTestCase {
                              "long": Int64(9_999_999),
                              "double": Double(1.2222222),
                              "string": "abc",
-                             "compB": ["id": "b", "compC": ["id": "c", "compD": ["id": "d-1"]]]])
+                             "compB": ["id": "b", "compC": ["id": "c", "compD": ["id": "d-1"]] as [String: Any]] as [String: Any]] as [String: Any])
 
             XCTAssertEqual(root.debugDescription,
                            """

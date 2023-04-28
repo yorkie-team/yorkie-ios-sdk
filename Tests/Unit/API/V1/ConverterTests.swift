@@ -365,5 +365,6 @@ class ConverterTests: XCTestCase {
         XCTAssertEqual(presence.clock, converted.clock)
         // swiftlint: disable force_cast
         XCTAssert((presence.data as NSDictionary).isEqual(to: (converted.data as NSDictionary) as! [AnyHashable: Any]))
+        // swiftlint: enable force_cast
     }
 }

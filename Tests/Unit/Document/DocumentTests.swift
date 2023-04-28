@@ -38,7 +38,7 @@ class DocumentTests: XCTestCase {
     func test_can_input_nil() async throws {
         let target = Document(key: "test-doc")
         try await target.update { root in
-            root.data = ["": nil, "null": nil]
+            root.data = ["": nil, "null": nil] as [String: Any?]
         }
 
         let result = await target.toSortedJSON()
@@ -246,6 +246,8 @@ class DocumentTests: XCTestCase {
                        {"list":[7,8,4,3,2,5,6,1,2]}
                        """)
     }
+
+    // swiftlint: enable function_body_length
 
     func test_splice_array_with_string() async throws {
         let target = Document(key: "test-doc")
@@ -734,7 +736,7 @@ class DocumentTests: XCTestCase {
         }.store(in: &self.cancellables)
 
         try await target.update { root in
-            root[""] = [:]
+            root[""] = [:] as [String: Any]
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -742,7 +744,7 @@ class DocumentTests: XCTestCase {
                            """)
 
             let emptyKey = root[""] as? JSONObject
-            emptyKey!.obj = [:]
+            emptyKey!.obj = [:] as [String: Any]
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -797,12 +799,12 @@ class DocumentTests: XCTestCase {
         }.store(in: &self.cancellables)
 
         try await target.update { root in
-            root.arr = []
+            root.arr = [] as [Any]
             let arr = root.arr as? JSONArray
             arr?.append(Int64(0))
             arr?.append(Int64(1))
             arr?.remove(index: 1)
-            root["$$...hello"] = []
+            root["$$...hello"] = [] as [Any]
             let hello = root["$$...hello"] as? JSONArray
             hello?.append(Int64(0))
 
