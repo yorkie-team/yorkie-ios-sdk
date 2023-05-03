@@ -165,3 +165,5 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 }
+
+// swiftlint: enable force_cast

@@ -25,6 +25,7 @@
 		9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A6294C7E1E00BF27F5 /* Logging */; };
 		9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */; };
 		9A66B1A02955833E00D10B94 /* LLRBTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19F2955833E00D10B94 /* LLRBTree.swift */; };
+		9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7C75E92A0261DD000B6E5A /* Version.swift */; };
 		9A8150522967FCD700DFADFB /* Helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8150512967FCD700DFADFB /* Helper.swift */; };
 		9AD6E7E329C190E7001A1F89 /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */; };
 		9AD6E7E529C190E7001A1F89 /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7E029C190E7001A1F89 /* yorkie.grpc.swift */; };
@@ -139,6 +140,7 @@
 		9A4DC744292DD82500C89478 /* YorkieCountable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieCountable.swift; sourceTree = "<group>"; };
 		9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGATreeSplit.swift; sourceTree = "<group>"; };
 		9A66B19F2955833E00D10B94 /* LLRBTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLRBTree.swift; sourceTree = "<group>"; };
+		9A7C75E92A0261DD000B6E5A /* Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Version.swift; sourceTree = "<group>"; };
 		9A8150512967FCD700DFADFB /* Helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Helper.swift; sourceTree = "<group>"; };
 		9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
 		9AD6E7DF29C190E7001A1F89 /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
@@ -271,6 +273,7 @@
 		96DA808428C5B7B400E2C1DA /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				9A7C75E92A0261DD000B6E5A /* Version.swift */,
 				CE6071E828C5EC2500A8783E /* API */,
 				CE8C22E328C9E53400432DE5 /* Core */,
 				CE8C22E428C9E53E00432DE5 /* Document */,
@@ -772,6 +775,7 @@
 				9ADAEE5A29657E03007E9F9F /* EditOperation.swift in Sources */,
 				CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */,
 				9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */,
+				9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */,
 				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */,
@@ -1009,6 +1013,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				INFOPLIST_FILE = Sources/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1034,6 +1039,7 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				INFOPLIST_FILE = Sources/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
