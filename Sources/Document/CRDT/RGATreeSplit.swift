@@ -816,8 +816,8 @@ extension RGATreeSplit: Sequence {
         NodeIterator(head: self.head)
     }
 
-    // swiftlint: disable nesting
     public class NodeIterator: IteratorProtocol {
+        // swiftlint: disable nesting
         typealias Element = RGATreeSplitNode<T>
 
         private var head: Element?
@@ -831,8 +831,8 @@ extension RGATreeSplit: Sequence {
             self.head = self.head?.next
             return next
         }
+        // swiftlint: enable nesting
     }
-    // swiftlint: enable nesting
 }
 
 /**
