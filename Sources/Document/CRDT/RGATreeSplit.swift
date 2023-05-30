@@ -831,6 +831,7 @@ extension RGATreeSplit: Sequence {
             self.head = self.head?.next
             return next
         }
+        // swiftlint: enable nesting
     }
 }
 
