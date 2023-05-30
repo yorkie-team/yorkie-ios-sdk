@@ -21,10 +21,12 @@ import NIOCore
 class AuthClientInterceptor<Request, Response>: ClientInterceptor<Request, Response> {
     let apiKey: String?
     let token: String?
+    let docKey: String?
 
-    init(apiKey: String? = nil, token: String? = nil) {
+    init(apiKey: String? = nil, token: String? = nil, docKey: String? = nil) {
         self.apiKey = apiKey
         self.token = token
+        self.docKey = docKey
     }
 
     override func send(_ part: GRPCClientRequestPart<Request>, promise: EventLoopPromise<Void>?, context: ClientInterceptorContext<Request, Response>) {
@@ -34,6 +36,14 @@ class AuthClientInterceptor<Request, Response>: ClientInterceptor<Request, Respo
         case .metadata(var header):
             if let apiKey {
                 header.add(name: "x-api-key", value: apiKey)
+
+                var shardKey = "\(apiKey)"
+
+                if let docKey = self.docKey, docKey.isEmpty == false {
+                    shardKey += "/\(docKey)"
+                }
+
+                header.add(name: "x-shard-key", value: shardKey)
             }
 
             if let token {
@@ -53,10 +63,16 @@ class AuthClientInterceptor<Request, Response>: ClientInterceptor<Request, Respo
 final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtocol {
     let apiKey: String?
     let token: String?
+    let docKey: String?
 
-    init(apiKey: String? = nil, token: String? = nil) {
+    init(apiKey: String? = nil, token: String? = nil, docKey: String? = nil) {
         self.apiKey = apiKey
         self.token = token
+        self.docKey = docKey
+    }
+
+    func docKeyChangedInterceptors(_ docKey: String?) -> AuthClientInterceptors {
+        AuthClientInterceptors(apiKey: self.apiKey, token: self.token, docKey: docKey)
     }
 
     func makeActivateClientInterceptors() -> [GRPC.ClientInterceptor<ActivateClientRequest, ActivateClientResponse>] {
@@ -68,26 +84,26 @@ final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtoco
     }
 
     func makeUpdatePresenceInterceptors() -> [GRPC.ClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>] {
-        [AuthClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
 
     func makeAttachDocumentInterceptors() -> [GRPC.ClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>] {
-        [AuthClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
 
     func makeDetachDocumentInterceptors() -> [GRPC.ClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>] {
-        [AuthClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
 
     func makeWatchDocumentInterceptors() -> [GRPC.ClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>] {
-        [AuthClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
 
     func makeRemoveDocumentInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_RemoveDocumentRequest, Yorkie_V1_RemoveDocumentResponse>] {
-        [AuthClientInterceptor<RemoveDocumentRequest, RemoveDocumentResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<RemoveDocumentRequest, RemoveDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
 
     func makePushPullChangesInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>] {
-        [AuthClientInterceptor<PushPullChangeRequest, PushPullChangeResponse>(apiKey: self.apiKey, token: self.token)]
+        [AuthClientInterceptor<PushPullChangeRequest, PushPullChangeResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
 }
