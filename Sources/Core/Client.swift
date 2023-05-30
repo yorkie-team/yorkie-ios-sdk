@@ -639,7 +639,7 @@ public actor Client {
         request.client = Converter.toClient(id: id, presence: self.presenceInfo)
         request.documentID = docID
 
-        changeDocKeyOfAuthInterceptors(docKey)
+        self.changeDocKeyOfAuthInterceptors(docKey)
         self.attachmentMap[docKey]?.remoteWatchStream = self.rpcClient.makeWatchDocumentCall(request)
 
         let event = StreamConnectionStatusChangedEvent(value: .connected)
