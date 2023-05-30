@@ -208,6 +208,7 @@ final class ClientIntegrationTests: XCTestCase {
             // swiftlint: disable identifier_name
             var x: Int
             var y: Int
+            // swiftlint: enable identifier_name
         }
 
         struct PresenceType: Codable {
@@ -318,6 +319,8 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
         try await c2.deactivate()
     }
+
+    // swiftlint: enable force_cast
 
     func test_client_pause_resume() async throws {
         let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())

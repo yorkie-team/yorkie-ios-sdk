@@ -247,6 +247,8 @@ class DocumentTests: XCTestCase {
                        """)
     }
 
+    // swiftlint: enable function_body_length
+
     func test_splice_array_with_string() async throws {
         let target = Document(key: "test-doc")
         try await target.update { root in
