@@ -40,6 +40,7 @@ class AuthClientInterceptor<Request, Response>: ClientInterceptor<Request, Respo
                 header.add(name: "authorization", value: token)
             }
 
+            header.add(name: "x-yorkie-user-agent", value: "yorkie-ios-sdk/\(yorkieVersion)")
             part = .metadata(header)
         default:
             break
