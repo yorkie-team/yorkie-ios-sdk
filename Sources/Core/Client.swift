@@ -427,13 +427,13 @@ public actor Client {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
-        
+
         let docKey = doc.getKey()
 
         guard self.attachmentMap[docKey] != nil else {
             throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
         }
-        
+
         self.attachmentMap[docKey]?.realtimeSyncMode = .pushOnly
     }
 
@@ -445,7 +445,7 @@ public actor Client {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
-        
+
         let docKey = doc.getKey()
 
         guard self.attachmentMap[docKey] != nil else {
