@@ -401,66 +401,65 @@ public actor Client {
      * `pause` pause the realtime syncronization of the given document.
      */
     public func pause(_ doc: Document) throws {
-        try self.changeRealtimeSyncSetting(doc, false)
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        try self.changeRealtimeSync(doc, false)
     }
 
     /**
      * `resume` resume the realtime syncronization of the given document.
      */
     public func resume(_ doc: Document) throws {
-        try self.changeRealtimeSyncSetting(doc, true)
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        try self.changeRealtimeSync(doc, true)
     }
 
     /**
-     * `remove` mrevoes the given document.
+     * `pauseRemoteChanges` pauses the synchronization of remote changes,
+     * allowing only local changes to be applied.
      */
-    @discardableResult
-    public func remove(_ doc: Document) async throws -> Document {
+    public func pauseRemoteChanges(doc: Document) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
+        
+        let docKey = doc.getKey()
 
-        guard let clientID = self.id, let clientIDData = clientID.toData else {
-            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
         }
-
-        guard let attachment = attachmentMap[doc.getKey()] else {
-            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
-        }
-
-        var removeDocumentRequest = RemoveDocumentRequest()
-        removeDocumentRequest.clientID = clientIDData
-        removeDocumentRequest.documentID = attachment.docID
-        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(.pushPull, true))
-
-        do {
-            let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
-
-            let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
-
-            try self.stopWatchLoop(doc.getKey())
-
-            self.attachmentMap.removeValue(forKey: doc.getKey())
-
-            Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
-
-            return doc
-        } catch {
-            Logger.error("Failed to request remove document(\(self.key)).", error: error)
-            throw error
-        }
+        
+        self.attachmentMap[docKey]?.realtimeSyncMode = .pushOnly
     }
 
-    public func changeRealtimeSyncMode(_ doc: Document, _ mode: SyncMode) {
-        self.attachmentMap[doc.getKey()]?.realtimeSyncMode = mode
-    }
-
-    private func changeRealtimeSyncSetting(_ doc: Document, _ isRealtimeSync: Bool) throws {
+    /**
+     * `resumeRemoteChanges` resumes the synchronization of remote changes,
+     * allowing both local and remote changes to be applied.
+     */
+    public func resumeRemoteChanges(doc: Document) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
+        
+        let docKey = doc.getKey()
 
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+        }
+
+        self.attachmentMap[docKey]?.realtimeSyncMode = .pushPull
+        self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+    }
+
+    /**
+     * `changeRealtimeSync` changes the synchronization mode of the given document.
+     */
+    private func changeRealtimeSync(_ doc: Document, _ isRealtimeSync: Bool) throws {
         let docKey = doc.getKey()
 
         guard self.attachmentMap[docKey] != nil else {
@@ -501,6 +500,47 @@ public actor Client {
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
 
+            throw error
+        }
+    }
+
+    /**
+     * `remove` mrevoes the given document.
+     */
+    @discardableResult
+    public func remove(_ doc: Document) async throws -> Document {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id, let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard let attachment = attachmentMap[doc.getKey()] else {
+            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
+        }
+
+        var removeDocumentRequest = RemoveDocumentRequest()
+        removeDocumentRequest.clientID = clientIDData
+        removeDocumentRequest.documentID = attachment.docID
+        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(.pushPull, true))
+
+        do {
+            let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
+
+            let pack = try Converter.fromChangePack(result.changePack)
+            try await doc.applyChangePack(pack: pack)
+
+            try self.stopWatchLoop(doc.getKey())
+
+            self.attachmentMap.removeValue(forKey: doc.getKey())
+
+            Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
+
+            return doc
+        } catch {
+            Logger.error("Failed to request remove document(\(self.key)).", error: error)
             throw error
         }
     }
@@ -806,7 +846,7 @@ public actor Client {
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
-            
+
             // NOTE(chacha912, hackerwins): If syncLoop already executed with
             // PushPull, ignore the response when the syncMode is PushOnly.
             if responsePack.hasChanges(), syncMode == .pushOnly {

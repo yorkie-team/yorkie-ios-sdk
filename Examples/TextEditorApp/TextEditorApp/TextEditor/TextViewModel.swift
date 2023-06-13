@@ -148,10 +148,10 @@ class TextViewModel {
     }
 
     func pause() async {
-        await self.client.changeRealtimeSyncMode(self.document, .pushOnly)
+        try? await self.client.pauseRemoteChanges(doc: self.document)
     }
 
     func resume() async {
-        await self.client.changeRealtimeSyncMode(self.document, .pushPull)
+        try? await self.client.resumeRemoteChanges(doc: self.document)
     }
 }
