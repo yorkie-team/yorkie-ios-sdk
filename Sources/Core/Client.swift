@@ -326,7 +326,7 @@ public actor Client {
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack, clientID: clientID)
+            try await doc.applyChangePack(pack: pack)
 
             if await doc.status == .removed {
                 throw YorkieError.documentRemoved(message: "\(doc) is removed.")
@@ -383,7 +383,7 @@ public actor Client {
             let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack, clientID: clientID)
+            try await doc.applyChangePack(pack: pack)
 
             if await doc.status != .removed {
                 await doc.setStatus(.detached)
@@ -442,7 +442,7 @@ public actor Client {
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack, clientID: clientID)
+            try await doc.applyChangePack(pack: pack)
 
             try self.stopWatchLoop(doc.getKey())
 
@@ -811,7 +811,14 @@ public actor Client {
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
-            try await doc.applyChangePack(pack: responsePack, syncMode: syncMode, clientID: clientID)
+            
+            // NOTE(chacha912, hackerwins): If syncLoop already executed with
+            // PushPull, ignore the response when the syncMode is PushOnly.
+            if responsePack.hasChanges(), syncMode == .pushOnly {
+                return doc
+            }
+
+            try await doc.applyChangePack(pack: responsePack)
 
             if await doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: doc.getKey())

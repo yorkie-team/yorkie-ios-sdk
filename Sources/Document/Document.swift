@@ -113,23 +113,11 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(pack: ChangePack, syncMode: SyncMode = .pushPull, clientID: ActorID) throws {
-        var serverSeq: Int64
-
-        if syncMode != .pushOnly {
-            if let snapshot = pack.getSnapshot() {
-                try self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: snapshot)
-            } else if pack.hasChanges() {
-                // Remove any changes I sent that are less than or equal to clientSeq.
-                let newChanges = pack.getChanges().filter { change in
-                    change.id.getActorID() != clientID || change.id.getClientSeq() > self.checkpoint.getClientSeq()
-                }
-                try self.applyChanges(changes: newChanges)
-            }
-
-            serverSeq = pack.getCheckpoint().getServerSeq()
-        } else {
-            serverSeq = self.checkpoint.getServerSeq()
+    func applyChangePack(pack: ChangePack) throws {
+        if let snapshot = pack.getSnapshot() {
+            try self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: snapshot)
+        } else if pack.hasChanges() {
+            try self.applyChanges(changes: pack.getChanges())
         }
 
         // 01. Remove local changes applied to server.
@@ -138,7 +126,7 @@ public actor Document {
         }
 
         // 02. Update the checkpoint.
-        self.checkpoint.forward(other: Checkpoint(serverSeq: serverSeq, clientSeq: pack.getCheckpoint().getClientSeq()))
+        self.checkpoint.forward(other: pack.getCheckpoint())
 
         // 03. Do Garbage collection.
         if let ticket = pack.getMinSyncedTicket() {
