@@ -460,6 +460,25 @@ public actor Client {
     }
 
     /**
+     * `changeRealtimeSync` changes the synchronization mode of the given document.
+     */
+    private func changeRealtimeSync(_ doc: Document, _ isRealtimeSync: Bool) throws {
+        let docKey = doc.getKey()
+
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.unexpected(message: "Can't find attachment by docKey! [\(docKey)]")
+        }
+
+        self.attachmentMap[docKey]?.isRealtimeSync = isRealtimeSync
+
+        if isRealtimeSync {
+            try self.runWatchLoop(docKey)
+        } else {
+            try self.stopWatchLoop(docKey)
+        }
+    }
+
+    /**
      * `pauseRemoteChanges` pauses the synchronization of remote changes,
      * allowing only local changes to be applied.
      */
@@ -494,25 +513,6 @@ public actor Client {
 
         self.attachmentMap[docKey]?.realtimeSyncMode = .pushPull
         self.attachmentMap[docKey]?.remoteChangeEventReceived = true
-    }
-
-    /**
-     * `changeRealtimeSync` changes the synchronization mode of the given document.
-     */
-    private func changeRealtimeSync(_ doc: Document, _ isRealtimeSync: Bool) throws {
-        let docKey = doc.getKey()
-
-        guard self.attachmentMap[docKey] != nil else {
-            throw YorkieError.unexpected(message: "Can't find attachment by docKey! [\(docKey)]")
-        }
-
-        self.attachmentMap[docKey]?.isRealtimeSync = isRealtimeSync
-
-        if isRealtimeSync {
-            try self.runWatchLoop(docKey)
-        } else {
-            try self.stopWatchLoop(docKey)
-        }
     }
 
     /**
