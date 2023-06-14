@@ -54,7 +54,6 @@ enum StreamConnectionStatus {
 public enum SyncMode {
     case pushPull
     case pushOnly
-    case pullOnly
 }
 
 struct Attachment {
@@ -524,7 +523,7 @@ public actor Client {
         var removeDocumentRequest = RemoveDocumentRequest()
         removeDocumentRequest.clientID = clientIDData
         removeDocumentRequest.documentID = attachment.docID
-        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(.pushPull, true))
+        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
 
         do {
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
@@ -639,7 +638,7 @@ public actor Client {
                 for (key, attachment) in self.attachmentMap where attachment.isRealtimeSync {
                     let docChanged = await attachment.doc.hasLocalChanges()
 
-                    if docChanged || (attachment.remoteChangeEventReceived && attachment.realtimeSyncMode != .pullOnly) {
+                    if docChanged || attachment.remoteChangeEventReceived {
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
                             try await self.syncInternal(attachment, attachment.realtimeSyncMode)
@@ -835,7 +834,7 @@ public actor Client {
         pushPullRequest.clientID = clientIDData
 
         let doc = attachment.doc
-        let requestPack = await doc.createChangePack(syncMode)
+        let requestPack = await doc.createChangePack()
         let localSize = requestPack.getChangeSize()
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
