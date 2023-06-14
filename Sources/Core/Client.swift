@@ -51,8 +51,19 @@ enum StreamConnectionStatus {
     case disconnected
 }
 
+/**
+ * `SyncMode` is the mode of synchronization. It is used to determine
+ * whether to push and pull changes in PushPullChanges API.
+ */
 public enum SyncMode {
+    /**
+     * `PushPull` is the mode that pushes and pulls changes.
+     */
     case pushPull
+
+    /**
+     * `PushOnly` is the mode that pushes changes only.
+     */
     case pushOnly
 }
 
