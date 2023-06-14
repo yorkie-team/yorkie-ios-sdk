@@ -76,6 +76,13 @@ struct Attachment {
     var remoteChangeEventReceived: Bool
     var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
     var watchLoopReconnectTimer: Timer?
+
+    /**
+     * `getPresence` returns the presence information of the client.
+     */
+    func getPresence(clientID: ActorID) -> Presence? {
+        self.peerPresenceMap[clientID]?.data
+    }
 }
 
 /**
@@ -593,13 +600,26 @@ public actor Client {
     }
 
     /**
-     * `getPeers` returns the peers of the given document.
+     * `getPeerPresence` returns the presence of the given document and client.
      */
-    public func getPeers(key: String) -> PresenceMap {
+    public func getPeerPresence(docKey: DocumentKey, clientID: ActorID) -> Presence? {
+        self.attachmentMap[docKey]?.getPresence(clientID: clientID)
+    }
+
+    /**
+     * `getPeersByDocKey` returns the peers of the given document.
+     */
+    public func getPeersByDocKey(docKey: DocumentKey) throws -> PresenceMap {
+        guard let attachment = self.attachmentMap[docKey] else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached.")
+        }
+
         var peers = PresenceMap()
-        self.attachmentMap[key]?.peerPresenceMap.forEach {
+
+        attachment.peerPresenceMap.forEach {
             peers[$0.key] = $0.value.data
         }
+
         return peers
     }
 
