@@ -419,6 +419,47 @@ public actor Client {
     }
 
     /**
+     * `remove` mrevoes the given document.
+     */
+    @discardableResult
+    public func remove(_ doc: Document) async throws -> Document {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id, let clientIDData = clientID.toData else {
+            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard let attachment = attachmentMap[doc.getKey()] else {
+            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
+        }
+
+        var removeDocumentRequest = RemoveDocumentRequest()
+        removeDocumentRequest.clientID = clientIDData
+        removeDocumentRequest.documentID = attachment.docID
+        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
+
+        do {
+            let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
+
+            let pack = try Converter.fromChangePack(result.changePack)
+            try await doc.applyChangePack(pack: pack)
+
+            try self.stopWatchLoop(doc.getKey())
+
+            self.attachmentMap.removeValue(forKey: doc.getKey())
+
+            Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
+
+            return doc
+        } catch {
+            Logger.error("Failed to request remove document(\(self.key)).", error: error)
+            throw error
+        }
+    }
+
+    /**
      * `pauseRemoteChanges` pauses the synchronization of remote changes,
      * allowing only local changes to be applied.
      */
@@ -499,47 +540,6 @@ public actor Client {
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
 
-            throw error
-        }
-    }
-
-    /**
-     * `remove` mrevoes the given document.
-     */
-    @discardableResult
-    public func remove(_ doc: Document) async throws -> Document {
-        guard self.isActive else {
-            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
-        }
-
-        guard let clientID = self.id, let clientIDData = clientID.toData else {
-            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
-        }
-
-        guard let attachment = attachmentMap[doc.getKey()] else {
-            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
-        }
-
-        var removeDocumentRequest = RemoveDocumentRequest()
-        removeDocumentRequest.clientID = clientIDData
-        removeDocumentRequest.documentID = attachment.docID
-        removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
-
-        do {
-            let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
-
-            let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
-
-            try self.stopWatchLoop(doc.getKey())
-
-            self.attachmentMap.removeValue(forKey: doc.getKey())
-
-            Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
-
-            return doc
-        } catch {
-            Logger.error("Failed to request remove document(\(self.key)).", error: error)
             throw error
         }
     }
