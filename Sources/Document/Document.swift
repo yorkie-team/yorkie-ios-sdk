@@ -60,7 +60,7 @@ public actor Document {
     private var root: CRDTRoot
     private var clone: CRDTRoot?
     private var changeID: ChangeID
-    internal var checkpoint: Checkpoint
+    private var checkpoint: Checkpoint
     private var localChanges: [Change]
 
     public let eventStream: PassthroughSubject<DocEvent, Never>
