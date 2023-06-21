@@ -19,8 +19,6 @@ import Foundation
 import Yorkie
 
 class KanbanViewModel: ObservableObject {
-    private var cancellables = Set<AnyCancellable>()
-
     private(set) var defaultColumns: [KanbanColumn] = [
         KanbanColumn(title: "todo", cards: [
             KanbanCard(title: "walking"),
@@ -48,7 +46,7 @@ class KanbanViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
 
-            await self.document.eventStream.sink { _ in
+            await self.document.subscribe { _ in
                 Task { @MainActor [weak self] in
                     guard let self, let lists = await self.document.getRoot().lists as? JSONArray else { return }
 
@@ -66,7 +64,7 @@ class KanbanViewModel: ObservableObject {
                         return KanbanColumn(id: column.getID(), title: column.title as! String, cards: cards)
                     }
                 }
-            }.store(in: &self.cancellables)
+            }
 
             Task {
                 try! await self.client.activate()

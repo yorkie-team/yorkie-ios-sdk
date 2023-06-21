@@ -62,8 +62,7 @@ class CRDTRoot {
         var pairForLoop: CRDTElementPair = pair
         while let parent = pairForLoop.parent {
             let createdAt = pairForLoop.element.createdAt
-            var subPath = try parent.subPath(createdAt: createdAt)
-            subPath = self.escapeSubpath(subPath)
+            let subPath = try parent.subPath(createdAt: createdAt)
             result.append(subPath)
             guard let parentPair = self.elementPairMapByCreatedAt[parent.createdAt] else {
                 break
@@ -74,12 +73,6 @@ class CRDTRoot {
 
         result.append(self.subPathPrefix)
         return result.reversed()
-    }
-
-    private func escapeSubpath(_ target: String) -> String {
-        return [self.subPathPrefix, self.subPathSeparator].reduce(target) { partialResult, seq in
-            partialResult.replacingOccurrences(of: seq, with: "\\\(seq)")
-        }
     }
 
     /**
