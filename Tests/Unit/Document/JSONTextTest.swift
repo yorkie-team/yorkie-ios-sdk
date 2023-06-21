@@ -112,14 +112,12 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            view.applyChanges(changes: $0)
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
-
+        await doc.subscribe(targetPath: "$.text") {
+            ($0 as! ChangeEventable).value.forEach { changeInfo in
+                view.applyChanges(operations: changeInfo.operations)
+            }
+        }
+        
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "ABC"),
             (from: 3, to: 3, content: "DEF"),
@@ -143,13 +141,11 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            view.applyChanges(changes: $0)
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") {
+            ($0 as! ChangeEventable).value.forEach { changeInfo in
+                view.applyChanges(operations: changeInfo.operations)
+            }
+        }
 
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "A"),
@@ -182,13 +178,11 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            view.applyChanges(changes: $0)
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") {
+            ($0 as! ChangeEventable).value.forEach { changeInfo in
+                view.applyChanges(operations: changeInfo.operations)
+            }
+        }
 
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "1A1BCXEF1"),
@@ -220,18 +214,9 @@ final class JSONTextTest: XCTestCase {
             (root.text as? JSONText)?.edit(0, 0, "ABCD")
         }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            let first = $0.first
-
-            if first?.type == .selection {
-                XCTAssertEqual(first?.from, 2)
-                XCTAssertEqual(first?.to, 4)
-            }
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") { event in
+            XCTAssertEqual((event as! ChangeEventable).value[0].operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
+        }
 
         try await doc.update { root in (root.text as? JSONText)?.select(2, 4) }
     }

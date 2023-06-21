@@ -152,8 +152,6 @@ final class CRDTText: CRDTTextElement {
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
-    weak var eventStream: PassthroughSubject<[TextChange], Never>?
-
     /**
      * `rgaTreeSplit` returns rgaTreeSplit.
      *
@@ -219,12 +217,6 @@ final class CRDTText: CRDTTextElement {
             changes.append(selectionChange)
         }
 
-        if let eventStream {
-            self.remoteChangeLock = true
-            eventStream.send(changes)
-            self.remoteChangeLock = false
-        }
-
         return (latestCreatedAtMap, changes)
     }
 
@@ -274,12 +266,6 @@ final class CRDTText: CRDTTextElement {
             }
         }
 
-        if let eventStream {
-            self.remoteChangeLock = true
-            eventStream.send(changes)
-            self.remoteChangeLock = false
-        }
-
         return changes
     }
 
@@ -292,17 +278,7 @@ final class CRDTText: CRDTTextElement {
             return nil
         }
 
-        if let change = try self.selectPriv(range, updatedAt) {
-            if let eventStream {
-                self.remoteChangeLock = true
-                eventStream.send([change])
-                self.remoteChangeLock = false
-            }
-
-            return change
-        }
-
-        return nil
+        return try self.selectPriv(range, updatedAt)
     }
 
     /**
