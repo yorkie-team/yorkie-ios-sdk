@@ -102,7 +102,7 @@ public actor Document {
             let changeInfo = ChangeInfo(message: change.message ?? "",
                                         operations: opInfos,
                                         actorID: change.id.getActorID())
-            let changeEvent = LocalChangeEvent(value: [changeInfo])
+            let changeEvent = LocalChangeEvent(value: changeInfo)
             self.processDocEvent(changeEvent)
 
             Logger.trace("after update a local change: \(self.toJSON())")
@@ -319,9 +319,10 @@ public actor Document {
 
             self.changeID.syncLamport(with: $0.id.getLamport())
         }
-
-        let changeEvent = RemoteChangeEvent(value: changeInfos)
-        self.processDocEvent(changeEvent)
+        
+        changeInfos.forEach {
+            self.processDocEvent(RemoteChangeEvent(value: $0))
+        }
 
         Logger.debug(
             """
@@ -372,32 +373,23 @@ public actor Document {
     private func processDocEvent(_ event: DocEvent) {
         if event.type != .snapshot {
             if let event = event as? ChangeEventable {
-                var changeInfos = [String: [ChangeInfo]]()
-
-                event.value.forEach { changeInfo in
-                    var operations = [String: [any OperationInfo]]()
-
-                    changeInfo.operations.forEach { operationInfo in
-                        self.subscribeCallbacks.keys.forEach { targetPath in
-                            if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
-                                if operations[targetPath] == nil {
-                                    operations[targetPath] = [any OperationInfo]()
-                                }
-                                operations[targetPath]?.append(operationInfo)
+                var operations = [String: [any OperationInfo]]()
+                
+                event.value.operations.forEach { operationInfo in
+                    self.subscribeCallbacks.keys.forEach { targetPath in
+                        if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
+                            if operations[targetPath] == nil {
+                                operations[targetPath] = [any OperationInfo]()
                             }
+                            operations[targetPath]?.append(operationInfo)
                         }
-                    }
-
-                    operations.forEach { key, value in
-                        if changeInfos[key] == nil {
-                            changeInfos[key] = [ChangeInfo]()
-                        }
-                        changeInfos[key]?.append(ChangeInfo(message: changeInfo.message, operations: value, actorID: changeInfo.actorID))
                     }
                 }
-
-                changeInfos.forEach { key, value in
-                    self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: value) : RemoteChangeEvent(value: value))
+                
+                operations.forEach { key, value in
+                    let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
+                    
+                    self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
                 }
             }
         }
