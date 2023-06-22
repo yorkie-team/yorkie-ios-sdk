@@ -21,6 +21,7 @@ import XCTest
 final class JSONTextTest: XCTestCase {
     var cancellables = Set<AnyCancellable>()
 
+    // swiftlint: disable force_cast
     func test_should_handle_edit_operations() async throws {
         let doc = Document(key: "test-doc")
 
@@ -117,7 +118,7 @@ final class JSONTextTest: XCTestCase {
                 view.applyChanges(operations: changeInfo.operations)
             }
         }
-        
+
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "ABC"),
             (from: 3, to: 3, content: "DEF"),
@@ -242,4 +243,5 @@ final class JSONTextTest: XCTestCase {
         XCTAssertEqual("{\"k1\":[{\"attrs\":{\"b\":\"1\"},\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"D\"}]}",
                        docContent)
     }
+    // swiftlint: enable force_cast
 }
