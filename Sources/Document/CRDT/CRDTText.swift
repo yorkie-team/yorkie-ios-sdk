@@ -38,11 +38,7 @@ func stringifyAttributes(_ attributes: TextAttributes) -> [String: String] {
     }
 }
 
-/**
- * `TextChange` is the value passed as an argument to `Text.onChanges()`.
- * `Text.onChanges()` is called when the `Text` is modified.
- */
-public class TextChange {
+class TextChange {
     /**
      * `TextChangeType` is the type of TextChange.
      */

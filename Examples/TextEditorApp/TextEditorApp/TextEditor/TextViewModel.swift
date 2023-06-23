@@ -27,7 +27,6 @@ enum TextOperation {
 class TextViewModel {
     private var client: Client
     private let document: Document
-    private var textEventStream = PassthroughSubject<[TextChange], Never>()
 
     private weak var operationSubject: PassthroughSubject<[TextOperation], Never>?
 
