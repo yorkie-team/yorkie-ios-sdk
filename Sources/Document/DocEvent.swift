@@ -58,7 +58,7 @@ public struct SnapshotEvent: DocEvent {
     public var value: Data
 }
 
-protocol ChangeEventable: DocEvent {
+protocol ChangeEvent: DocEvent {
     var type: DocEventType { get }
     var value: [ChangeInfo] { get }
 }
@@ -78,7 +78,7 @@ public struct ChangeInfo {
  * by local changes.
  *
  */
-public struct LocalChangeEvent: ChangeEventable {
+public struct LocalChangeEvent: ChangeEvent {
     /**
      * ``DocEventType/localChange``
      */
@@ -94,7 +94,7 @@ public struct LocalChangeEvent: ChangeEventable {
  * by remote changes.
  *
  */
-public struct RemoteChangeEvent: ChangeEventable {
+public struct RemoteChangeEvent: ChangeEvent {
     /**
      * ``DocEventType/remoteChange``
      */

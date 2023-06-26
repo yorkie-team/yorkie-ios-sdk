@@ -371,7 +371,7 @@ public actor Document {
 
     private func processDocEvent(_ event: DocEvent) {
         if event.type != .snapshot {
-            if let event = event as? ChangeEventable {
+            if let event = event as? ChangeEvent {
                 var changeInfos = [String: [ChangeInfo]]()
 
                 event.value.forEach { changeInfo in
