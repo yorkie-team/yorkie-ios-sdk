@@ -162,7 +162,7 @@ public actor Client {
     private let reconnectStreamDelay: Int
     private let maximumAttachmentTimeout: Int
 
-    private let rpcClient: YorkieServiceAsyncClient
+    private var rpcClient: YorkieServiceAsyncClient
 
     private let group: EventLoopGroup
 
@@ -230,6 +230,7 @@ public actor Client {
         activateRequest.clientKey = self.key
 
         do {
+            self.changeDocKeyOfAuthInterceptors(nil)
             let activateResponse = try await self.rpcClient.activateClient(activateRequest, callOptions: nil)
 
             self.id = activateResponse.clientID.toHexString
@@ -267,6 +268,7 @@ public actor Client {
         deactivateRequest.clientID = clientIDData
 
         do {
+            self.changeDocKeyOfAuthInterceptors(nil)
             _ = try await self.rpcClient.deactivateClient(deactivateRequest)
         } catch {
             Logger.error("Failed to request deactivate client(\(self.key)).", error: error)
@@ -311,6 +313,7 @@ public actor Client {
 
             self.semaphoresForInitialzation[docKey] = semaphore
 
+            self.changeDocKeyOfAuthInterceptors(docKey)
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
@@ -368,6 +371,7 @@ public actor Client {
         detachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
+            self.changeDocKeyOfAuthInterceptors(doc.getKey())
             let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
@@ -427,6 +431,7 @@ public actor Client {
         removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
 
         do {
+            self.changeDocKeyOfAuthInterceptors(doc.getKey())
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
@@ -523,6 +528,7 @@ public actor Client {
             self.sendPeerChangeEvent(.presenceChanged, [docKey], id)
 
             do {
+                self.changeDocKeyOfAuthInterceptors(docKey)
                 _ = try await self.rpcClient.updatePresence(updatePresenceRequest)
                 Logger.info("[UM] c\"\(self.key)\" updated")
             } catch {
@@ -633,6 +639,7 @@ public actor Client {
         request.client = Converter.toClient(id: id, presence: self.presenceInfo)
         request.documentID = docID
 
+        self.changeDocKeyOfAuthInterceptors(docKey)
         self.attachmentMap[docKey]?.remoteWatchStream = self.rpcClient.makeWatchDocumentCall(request)
 
         let event = StreamConnectionStatusChangedEvent(value: .connected)
@@ -791,19 +798,21 @@ public actor Client {
         pushPullRequest.documentID = attachment.docID
 
         do {
+            let docKey = doc.getKey()
+
+            self.changeDocKeyOfAuthInterceptors(docKey)
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
             try await doc.applyChangePack(pack: responsePack)
 
             if await doc.status == .removed {
-                self.attachmentMap.removeValue(forKey: doc.getKey())
+                self.attachmentMap.removeValue(forKey: docKey)
             }
 
             let event = DocumentSyncedEvent(value: .synced)
             self.eventStream.send(event)
 
-            let docKey = doc.getKey()
             let remoteSize = responsePack.getChangeSize()
             Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().structureAsString)")
 
@@ -813,5 +822,9 @@ public actor Client {
 
             throw error
         }
+    }
+
+    private func changeDocKeyOfAuthInterceptors(_ docKey: String?) {
+        self.rpcClient.interceptors = (self.rpcClient.interceptors as? AuthClientInterceptors)?.docKeyChangedInterceptors(docKey)
     }
 }
