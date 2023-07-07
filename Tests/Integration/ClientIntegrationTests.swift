@@ -290,7 +290,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.sync()
         try await c2.sync()
 
-        let presence1: PresenceType = self.decodePresence(await c2.getPeers(key: d2.getKey())[c1.id!]!)!
+        let presence1: PresenceType = self.decodePresence(await c2.getPeerPresence(docKey: docKey, clientID: c1.id!)!)!
 
         XCTAssert(c1Name == presence1.name)
 
@@ -300,12 +300,12 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.sync()
         try await c1.sync()
 
-        let presence2: PresenceType = self.decodePresence(await c1.getPeers(key: d1.getKey())[c2.id!]!)!
+        let presence2: PresenceType = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)!
 
         XCTAssert(c2Name == presence2.name)
 
-        let c1Peer = await c1.getPeers(key: d1.getKey()) as NSDictionary
-        let c2Peer = (await c2.getPeers(key: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
+        let c1Peer = try await c1.getPeersByDocKey(docKey: d1.getKey()) as NSDictionary
+        let c2Peer = try (await c2.getPeersByDocKey(docKey: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
 
         XCTAssert(c1Peer.isEqual(to: c2Peer))
 
@@ -358,6 +358,59 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.detach(d1)
 
         try await c1.deactivate()
+    }
+
+    func test_can_get_peers_presence() async throws {
+        struct Cursor: Codable, Equatable {
+            // swiftlint: disable identifier_name
+            var x: Int
+            var y: Int
+            // swiftlint: enable identifier_name
+        }
+
+        struct PresenceType: Codable, Equatable {
+            static func == (lhs: PresenceType, rhs: PresenceType) -> Bool {
+                lhs.name == rhs.name && lhs.cursor == rhs.cursor
+            }
+
+            var name: String
+            var cursor: Cursor
+        }
+
+        var option = ClientOptions()
+        option.presence = PresenceType(name: "a", cursor: Cursor(x: 0, y: 0)).createdDictionary
+
+        let c1 = Client(rpcAddress: rpcAddress, options: option)
+
+        option.presence = PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)).createdDictionary
+
+        let c2 = Client(rpcAddress: rpcAddress, options: option)
+
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        try await c1.attach(d1)
+
+        let presence1 = await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)
+
+        XCTAssert(presence1 == nil)
+
+        try await c2.attach(d2)
+
+        let presence2: PresenceType? = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)
+
+        XCTAssertTrue(presence2 == PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)))
+
+        try await c1.detach(d1)
+        try await c2.detach(d2)
+
+        try await c1.deactivate()
+        try await c2.deactivate()
     }
 
     private func decodePresence<T: Decodable>(_ dictionary: [String: Any]) -> T? {
