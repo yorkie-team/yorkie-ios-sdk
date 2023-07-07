@@ -96,6 +96,28 @@ class RHT {
     }
 
     /**
+     * `toXML` converts the given RHT to XML string.
+     */
+    public func toXML() -> String {
+        if self.nodeMapByKey.isEmpty {
+            return ""
+        }
+
+        let xmlAttributes = self.nodeMapByKey.map { key, value in
+            "\(key)=\"\(value.value)\""
+        }.joined(separator: " ")
+
+        return " \(xmlAttributes)"
+    }
+
+    /**
+     * `size` returns the size of RHT
+     */
+    public var size: Int {
+        self.nodeMapByKey.count
+    }
+
+    /**
      * `toObject` returns the object of this hashtable.
      */
     func toObject() -> [String: (value: String, updatedAt: TimeTicket)] {

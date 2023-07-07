@@ -330,7 +330,7 @@ public actor Document {
 
             self.changeID.syncLamport(with: $0.id.getLamport())
         }
-        
+
         changeInfos.forEach {
             self.processDocEvent(RemoteChangeEvent(value: $0))
         }

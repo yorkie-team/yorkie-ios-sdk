@@ -58,11 +58,11 @@ class ChangeContext {
     }
 
     /**
-     * `registerRemovedNodeTextElement` register text element has removed node for
+     * `registerElementHasRemovedNodes` register GC element has removed node for
      * garbage collection.
      */
-    func registerRemovedNodeTextElement(_ text: CRDTTextElement) {
-        self.root.registerTextWithGarbage(text: text)
+    func registerElementHasRemovedNodes(_ element: CRDTGCElement) {
+        self.root.registerElementHasRemovedNodes(element)
     }
 
     /**
@@ -85,5 +85,12 @@ class ChangeContext {
     func issueTimeTicket() -> TimeTicket {
         self.delimiter += 1
         return self.id.createTimeTicket(delimiter: self.delimiter)
+    }
+
+    /**
+     * `letLastTimeTicket` returns the last time ticket issued in this context.
+     */
+    var lastTimeTicket: TimeTicket {
+        self.id.createTimeTicket(delimiter: self.delimiter)
     }
 }

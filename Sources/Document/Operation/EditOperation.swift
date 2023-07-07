@@ -76,7 +76,7 @@ struct EditOperation: Operation {
         let changes = try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor).1
 
         if self.fromPos != self.toPos {
-            root.registerTextWithGarbage(text: text)
+            root.registerElementHasRemovedNodes(text)
         }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {

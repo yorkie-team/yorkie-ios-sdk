@@ -84,7 +84,7 @@ public class JSONText {
         )
 
         if range.0 != range.1 {
-            context.registerRemovedNodeTextElement(text)
+            context.registerElementHasRemovedNodes(text)
         }
 
         return true

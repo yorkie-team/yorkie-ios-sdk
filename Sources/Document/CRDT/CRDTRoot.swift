@@ -25,10 +25,27 @@ typealias CRDTElementPair = (element: CRDTElement, parent: CRDTContainer?)
  * a particular element.
  */
 class CRDTRoot {
+    /**
+     * `rootObject` is the root object of the document.
+     */
     private var rootObject: CRDTObject
+    /**
+     * `elementPairMapByCreatedAt` is a hash table that maps the creation time of
+     * an element to the element itself and its parent.
+     */
     private var elementPairMapByCreatedAt: [TimeTicket: CRDTElementPair] = [:]
+    /**
+     * `removedElementSetByCreatedAt` is a hash set that contains the creation
+     * time of the removed element. It is used to find the removed element when
+     * executing garbage collection.
+     */
     private var removedElementSetByCreatedAt: Set<TimeTicket> = Set()
-    private var textWithGarbageSetByCreatedAt: Set<TimeTicket> = Set()
+    /**
+     * `elementHasRemovedNodesSetByCreatedAt` is a hash set that contains the
+     * creation time of the element that has removed nodes. It is used to find
+     * the element that has removed nodes when executing garbage collection.
+     */
+    private var elementHasRemovedNodesSetByCreatedAt: Set<TimeTicket> = Set()
 
     init(rootObject: CRDTObject = CRDTObject(createdAt: TimeTicket.initial)) {
         self.rootObject = rootObject
@@ -105,10 +122,11 @@ class CRDTRoot {
     }
 
     /**
-     * `registerTextWithGarbage` registers the given text to hash set.
+     * `registerElementHasRemovedNodes` registers the given GC element to the
+     * hash set.
      */
-    func registerTextWithGarbage(text: CRDTTextElement) {
-        self.textWithGarbageSetByCreatedAt.insert(text.createdAt)
+    func registerElementHasRemovedNodes(_ element: CRDTElement) {
+        self.elementHasRemovedNodesSetByCreatedAt.insert(element.createdAt)
     }
 
     /**
@@ -152,14 +170,14 @@ class CRDTRoot {
             }
         }
 
-        self.textWithGarbageSetByCreatedAt.forEach {
+        self.elementHasRemovedNodesSetByCreatedAt.forEach {
             guard let pair = self.elementPairMapByCreatedAt[$0],
-                  let text = pair.element as? CRDTTextElement
+                  let element = pair.element as? CRDTGCElement
             else {
                 return
             }
 
-            count += text.removedNodesLength
+            count += element.removedNodesLength
         }
 
         return count
@@ -194,19 +212,19 @@ class CRDTRoot {
             count += self.garbageCollectInternal(element: pair.element)
         }
 
-        self.textWithGarbageSetByCreatedAt.forEach {
+        self.elementHasRemovedNodesSetByCreatedAt.forEach {
             guard let pair = self.elementPairMapByCreatedAt[$0],
-                  let text = pair.element as? CRDTTextElement
+                  let element = pair.element as? CRDTGCElement
             else {
                 return
             }
 
-            let removedNodeCount = text.purgeTextNodesWithGarbage(ticket: ticket)
+            let removedNodeCount = element.purgeRemovedNodesBefore(ticket: ticket)
             guard removedNodeCount > 0 else {
                 return
             }
 
-            self.textWithGarbageSetByCreatedAt.remove(text.createdAt)
+            self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt)
             count += removedNodeCount
         }
 

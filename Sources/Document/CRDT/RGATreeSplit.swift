@@ -775,9 +775,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     }
 
     /**
-     * `purgeTextNodesWithGarbage` physically purges nodes that have been removed.
+     * `purgeRemovedNodesBefore` physically purges nodes that have been removed.
      */
-    public func purgeTextNodesWithGarbage(_ ticket: TimeTicket) -> Int {
+    public func purgeRemovedNodesBefore(_ ticket: TimeTicket) -> Int {
         var count = 0
 
         for (_, node) in self.removedNodeMap {

@@ -56,4 +56,4 @@ typealias PbTextNodeID = Yorkie_V1_TextNodeID
 typealias PbTimeTicket = Yorkie_V1_TimeTicket
 typealias PbValueType = Yorkie_V1_ValueType
 typealias PbTextNodePos = Yorkie_V1_TextNodePos
-typealias PbTextNodeAttr = Yorkie_V1_TextNodeAttr
+typealias PbNodeAttr = Yorkie_V1_NodeAttr

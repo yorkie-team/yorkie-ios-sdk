@@ -64,3 +64,16 @@ private extension String {
         return String(self[range])
     }
 }
+
+/**
+ * `buildIndexTree` builds an index tree from the given element node.
+ */
+/*
+ func buildIndexTree(_ node: ElementNode) -> IndexTree<CRDTTreeNode> {
+     let doc = Document(key: "test")
+     doc.update { root in
+         root.t = JSONTree(node)
+     }
+     return doc.getRoot().t.getIndexTree()
+ }
+ */
