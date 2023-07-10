@@ -62,7 +62,7 @@ public actor Document {
     private var root: CRDTRoot
     private var clone: CRDTRoot?
     private var changeID: ChangeID
-    private var checkpoint: Checkpoint
+    internal var checkpoint: Checkpoint
     private var localChanges: [Change]
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
