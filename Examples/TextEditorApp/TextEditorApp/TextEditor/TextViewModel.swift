@@ -57,8 +57,6 @@ class TextViewModel {
             }
 
             // subscribe document event.
-            let clientID = await self.client.id
-
             await self.document.subscribe { [weak self] event in
                 if event.type == .snapshot {
                     Task { [weak self] in
@@ -74,7 +72,7 @@ class TextViewModel {
 
                 var textChanges = [TextOperation]()
 
-                event.value.filter { $0.actorID != clientID }.forEach { changeInfo in
+                event.value.forEach { changeInfo in
                     changeInfo.operations.forEach {
                         if let op = $0 as? EditOpInfo {
                             let range = NSRange(location: op.from, length: op.to - op.from)
