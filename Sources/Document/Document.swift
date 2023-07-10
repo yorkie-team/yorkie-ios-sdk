@@ -400,6 +400,8 @@ public actor Document {
                     self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: value) : RemoteChangeEvent(value: value))
                 }
             }
+        } else {
+            self.subscribeCallbacks["$"]?(event)
         }
 
         self.defaultSubscribeCallback?(event)
