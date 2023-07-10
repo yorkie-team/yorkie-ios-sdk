@@ -51,14 +51,38 @@ enum StreamConnectionStatus {
     case disconnected
 }
 
+/**
+ * `SyncMode` is the mode of synchronization. It is used to determine
+ * whether to push and pull changes in PushPullChanges API.
+ */
+public enum SyncMode {
+    /**
+     * `PushPull` is the mode that pushes and pulls changes.
+     */
+    case pushPull
+
+    /**
+     * `PushOnly` is the mode that pushes changes only.
+     */
+    case pushOnly
+}
+
 struct Attachment {
     var doc: Document
     var docID: String
     var isRealtimeSync: Bool
+    var realtimeSyncMode: SyncMode
     var peerPresenceMap: [ActorID: PresenceInfo]
     var remoteChangeEventReceived: Bool
     var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
     var watchLoopReconnectTimer: Timer?
+
+    /**
+     * `getPresence` returns the presence information of the client.
+     */
+    func getPresence(clientID: ActorID) -> Presence? {
+        self.peerPresenceMap[clientID]?.data
+    }
 }
 
 /**
@@ -325,7 +349,7 @@ public actor Client {
 
             await doc.setStatus(.attached)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, isRealtimeSync: isRealtimeSync, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, isRealtimeSync: isRealtimeSync, realtimeSyncMode: .pushPull, peerPresenceMap: [String: PresenceInfo](), remoteChangeEventReceived: false)
             try self.runWatchLoop(docKey)
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
@@ -398,14 +422,22 @@ public actor Client {
      * `pause` pause the realtime syncronization of the given document.
      */
     public func pause(_ doc: Document) throws {
-        try self.changeRealtimeSyncSetting(doc, false)
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        try self.changeRealtimeSync(doc, false)
     }
 
     /**
      * `resume` resume the realtime syncronization of the given document.
      */
     public func resume(_ doc: Document) throws {
-        try self.changeRealtimeSyncSetting(doc, true)
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        try self.changeRealtimeSync(doc, true)
     }
 
     /**
@@ -450,11 +482,10 @@ public actor Client {
         }
     }
 
-    private func changeRealtimeSyncSetting(_ doc: Document, _ isRealtimeSync: Bool) throws {
-        guard self.isActive else {
-            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
-        }
-
+    /**
+     * `changeRealtimeSync` changes the synchronization mode of the given document.
+     */
+    private func changeRealtimeSync(_ doc: Document, _ isRealtimeSync: Bool) throws {
         let docKey = doc.getKey()
 
         guard self.attachmentMap[docKey] != nil else {
@@ -471,19 +502,56 @@ public actor Client {
     }
 
     /**
+     * `pauseRemoteChanges` pauses the synchronization of remote changes,
+     * allowing only local changes to be applied.
+     */
+    public func pauseRemoteChanges(doc: Document) throws {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        let docKey = doc.getKey()
+
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+        }
+
+        self.attachmentMap[docKey]?.realtimeSyncMode = .pushOnly
+    }
+
+    /**
+     * `resumeRemoteChanges` resumes the synchronization of remote changes,
+     * allowing both local and remote changes to be applied.
+     */
+    public func resumeRemoteChanges(doc: Document) throws {
+        guard self.isActive else {
+            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+        }
+
+        let docKey = doc.getKey()
+
+        guard self.attachmentMap[docKey] != nil else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+        }
+
+        self.attachmentMap[docKey]?.realtimeSyncMode = .pushPull
+        self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+    }
+
+    /**
      * `sync` pushes local changes of the attached documents to the server and
      * receives changes of the remote replica from the server then apply them to
      * local documents.
      */
     @discardableResult
-    public func sync() async throws -> [Document] {
+    public func sync(_ syncModes: [DocumentKey: SyncMode] = [:]) async throws -> [Document] {
         let attachments = self.attachmentMap.values
 
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 attachments.forEach { attachment in
                     group.addTask {
-                        try await self.syncInternal(attachment)
+                        try await self.syncInternal(attachment, syncModes[attachment.doc.getKey()] ?? .pushPull)
                     }
                 }
 
@@ -538,13 +606,26 @@ public actor Client {
     }
 
     /**
-     * `getPeers` returns the peers of the given document.
+     * `getPeerPresence` returns the presence of the given document and client.
      */
-    public func getPeers(key: String) -> PresenceMap {
+    public func getPeerPresence(docKey: DocumentKey, clientID: ActorID) -> Presence? {
+        self.attachmentMap[docKey]?.getPresence(clientID: clientID)
+    }
+
+    /**
+     * `getPeersByDocKey` returns the peers of the given document.
+     */
+    public func getPeersByDocKey(docKey: DocumentKey) throws -> PresenceMap {
+        guard let attachment = self.attachmentMap[docKey] else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached.")
+        }
+
         var peers = PresenceMap()
-        self.attachmentMap[key]?.peerPresenceMap.forEach {
+
+        attachment.peerPresenceMap.forEach {
             peers[$0.key] = $0.value.data
         }
+
         return peers
     }
 
@@ -597,7 +678,7 @@ public actor Client {
                     if docChanged || attachment.remoteChangeEventReceived {
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         group.addTask {
-                            try await self.syncInternal(attachment)
+                            try await self.syncInternal(attachment, attachment.realtimeSyncMode)
                         }
                     }
                 }
@@ -782,7 +863,7 @@ public actor Client {
     }
 
     @discardableResult
-    private func syncInternal(_ attachment: Attachment) async throws -> Document {
+    private func syncInternal(_ attachment: Attachment, _ syncMode: SyncMode) async throws -> Document {
         guard let clientID = self.id, let clientIDData = clientID.toData else {
             throw YorkieError.unexpected(message: "Invalid Client ID!")
         }
@@ -796,6 +877,7 @@ public actor Client {
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.docID
+        pushPullRequest.pushOnly = syncMode == .pushOnly
 
         do {
             let docKey = doc.getKey()
@@ -804,6 +886,13 @@ public actor Client {
             let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
 
             let responsePack = try Converter.fromChangePack(response.changePack)
+
+            // NOTE(chacha912, hackerwins): If syncLoop already executed with
+            // PushPull, ignore the response when the syncMode is PushOnly.
+            if responsePack.hasChanges(), syncMode == .pushOnly {
+                return doc
+            }
+
             try await doc.applyChangePack(pack: responsePack)
 
             if await doc.status == .removed {

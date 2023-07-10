@@ -290,7 +290,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.sync()
         try await c2.sync()
 
-        let presence1: PresenceType = self.decodePresence(await c2.getPeers(key: d2.getKey())[c1.id!]!)!
+        let presence1: PresenceType = self.decodePresence(await c2.getPeerPresence(docKey: docKey, clientID: c1.id!)!)!
 
         XCTAssert(c1Name == presence1.name)
 
@@ -300,12 +300,12 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.sync()
         try await c1.sync()
 
-        let presence2: PresenceType = self.decodePresence(await c1.getPeers(key: d1.getKey())[c2.id!]!)!
+        let presence2: PresenceType = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)!
 
         XCTAssert(c2Name == presence2.name)
 
-        let c1Peer = await c1.getPeers(key: d1.getKey()) as NSDictionary
-        let c2Peer = (await c2.getPeers(key: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
+        let c1Peer = try await c1.getPeersByDocKey(docKey: d1.getKey()) as NSDictionary
+        let c2Peer = try (await c2.getPeersByDocKey(docKey: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
 
         XCTAssert(c1Peer.isEqual(to: c2Peer))
 
@@ -358,6 +358,137 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.detach(d1)
 
         try await c1.deactivate()
+    }
+
+    func test_can_change_sync_mode_in_realtime_sync() async throws {
+        let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+        let c3 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+
+        try await c1.activate()
+        try await c2.activate()
+        try await c3.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+        let d3 = Document(key: docKey)
+
+        // 01. c1, c2, c3 attach to the same document in realtime sync.
+        try await c1.attach(d1)
+        try await c2.attach(d2)
+        try await c3.attach(d3)
+
+        // 02. c1, c2 sync in realtime.
+        try await d1.update { root in
+            root.c1 = Int64(0)
+        }
+
+        try await d2.update { root in
+            root.c2 = Int64(0)
+        }
+
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        var d1Doc = await d1.toSortedJSON()
+        var d2Doc = await d2.toSortedJSON()
+
+        XCTAssertEqual(d1Doc, "{\"c1\":0,\"c2\":0}")
+        XCTAssertEqual(d2Doc, "{\"c1\":0,\"c2\":0}")
+
+        // 03. c1 and c2 sync with push-only mode. So, the changes of c1 and c2
+        // are not reflected to each other.
+        // But, c can get the changes of c1 and c2, because c3 sync with push-pull mode.
+        try await c1.pauseRemoteChanges(doc: d1)
+        try await c2.pauseRemoteChanges(doc: d2)
+
+        try await d1.update { root in
+            root.c1 = Int64(1)
+        }
+
+        try await d2.update { root in
+            root.c2 = Int64(1)
+        }
+
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        d1Doc = await d1.toSortedJSON()
+        d2Doc = await d2.toSortedJSON()
+        let d3Doc = await d3.toSortedJSON()
+
+        XCTAssertEqual(d1Doc, "{\"c1\":1,\"c2\":0}")
+        XCTAssertEqual(d2Doc, "{\"c1\":0,\"c2\":1}")
+        XCTAssertEqual(d3Doc, "{\"c1\":1,\"c2\":1}")
+
+        // 04. c1 and c2 sync with push-pull mode.
+        try await c1.resumeRemoteChanges(doc: d1)
+        try await c2.resumeRemoteChanges(doc: d2)
+
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        d1Doc = await d1.toSortedJSON()
+        d2Doc = await d2.toSortedJSON()
+
+        XCTAssertEqual(d1Doc, "{\"c1\":1,\"c2\":1}")
+        XCTAssertEqual(d2Doc, "{\"c1\":1,\"c2\":1}")
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+        try await c3.deactivate()
+    }
+
+    func test_can_get_peers_presence() async throws {
+        struct Cursor: Codable, Equatable {
+            // swiftlint: disable identifier_name
+            var x: Int
+            var y: Int
+            // swiftlint: enable identifier_name
+        }
+
+        struct PresenceType: Codable, Equatable {
+            static func == (lhs: PresenceType, rhs: PresenceType) -> Bool {
+                lhs.name == rhs.name && lhs.cursor == rhs.cursor
+            }
+
+            var name: String
+            var cursor: Cursor
+        }
+
+        var option = ClientOptions()
+        option.presence = PresenceType(name: "a", cursor: Cursor(x: 0, y: 0)).createdDictionary
+
+        let c1 = Client(rpcAddress: rpcAddress, options: option)
+
+        option.presence = PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)).createdDictionary
+
+        let c2 = Client(rpcAddress: rpcAddress, options: option)
+
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        try await c1.attach(d1)
+
+        let presence1 = await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)
+
+        XCTAssert(presence1 == nil)
+
+        try await c2.attach(d2)
+
+        let presence2: PresenceType? = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)
+
+        XCTAssertTrue(presence2 == PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)))
+
+        try await c1.detach(d1)
+        try await c2.detach(d2)
+
+        try await c1.deactivate()
+        try await c2.deactivate()
     }
 
     private func decodePresence<T: Decodable>(_ dictionary: [String: Any]) -> T? {

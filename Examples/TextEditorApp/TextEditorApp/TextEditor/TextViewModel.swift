@@ -61,10 +61,13 @@ class TextViewModel {
             let clientID = await self.client.id
 
             await self.document.eventStream.sink { [weak self] event in
-                if event.type == .snapshot {
+                switch event.type {
+                case .snapshot, .remoteChange:
                     Task { [weak self] in
                         await self?.syncText()
                     }
+                default:
+                    break
                 }
             }.store(in: &self.cancellables)
 
@@ -75,10 +78,7 @@ class TextViewModel {
                 events.filter { $0.actor != clientID }.forEach {
                     switch $0.type {
                     case .content:
-                        let range = NSRange(location: $0.from, length: $0.to - $0.from)
-                        let content = $0.content ?? ""
-
-                        textChanges.append(.edit(range: range, content: content))
+                        break
                     case .style:
                         break
                     case .selection:
@@ -148,10 +148,10 @@ class TextViewModel {
     }
 
     func pause() async {
-        try! await self.client.pause(self.document)
+        try? await self.client.pauseRemoteChanges(doc: self.document)
     }
 
     func resume() async {
-        try! await self.client.resume(self.document)
+        try? await self.client.resumeRemoteChanges(doc: self.document)
     }
 }
