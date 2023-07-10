@@ -122,6 +122,17 @@ public actor Document {
     }
 
     /**
+     * `unsubscribe` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribe(targetPath: String? = nil) {
+        if let targetPath {
+            self.subscribeCallbacks[targetPath] = nil
+        } else {
+            self.defaultSubscribeCallback = nil
+        }
+    }
+
+    /**
      * `applyChangePack` applies the given change pack into this document.
      * 1. Remove local changes applied to server.
      * 2. Update the checkpoint.
