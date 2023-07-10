@@ -281,9 +281,6 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.attach(d1)
         try await c2.attach(d2)
 
-        // To catch the watched event first.
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
         c1Name = "c1+"
         try await c1.updatePresence("name", c1Name)
 
@@ -310,10 +307,6 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssert(c1Peer.isEqual(to: c2Peer))
 
         try await c1.detach(d1)
-
-        // Keep the watchLoop of c2 for catch the detach event of c1.
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
         try await c2.detach(d2)
 
         try await c1.deactivate()
