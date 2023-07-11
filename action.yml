@@ -1,0 +1,68 @@
+name: "Setup Docker on macOS"
+description: "Setup Docker on macOS using Colima, Lima-VM, and Homebrew."
+outputs:
+  colima-version:
+    value: ${{ steps.colima-version.outputs.version }}
+    description: Version of Colima
+  docker-client-version:
+    value: ${{ steps.docker-client-version.outputs.version }}
+    description: Version of the Docker client
+  docker-compose-version:
+    value: ${{ steps.docker-compose-version.outputs.version }}
+    description: Version of Docker Compose
+runs:
+  using: "composite"
+  steps:
+    - name: Safety check
+      if: runner.os != 'macOS'
+      run: |
+        echo "Not a macOS runner, exiting."
+        exit 1
+      shell: bash
+    - name: Update Homebrew
+      run: |
+        brew update --preinstall
+        brew_repository="$(brew --repository)"
+        mkdir -p .github
+        cat "$brew_repository/Library/Taps/homebrew/homebrew-core/Formula/colima.rb" > .github/brew-colima
+        cat "$brew_repository/Library/Taps/homebrew/homebrew-core/Formula/docker.rb" > .github/brew-docker
+        cat "$brew_repository/Library/Taps/homebrew/homebrew-core/Formula/docker-compose.rb" > .github/brew-docker-compose
+      shell: bash
+    - name: Install Docker client, Docker Compose, and Colima
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: "1"
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "1"
+      run: brew install -f docker docker-compose colima
+      shell: bash
+    - name: Configure Docker Compose plugin
+      run: |
+        mkdir -p ~/.docker/cli-plugins
+        ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" ~/.docker/cli-plugins/docker-compose
+      shell: bash
+    - name: Start Colima
+      run: colima start
+      shell: bash
+    - id: docker-client-version
+      run: |
+        content="$(docker version)"
+        content="${content//'%'/'%25'}"
+        content="${content//$'\n'/'%0A'}"
+        content="${content//$'\r'/'%0D'}"
+        echo "::set-output name=version::$content"
+      shell: bash
+    - id: docker-compose-version
+      run: |
+        content="$(docker compose version)"
+        content="${content//'%'/'%25'}"
+        content="${content//$'\n'/'%0A'}"
+        content="${content//$'\r'/'%0D'}"
+        echo "::set-output name=version::$content"
+      shell: bash
+    - id: colima-version
+      run: |
+        content="$(colima version)"
+        content="${content//'%'/'%25'}"
+        content="${content//$'\n'/'%0A'}"
+        content="${content//$'\r'/'%0D'}"
+        echo "::set-output name=version::$content"
+      shell: bash
