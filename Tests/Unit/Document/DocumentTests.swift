@@ -730,7 +730,7 @@ class DocumentTests: XCTestCase {
 
         await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
-            XCTAssertEqual((event as? LocalChangeEvent)?.value[0].operations.compactMap { $0.path }, ["$", "$.", "$..obj", "$..obj", "$..obj", "$..obj", "$."])
+            XCTAssertEqual((event as? LocalChangeEvent)?.value.operations.compactMap { $0.path }, ["$", "$.", "$..obj", "$..obj", "$..obj", "$..obj", "$."])
         }
 
         try await target.update { root in
@@ -794,7 +794,7 @@ class DocumentTests: XCTestCase {
         await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
 
-            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+            if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "arr"))
                 XCTAssertEqual(ops[1] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 0))
                 XCTAssertEqual(ops[2] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 1))
@@ -809,7 +809,7 @@ class DocumentTests: XCTestCase {
         await target.subscribe(targetPath: "$.arr") { event in
             XCTAssertEqual(event.type, .localChange)
 
-            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+            if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 0))
                 XCTAssertEqual(ops[1] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 1))
                 XCTAssertEqual(ops[2] as! RemoveOpInfo, RemoveOpInfo(path: "$.arr", key: nil, index: 1))
@@ -841,7 +841,7 @@ class DocumentTests: XCTestCase {
         await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
 
-            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+            if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "cnt"))
                 XCTAssertEqual(ops[1] as! IncreaseOpInfo, IncreaseOpInfo(path: "$.cnt", value: 1))
                 XCTAssertEqual(ops[2] as! IncreaseOpInfo, IncreaseOpInfo(path: "$.cnt", value: 10))
@@ -865,7 +865,7 @@ class DocumentTests: XCTestCase {
         await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
 
-            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+            if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "text"))
                 XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.text", from: 0, to: 0, attributes: nil, content: "hello world"))
                 XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 11, to: 11))
@@ -888,7 +888,7 @@ class DocumentTests: XCTestCase {
         await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
 
-            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+            if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "textWithAttr"))
                 XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.textWithAttr", from: 0, to: 0, attributes: nil, content: "hello world"))
                 XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.textWithAttr", from: 11, to: 11))

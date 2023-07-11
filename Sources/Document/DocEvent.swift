@@ -60,7 +60,7 @@ public struct SnapshotEvent: DocEvent {
 
 protocol ChangeEvent: DocEvent {
     var type: DocEventType { get }
-    var value: [ChangeInfo] { get }
+    var value: ChangeInfo { get }
 }
 
 /**
@@ -86,7 +86,7 @@ public struct LocalChangeEvent: ChangeEvent {
     /**
      * LocalChangeEvent type
      */
-    public var value: [ChangeInfo]
+    public var value: ChangeInfo
 }
 
 /**
@@ -102,5 +102,5 @@ public struct RemoteChangeEvent: ChangeEvent {
     /**
      * RemoteChangeEvent type
      */
-    public var value: [ChangeInfo]
+    public var value: ChangeInfo
 }

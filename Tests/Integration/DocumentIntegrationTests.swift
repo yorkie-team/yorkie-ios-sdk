@@ -387,15 +387,15 @@ final class DocumentIntegrationTests: XCTestCase {
         var d3Events = [any OperationInfo]()
 
         await self.d1.subscribe { event in
-            d1Events.append(contentsOf: (event as? ChangeEvent)?.value[0].operations ?? [])
+            d1Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
         await self.d1.subscribe(targetPath: "$.todos") { event in
-            d2Events.append(contentsOf: (event as? ChangeEvent)?.value[0].operations ?? [])
+            d2Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
         await self.d1.subscribe(targetPath: "$.counter") { event in
-            d3Events.append(contentsOf: (event as? ChangeEvent)?.value[0].operations ?? [])
+            d3Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
         try await self.d2.update { root in
