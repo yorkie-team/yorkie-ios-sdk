@@ -38,7 +38,7 @@ class DocumentTests: XCTestCase {
     func test_can_input_nil() async throws {
         let target = Document(key: "test-doc")
         try await target.update { root in
-            root.data = ["": nil, "null": nil]
+            root.data = ["": nil, "null": nil] as [String: Any?]
         }
 
         let result = await target.toSortedJSON()
@@ -734,7 +734,7 @@ class DocumentTests: XCTestCase {
         }
 
         try await target.update { root in
-            root[""] = [:]
+            root[""] = [:] as [String: Any]
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -742,7 +742,7 @@ class DocumentTests: XCTestCase {
                            """)
 
             let emptyKey = root[""] as? JSONObject
-            emptyKey!.obj = [:]
+            emptyKey!.obj = [:] as [String: Any]
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -819,12 +819,12 @@ class DocumentTests: XCTestCase {
         }
 
         try await target.update { root in
-            root.arr = []
+            root.arr = [] as [String]
             let arr = root.arr as? JSONArray
             arr?.append(Int64(0))
             arr?.append(Int64(1))
             arr?.remove(index: 1)
-            root["$$...hello"] = []
+            root["$$...hello"] = [] as [String]
             let hello = root["$$...hello"] as? JSONArray
             hello?.append(Int64(0))
 

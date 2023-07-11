@@ -114,7 +114,7 @@ final class JSONTextTest: XCTestCase {
         try await doc.update { root in root.text = JSONText() }
 
         await doc.subscribe(targetPath: "$.text") {
-            view.applyChanges(operations: ($0 as! ChangeEventable).value.operations)
+            view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
         }
 
         let commands: [(from: Int, to: Int, content: String)] = [
@@ -141,7 +141,7 @@ final class JSONTextTest: XCTestCase {
         try await doc.update { root in root.text = JSONText() }
 
         await doc.subscribe(targetPath: "$.text") {
-            view.applyChanges(operations: ($0 as! ChangeEventable).value.operations)
+            view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
         }
 
         let commands: [(from: Int, to: Int, content: String)] = [
@@ -176,7 +176,7 @@ final class JSONTextTest: XCTestCase {
         try await doc.update { root in root.text = JSONText() }
 
         await doc.subscribe(targetPath: "$.text") {
-            view.applyChanges(operations: ($0 as! ChangeEventable).value.operations)
+            view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
         }
 
         let commands: [(from: Int, to: Int, content: String)] = [
@@ -210,7 +210,7 @@ final class JSONTextTest: XCTestCase {
         }
 
         await doc.subscribe(targetPath: "$.text") { event in
-            XCTAssertEqual((event as! ChangeEventable).value.operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
+            XCTAssertEqual((event as! ChangeEvent).value.operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
         }
 
         try await doc.update { root in (root.text as? JSONText)?.select(2, 4) }

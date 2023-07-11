@@ -62,7 +62,7 @@ public actor Document {
     private var root: CRDTRoot
     private var clone: CRDTRoot?
     private var changeID: ChangeID
-    private var checkpoint: Checkpoint
+    internal var checkpoint: Checkpoint
     private var localChanges: [Change]
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
@@ -118,6 +118,17 @@ public actor Document {
             self.subscribeCallbacks[targetPath] = callback
         } else {
             self.defaultSubscribeCallback = callback
+        }
+    }
+
+    /**
+     * `unsubscribe` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribe(targetPath: String? = nil) {
+        if let targetPath {
+            self.subscribeCallbacks[targetPath] = nil
+        } else {
+            self.defaultSubscribeCallback = nil
         }
     }
 
@@ -319,7 +330,7 @@ public actor Document {
 
             self.changeID.syncLamport(with: $0.id.getLamport())
         }
-        
+
         changeInfos.forEach {
             self.processDocEvent(RemoteChangeEvent(value: $0))
         }
@@ -372,9 +383,9 @@ public actor Document {
 
     private func processDocEvent(_ event: DocEvent) {
         if event.type != .snapshot {
-            if let event = event as? ChangeEventable {
+            if let event = event as? ChangeEvent {
                 var operations = [String: [any OperationInfo]]()
-                
+
                 event.value.operations.forEach { operationInfo in
                     self.subscribeCallbacks.keys.forEach { targetPath in
                         if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
@@ -385,13 +396,15 @@ public actor Document {
                         }
                     }
                 }
-                
+
                 operations.forEach { key, value in
                     let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
-                    
+
                     self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
                 }
             }
+        } else {
+            self.subscribeCallbacks["$"]?(event)
         }
 
         self.defaultSubscribeCallback?(event)

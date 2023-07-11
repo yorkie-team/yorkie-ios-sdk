@@ -56,13 +56,14 @@ class TextViewModel {
             }
 
             // subscribe document event.
-            let clientID = await self.client.id
-
             await self.document.subscribe { [weak self] event in
-                if event.type == .snapshot {
+                switch event.type {
+                case .snapshot, .remoteChange:
                     Task { [weak self] in
                         await self?.syncText()
                     }
+                default:
+                    break
                 }
             }
 
@@ -73,15 +74,9 @@ class TextViewModel {
 
                 var textChanges = [TextOperation]()
 
-                event.value.filter { $0.actorID != clientID }.forEach { changeInfo in
+                event.value.forEach { changeInfo in
                     changeInfo.operations.forEach {
-                        if let op = $0 as? EditOpInfo {
-                            let range = NSRange(location: op.from, length: op.to - op.from)
-                            let content = op.content ?? ""
-
-                            textChanges.append(.edit(range: range, content: content))
-                        } else if let _ = $0 as? StyleOpInfo {
-                        } else if let op = $0 as? SelectOpInfo {
+                        if let op = $0 as? SelectOpInfo {
                             let range: NSRange
 
                             if op.from <= op.to {
@@ -146,10 +141,10 @@ class TextViewModel {
     }
 
     func pause() async {
-        try! await self.client.pause(self.document)
+        try? await self.client.pauseRemoteChanges(doc: self.document)
     }
 
     func resume() async {
-        try! await self.client.resume(self.document)
+        try? await self.client.resumeRemoteChanges(doc: self.document)
     }
 }
