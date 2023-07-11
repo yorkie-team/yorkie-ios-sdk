@@ -55,7 +55,7 @@ public typealias DocumentID = String
  *
  */
 public actor Document {
-    typealias SubscribeCallback = (DocEvent) async -> Void
+    typealias SubscribeCallback = (DocEvent) -> Void
 
     private let key: DocumentKey
     private(set) var status: DocumentStatus
@@ -80,7 +80,7 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) async throws {
+    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -113,7 +113,7 @@ public actor Document {
      * `subscribe` registers a callback to subscribe to events on the document.
      * The callback will be called when the targetPath or any of its nested values change.
      */
-    public func subscribe(targetPath: String? = nil, callback: @escaping (DocEvent) async -> Void) {
+    public func subscribe(targetPath: String? = nil, callback: @escaping (DocEvent) -> Void) {
         if let targetPath {
             self.subscribeCallbacks[targetPath] = callback
         } else {
@@ -352,8 +352,7 @@ public actor Document {
             throw YorkieError.unexpected(message: "The path must start with \"$\"")
         }
 
-        let context = ChangeContext(id: self.changeID.next(), root: self.root)
-        let rootObject = JSONObject(target: self.root.object, context: context)
+        let rootObject = self.getRoot()
 
         if path == "$" {
             return rootObject
@@ -418,26 +417,16 @@ public actor Document {
                     }
                 }
 
-                for (key, value) in operations {
+                operations.forEach { key, value in
                     let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
 
-                    if let callback = self.subscribeCallbacks[key] {
-                        Task {
-                            await callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
-                        }
-                    }
+                    self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
                 }
             }
         } else {
-            if let callback = self.subscribeCallbacks["$"] {
-                Task {
-                    await callback(event)
-                }
-            }
+            self.subscribeCallbacks["$"]?(event)
         }
 
-        Task {
-            await self.defaultSubscribeCallback?(event)
-        }
+        self.defaultSubscribeCallback?(event)
     }
 }
