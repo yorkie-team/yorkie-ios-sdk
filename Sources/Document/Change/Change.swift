@@ -52,8 +52,9 @@ struct Change {
     /**
      * `execute` executes the operations of this change to the given root.
      */
-    func execute(root: CRDTRoot) throws {
-        try self.operations.forEach {
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+        try self.operations.flatMap {
             try $0.execute(root: root)
         }
     }

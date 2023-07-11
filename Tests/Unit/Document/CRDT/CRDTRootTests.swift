@@ -69,10 +69,10 @@ class CRDTRootTests: XCTestCase {
         XCTAssertEqual(resultA1, ["$", "K-a1"])
 
         let resultC1 = try target.createSubPaths(createdAt: c1.createdAt)
-        XCTAssertEqual(resultC1, ["$", "K-\\$a3", "K-\\.B2", "K-c1"])
+        XCTAssertEqual(resultC1, ["$", "K-$a3", "K-.B2", "K-c1"])
 
         let result = try target.createPath(createdAt: c1.createdAt)
-        XCTAssertEqual(result, "$.K-\\$a3.K-\\.B2.K-c1")
+        XCTAssertEqual(result, "$.K-$a3.K-.B2.K-c1")
     }
 
     func test_can_resturn_elements_count() throws {

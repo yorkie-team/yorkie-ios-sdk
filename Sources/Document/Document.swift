@@ -55,6 +55,8 @@ public typealias DocumentID = String
  *
  */
 public actor Document {
+    typealias SubscribeCallback = (DocEvent) -> Void
+
     private let key: DocumentKey
     private(set) var status: DocumentStatus
     private var root: CRDTRoot
@@ -62,8 +64,8 @@ public actor Document {
     private var changeID: ChangeID
     internal var checkpoint: Checkpoint
     private var localChanges: [Change]
-
-    public let eventStream: PassthroughSubject<DocEvent, Never>
+    private var defaultSubscribeCallback: SubscribeCallback?
+    private var subscribeCallbacks: [String: SubscribeCallback]
 
     public init(key: String) {
         self.key = key
@@ -72,7 +74,7 @@ public actor Document {
         self.changeID = ChangeID.initial
         self.checkpoint = Checkpoint.initial
         self.localChanges = []
-        self.eventStream = PassthroughSubject()
+        self.subscribeCallbacks = [:]
     }
 
     /**
@@ -93,15 +95,40 @@ public actor Document {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
             let change = context.getChange()
-            try? change.execute(root: self.root)
+            let opInfos = (try? change.execute(root: self.root)) ?? []
             self.localChanges.append(change)
             self.changeID = change.id
 
-            let changeInfo = ChangeInfo(change: change, paths: self.createPaths(change: change))
+            let changeInfo = ChangeInfo(message: change.message ?? "",
+                                        operations: opInfos,
+                                        actorID: change.id.getActorID())
             let changeEvent = LocalChangeEvent(value: [changeInfo])
-            self.eventStream.send(changeEvent)
+            self.processDocEvent(changeEvent)
 
             Logger.trace("after update a local change: \(self.toJSON())")
+        }
+    }
+
+    /**
+     * `subscribe` registers a callback to subscribe to events on the document.
+     * The callback will be called when the targetPath or any of its nested values change.
+     */
+    public func subscribe(targetPath: String? = nil, callback: @escaping (DocEvent) -> Void) {
+        if let targetPath {
+            self.subscribeCallbacks[targetPath] = callback
+        } else {
+            self.defaultSubscribeCallback = callback
+        }
+    }
+
+    /**
+     * `unsubscribe` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribe(targetPath: String? = nil) {
+        if let targetPath {
+            self.subscribeCallbacks[targetPath] = nil
+        } else {
+            self.defaultSubscribeCallback = nil
         }
     }
 
@@ -272,7 +299,7 @@ public actor Document {
         self.clone = nil
 
         let snapshotEvent = SnapshotEvent(value: snapshot)
-        self.eventStream.send(snapshotEvent)
+        self.processDocEvent(snapshotEvent)
     }
 
     /**
@@ -293,17 +320,19 @@ public actor Document {
             try $0.execute(root: clone)
         }
 
+        var changeInfos = [ChangeInfo]()
         try changes.forEach {
-            try $0.execute(root: self.root)
+            let opInfos = try $0.execute(root: self.root)
+
+            changeInfos.append(ChangeInfo(message: $0.message ?? "",
+                                          operations: opInfos,
+                                          actorID: $0.id.getActorID()))
+
             self.changeID.syncLamport(with: $0.id.getLamport())
         }
 
-        let changeInfos = changes.map {
-            ChangeInfo(change: $0, paths: self.createPaths(change: $0))
-        }
-
         let changeEvent = RemoteChangeEvent(value: changeInfos)
-        self.eventStream.send(changeEvent)
+        self.processDocEvent(changeEvent)
 
         Logger.debug(
             """
@@ -332,5 +361,60 @@ public actor Document {
 
     public nonisolated var debugDescription: String {
         "[\(self.key)]"
+    }
+
+    private func isSameElementOrChildOf(_ elem: String, _ parent: String) -> Bool {
+        if parent == elem {
+            return true
+        }
+
+        let nodePath = elem.components(separatedBy: ".")
+        let targetPath = parent.components(separatedBy: ".")
+
+        var result = true
+
+        for (index, path) in targetPath.enumerated() where path != nodePath[safe: index] {
+            result = false
+        }
+
+        return result
+    }
+
+    private func processDocEvent(_ event: DocEvent) {
+        if event.type != .snapshot {
+            if let event = event as? ChangeEvent {
+                var changeInfos = [String: [ChangeInfo]]()
+
+                event.value.forEach { changeInfo in
+                    var operations = [String: [any OperationInfo]]()
+
+                    changeInfo.operations.forEach { operationInfo in
+                        self.subscribeCallbacks.keys.forEach { targetPath in
+                            if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
+                                if operations[targetPath] == nil {
+                                    operations[targetPath] = [any OperationInfo]()
+                                }
+                                operations[targetPath]?.append(operationInfo)
+                            }
+                        }
+                    }
+
+                    operations.forEach { key, value in
+                        if changeInfos[key] == nil {
+                            changeInfos[key] = [ChangeInfo]()
+                        }
+                        changeInfos[key]?.append(ChangeInfo(message: changeInfo.message, operations: value, actorID: changeInfo.actorID))
+                    }
+                }
+
+                changeInfos.forEach { key, value in
+                    self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: value) : RemoteChangeEvent(value: value))
+                }
+            }
+        } else {
+            self.subscribeCallbacks["$"]?(event)
+        }
+
+        self.defaultSubscribeCallback?(event)
     }
 }

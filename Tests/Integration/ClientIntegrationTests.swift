@@ -480,6 +480,8 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await c2.attach(d2)
 
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
         let presence2: PresenceType? = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)
 
         XCTAssertTrue(presence2 == PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)))

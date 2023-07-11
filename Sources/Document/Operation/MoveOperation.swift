@@ -36,7 +36,8 @@ struct MoveOperation: Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws {
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let array = parent as? CRDTArray else {
             let log: String
@@ -49,7 +50,21 @@ struct MoveOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
+        let previousIndex = try? Int(array.subPath(createdAt: self.createdAt))
+
         try array.move(createdAt: self.createdAt, afterCreatedAt: self.previousCreatedAt, executedAt: self.executedAt)
+
+        let index = try? Int(array.subPath(createdAt: self.createdAt))
+
+        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
+            throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        guard let previousIndex, let index else {
+            throw YorkieError.unexpected(message: "fail to get indexes")
+        }
+
+        return [MoveOpInfo(path: path, previousIndex: previousIndex, index: index)]
     }
 
     /**

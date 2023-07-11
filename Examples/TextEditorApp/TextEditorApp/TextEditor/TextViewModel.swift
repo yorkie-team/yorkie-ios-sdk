@@ -25,10 +25,8 @@ enum TextOperation {
 }
 
 class TextViewModel {
-    private var cancellables = Set<AnyCancellable>()
     private var client: Client
     private let document: Document
-    private var textEventStream = PassthroughSubject<[TextChange], Never>()
 
     private weak var operationSubject: PassthroughSubject<[TextOperation], Never>?
 
@@ -58,9 +56,7 @@ class TextViewModel {
             }
 
             // subscribe document event.
-            let clientID = await self.client.id
-
-            await self.document.eventStream.sink { [weak self] event in
+            await self.document.subscribe { [weak self] event in
                 switch event.type {
                 case .snapshot, .remoteChange:
                     Task { [weak self] in
@@ -69,38 +65,35 @@ class TextViewModel {
                 default:
                     break
                 }
-            }.store(in: &self.cancellables)
+            }
 
-            // define event handler that apply remote changes to local
-            self.textEventStream.sink { [weak self] events in
+            await self.document.subscribe(targetPath: "$.content") { event in
+                guard let event = event as? RemoteChangeEvent else {
+                    return
+                }
+
                 var textChanges = [TextOperation]()
 
-                events.filter { $0.actor != clientID }.forEach {
-                    switch $0.type {
-                    case .content:
-                        break
-                    case .style:
-                        break
-                    case .selection:
-                        let range: NSRange
+                event.value.forEach { changeInfo in
+                    changeInfo.operations.forEach {
+                        if let op = $0 as? SelectOpInfo {
+                            let range: NSRange
 
-                        if $0.from <= $0.to {
-                            range = NSRange(location: $0.from, length: $0.to - $0.from)
-                        } else {
-                            range = NSRange(location: $0.to, length: $0.from - $0.to)
+                            if op.from <= op.to {
+                                range = NSRange(location: op.from, length: op.to - op.from)
+                            } else {
+                                range = NSRange(location: op.to, length: op.from - op.to)
+                            }
+
+                            textChanges.append(.select(range: range, actorID: changeInfo.actorID ?? ""))
                         }
-
-                        textChanges.append(.select(range: range, actorID: $0.actor))
                     }
                 }
 
                 if textChanges.isEmpty == false {
-                    self?.operationSubject?.send(textChanges)
+                    self.operationSubject?.send(textChanges)
                 }
-
-            }.store(in: &self.cancellables)
-
-            await(self.document.getRoot().content as? JSONText)?.setEventStream(eventStream: self.textEventStream)
+            }
 
             await self.syncText()
         }

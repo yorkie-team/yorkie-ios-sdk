@@ -40,7 +40,11 @@ struct IncreaseOperation: Operation {
         "\(self.parentCreatedAt.structureAsString).INCREASE"
     }
 
-    func execute(root: CRDTRoot) throws {
+    /**
+     * `execute` executes this operation on the given document(`root`).
+     */
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
             Logger.critical(log)
@@ -60,5 +64,15 @@ struct IncreaseOperation: Operation {
             Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
+
+        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
+            throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        guard let value = Int((value as? Primitive)?.toJSON() ?? "") else {
+            throw YorkieError.unexpected(message: "fail to get counter value")
+        }
+
+        return [IncreaseOpInfo(path: path, value: value)]
     }
 }

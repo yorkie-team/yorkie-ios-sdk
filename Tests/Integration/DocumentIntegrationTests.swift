@@ -365,4 +365,115 @@ final class DocumentIntegrationTests: XCTestCase {
 
         try await self.c1.deactivate()
     }
+
+    func test_specify_the_topic_to_subscribe_to() async throws {
+        let options = ClientOptions()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+
+        try await self.c1.activate()
+        try await self.c2.activate()
+
+        self.d1 = Document(key: docKey)
+        self.d2 = Document(key: docKey)
+
+        try await self.c1.attach(self.d1)
+        try await self.c2.attach(self.d2)
+
+        var d1Events = [any OperationInfo]()
+        var d2Events = [any OperationInfo]()
+        var d3Events = [any OperationInfo]()
+
+        await self.d1.subscribe { event in
+            d1Events.append(contentsOf: (event as? ChangeEvent)?.value[0].operations ?? [])
+        }
+
+        await self.d1.subscribe(targetPath: "$.todos") { event in
+            d2Events.append(contentsOf: (event as? ChangeEvent)?.value[0].operations ?? [])
+        }
+
+        await self.d1.subscribe(targetPath: "$.counter") { event in
+            d3Events.append(contentsOf: (event as? ChangeEvent)?.value[0].operations ?? [])
+        }
+
+        try await self.d2.update { root in
+            root.counter = JSONCounter(value: Int32(0))
+            root.todos = ["todo1", "todo2"]
+        }
+
+        // Wait sync.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        XCTAssertEqual(d1Events[0] as? SetOpInfo, SetOpInfo(path: "$", key: "counter"))
+        XCTAssertEqual(d1Events[1] as? SetOpInfo, SetOpInfo(path: "$", key: "todos"))
+        XCTAssertEqual(d1Events[2] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 0))
+        XCTAssertEqual(d1Events[3] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 1))
+        XCTAssertEqual(d2Events[0] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 0))
+        XCTAssertEqual(d2Events[1] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 1))
+
+        d1Events = []
+        d2Events = []
+
+        try await self.d2.update { root in
+            (root.counter as? JSONCounter<Int32>)?.increase(value: 10)
+        }
+
+        // Wait sync.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        XCTAssertEqual(d1Events[0] as? IncreaseOpInfo, IncreaseOpInfo(path: "$.counter", value: 10))
+        XCTAssertEqual(d3Events[0] as? IncreaseOpInfo, IncreaseOpInfo(path: "$.counter", value: 10))
+
+        d1Events = []
+        d3Events = []
+
+        try await self.d2.update { root in
+            (root.todos as? JSONArray)?.append("todo3")
+        }
+
+        // Wait sync.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        XCTAssertEqual(d1Events[0] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 2))
+        XCTAssertEqual(d2Events[0] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 2))
+
+        d1Events = []
+        d2Events = []
+
+        await self.d1.unsubscribe(targetPath: "$.todos")
+
+        try await self.d2.update { root in
+            (root.todos as? JSONArray)?.append("todo4")
+        }
+
+        // Wait sync.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        XCTAssertEqual(d1Events[0] as? AddOpInfo, AddOpInfo(path: "$.todos", index: 3))
+        XCTAssertTrue(d2Events.isEmpty)
+
+        d1Events = []
+
+        await self.d1.unsubscribe(targetPath: "$.counter")
+
+        try await self.d2.update { root in
+            (root.counter as? JSONCounter<Int32>)?.increase(value: 10)
+        }
+
+        // Wait sync.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+
+        XCTAssertEqual(d1Events[0] as? IncreaseOpInfo, IncreaseOpInfo(path: "$.counter", value: 10))
+        XCTAssertTrue(d3Events.isEmpty)
+
+        await self.d1.unsubscribe()
+
+        try await self.c1.detach(self.d1)
+        try await self.c2.detach(self.d2)
+
+        try await self.c1.deactivate()
+        try await self.c2.deactivate()
+    }
 }

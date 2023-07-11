@@ -38,7 +38,8 @@ struct SetOperation: Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws {
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let parent = parent as? CRDTObject else {
             let log: String
@@ -56,6 +57,12 @@ struct SetOperation: Operation {
         let value = self.value.deepcopy()
         parent.set(key: self.key, value: value)
         root.registerElement(value, parent: parent)
+
+        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
+            throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        return [SetOpInfo(path: path, key: self.key)]
     }
 
     /**

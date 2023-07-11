@@ -189,17 +189,6 @@ public class JSONText {
     }
 
     /**
-     * `setEventStream` registers a event Stream of TextChange events.
-     */
-    public func setEventStream(eventStream: PassthroughSubject<[TextChange], Never>?) {
-        guard self.context != nil, let text else {
-            Logger.critical("it is not initialized yet")
-            return
-        }
-        text.eventStream = eventStream
-    }
-
-    /**
      * `createRange` returns pair of RGATreeSplitNodePos of the given integer offsets.
      */
     func createRange(_ fromIdx: Int, _ toIdx: Int) -> RGATreeSplitNodeRange? {

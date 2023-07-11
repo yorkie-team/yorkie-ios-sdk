@@ -38,11 +38,7 @@ func stringifyAttributes(_ attributes: TextAttributes) -> [String: String] {
     }
 }
 
-/**
- * `TextChange` is the value passed as an argument to `Text.onChanges()`.
- * `Text.onChanges()` is called when the `Text` is modified.
- */
-public class TextChange {
+class TextChange {
     /**
      * `TextChangeType` is the type of TextChange.
      */
@@ -152,8 +148,6 @@ final class CRDTText: CRDTTextElement {
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
-    weak var eventStream: PassthroughSubject<[TextChange], Never>?
-
     /**
      * `rgaTreeSplit` returns rgaTreeSplit.
      *
@@ -183,7 +177,7 @@ final class CRDTText: CRDTTextElement {
                              content,
                              editedAt,
                              attributes != nil ? stringifyAttributes(attributes!) : nil,
-                             latestCreatedAtMapByActor)
+                             latestCreatedAtMapByActor).0
     }
 
     @discardableResult
@@ -191,7 +185,7 @@ final class CRDTText: CRDTTextElement {
               _ content: String,
               _ editedAt: TimeTicket,
               _ attributes: [String: String]? = nil,
-              _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> [String: TimeTicket]
+              _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange])
     {
         let value = !content.isEmpty ? TextValue(content) : nil
         if !content.isEmpty, let attributes {
@@ -219,13 +213,7 @@ final class CRDTText: CRDTTextElement {
             changes.append(selectionChange)
         }
 
-        if let eventStream {
-            self.remoteChangeLock = true
-            eventStream.send(changes)
-            self.remoteChangeLock = false
-        }
-
-        return latestCreatedAtMap
+        return (latestCreatedAtMap, changes)
     }
 
     /**
@@ -241,12 +229,13 @@ final class CRDTText: CRDTTextElement {
                          _ attributes: TextAttributes,
                          _ editedAt: TimeTicket) throws
     {
-        return try self.setStyle(range, stringifyAttributes(attributes), editedAt)
+        try self.setStyle(range, stringifyAttributes(attributes), editedAt)
     }
 
+    @discardableResult
     func setStyle(_ range: RGATreeSplitNodeRange,
                   _ attributes: [String: String],
-                  _ editedAt: TimeTicket) throws
+                  _ editedAt: TimeTicket) throws -> [TextChange]
     {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
@@ -273,28 +262,19 @@ final class CRDTText: CRDTTextElement {
             }
         }
 
-        if let eventStream {
-            self.remoteChangeLock = true
-            eventStream.send(changes)
-            self.remoteChangeLock = false
-        }
+        return changes
     }
 
     /**
      * `select` stores that the given range has been selected.
      */
-    public func select(_ range: RGATreeSplitNodeRange, _ updatedAt: TimeTicket) throws {
+    @discardableResult
+    public func select(_ range: RGATreeSplitNodeRange, _ updatedAt: TimeTicket) throws -> TextChange? {
         if self.remoteChangeLock {
-            return
+            return nil
         }
 
-        if let change = try self.selectPriv(range, updatedAt) {
-            if let eventStream {
-                self.remoteChangeLock = true
-                eventStream.send([change])
-                self.remoteChangeLock = false
-            }
-        }
+        return try self.selectPriv(range, updatedAt)
     }
 
     /**
@@ -385,18 +365,19 @@ final class CRDTText: CRDTTextElement {
             return nil
         }
 
-        if !self.selectionMap.keys.contains(actorID) {
+        let postProcess = {
             self.selectionMap[actorID] = Selection(range, updatedAt)
-            return nil
+
+            let (from, to) = try self.rgaTreeSplit.findIndexesFromRange(range)
+            return TextChange(type: .selection, actor: actorID, from: from, to: to)
         }
 
         if let prevSelection = self.selectionMap[actorID] {
             if updatedAt.after(prevSelection.updatedAt) {
-                self.selectionMap[actorID] = Selection(range, updatedAt)
-
-                let (from, to) = try self.rgaTreeSplit.findIndexesFromRange(range)
-                return TextChange(type: .selection, actor: actorID, from: from, to: to)
+                return try postProcess()
             }
+        } else {
+            return try postProcess()
         }
 
         return nil

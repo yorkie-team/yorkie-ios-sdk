@@ -35,7 +35,8 @@ struct AddOperation: Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws {
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let array = parent as? CRDTArray else {
             let log: String
@@ -51,6 +52,16 @@ struct AddOperation: Operation {
         let value = self.value.deepcopy()
         try array.insert(value: value, afterCreatedAt: self.previousCreatedAt)
         root.registerElement(value, parent: array)
+
+        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
+            throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        guard let index = try Int(array.subPath(createdAt: self.effectedCreatedAt)) else {
+            throw YorkieError.unexpected(message: "fail to get index")
+        }
+
+        return [AddOpInfo(path: path, index: index)]
     }
 
     /**

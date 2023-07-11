@@ -45,7 +45,8 @@ struct StyleOperation: Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws {
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let text = parent as? CRDTText else {
             let log: String
@@ -59,7 +60,15 @@ struct StyleOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        try text.setStyle((self.fromPos, self.toPos), self.attributes, self.executedAt)
+        let changes = try text.setStyle((self.fromPos, self.toPos), self.attributes, self.executedAt)
+
+        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
+            throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        return changes.compactMap {
+            StyleOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary)
+        }
     }
 
     /**

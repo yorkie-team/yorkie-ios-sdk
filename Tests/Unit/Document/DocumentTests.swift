@@ -725,15 +725,13 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 4)
     }
 
-    private var cancellables = Set<AnyCancellable>()
-
     func test_change_paths_test_for_object() async throws {
         let target = Document(key: "test-doc")
 
-        await target.eventStream.sink { event in
+        await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
-            XCTAssertEqual((event as? LocalChangeEvent)?.value[0].paths, ["$."])
-        }.store(in: &self.cancellables)
+            XCTAssertEqual((event as? LocalChangeEvent)?.value[0].operations.compactMap { $0.path }, ["$", "$.", "$..obj", "$..obj", "$..obj", "$..obj", "$."])
+        }
 
         try await target.update { root in
             root[""] = [:] as [String: Any]
@@ -789,14 +787,36 @@ class DocumentTests: XCTestCase {
         }
     }
 
+    // swiftlint: disable force_cast
     func test_change_paths_test_for_array() async throws {
         let target = Document(key: "test-doc")
 
-        await target.eventStream.sink { event in
+        await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
 
-            XCTAssertEqual((event as? LocalChangeEvent)?.value[0].paths.sorted(), ["$.arr", "$.\\$\\$\\.\\.\\.hello"].sorted())
-        }.store(in: &self.cancellables)
+            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+                XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "arr"))
+                XCTAssertEqual(ops[1] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 0))
+                XCTAssertEqual(ops[2] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 1))
+                XCTAssertEqual(ops[3] as! RemoveOpInfo, RemoveOpInfo(path: "$.arr", key: nil, index: 1))
+                XCTAssertEqual(ops[4] as! SetOpInfo, SetOpInfo(path: "$", key: "$$...hello"))
+                XCTAssertEqual(ops[5] as! AddOpInfo, AddOpInfo(path: "$.$$...hello", index: 0))
+            } else {
+                XCTAssert(false, "No operations.")
+            }
+        }
+
+        await target.subscribe(targetPath: "$.arr") { event in
+            XCTAssertEqual(event.type, .localChange)
+
+            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+                XCTAssertEqual(ops[0] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 0))
+                XCTAssertEqual(ops[1] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 1))
+                XCTAssertEqual(ops[2] as! RemoveOpInfo, RemoveOpInfo(path: "$.arr", key: nil, index: 1))
+            } else {
+                XCTAssert(false, "No operations.")
+            }
+        }
 
         try await target.update { root in
             root.arr = [] as [String]
@@ -814,6 +834,78 @@ class DocumentTests: XCTestCase {
                            """)
         }
     }
+
+    func test_change_paths_test_for_counter() async throws {
+        let target = Document(key: "test-doc")
+
+        await target.subscribe { event in
+            XCTAssertEqual(event.type, .localChange)
+
+            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+                XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "cnt"))
+                XCTAssertEqual(ops[1] as! IncreaseOpInfo, IncreaseOpInfo(path: "$.cnt", value: 1))
+                XCTAssertEqual(ops[2] as! IncreaseOpInfo, IncreaseOpInfo(path: "$.cnt", value: 10))
+                XCTAssertEqual(ops[3] as! IncreaseOpInfo, IncreaseOpInfo(path: "$.cnt", value: -3))
+            } else {
+                XCTAssert(false, "No operations.")
+            }
+        }
+
+        try await target.update { root in
+            root.cnt = JSONCounter(value: Int64(0))
+            (root.cnt as? JSONCounter<Int64>)?.increase(value: 1)
+            (root.cnt as? JSONCounter<Int64>)?.increase(value: 10)
+            (root.cnt as? JSONCounter<Int64>)?.increase(value: -3)
+        }
+    }
+
+    func test_change_paths_test_for_text() async throws {
+        let target = Document(key: "test-doc")
+
+        await target.subscribe { event in
+            XCTAssertEqual(event.type, .localChange)
+
+            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+                XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "text"))
+                XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.text", from: 0, to: 0, attributes: nil, content: "hello world"))
+                XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 11, to: 11))
+                XCTAssertEqual(ops[3] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 0, to: 2))
+            } else {
+                XCTAssert(false, "No operations.")
+            }
+        }
+
+        try await target.update { root in
+            root.text = JSONText()
+            (root.text as? JSONText)?.edit(0, 0, "hello world")
+            (root.text as? JSONText)?.select(0, 2)
+        }
+    }
+
+    func test_change_paths_test_for_text_with_attributes() async throws {
+        let target = Document(key: "test-doc")
+
+        await target.subscribe { event in
+            XCTAssertEqual(event.type, .localChange)
+
+            if let ops = (event as? LocalChangeEvent)?.value[0].operations {
+                XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "textWithAttr"))
+                XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.textWithAttr", from: 0, to: 0, attributes: nil, content: "hello world"))
+                XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.textWithAttr", from: 11, to: 11))
+                XCTAssertEqual(ops[3] as! StyleOpInfo, StyleOpInfo(path: "$.textWithAttr", from: 0, to: 1, attributes: ["bold": "true"]))
+            } else {
+                XCTAssert(false, "No operations.")
+            }
+        }
+
+        try await target.update { root in
+            root.textWithAttr = JSONText()
+            (root.textWithAttr as? JSONText)?.edit(0, 0, "hello world")
+            (root.textWithAttr as? JSONText)?.setStyle(0, 1, ["bold": true])
+        }
+    }
+
+    // swiftlint: enable force_cast
 
     func test_insert_elements_before_a_specific_node_of_array() async throws {
         let target = Document(key: "test-doc")

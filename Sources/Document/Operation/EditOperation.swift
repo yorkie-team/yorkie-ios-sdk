@@ -58,7 +58,8 @@ struct EditOperation: Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws {
+    @discardableResult
+    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let text = parent as? CRDTText else {
             let log: String
@@ -72,10 +73,22 @@ struct EditOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor)
+        let changes = try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor).1
 
         if self.fromPos != self.toPos {
             root.registerTextWithGarbage(text: text)
+        }
+
+        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
+            throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        return changes.compactMap {
+            if $0.type == .content {
+                return EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)
+            } else {
+                return SelectOpInfo(path: path, from: $0.from, to: $0.to)
+            }
         }
     }
 

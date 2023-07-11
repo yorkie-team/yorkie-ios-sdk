@@ -47,24 +47,30 @@ public protocol DocEvent {
  * the server.
  *
  */
-struct SnapshotEvent: DocEvent {
+public struct SnapshotEvent: DocEvent {
     /**
      * ``DocEventType.snapshot``
      */
-    let type: DocEventType = .snapshot
+    public let type: DocEventType = .snapshot
     /**
      * SnapshotEvent type
      */
-    var value: Data
+    public var value: Data
+}
+
+protocol ChangeEvent: DocEvent {
+    var type: DocEventType { get }
+    var value: [ChangeInfo] { get }
 }
 
 /**
- * `ChangeInfo` represents a pair of `Change` and the JsonPath of the changed
- * element.
+ * `ChangeInfo` represents the modifications made during a document update
+ * and the message passed.
  */
-struct ChangeInfo {
-    let change: Change
-    let paths: [String]
+public struct ChangeInfo {
+    public let message: String
+    public let operations: [any OperationInfo]
+    public let actorID: ActorID?
 }
 
 /**
@@ -72,15 +78,15 @@ struct ChangeInfo {
  * by local changes.
  *
  */
-struct LocalChangeEvent: DocEvent {
+public struct LocalChangeEvent: ChangeEvent {
     /**
      * ``DocEventType/localChange``
      */
-    let type: DocEventType = .localChange
+    public let type: DocEventType = .localChange
     /**
      * LocalChangeEvent type
      */
-    var value: [ChangeInfo]
+    public var value: [ChangeInfo]
 }
 
 /**
@@ -88,13 +94,13 @@ struct LocalChangeEvent: DocEvent {
  * by remote changes.
  *
  */
-struct RemoteChangeEvent: DocEvent {
+public struct RemoteChangeEvent: ChangeEvent {
     /**
      * ``DocEventType/remoteChange``
      */
-    let type: DocEventType = .remoteChange
+    public let type: DocEventType = .remoteChange
     /**
      * RemoteChangeEvent type
      */
-    var value: [ChangeInfo]
+    public var value: [ChangeInfo]
 }

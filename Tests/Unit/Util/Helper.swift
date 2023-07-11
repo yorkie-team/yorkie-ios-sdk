@@ -24,18 +24,18 @@ import Yorkie
 class TextView {
     private var value: String = ""
 
-    public func applyChanges(changes: [TextChange], enableLog: Bool = false) {
+    public func applyChanges(operations: [any OperationInfo], enableLog: Bool = false) {
         let oldValue = self.value
         var changeLogs = [String]()
-        changes.forEach { change in
-            if change.type == .content {
+        operations.forEach { operation in
+            if let operation = operation as? EditOpInfo {
                 self.value = [
-                    self.value.substring(from: 0, to: change.from - 1),
-                    change.content ?? "",
-                    self.value.substring(from: change.to, to: self.value.count - 1)
+                    self.value.substring(from: 0, to: operation.from - 1),
+                    operation.content ?? "",
+                    self.value.substring(from: operation.to, to: self.value.count - 1)
                 ].joined(separator: "")
 
-                changeLogs.append("{f:\(change.from), t:\(change.to), c:\(change.content ?? "")}")
+                changeLogs.append("{f:\(operation.from), t:\(operation.to), c:\(operation.content ?? "")}")
             }
         }
 

@@ -17,6 +17,122 @@
 import Foundation
 
 /**
+ * `OperationInfoType` is operation info types
+ */
+public enum OperationInfoType: String {
+    case add
+    case move
+    case set
+    case remove
+    case increase
+    case edit
+    case style
+    case select
+}
+
+/**
+ * `OperationInfo` represents the information of an operation.
+ * It is used to inform to the user what kind of operation was executed.
+ */
+public protocol OperationInfo: Equatable {
+    var type: OperationInfoType { get }
+    var path: String { get }
+}
+
+public struct AddOpInfo: OperationInfo {
+    public let type: OperationInfoType = .add
+    public let path: String
+    public let index: Int
+}
+
+public struct MoveOpInfo: OperationInfo {
+    public let type: OperationInfoType = .move
+    public let path: String
+    public let previousIndex: Int
+    public let index: Int
+}
+
+public struct SetOpInfo: OperationInfo {
+    public let type: OperationInfoType = .set
+    public let path: String
+    public let key: String
+}
+
+public struct RemoveOpInfo: OperationInfo {
+    public let type: OperationInfoType = .remove
+    public let path: String
+    public let key: String?
+    public let index: Int?
+}
+
+public struct IncreaseOpInfo: OperationInfo {
+    public let type: OperationInfoType = .increase
+    public let path: String
+    public let value: Int
+}
+
+public struct EditOpInfo: OperationInfo {
+    public let type: OperationInfoType = .edit
+    public let path: String
+    public let from: Int
+    public let to: Int
+    public let attributes: [String: Any]?
+    public let content: String?
+
+    public static func == (lhs: EditOpInfo, rhs: EditOpInfo) -> Bool {
+        if lhs.type != rhs.type ||
+            lhs.path != rhs.path ||
+            lhs.from != rhs.from ||
+            lhs.to != rhs.to ||
+            lhs.content != rhs.content
+        {
+            return false
+        }
+
+        if let leftAttrs = lhs.attributes, let rightAttrs = rhs.attributes {
+            return NSDictionary(dictionary: leftAttrs).isEqual(to: rightAttrs)
+        } else if lhs.attributes == nil, rhs.attributes == nil {
+            return true
+        }
+
+        return false
+    }
+}
+
+public struct StyleOpInfo: OperationInfo {
+    public let type: OperationInfoType = .style
+    public let path: String
+    public let from: Int
+    public let to: Int
+    public let attributes: [String: Any]?
+
+    public static func == (lhs: StyleOpInfo, rhs: StyleOpInfo) -> Bool {
+        if lhs.type != rhs.type ||
+            lhs.path != rhs.path ||
+            lhs.from != rhs.from ||
+            lhs.to != rhs.to
+        {
+            return false
+        }
+
+        if let leftAttrs = lhs.attributes, let rightAttrs = rhs.attributes {
+            return NSDictionary(dictionary: leftAttrs).isEqual(to: rightAttrs)
+        } else if lhs.attributes == nil, rhs.attributes == nil {
+            return true
+        }
+
+        return false
+    }
+}
+
+public struct SelectOpInfo: OperationInfo {
+    public let type: OperationInfoType = .select
+    public let path: String
+    public let from: Int
+    public let to: Int
+}
+
+/**
  * `Operation` represents an operation to be executed on a document.
  *  Types confiming ``Operation`` must be struct to avoid data racing.
  */
@@ -39,7 +155,7 @@ protocol Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws
+    func execute(root: CRDTRoot) throws -> [any OperationInfo]
 }
 
 extension Operation {

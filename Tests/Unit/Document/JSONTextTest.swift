@@ -21,6 +21,7 @@ import XCTest
 final class JSONTextTest: XCTestCase {
     var cancellables = Set<AnyCancellable>()
 
+    // swiftlint: disable force_cast
     func test_should_handle_edit_operations() async throws {
         let doc = Document(key: "test-doc")
 
@@ -112,13 +113,11 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            view.applyChanges(changes: $0)
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") {
+            ($0 as! ChangeEvent).value.forEach { changeInfo in
+                view.applyChanges(operations: changeInfo.operations)
+            }
+        }
 
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "ABC"),
@@ -143,13 +142,11 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            view.applyChanges(changes: $0)
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") {
+            ($0 as! ChangeEvent).value.forEach { changeInfo in
+                view.applyChanges(operations: changeInfo.operations)
+            }
+        }
 
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "A"),
@@ -182,13 +179,11 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            view.applyChanges(changes: $0)
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") {
+            ($0 as! ChangeEvent).value.forEach { changeInfo in
+                view.applyChanges(operations: changeInfo.operations)
+            }
+        }
 
         let commands: [(from: Int, to: Int, content: String)] = [
             (from: 0, to: 0, content: "1A1BCXEF1"),
@@ -220,18 +215,9 @@ final class JSONTextTest: XCTestCase {
             (root.text as? JSONText)?.edit(0, 0, "ABCD")
         }
 
-        let eventStream = PassthroughSubject<[TextChange], Never>()
-
-        eventStream.sink {
-            let first = $0.first
-
-            if first?.type == .selection {
-                XCTAssertEqual(first?.from, 2)
-                XCTAssertEqual(first?.to, 4)
-            }
-        }.store(in: &self.cancellables)
-
-        await(doc.getRoot()["text"] as? JSONText)?.setEventStream(eventStream: eventStream)
+        await doc.subscribe(targetPath: "$.text") { event in
+            XCTAssertEqual((event as! ChangeEvent).value[0].operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
+        }
 
         try await doc.update { root in (root.text as? JSONText)?.select(2, 4) }
     }
@@ -257,4 +243,5 @@ final class JSONTextTest: XCTestCase {
         XCTAssertEqual("{\"k1\":[{\"attrs\":{\"b\":\"1\"},\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"D\"}]}",
                        docContent)
     }
+    // swiftlint: enable force_cast
 }
