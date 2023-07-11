@@ -77,13 +77,13 @@ class TextViewModel {
                 event.value.operations.forEach {
                     if let op = $0 as? SelectOpInfo {
                         let range: NSRange
-                        
+
                         if op.from <= op.to {
                             range = NSRange(location: op.from, length: op.to - op.from)
                         } else {
                             range = NSRange(location: op.to, length: op.from - op.to)
                         }
-                        
+
                         textChanges.append(.select(range: range, actorID: event.value.actorID ?? ""))
                     }
                 }
