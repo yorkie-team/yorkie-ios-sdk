@@ -733,6 +733,18 @@ class DocumentTests: XCTestCase {
             XCTAssertEqual((event as? LocalChangeEvent)?.value.operations.compactMap { $0.path }, ["$", "$.", "$..obj", "$..obj", "$..obj", "$..obj", "$."])
         }
 
+        await target.subscribe(targetPath: "$.") { _ in
+            let array = try? await target.getValueByPath(path: "$.") as? JSONObject
+
+            XCTAssertTrue(array != nil)
+        }
+
+        await target.subscribe(targetPath: "$..obj") { _ in
+            let array = try? await target.getValueByPath(path: "$..obj") as? JSONObject
+
+            XCTAssertTrue(array != nil)
+        }
+
         try await target.update { root in
             root[""] = [:] as [String: Any]
 

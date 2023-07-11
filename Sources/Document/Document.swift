@@ -55,7 +55,7 @@ public typealias DocumentID = String
  *
  */
 public actor Document {
-    typealias SubscribeCallback = (DocEvent) -> Void
+    typealias SubscribeCallback = (DocEvent) async -> Void
 
     private let key: DocumentKey
     private(set) var status: DocumentStatus
@@ -80,7 +80,7 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) throws {
+    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) async throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -113,7 +113,7 @@ public actor Document {
      * `subscribe` registers a callback to subscribe to events on the document.
      * The callback will be called when the targetPath or any of its nested values change.
      */
-    public func subscribe(targetPath: String? = nil, callback: @escaping (DocEvent) -> Void) {
+    public func subscribe(targetPath: String? = nil, callback: @escaping (DocEvent) async -> Void) {
         if let targetPath {
             self.subscribeCallbacks[targetPath] = callback
         } else {
@@ -344,6 +344,27 @@ public actor Document {
         )
     }
 
+    /**
+     * `getValueByPath` returns the JSONElement corresponding to the given path.
+     */
+    public func getValueByPath(path: String) throws -> Any? {
+        guard path.starts(with: "$") else {
+            throw YorkieError.unexpected(message: "The path must start with \"$\"")
+        }
+
+        let context = ChangeContext(id: self.changeID.next(), root: self.root)
+        let rootObject = JSONObject(target: self.root.object, context: context)
+
+        if path == "$" {
+            return rootObject
+        }
+
+        var subPath = path
+        subPath.removeFirst(2) // remove root path "$."
+
+        return rootObject.get(keyPath: subPath)
+    }
+
     private func createPaths(change: Change) -> [String] {
         let pathTrie = Trie<String>(value: "$")
         for op in change.operations {
@@ -397,16 +418,26 @@ public actor Document {
                     }
                 }
 
-                operations.forEach { key, value in
+                for (key, value) in operations {
                     let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
 
-                    self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
+                    if let callback = self.subscribeCallbacks[key] {
+                        Task {
+                            await callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
+                        }
+                    }
                 }
             }
         } else {
-            self.subscribeCallbacks["$"]?(event)
+            if let callback = self.subscribeCallbacks["$"] {
+                Task {
+                    await callback(event)
+                }
+            }
         }
 
-        self.defaultSubscribeCallback?(event)
+        Task {
+            await self.defaultSubscribeCallback?(event)
+        }
     }
 }
