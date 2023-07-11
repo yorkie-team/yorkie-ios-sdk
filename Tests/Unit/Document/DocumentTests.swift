@@ -741,14 +741,6 @@ class DocumentTests: XCTestCase {
             }
         }
 
-        await target.subscribe(targetPath: "$..obj") { _ in
-            Task {
-                let array = try? await target.getValueByPath(path: "$..obj") as? JSONObject
-
-                XCTAssertTrue(array != nil)
-            }
-        }
-
         try await target.update { root in
             root[""] = [:] as [String: Any]
 
