@@ -276,21 +276,21 @@ public actor Document {
     /**
      * `toJSON` returns the JSON encoding of this array.
      */
-    func toJSON() -> String {
+    public func toJSON() -> String {
         return self.root.toJSON()
     }
 
     /**
      * `toSortedJSON` returns the sorted JSON encoding of this array.
      */
-    func toSortedJSON() -> String {
+    public func toSortedJSON() -> String {
         return self.root.debugDescription
     }
 
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    func applySnapshot(serverSeq: Int64, snapshot: Data) throws {
+    public func applySnapshot(serverSeq: Int64, snapshot: Data) throws {
         let obj = try Converter.bytesToObject(bytes: snapshot)
         self.root = CRDTRoot(rootObject: obj)
         self.changeID.syncLamport(with: serverSeq)
@@ -305,7 +305,7 @@ public actor Document {
     /**
      * `applyChanges` applies the given changes into this document.
      */
-    func applyChanges(changes: [Change]) throws {
+    public func applyChanges(changes: [Change]) throws {
         Logger.debug(
             """
             trying to apply \(changes.count) remote changes.
