@@ -29,6 +29,9 @@
 		9A7E88BE2A49600B00AF8997 /* JSONTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BD2A49600B00AF8997 /* JSONTree.swift */; };
 		9A7E88C02A4962A700AF8997 /* IndexTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BF2A4962A700AF8997 /* IndexTree.swift */; };
 		9A8150522967FCD700DFADFB /* Helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8150512967FCD700DFADFB /* Helper.swift */; };
+		9A82C47E2A6126570002D09A /* CRDTTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */; };
+		9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */; };
+		9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */; };
 		9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */; };
 		9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */; };
 		9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */; };
@@ -151,6 +154,9 @@
 		9A7E88BD2A49600B00AF8997 /* JSONTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTree.swift; sourceTree = "<group>"; };
 		9A7E88BF2A4962A700AF8997 /* IndexTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTree.swift; sourceTree = "<group>"; };
 		9A8150512967FCD700DFADFB /* Helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Helper.swift; sourceTree = "<group>"; };
+		9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTTreeTests.swift; sourceTree = "<group>"; };
+		9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeIntegrationTests.swift; sourceTree = "<group>"; };
+		9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationHelper.swift; sourceTree = "<group>"; };
 		9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTreeTests.swift; sourceTree = "<group>"; };
 		9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeEditOperation.swift; sourceTree = "<group>"; };
 		9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeSytleOperation.swift; sourceTree = "<group>"; };
@@ -342,6 +348,8 @@
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
 				9AEA80DB296FE38D000672FC /* TextIntegrationTests.swift */,
 				9AD6E7E829C19E0A001A1F89 /* DocumentIntegrationTests.swift */,
+				9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */,
+				9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */,
 			);
 			path = Integration;
 			sourceTree = "<group>";
@@ -399,6 +407,7 @@
 				CEC631D828F02B1200915A85 /* CRDTRootTests.swift */,
 				CE370E5B28EEBFA6008FCABD /* RHTTests.swift */,
 				9A3CF3EE2966A7370024E3DD /* CRDTTextTests.swift */,
+				9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -862,6 +871,8 @@
 				9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */,
 				CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
+				9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */,
+				9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */,
 				9A30D40429514F150036F732 /* ClientTests.swift in Sources */,
 				9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */,
 				CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */,
@@ -879,6 +890,7 @@
 				CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */,
 				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */,
+				9A82C47E2A6126570002D09A /* CRDTTreeTests.swift in Sources */,
 				9A3CF3ED29666AB30024E3DD /* JSONTextTest.swift in Sources */,
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,
 				9AEA80DC296FE38D000672FC /* TextIntegrationTests.swift in Sources */,

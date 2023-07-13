@@ -127,7 +127,7 @@ class ConverterTests: XCTestCase {
                                         value: Primitive(value: .null, createdAt: TimeTicket.initial),
                                         executedAt: TimeTicket.initial)
         let change = Change(id: ChangeID.initial, operations: [addOperation], message: "AddOperation")
-        let changePack = ChangePack(key: "sample", checkpoint: Checkpoint.initial, changes: [change], isRemoved: false)
+        let changePack = ChangePack(key: "sample", checkpoint: Checkpoint.initial, isRemoved: false, changes: [change])
 
         do {
             let converted = try Converter.fromChangePack(Converter.toChangePack(pack: changePack))

@@ -65,6 +65,10 @@ enum ElementConverter {
             let text = JSONText(context: context, text: value)
             text.initialize(context: context, text: value)
             return text
+        } else if let value = value as? CRDTTree {
+            let tree = JSONTree()
+            tree.initialize(context: context, tree: value)
+            return tree
         } else {
             assertionFailure()
             return nil

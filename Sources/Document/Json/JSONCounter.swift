@@ -74,7 +74,7 @@ public class JSONCounter<T: YorkieCountable> {
             return self
         }
 
-        let ticket = context.issueTimeTicket()
+        let ticket = context.issueTimeTicket
         let primitive = Primitive(value: primitiveValue, createdAt: ticket)
 
         guard primitive.isNumericType else {

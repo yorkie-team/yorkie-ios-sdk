@@ -26,7 +26,7 @@ class ObjectDataHandler {
     }
 
     func set<T>(key: String, value: T) {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
 
         if let value = value as? Bool {
             self.setValue(key: key, value: value, ticket: ticket)
@@ -165,14 +165,14 @@ class ObjectDataHandler {
     }
 
     func remove(key: String) throws {
-        let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket())
+        let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket)
         guard let removed else {
             return
         }
 
         let removeOperation = RemoveOperation(parentCreatedAt: self.target.createdAt,
                                               createdAt: removed.createdAt,
-                                              executedAt: self.context.issueTimeTicket())
+                                              executedAt: self.context.issueTimeTicket)
         self.context.push(operation: removeOperation)
         self.context.registerRemovedElement(removed)
     }

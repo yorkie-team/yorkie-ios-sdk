@@ -60,7 +60,7 @@ class TreeStyleOperation: Operation {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
-        let changes = try tree.style(range: (self.fromPos, self.toPos), attributes: self.attributes, editedAt: self.executedAt)
+        let changes = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt)
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError.unexpected(message: "fail to get path")
@@ -75,7 +75,7 @@ class TreeStyleOperation: Operation {
                 path: path,
                 from: change.from,
                 to: change.to,
-                formPath: change.fromPath,
+                fromPath: change.fromPath,
                 value: attributes
             )
         }

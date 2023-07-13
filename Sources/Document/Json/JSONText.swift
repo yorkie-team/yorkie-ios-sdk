@@ -67,7 +67,7 @@ public class JSONText {
 
         Logger.debug("EDIT: f:\(fromIdx)->\(range.0.structureAsString), t:\(toIdx)->\(range.1.structureAsString) c:\(content)")
 
-        let ticket = context.issueTimeTicket()
+        let ticket = context.issueTimeTicket
         guard let maxCreatedAtMapByActor = try? text.edit(range, content, ticket, attributes) else {
             Logger.critical("can't edit Text")
             return false
@@ -112,7 +112,7 @@ public class JSONText {
 
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.structureAsString), t:\(toIdx)->\(range.1.structureAsString) a:\(attributes)")
 
-        let ticket = context.issueTimeTicket()
+        let ticket = context.issueTimeTicket
         do {
             try text.setStyle(range, attributes, ticket)
         } catch {
@@ -146,7 +146,7 @@ public class JSONText {
 
         Logger.debug("SELT: f:\(fromIdx)->\(range.0.structureAsString), t:\(toIdx)->\(range.1.structureAsString)")
 
-        let ticket = context.issueTimeTicket()
+        let ticket = context.issueTimeTicket
         do {
             try text.select(range, ticket)
         } catch {

@@ -140,7 +140,7 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(pack: ChangePack) throws {
+    func applyChangePack(_ pack: ChangePack) throws {
         if let snapshot = pack.getSnapshot() {
             try self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: snapshot)
         } else if pack.hasChanges() {
@@ -197,7 +197,7 @@ public actor Document {
     func createChangePack(_ forceToRemoved: Bool = false) -> ChangePack {
         let changes = self.localChanges
         let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
-        return ChangePack(key: self.key, checkpoint: checkpoint, changes: changes, isRemoved: forceToRemoved ? true : self.status == .removed)
+        return ChangePack(key: self.key, checkpoint: checkpoint, isRemoved: forceToRemoved ? true : self.status == .removed, changes: changes)
     }
 
     /**

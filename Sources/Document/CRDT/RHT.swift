@@ -20,9 +20,9 @@ import Foundation
  * `RHTNode` is a node of RHT(Replicated Hashtable).
  */
 struct RHTNode {
-    fileprivate var key: String
-    fileprivate var value: String
-    fileprivate var updatedAt: TimeTicket
+    var key: String
+    var value: String
+    var updatedAt: TimeTicket
 
     init(key: String, value: String, updatedAt: TimeTicket) {
         self.key = key
@@ -103,8 +103,14 @@ class RHT {
             return ""
         }
 
-        let xmlAttributes = self.nodeMapByKey.map { key, value in
-            "\(key)=\"\(value.value)\""
+        let sortedKeys = self.nodeMapByKey.keys.sorted()
+
+        let xmlAttributes = sortedKeys.compactMap { key in
+            if let value = self.nodeMapByKey[key] {
+                return "\(key)=\"\(value.value)\""
+            } else {
+                return nil
+            }
         }.joined(separator: " ")
 
         return " \(xmlAttributes)"

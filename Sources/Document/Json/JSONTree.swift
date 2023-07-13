@@ -16,19 +16,8 @@
 
 import Foundation
 
-public enum JSONTreeNode: Equatable {
-    case textNode(TextNode)
-    case elementNode(ElementNode)
-
-    public static func == (lhs: JSONTreeNode, rhs: JSONTreeNode) -> Bool {
-        if case .textNode(let lhsNode) = lhs, case .textNode(let rhsNode) = rhs {
-            return lhsNode == rhsNode
-        } else if case .elementNode(let lhsNode) = lhs, case .elementNode(let rhsNode) = rhs {
-            return lhsNode == rhsNode
-        } else {
-            return false
-        }
-    }
+public protocol JSONTreeNode: Equatable {
+    var type: TreeNodeType { get }
 }
 
 struct TreeChangeWithPath {
@@ -44,32 +33,45 @@ struct TreeChangeWithPath {
 /**
  * `ElementNode` is a node that has children.
  */
-public struct ElementNode: Equatable {
-    let type: TreeNodeType
-    let attributes: [String: String]?
-    let children: [JSONTreeNode]
+public struct ElementNode: JSONTreeNode {
+    public let type: TreeNodeType
+    public let attributes: [String: String]?
+    public let children: [any JSONTreeNode]
+
+    public static func == (lhs: ElementNode, rhs: ElementNode) -> Bool {
+        if lhs.type != rhs.type {
+            return false
+        }
+
+        return true
+    }
+
+    init(type: TreeNodeType, attributes: [String: String]? = nil, children: [any JSONTreeNode] = []) {
+        self.type = type
+        self.attributes = attributes
+        self.children = children
+    }
 }
 
 /**
  * `TextNode` is a node that has a value.
  */
-public struct TextNode: Equatable {
-    let type = TreeNodeType.text
-    let value: String
+public struct TextNode: JSONTreeNode {
+    public let type = DefaultTreeNodeType.text.rawValue
+    public let value: String
 }
 
 /**
  * `buildDescendants` builds descendants of the given tree node.
  */
-func buildDescendants(treeNode: JSONTreeNode, parent: CRDTTreeNode, context: ChangeContext) throws {
-    let ticket = context.issueTimeTicket()
+func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context: ChangeContext) throws {
+    let ticket = context.issueTimeTicket
 
-    switch treeNode {
-    case .textNode(let node):
-        let textNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: .text, value: node.value)
+    if let node = treeNode as? TextNode {
+        let textNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: DefaultTreeNodeType.text.rawValue, value: node.value)
 
-        try parent.append(newNode: [textNode])
-    case .elementNode(let node):
+        try parent.append(contentsOf: [textNode])
+    } else if let node = treeNode as? ElementNode {
         let attrs = RHT()
 
         node.attributes?.forEach { key, value in
@@ -78,25 +80,26 @@ func buildDescendants(treeNode: JSONTreeNode, parent: CRDTTreeNode, context: Cha
 
         let elementNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type, attributes: attrs.size == 0 ? nil : attrs)
 
-        try parent.append(newNode: [elementNode])
+        try parent.append(contentsOf: [elementNode])
 
         try node.children.forEach { child in
             try buildDescendants(treeNode: child, parent: elementNode, context: context)
         }
+    } else {
+        throw YorkieError.unexpected(message: "Must not here!")
     }
 }
 
 /**
  * createCRDTTreeNode returns CRDTTreeNode by given TreeNode.
  */
-func createCRDTTreeNode(context: ChangeContext, content: JSONTreeNode) throws -> CRDTTreeNode {
-    let ticket = context.issueTimeTicket()
+func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throws -> CRDTTreeNode {
+    let ticket = context.issueTimeTicket
 
     let root: CRDTTreeNode
-    switch content {
-    case .textNode(let node):
-        root = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type)
-    case .elementNode(let node):
+    if let node = content as? TextNode {
+        root = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type, value: node.value)
+    } else if let node = content as? ElementNode {
         let attrs = RHT()
 
         node.attributes?.forEach { key, value in
@@ -108,6 +111,8 @@ func createCRDTTreeNode(context: ChangeContext, content: JSONTreeNode) throws ->
         try node.children.forEach { child in
             try buildDescendants(treeNode: child, parent: root, context: context)
         }
+    } else {
+        throw YorkieError.unexpected(message: "Must not here!")
     }
 
     return root
@@ -119,11 +124,21 @@ func createCRDTTreeNode(context: ChangeContext, content: JSONTreeNode) throws ->
  */
 public class JSONTree {
     private let initialRoot: ElementNode?
-    private let context: ChangeContext?
-    private let tree: CRDTTree?
+    private var context: ChangeContext?
+    private var tree: CRDTTree?
 
-    init(initialRoot: ElementNode? = nil, context: ChangeContext?, tree: CRDTTree?) {
+    public convenience init() {
+        self.init(initialRoot: nil)
+    }
+
+    public init(initialRoot: ElementNode? = nil) {
         self.initialRoot = initialRoot
+    }
+
+    /**
+     * `initialize` initialize this text with context and internal text.
+     */
+    func initialize(context: ChangeContext?, tree: CRDTTree?) {
         self.context = context
         self.tree = tree
     }
@@ -138,13 +153,13 @@ public class JSONTree {
     /**
      * `buildRoot` returns the root node of this tree.
      */
-    func buildRoot(context: ChangeContext) throws -> CRDTTreeNode {
+    func buildRoot(_ context: ChangeContext) throws -> CRDTTreeNode {
         guard let initialRoot else {
-            return CRDTTreeNode(pos: CRDTTreePos(createdAt: context.issueTimeTicket(), offset: 0), type: .root)
+            return CRDTTreeNode(pos: CRDTTreePos(createdAt: context.issueTimeTicket, offset: 0), type: DefaultTreeNodeType.root.rawValue)
         }
 
         // TODO(hackerwins): Need to use the ticket of operation of creating tree.
-        let root = CRDTTreeNode(pos: CRDTTreePos(createdAt: context.issueTimeTicket(), offset: 0), type: initialRoot.type)
+        let root = CRDTTreeNode(pos: CRDTTreePos(createdAt: context.issueTimeTicket, offset: 0), type: initialRoot.type)
 
         try self.initialRoot?.children.forEach { child in
             try buildDescendants(treeNode: child, parent: root, context: context)
@@ -178,7 +193,7 @@ public class JSONTree {
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
      */
-    public func styleByPath(path: [Int], attributes: [String: String]) throws {
+    public func styleByPath(_ path: [Int], _ attributes: [String: String]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -187,27 +202,24 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "path should not be empty")
         }
 
-        let (fromPos, toPos) = try tree.pathToPosRange(path: path)
-        let ticket = context.issueTimeTicket()
+        let (fromPos, toPos) = try tree.pathToPosRange(path)
+        let ticket = context.issueTimeTicket
 
-        try tree.style(range: (fromPos, toPos), attributes: attributes, editedAt: ticket)
+        try tree.style((fromPos, toPos), attributes, ticket)
 
         // TreeStyleOperation
-//        context.push(
-//            TreeStyleOperation.create(
-//                tree.getCreatedAt(),
-//                fromPos,
-//                toPos,
-//                attrs != nil ? Dictionary(uniqueKeysWithValues: attrs!.map { ($0.key, $0.value) }) : [:],
-//                ticket
-//            )
-//        )
+        context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
+                                                   fromPos: fromPos,
+                                                   toPos: toPos,
+                                                   attributes: attributes,
+                                                   executedAt: ticket)
+        )
     }
 
     /**
      * `style` sets the attributes to the elements of the given range.
      */
-    public func style(fromIdx: Int, toIdx: Int, attributes: [String: String]) throws {
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: String]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -216,27 +228,24 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "from should be less than or equal to to")
         }
 
-        let fromPos = try tree.findPos(index: fromIdx)
-        let toPos = try tree.findPos(index: toIdx)
-        let ticket = context.issueTimeTicket()
+        let fromPos = try tree.findPos(fromIdx)
+        let toPos = try tree.findPos(toIdx)
+        let ticket = context.issueTimeTicket
 
-        try tree.style(range: (fromPos, toPos), attributes: attributes, editedAt: ticket)
+        try tree.style((fromPos, toPos), attributes, ticket)
 
-//        context.push(
-//            TreeStyleOperation.create(
-//                tree.getCreatedAt(),
-//                fromPos,
-//                toPos,
-//                attrs != nil ? Dictionary(uniqueKeysWithValues: attrs!.map { ($0.key, $0.value) }) : [:],
-//                ticket
-//            )
-//        )
+        context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
+                                                   fromPos: fromPos,
+                                                   toPos: toPos,
+                                                   attributes: attributes,
+                                                   executedAt: ticket)
+        )
     }
 
     /**
      * `editByPath` edits this tree with the given node and path.
      */
-    public func editByPath(fromPath: [Int], toPath: [Int], content: JSONTreeNode?) throws -> Bool {
+    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -249,21 +258,18 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "path should not be empty")
         }
 
-        let crdtNode = content != nil ? try createCRDTTreeNode(context: context, content: content!) : nil
-        let fromPos = try tree.pathToPos(path: fromPath)
-        let toPos = try tree.pathToPos(path: toPath)
+        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        let fromPos = try tree.pathToPos(fromPath)
+        let toPos = try tree.pathToPos(toPath)
         let ticket = context.lastTimeTicket
-        try tree.edit(range: (fromPos, toPos), content: crdtNode?.deepcopy(), editedAt: ticket)
+        try tree.edit((fromPos, toPos), crdtNode?.compactMap { $0.deepcopy() }, ticket)
 
-//        context.push(
-//            TreeEditOperation.create(
-//                tree.getCreatedAt(),
-//                fromPos,
-//                toPos,
-//                crdtNode,
-//                ticket
-//            )
-//        )
+        context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
+                                                  fromPos: fromPos,
+                                                  toPos: toPos,
+                                                  contents: crdtNode,
+                                                  executedAt: ticket)
+        )
 
         if fromPos != toPos {
             context.registerElementHasRemovedNodes(tree)
@@ -275,7 +281,8 @@ public class JSONTree {
     /**
      * `edit` edits this tree with the given node.
      */
-    public func edit(fromIdx: Int, toIdx: Int, content: JSONTreeNode?) throws -> Bool {
+    @discardableResult
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -284,21 +291,18 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "from should be less than or equal to to")
         }
 
-        let crdtNode = content != nil ? try createCRDTTreeNode(context: context, content: content!) : nil
-        let fromPos = try tree.findPos(index: fromIdx)
-        let toPos = try tree.findPos(index: toIdx)
+        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        let fromPos = try tree.findPos(fromIdx)
+        let toPos = try tree.findPos(toIdx)
         let ticket = context.lastTimeTicket
-        try tree.edit(range: (fromPos, toPos), content: crdtNode?.deepcopy(), editedAt: ticket)
+        try tree.edit((fromPos, toPos), crdtNode?.compactMap { $0.deepcopy() }, ticket)
 
-//        context.push(
-//            TreeEditOperation.create(
-//                createdAt: tree.getCreatedAt(),
-//                fromPos: fromPos,
-//                toPos: toPos,
-//                crdtNode: crdtNode,
-//                ticket: ticket
-//            )
-//        )
+        context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
+                                                  fromPos: fromPos,
+                                                  toPos: toPos,
+                                                  contents: crdtNode,
+                                                  executedAt: ticket)
+        )
 
         if fromPos != toPos {
             context.registerElementHasRemovedNodes(tree)
@@ -310,32 +314,34 @@ public class JSONTree {
     /**
      * `split` splits this tree at the given index.
      */
-    public func split(index: Int, depth: Int) throws -> Bool {
+    public func split(_ index: Int, _ depth: Int) throws -> Bool {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        try tree.split(index: index, depth: depth)
+        try tree.split(index, depth)
         return true
     }
 
     /**
      * `toXML` returns the XML string of this tree.
      */
-    public func toXML() throws -> String {
+    public func toXML() -> String {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            Logger.critical("it is not initialized yet")
+            return ""
         }
 
-        return tree.toXML
+        return tree.toXML()
     }
 
     /**
      * `toJSON` returns the JSON string of this tree.
      */
-    public func toJSON() throws -> String {
+    public func toJSON() -> String {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            Logger.critical("it is not initialized yet")
+            return ""
         }
 
         return tree.toJSON()
@@ -344,121 +350,152 @@ public class JSONTree {
     /**
      * `indexToPath` returns the path of the given index.
      */
-    public func indexToPath(index: Int) throws -> [Int] {
+    public func indexToPath(_ index: Int) throws -> [Int] {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return try tree.indexToPath(index: index)
+        return try tree.indexToPath(index)
     }
-
-//    /**
-//     * eslint-disable-next-line jsdoc/require-jsdoc
-//     * @internal
-//     */
-//    public *[Symbol.iterator](): IterableIterator<TreeNode> {
-//        if (!this.tree) {
-//            return;
-//        }
-//
-//        // TODO(hackerwins): Fill children of element node later.
-//        for (const node of this.tree) {
-//            if (node.isText) {
-//                const textNode = node as TextNode;
-//                yield {
-//                type: textNode.type,
-//                value: textNode.value,
-//                };
-//            } else {
-//                const elementNode = node as ElementNode;
-//                yield {
-//                type: elementNode.type,
-//                children: [],
-//                };
-//            }
-//        }
-//    }
 
     /**
      * `createRange` returns pair of CRDTTreePos of the given integer offsets.
      */
-    func createRange(fromIdx: Int, toIdx: Int) throws -> TreeRange? {
+    func createRange(_ fromIdx: Int, _ toIdx: Int) throws -> TreeRange? {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return try tree.createRange(fromIdx: fromIdx, toIdx: toIdx)
+        return try tree.createRange(fromIdx, toIdx)
     }
 
     /**
      * `createRangeByPath` returns pair of CRDTTreePos of the given integer offsets.
      */
-    func createRangeByPath(fromPath: [Int], toPath: [Int]) throws -> TreeRange? {
+    func createRangeByPath(_ fromPath: [Int], _ toPath: [Int]) throws -> TreeRange? {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        let fromIdx = try tree.pathToIndex(path: fromPath)
-        let toIdx = try tree.pathToIndex(path: toPath)
+        let fromIdx = try tree.pathToIndex(fromPath)
+        let toIdx = try tree.pathToIndex(toPath)
 
-        return try tree.createRange(fromIdx: fromIdx, toIdx: toIdx)
+        return try tree.createRange(fromIdx, toIdx)
     }
 
     /**
-     * `rangeToIndex` returns the integer offsets of the given range.
+     * `toPosRange` converts the integer index range into the Tree position range structure.
      */
-    func rangeToIndex(range: TreeRange) throws -> (Int, Int) {
+    func toPosRange(_ range: (Int, Int)) throws -> TreeRangeStruct {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return try tree.rangeToIndex(range: range)
+        let range = try tree.toPosRange(range)
+
+        return (range.0.toStructure, range.1.toStructure)
+    }
+
+    /**
+     * `toIndexRange` converts the Tree position range into the integer index range.
+     */
+    func toIndexRange(_ range: TreeRangeStruct) throws -> (Int, Int) {
+        guard self.context != nil, let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        return try tree.toIndexRange((CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1)))
     }
 
     /**
      * `rangeToPath` returns the path of the given range.
      */
-    func rangeToPath(range: TreeRange) throws -> ([Int], [Int]) {
+    func rangeToPath(_ range: TreeRange) throws -> ([Int], [Int]) {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return try tree.rangeToPath(range: range)
+        return try tree.rangeToPath(range)
     }
 }
 
-/*
- public struct TreeIterator: IteratorProtocol {
-     private let tree: JSONTree?
-     private var iterator: TreeIteratorProtocol?
+extension JSONTree: Sequence {
+    public func makeIterator() -> JSONTreeListIterator {
+        return JSONTreeListIterator(self.tree)
+    }
+}
 
-     init(tree: Tree?) {
-         self.tree = tree
-         self.iterator = tree?.makeIterator()
-     }
+public class JSONTreeListIterator: IteratorProtocol {
+    private weak var treeIterator: CRDTTreeListIterator?
 
-     mutating public func next() -> TreeNode? {
-         guard let iterator = iterator?.next() else {
-             return nil
-         }
+    init(_ firstNode: CRDTTree?) {
+        self.treeIterator = firstNode?.makeIterator()
+    }
 
-         if iterator.isText {
-             if let textNode = iterator as? TextNode {
-                 return TreeNode(type: textNode.type, value: textNode.value)
-             }
-         } else {
-             if let elementNode = iterator as? ElementNode {
-                 return TreeNode(type: elementNode.type, children: [])
-             }
-         }
+    public func next() -> (any JSONTreeNode)? {
+        guard let node = self.treeIterator?.next() else {
+            return nil
+        }
 
-         return nil
-     }
- }
+        return node.toJSONTreeNode
+    }
+}
 
- extension TreeWrapper: Sequence {
-     public func makeIterator() -> TreeIterator {
-         return TreeIterator(tree: self.tree)
-     }
- }
+// MARK: For Presence
+
+/**
+ * `TimeTicketStruct` is a structure represents the meta data of the ticket.
+ * It is used to serialize and deserialize the ticket.
  */
+struct TimeTicketStruct {
+    let lamport: Int64
+    let delimiter: UInt32
+    let actorID: ActorID?
+}
+
+/**
+ * `CRDTTreePosStruct` represents the structure of CRDTTreePos.
+ * It is used to serialize and deserialize the CRDTTreePos.
+ */
+struct CRDTTreePosStruct {
+    let createdAt: TimeTicketStruct
+    let offset: Int32
+}
+
+/**
+ * `TreeRangeStruct` represents the structure of TreeRange.
+ * It is used to serialize and deserialize the TreeRange.
+ */
+typealias TreeRangeStruct = (CRDTTreePosStruct, CRDTTreePosStruct)
+
+extension TimeTicket {
+    /**
+     * `fromStruct` creates a new instance of TimeTicket from the given struct.
+     */
+    static func fromStruct(_ value: TimeTicketStruct) -> TimeTicket {
+        TimeTicket(lamport: value.lamport, delimiter: value.delimiter, actorID: value.actorID)
+    }
+
+    /**
+     * `toStructure` returns the structure of this Ticket.
+     */
+    var toStructure: TimeTicketStruct {
+        TimeTicketStruct(lamport: self.lamport, delimiter: self.delimiter, actorID: self.actorID)
+    }
+}
+
+extension CRDTTreePos {
+    /**
+     * `fromStruct` creates a new instance of CRDTTreePos from the given struct.
+     */
+    static func fromStruct(_ value: CRDTTreePosStruct) -> CRDTTreePos {
+        CRDTTreePos(createdAt: TimeTicket.fromStruct(value.createdAt), offset: value.offset)
+    }
+
+    /**
+     * `toStructure` returns the structure of this position.
+     */
+    var toStructure: CRDTTreePosStruct {
+        CRDTTreePosStruct(createdAt: self.createdAt.toStructure, offset: self.offset)
+    }
+}

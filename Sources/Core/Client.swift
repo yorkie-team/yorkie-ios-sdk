@@ -341,7 +341,7 @@ public actor Client {
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack)
 
             if await doc.status == .removed {
                 throw YorkieError.documentRemoved(message: "\(doc) is removed.")
@@ -399,7 +399,7 @@ public actor Client {
             let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack)
 
             if await doc.status != .removed {
                 await doc.setStatus(.detached)
@@ -467,7 +467,7 @@ public actor Client {
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack)
 
             try self.stopWatchLoop(doc.getKey())
 
@@ -893,7 +893,7 @@ public actor Client {
                 return doc
             }
 
-            try await doc.applyChangePack(pack: responsePack)
+            try await doc.applyChangePack(responsePack)
 
             if await doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: docKey)

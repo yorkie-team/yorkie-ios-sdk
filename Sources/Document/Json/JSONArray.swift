@@ -209,7 +209,7 @@ public class JSONArray {
      * after the previously created element.
      */
     private func moveBeforeInternal(nextCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
         let previousCreatedAt = try target.getPreviousCreatedAt(createdAt: nextCreatedAt)
         try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
@@ -221,7 +221,7 @@ public class JSONArray {
      * after the specific element.
      */
     private func moveAfterInternal(previousCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
         try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
@@ -232,7 +232,7 @@ public class JSONArray {
      * at the first of array.
      */
     private func moveFrontInternal(createdAt: TimeTicket) throws {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
         let head = self.target.getHead()
         try self.target.move(createdAt: createdAt, afterCreatedAt: head.createdAt, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: head.createdAt, createdAt: createdAt, executedAt: ticket)
@@ -244,7 +244,7 @@ public class JSONArray {
      * at the last of array.
      */
     private func moveLastInternal(createdAt: TimeTicket) throws {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
         let last = self.target.getLastCreatedAt()
         try self.target.move(createdAt: createdAt, afterCreatedAt: last, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: last, createdAt: createdAt, executedAt: ticket)
@@ -256,7 +256,7 @@ public class JSONArray {
      */
     @discardableResult
     private func insertAfterInternal(previousCreatedAt: TimeTicket, value: Any) throws -> CRDTElement {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
 
         if let value = Primitive.type(of: value) {
             let primitive = Primitive(value: value, createdAt: ticket)
@@ -347,6 +347,22 @@ public class JSONArray {
             self.context.push(operation: operation)
 
             return text
+        } else if let element = value as? JSONTree {
+            guard let root = try? element.buildRoot(context) else {
+                throw YorkieError.unexpected(message: "Can't build root!")
+            }
+            let tree = CRDTTree(root: root, createdAt: ticket)
+            element.initialize(context: self.context, tree: tree)
+
+            let clone = tree.deepcopy()
+
+            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: tree, executedAt: ticket)
+            self.context.push(operation: operation)
+
+            return tree
         }
 
         throw YorkieError.unimplemented(message: "Unsupported type of value: \(type(of: value))")
@@ -364,7 +380,7 @@ public class JSONArray {
      */
     @discardableResult
     private func removeInternal(byIndex index: Int) -> CRDTElement? {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
         let removed = try? self.target.remove(index: index, executedAt: ticket)
 
         guard let removed else {
@@ -382,7 +398,7 @@ public class JSONArray {
      */
     @discardableResult
     private func removeInternal(byID createdAt: TimeTicket) throws -> CRDTElement {
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
         let removed = try self.target.remove(createdAt: createdAt, executedAt: ticket)
 
         let operation = RemoveOperation(parentCreatedAt: self.target.createdAt, createdAt: removed.createdAt, executedAt: ticket)

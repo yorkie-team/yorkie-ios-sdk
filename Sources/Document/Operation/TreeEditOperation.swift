@@ -34,13 +34,13 @@ struct TreeEditOperation: Operation {
     /**
      * `content` returns the content of Edit.
      */
-    let content: CRDTTreeNode?
+    let contents: [CRDTTreeNode]?
 
-    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, content: CRDTTreeNode?, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, contents: [CRDTTreeNode]?, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
-        self.content = content
+        self.contents = contents
         self.executedAt = executedAt
     }
 
@@ -59,7 +59,7 @@ struct TreeEditOperation: Operation {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
-        let changes = try tree.edit(range: (self.fromPos, self.toPos), content: self.content?.deepcopy(), editedAt: self.executedAt)
+        let changes = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.executedAt)
 
         if self.fromPos != self.toPos {
             root.registerElementHasRemovedNodes(tree)
@@ -70,7 +70,7 @@ struct TreeEditOperation: Operation {
         }
 
         return changes.compactMap { change in
-            guard case .node(let node) = change.value else {
+            guard case .nodes(let nodes) = change.value else {
                 return nil
             }
 
@@ -78,9 +78,9 @@ struct TreeEditOperation: Operation {
                 path: path,
                 from: change.from,
                 to: change.to,
-                formPath: change.fromPath,
+                fromPath: change.fromPath,
                 toPath: change.toPath,
-                value: node
+                value: nodes
             )
         }
     }
@@ -100,6 +100,6 @@ struct TreeEditOperation: Operation {
         let fromPos = "\(self.fromPos.createdAt.structureAsString):\(self.fromPos.offset)"
         let toPos = "\(self.toPos.createdAt.structureAsString):\(self.toPos.offset)"
 
-        return "\(parent).EDIT(\(fromPos),\(toPos),\(self.content?.value ?? ""))"
+        return "\(parent).EDIT(\(fromPos),\(toPos),\(self.contents?.map { "\($0)" }.joined(separator: ",") ?? ""))"
     }
 }

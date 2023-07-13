@@ -244,6 +244,13 @@ extension Converter {
         } else if let counter = element as? CRDTCounter<Int64> {
             pbElementSimple.type = .longCnt
             pbElementSimple.value = counter.toBytes()
+        } else if let tree = element as? CRDTTree {
+            pbElementSimple.type = .tree
+            do {
+                pbElementSimple.value = try treeToBytes(tree)
+            } catch {
+                fatalError("Can't convert CRDTTree to bytes.")
+            }
         }
 
         pbElementSimple.createdAt = toTimeTicket(element.createdAt)
@@ -276,6 +283,8 @@ extension Converter {
             }
 
             return CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
+        case .tree:
+            return try bytesToTree(bytes: pbElementSimple.value)
         default:
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
         }
@@ -394,6 +403,25 @@ extension Converter {
             pbIncreaseOperation.value = toElementSimple(increaseOperation.value)
             pbIncreaseOperation.executedAt = toTimeTicket(increaseOperation.executedAt)
             pbOperation.increase = pbIncreaseOperation
+        } else if let treeEditOperation = operation as? TreeEditOperation {
+            var pbTreeEditOperation = PbOperation.TreeEdit()
+            pbTreeEditOperation.parentCreatedAt = toTimeTicket(treeEditOperation.parentCreatedAt)
+            pbTreeEditOperation.from = toTreePos(treeEditOperation.fromPos)
+            pbTreeEditOperation.to = toTreePos(treeEditOperation.toPos)
+            pbTreeEditOperation.content = toTreeNodes(treeEditOperation.contents![0])
+            pbTreeEditOperation.executedAt = toTimeTicket(treeEditOperation.executedAt)
+            pbOperation.treeEdit = pbTreeEditOperation
+        } else if let treeStyleOperation = operation as? TreeStyleOperation {
+            var pbTreeStyleOperation = PbOperation.TreeStyle()
+            pbTreeStyleOperation.parentCreatedAt = toTimeTicket(treeStyleOperation.parentCreatedAt)
+            pbTreeStyleOperation.from = toTreePos(treeStyleOperation.fromPos)
+            pbTreeStyleOperation.to = toTreePos(treeStyleOperation.toPos)
+            
+            treeStyleOperation.attributes.forEach { key, value in
+                pbTreeStyleOperation.attributes[key] = value
+            }
+            pbTreeStyleOperation.executedAt = toTimeTicket(treeStyleOperation.executedAt)
+            pbOperation.treeStyle = pbTreeStyleOperation
         } else {
             throw YorkieError.unimplemented(message: "unimplemented operation \(operation)")
         }
@@ -457,6 +485,18 @@ extension Converter {
                 return IncreaseOperation(parentCreatedAt: fromTimeTicket(pbIncreaseOperation.parentCreatedAt),
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
+            } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
+                return try TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
+                                         fromPos: fromTreePos(pbTreeEditOperation.from),
+                                         toPos: fromTreePos(pbTreeEditOperation.to),
+                                         contents: [fromTreeNodes(pbTreeEditOperation.content)!],
+                                         executedAt: fromTimeTicket(pbTreeEditOperation.executedAt))
+            } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
+                return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
+                                          fromPos: fromTreePos(pbTreeStyleOperation.from),
+                                          toPos: fromTreePos(pbTreeStyleOperation.to),
+                                          attributes: pbTreeStyleOperation.attributes,
+                                          executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
             } else {
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
             }
@@ -710,6 +750,39 @@ extension Converter {
     }
 
     /**
+     * `fromTree` converts the given Protobuf format to model format.
+     */
+    static func fromTree(_ pbTree: PbJSONElement.Tree) throws -> CRDTTree {
+        guard let root = try fromTreeNodes(pbTree.nodes) else {
+            throw YorkieError.unexpected(message: "Can't get root from PbJSONElement.Tree")
+        }
+        return CRDTTree(root: root, createdAt: fromTimeTicket(pbTree.createdAt))
+    }
+
+    /**
+     * `toTree` converts the given model to Protobuf format.
+     */
+    static func toTree(_ tree: CRDTTree) -> PbJSONElement {
+        var pbTree = PbJSONElement.Tree()
+        pbTree.nodes = toTreeNodes(tree.root)
+        pbTree.createdAt = toTimeTicket(tree.createdAt)
+        if let ticket = tree.movedAt {
+            pbTree.movedAt = toTimeTicket(ticket)
+        } else {
+            pbTree.clearMovedAt()
+        }
+        if let ticket = tree.removedAt {
+            pbTree.removedAt = toTimeTicket(ticket)
+        } else {
+            pbTree.clearRemovedAt()
+        }
+
+        var pbElement = PbJSONElement()
+        pbElement.tree = pbTree
+        return pbElement
+    }
+
+    /**
      * `toElement` converts the given model to Protobuf format.
      */
     static func toElement(_ element: CRDTElement) throws -> PbJSONElement {
@@ -725,6 +798,8 @@ extension Converter {
             return toCounter(element)
         } else if let element = element as? CRDTCounter<Int64> {
             return toCounter(element)
+        } else if let element = element as? CRDTTree {
+            return toTree(element)
         } else {
             throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
         }
@@ -747,6 +822,136 @@ extension Converter {
         } else {
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElement)")
         }
+    }
+}
+
+// MARK: Tree
+extension Converter {
+    /**
+     * `toTreePos` converts the given model to Protobuf format.
+     */
+    static func toTreePos(_ pos: CRDTTreePos) -> PbTreePos {
+        var pbTreePos = PbTreePos()
+        pbTreePos.createdAt = toTimeTicket(pos.createdAt)
+        pbTreePos.offset = pos.offset
+        
+        return pbTreePos
+    }
+/*
+    /**
+     * `toTreeNodesWhenEdit` converts the given model to Protobuf format.
+     */
+    static func toTreeNodesWhenEdit(_ nodes: [CRDTTreeNode]?) -> [PbTreeNode] {
+        guard let nodes else {
+            return []
+        }
+        
+        return nodes.compactMap {
+            var pbTreeNodes = PbTreeNodes()
+            pbTreeNodes.content = toTreeNodes($0)
+            
+            return pbTreeNodes
+        }
+    }
+*/
+    /**
+     * `toTreeNodes` converts the given model to Protobuf format.
+     */
+    static func toTreeNodes(_ node: CRDTTreeNode) -> [PbTreeNode] {
+        var pbTreeNodes = [PbTreeNode]()
+        
+        traverse(node: node) { node, depth in
+            var pbTreeNode = PbTreeNode()
+            pbTreeNode.pos = toTreePos(node.pos)
+            pbTreeNode.type = node.type
+            if node.isText {
+                pbTreeNode.value = node.value
+            }
+            if let ticket = node.removedAt {
+                pbTreeNode.removedAt = toTimeTicket(ticket)
+            } else {
+                pbTreeNode.clearRemovedAt()
+            }
+            pbTreeNode.depth = depth
+            
+            node.attrs?.forEach { rhtNode in
+                var pbNodeAttr = PbNodeAttr()
+                pbNodeAttr.value = rhtNode.value
+                pbNodeAttr.updatedAt = toTimeTicket(rhtNode.updatedAt)
+                pbTreeNode.attributes[rhtNode.key] = pbNodeAttr
+            }
+
+            pbTreeNodes.append(pbTreeNode)
+        }
+
+        return pbTreeNodes
+    }
+
+    /**
+     * `fromTreePos` converts the given Protobuf format to model format.
+     */
+    static func fromTreePos(_ pbTreePos: PbTreePos) -> CRDTTreePos {
+        CRDTTreePos(createdAt: fromTimeTicket(pbTreePos.createdAt), offset: pbTreePos.offset)
+    }
+/*
+    /**
+     * `fromTreeNodesWhenEdit` converts the given Protobuf format to model format.
+     */
+    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNode]) -> [CRDTTreeNode]? {
+        guard pbTreeNodes.isEmpty == false else {
+            return nil
+        }
+        
+        return pbTreeNodes.compactMap { try? fromTreeNodes($0.content) }
+    }
+
+    */
+    /**
+     * `fromTreeNodes` converts the given Protobuf format to model format.
+     */
+    static func fromTreeNodes(_ pbTreeNodes: [PbTreeNode]) throws -> CRDTTreeNode? {
+        guard pbTreeNodes.isEmpty == false else {
+            return nil
+        }
+        
+        let nodes = pbTreeNodes.compactMap { fromTreeNode($0) }
+        
+        let root = nodes[nodes.count - 1]
+        
+        for index in stride(from: nodes.count - 2, to: -1, by: -1) {
+            var parent: CRDTTreeNode?
+            for index2 in index + 1 ..< nodes.count {
+                if pbTreeNodes[index].depth - 1 == pbTreeNodes[index2].depth {
+                    parent = nodes[index2]
+                    break
+                }
+            }
+            
+            try parent?.prepend(contentsOf: [nodes[index]])
+        }
+        
+        // build CRDTTree from the root to construct the links between nodes.
+        return CRDTTree(root: root, createdAt: TimeTicket.initial).root
+    }
+
+    /**
+     * `fromTreeNode` converts the given Protobuf format to model format.
+     */
+    static func fromTreeNode(_ pbTreeNode: PbTreeNode) -> CRDTTreeNode {
+        let pos = fromTreePos(pbTreeNode.pos)
+        let node = CRDTTreeNode(pos: pos, type: pbTreeNode.type)
+
+        if node.isText {
+            node.value = pbTreeNode.value
+        } else {
+            node.attrs = RHT()
+            
+            pbTreeNode.attributes.forEach { key, value in
+                node.attrs?.set(key: key, value: value.value, executedAt: fromTimeTicket(value.updatedAt))
+            }
+        }
+        
+        return node
     }
 }
 
@@ -818,10 +1023,9 @@ extension Converter {
     static func fromChangePack(_ pbPack: PbChangePack) throws -> ChangePack {
         ChangePack(key: pbPack.documentKey,
                    checkpoint: fromCheckpoint(pbPack.checkpoint),
-                   changes: try fromChanges(pbPack.changes),
+                   isRemoved: pbPack.isRemoved, changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
-                   minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil,
-                   isRemoved: pbPack.isRemoved)
+                   minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil)
     }
 
 }
@@ -862,6 +1066,25 @@ extension Converter {
 
 // MARK: Bytes.
 extension Converter {
+    /**
+     * `bytesToTree` creates an CRDTTree from the given bytes.
+     */
+    static func bytesToTree(bytes: Data) throws -> CRDTTree {
+        guard bytes.isEmpty == false else {
+            return CRDTTree(root: CRDTTreeNode(pos: CRDTTreePos.initial, type: DefaultTreeNodeType.root.rawValue), createdAt: TimeTicket.initial)
+        }
+        
+        let pbElement = try PbJSONElement(serializedData: bytes)
+        return try fromTree(pbElement.tree)
+    }
+
+    /**
+     * `treeToBytes` converts the given tree to bytes.
+     */
+    static func treeToBytes(_ tree: CRDTTree) throws -> Data {
+        try toTree(tree).serializedData()
+    }
+
     /**
      * `bytesToObject` creates an JSONObject from the given byte array.
      */

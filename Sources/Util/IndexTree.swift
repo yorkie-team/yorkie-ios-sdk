@@ -68,7 +68,9 @@
 /**
  * `NoteType` is the type of a node in the tree.
  */
-enum TreeNodeType {
+public typealias TreeNodeType = String
+
+enum DefaultTreeNodeType: String {
     /**
      * DummyHeadType is a type of dummy head. It is used to represent the head node
      * of RGA.
@@ -118,7 +120,7 @@ protocol IndexTreeNode: AnyObject {
 
     func findOffset(node: Self) throws -> Int?
     @discardableResult
-    func split(offset: Int) throws -> Self?
+    func split(_ soffset: Int32) throws -> Self?
 
     // For extension
     var isRemoved: Bool { get }
@@ -126,7 +128,7 @@ protocol IndexTreeNode: AnyObject {
     var value: String { get set }
     var innerChildren: [Self] { get set }
 
-    func clone(offset: Int) -> Self
+    func clone(offset: Int32) -> Self
 }
 
 extension IndexTreeNode {
@@ -149,7 +151,7 @@ extension IndexTreeNode {
     var isText: Bool {
         // TODO(hackerwins): We need to get the type of text node from user.
         // Consider the use schema to get the type of text node.
-        self.type == .text
+        self.type == DefaultTreeNodeType.text.rawValue
     }
 
     /**
@@ -185,7 +187,7 @@ extension IndexTreeNode {
      * `split` splits the node at the given offset.
      */
     @discardableResult
-    func split(offset: Int) throws -> Self? {
+    func split(_ offset: Int32) throws -> Self? {
         if self.isText {
             return try self.splitText(offset: offset)
         }
@@ -194,35 +196,15 @@ extension IndexTreeNode {
     }
 
     /**
-     * `value` set and returns the value of the node.
-     */
-
-    func getValue() throws -> String {
-        if self.isText == false {
-            throw YorkieError.unexpected(message: "cannot get value of element node: \(self.type)")
-        }
-
-        return self.value
-    }
-
-    func setValue(_ newValue: String) {
-        if self.isText == false {
-            fatalError("cannot set value of element node: \(self.type)")
-        }
-
-        self.value = newValue
-    }
-
-    /**
      * `splitText` splits the given node at the given offset.
      */
-    func splitText(offset: Int) throws -> Self? {
-        guard offset > 0 || offset < self.size else {
+    func splitText(offset: Int32) throws -> Self? {
+        guard offset > 0, offset < self.size else {
             return nil
         }
 
-        let leftValue = String(self.value.substring(from: 0, to: offset - 1))
-        let rightValue = String(self.value.substring(from: offset, to: self.value.count - 1))
+        let leftValue = String(self.value.substring(from: 0, to: Int(offset) - 1))
+        let rightValue = String(self.value.substring(from: Int(offset), to: self.value.count - 1))
 
         self.value = leftValue
 
@@ -253,7 +235,7 @@ extension IndexTreeNode {
     /**
      * `append` appends the given nodes to the children.
      */
-    func append(newNode: [Self]) throws {
+    func append(contentsOf newNode: [Self]) throws {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
@@ -269,7 +251,7 @@ extension IndexTreeNode {
     /**
      * `prepend` prepends the given nodes to the children.
      */
-    func prepend(newNode: [Self]) throws {
+    func prepend(contentsOf newNode: [Self]) throws {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
@@ -345,13 +327,13 @@ extension IndexTreeNode {
     /**
      * `splitElement` splits the given element at the given offset.
      */
-    func splitElement(offset: Int) throws -> Self? {
+    func splitElement(offset: Int32) throws -> Self? {
         let clone = self.clone(offset: offset)
-        try self.parent!.insertAfterInternal(newNode: clone, referenceNode: self)
+        try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
         clone.updateAncestorsSize()
 
-        let leftChildren = Array(self.children[0 ..< offset])
-        let rightChildren = Array(self.children[offset...])
+        let leftChildren = Array(self.children[0 ..< Int(offset)])
+        let rightChildren = Array(self.children[Int(offset)...])
         self.innerChildren = leftChildren
         clone.innerChildren = rightChildren
         self.size = self.innerChildren.reduce(0) { acc, child in
@@ -437,7 +419,11 @@ extension IndexTreeNode {
 
 extension Array {
     mutating func splice<C>(_ start: Int, _ deleteCount: Int, with newElements: C) where C: Collection, Self.Element == C.Element {
-        self.replaceSubrange(start ... (start + deleteCount), with: newElements)
+        let actualStart = Swift.max(Swift.min(start, self.count), 0)
+        let actualDeleteCount = Swift.max(Swift.min(deleteCount, self.count - actualStart), 0)
+
+        self.removeSubrange(actualStart ..< actualStart + actualDeleteCount)
+        self.insert(contentsOf: newElements, at: actualStart)
     }
 }
 
@@ -450,7 +436,7 @@ extension Array {
  */
 struct TreePos<T: IndexTreeNode> {
     let node: T
-    let offset: Int
+    let offset: Int32
 }
 
 /**
@@ -527,8 +513,8 @@ func nodesBetween<T: IndexTreeNode>(root: T,
  * `traverse` traverses the tree with postorder traversal.
  */
 func traverse<T: IndexTreeNode>(node: T,
-                                callback: @escaping (T, Int) -> Void,
-                                depth: Int = 0)
+                                callback: @escaping (T, Int32) -> Void,
+                                depth: Int32 = 0)
 {
     node.children.forEach { child in
         traverse(node: child, callback: callback, depth: depth + 1)
@@ -539,7 +525,7 @@ func traverse<T: IndexTreeNode>(node: T,
 /**
  * `traverseAll` traverses the whole tree (include tombstones) with postorder traversal.
  */
-func traverseAll<T: IndexTreeNode>(node: T, depth: Int = 0, callback: @escaping (T, Int) -> Void) {
+func traverseAll<T: IndexTreeNode>(node: T, depth: Int32 = 0, callback: @escaping (T, Int32) -> Void) {
     node.innerChildren.forEach { child in
         traverseAll(node: child, depth: depth + 1, callback: callback)
     }
@@ -559,7 +545,7 @@ func findTreePos<T: IndexTreeNode>(node: T,
     }
 
     if node.isText {
-        return TreePos(node: node, offset: index)
+        return TreePos(node: node, offset: Int32(index))
     }
 
     // offset is the index of the child node.
@@ -575,12 +561,12 @@ func findTreePos<T: IndexTreeNode>(node: T,
 
         // The position is in leftside of the element node.
         if index == pos {
-            return TreePos(node: node, offset: offset)
+            return TreePos(node: node, offset: Int32(offset))
         }
 
         // The position is in rightside of the element node and preferText is false.
         if !preferText, child.paddedSize == index - pos {
-            return TreePos(node: node, offset: offset + 1)
+            return TreePos(node: node, offset: Int32(offset + 1))
         }
 
         // The position is in middle the element node.
@@ -595,7 +581,7 @@ func findTreePos<T: IndexTreeNode>(node: T,
     }
 
     // The position is in rightmost of the given node.
-    return TreePos(node: node, offset: offset)
+    return TreePos(node: node, offset: Int32(offset))
 }
 
 /**
@@ -671,7 +657,7 @@ func findTextPos<T: IndexTreeNode>(node: T, pathElement: Int) throws -> TreePos<
         }
     }
 
-    return TreePos(node: node, offset: pathElement)
+    return TreePos(node: node, offset: Int32(pathElement))
 }
 
 /**
@@ -687,28 +673,28 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `nodeBetween` returns the nodes between the given range.
      */
-    func nodesBetween(from: Int, to: Int, callback: @escaping (T) -> Void) throws {
+    func nodesBetween(_ from: Int, _ to: Int, _ callback: @escaping (T) -> Void) throws {
         try Yorkie.nodesBetween(root: self.root, from: from, to: to, callback: callback)
     }
 
     /**
      * `traverse` traverses the tree with postorder traversal.
      */
-    func traverse(callback: @escaping (T, Int) -> Void) {
+    func traverse(callback: @escaping (T, Int32) -> Void) {
         Yorkie.traverse(node: self.root, callback: callback, depth: 0)
     }
 
     /**
      * `traverseAll` traverses the whole tree (include tombstones) with postorder traversal.
      */
-    func traverseAll(callback: @escaping (T, Int) -> Void) {
+    func traverseAll(callback: @escaping (T, Int32) -> Void) {
         Yorkie.traverseAll(node: self.root, depth: 0, callback: callback)
     }
 
     /**
      * `split` splits the node at the given index.
      */
-    public func split(index: Int, depth: Int = 1) throws -> TreePos<T> {
+    public func split(_ index: Int, _ depth: Int = 1) throws -> TreePos<T> {
         let treePos = try Yorkie.findTreePos(node: self.root, index: index, preferText: true)
 
         var node: T? = treePos.node
@@ -717,12 +703,12 @@ class IndexTree<T: IndexTreeNode> {
             guard node != nil, node !== self.root else {
                 break
             }
-            try node!.split(offset: offset)
+            try node!.split(offset)
 
             guard let nextOffset = try node!.parent?.findOffset(node: node!) else {
                 throw YorkieError.unexpected(message: "cant find offset")
             }
-            offset = offset == 0 ? nextOffset : nextOffset + 1
+            offset = Int32(offset == 0 ? nextOffset : nextOffset + 1)
             node = node?.parent
         }
 
@@ -732,14 +718,14 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * findTreePos finds the position of the given index in the tree.
      */
-    public func findTreePos(index: Int, preferText: Bool = true) throws -> TreePos<T> {
+    public func findTreePos(_ index: Int, _ preferText: Bool = true) throws -> TreePos<T> {
         try Yorkie.findTreePos(node: self.root, index: index, preferText: preferText)
     }
 
     /**
      * `treePosToPath` returns path from given treePos
      */
-    public func treePosToPath(treePos: TreePos<T>) throws -> [Int] {
+    public func treePosToPath(_ treePos: TreePos<T>) throws -> [Int] {
         var path = [Int]()
         var node = treePos.node
 
@@ -750,9 +736,9 @@ class IndexTree<T: IndexTreeNode> {
 
             let sizeOfLeftSiblings = addSizeOfLeftSiblings(parent: node.parent!, offset: offset)
             node = node.parent!
-            path.append(sizeOfLeftSiblings + treePos.offset)
+            path.append(sizeOfLeftSiblings + Int(treePos.offset))
         } else {
-            path.append(treePos.offset)
+            path.append(Int(treePos.offset))
         }
 
         while node.parent != nil {
@@ -770,17 +756,17 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `pathToIndex` returns index from given path
      */
-    public func pathToIndex(path: [Int]) throws -> Int {
-        let treePos = try self.pathToTreePos(path: path)
+    public func pathToIndex(_ path: [Int]) throws -> Int {
+        let treePos = try self.pathToTreePos(path)
 
-        return try self.indexOf(pos: treePos)
+        return try self.indexOf(treePos)
     }
 
     /**
      * `pathToTreePos` returns treePos from given path
      */
-    public func pathToTreePos(path: [Int]) throws -> TreePos<T> {
-        guard path.isEmpty != false else {
+    public func pathToTreePos(_ path: [Int]) throws -> TreePos<T> {
+        guard path.isEmpty != true else {
             throw YorkieError.unexpected(message: "unacceptable path")
         }
 
@@ -803,7 +789,7 @@ class IndexTree<T: IndexTreeNode> {
             throw YorkieError.unexpected(message: "unacceptable path")
         }
 
-        return TreePos(node: node, offset: path[path.count - 1])
+        return TreePos(node: node, offset: Int32(path[path.count - 1]))
     }
 
     /**
@@ -817,9 +803,9 @@ class IndexTree<T: IndexTreeNode> {
      * `findPostorderRight` finds right node of the given tree position with
      *  postorder traversal.
      */
-    public func findPostorderRight(treePos: TreePos<T>) -> T {
+    public func findPostorderRight(_ treePos: TreePos<T>) -> T {
         let node = treePos.node
-        let offset = treePos.offset
+        let offset = Int(treePos.offset)
 
         if node.isText {
             if node.size == offset {
@@ -843,9 +829,9 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `indexOf` returns the index of the given tree position.
      */
-    public func indexOf(pos: TreePos<T>) throws -> Int {
+    public func indexOf(_ pos: TreePos<T>) throws -> Int {
         var node = pos.node
-        let offset = pos.offset
+        let offset = Int(pos.offset)
 
         var size = 0
         var depth = 1
@@ -881,8 +867,8 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `indexToPath` returns the path of the given index.
      */
-    public func indexToPath(index: Int) throws -> [Int] {
-        let treePos = try self.findTreePos(index: index)
-        return try self.treePosToPath(treePos: treePos)
+    public func indexToPath(_ index: Int) throws -> [Int] {
+        let treePos = try self.findTreePos(index)
+        return try self.treePosToPath(treePos)
     }
 }

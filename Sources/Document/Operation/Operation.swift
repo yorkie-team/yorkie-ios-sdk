@@ -139,9 +139,9 @@ public struct TreeEditOpInfo: OperationInfo {
     public let path: String
     public let from: Int
     public let to: Int
-    public let formPath: [Int]
+    public let fromPath: [Int]
     public let toPath: [Int]
-    public let value: TreeNode
+    public let value: [TreeNode]
 }
 
 public struct TreeStyleOpInfo: OperationInfo {
@@ -149,7 +149,7 @@ public struct TreeStyleOpInfo: OperationInfo {
     public let path: String
     public let from: Int
     public let to: Int
-    public let formPath: [Int]
+    public let fromPath: [Int]
     public let value: [String: String]
 }
 

@@ -69,7 +69,7 @@ class ChangeContextTests: XCTestCase {
         let changeID = ChangeID(clientSeq: 1, lamport: 2)
         let target = ChangeContext(id: changeID, root: root, message: "test message.")
 
-        let result = target.issueTimeTicket()
+        let result = target.issueTimeTicket
         XCTAssertEqual(result.structureAsString, "2:nil:1")
     }
 }

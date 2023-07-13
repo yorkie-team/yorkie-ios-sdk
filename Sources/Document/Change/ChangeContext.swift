@@ -82,7 +82,7 @@ class ChangeContext {
     /**
      * `issueTimeTicket` creates a time ticket to be used to create a new operation.
      */
-    func issueTimeTicket() -> TimeTicket {
+    var issueTimeTicket: TimeTicket {
         self.delimiter += 1
         return self.id.createTimeTicket(delimiter: self.delimiter)
     }
