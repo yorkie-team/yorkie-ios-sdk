@@ -343,6 +343,21 @@ final class CRDTTreeNode: IndexTreeNode {
                                        children: self.children.compactMap { $0.toJSONTreeNode })
         }
     }
+
+    var toJSONTreeNode: any JSONTreeNode {
+        if self.isText {
+            return TextNode(value: self.value)
+        } else {
+            var attrs = [String: String]()
+            self.attrs?.forEach {
+                attrs[$0.key] = $0.value
+            }
+
+            return ElementNode(type: self.type,
+                               attributes: attrs.isEmpty ? nil : attrs,
+                               children: self.children.compactMap { $0.toJSONTreeNode })
+        }
+    }
 }
 
 /**
