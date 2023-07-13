@@ -186,7 +186,7 @@ class JSONObjectTests: XCTestCase {
                            {"object":{"array":[{"id":200}],"id":100,"type":"struct"}}
                            """)
 
-            let array = root[keyPath: "object/.^/array"] as? JSONArray
+            let array = root[keyPath: "object.array"] as? JSONArray
             array!.append(JsonArrayTestType(id: 300))
 
             XCTAssertEqual(root.debugDescription,
@@ -222,7 +222,7 @@ class JSONObjectTests: XCTestCase {
                            {"object":{"first":{"second":{"third":{"value":"initial"}}}}}
                            """)
 
-            let third = root[keyPath: "object/.^/first/.^/second/.^/third"] as? JSONObject
+            let third = root[keyPath: "object.first.second.third"] as? JSONObject
             third!.value = "changed"
 
             XCTAssertEqual(root.debugDescription,

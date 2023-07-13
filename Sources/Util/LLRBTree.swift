@@ -26,19 +26,19 @@ import Foundation
  * Invariant 2: Every leaf path has the same number of black nodes
  * Invariant 3: Only the left child can be red (left leaning)
  */
-public class LLRBTree<K: Comparable, V> {
-    public typealias Entry<K, V> = (key: K, value: V)
+class LLRBTree<K: Comparable, V> {
+    typealias Entry<K, V> = (key: K, value: V)
 
     /**
      * `LLRBNode` is node of LLRBTree.
      */
     class Node<K, V>: CustomDebugStringConvertible {
-        public var key: K
-        public var value: V
-        public var parent: Node<K, V>?
-        public var left: Node<K, V>?
-        public var right: Node<K, V>?
-        public var isRed: Bool
+        var key: K
+        var value: V
+        var parent: Node<K, V>?
+        var left: Node<K, V>?
+        var right: Node<K, V>?
+        var isRed: Bool
 
         init(_ key: K, _ value: V, _ isRed: Bool) {
             self.key = key
@@ -66,7 +66,7 @@ public class LLRBTree<K: Comparable, V> {
      * `put` puts the value of the given key.
      */
     @discardableResult
-    public func put(_ key: K, _ value: V) -> V {
+    func put(_ key: K, _ value: V) -> V {
         self.root = self.putInternal(key, value, self.root)
         self.root?.isRed = false
 
@@ -76,14 +76,14 @@ public class LLRBTree<K: Comparable, V> {
     /**
      * `get` gets a value of the given key.
      */
-    public func get(_ key: K) -> V? {
+    func get(_ key: K) -> V? {
         self.getInternal(key, self.root)?.value
     }
 
     /**
      * `remove` removes a element of key.
      */
-    public func remove(_ key: K) {
+    func remove(_ key: K) {
         guard let root else {
             return
         }
@@ -97,7 +97,7 @@ public class LLRBTree<K: Comparable, V> {
         self.root?.isRed = false
     }
 
-    public var values: [V] {
+    var values: [V] {
         var result = [V]()
 
         self.traverseInorder(self.root, &result)
@@ -119,7 +119,7 @@ public class LLRBTree<K: Comparable, V> {
      * `floorEntry` returns the entry for the greatest key less than or equal to the
      *  given key. If there is no such key, returns `undefined`.
      */
-    public func floorEntry(_ key: K) -> Entry<K, V>? {
+    func floorEntry(_ key: K) -> Entry<K, V>? {
         var node = self.root
 
         while node != nil {
@@ -154,7 +154,7 @@ public class LLRBTree<K: Comparable, V> {
     /**
      * `lastEntry` returns last entry of LLRBTree.
      */
-    public func lastEntry() -> Entry<K, V>? {
+    func lastEntry() -> Entry<K, V>? {
         if self.root == nil {
             return nil
         }
@@ -169,18 +169,18 @@ public class LLRBTree<K: Comparable, V> {
     /**
      * `size` is a size of LLRBTree.
      */
-    public var size: Int {
+    var size: Int {
         self.counter
     }
 
     /**
      * `isEmpty` checks if size is empty.
      */
-    public var isEmpty: Bool {
+    var isEmpty: Bool {
         self.counter == 0
     }
 
-    public var minValue: V? {
+    var minValue: V? {
         guard let root else {
             return nil
         }
@@ -188,7 +188,7 @@ public class LLRBTree<K: Comparable, V> {
         return self.min(root).value
     }
 
-    public var maxValue: V? {
+    var maxValue: V? {
         guard let root else {
             return nil
         }
