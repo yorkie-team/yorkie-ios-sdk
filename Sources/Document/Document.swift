@@ -348,18 +348,26 @@ public actor Document {
      * `getValueByPath` returns the JSONElement corresponding to the given path.
      */
     public func getValueByPath(path: String) throws -> Any? {
-        guard path.starts(with: "$") else {
-            throw YorkieError.unexpected(message: "The path must start with \"$\"")
+        guard path.starts(with: JSONObject.rootKey) else {
+            throw YorkieError.unexpected(message: "The path must start with \(JSONObject.rootKey)")
         }
 
         let rootObject = self.getRoot()
 
-        if path == "$" {
+        if path == JSONObject.rootKey {
             return rootObject
         }
 
         var subPath = path
-        subPath.removeFirst(2) // remove root path "$."
+        subPath.removeFirst(JSONObject.rootKey.count) // remove root path("$")
+
+        let keySeparator = JSONObject.keySeparator
+
+        guard subPath.starts(with: keySeparator) else {
+            throw YorkieError.unexpected(message: "Invalid path.")
+        }
+
+        subPath.removeFirst(keySeparator.count)
 
         return rootObject.get(keyPath: subPath)
     }

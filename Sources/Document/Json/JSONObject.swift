@@ -22,7 +22,8 @@ import Foundation
  */
 @dynamicMemberLookup
 public class JSONObject {
-    private static let keySeparator = "/.^/"
+    static let rootKey = "$"
+    static let keySeparator = "."
     private let reservedCharacterForKey = JSONObject.keySeparator
     private func isValidKey(_ key: String) -> Bool {
         return key.contains(self.reservedCharacterForKey) == false
