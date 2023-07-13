@@ -47,7 +47,7 @@ public class JSONObject {
 
     func set<T>(key: String, value: T) {
         guard self.isValidKey(key) else {
-            Logger.error("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
+            assertionFailure("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
             return
         }
 
@@ -168,6 +168,11 @@ public class JSONObject {
     }
 
     public func get(key: String) -> Any? {
+        guard self.isValidKey(key) else {
+            assertionFailure("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
+            return nil
+        }
+
         guard let value = try? self.target.get(key: key) else {
             Logger.error("The value does not exist. - key: \(key)")
             return nil

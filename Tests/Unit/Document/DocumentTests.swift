@@ -845,11 +845,6 @@ class DocumentTests: XCTestCase {
             arr?.append(Int64(0))
             arr?.append(Int64(1))
             arr?.remove(index: 1)
-            root["$$...hello"] = [] as [Any]
-
-            // The key name can't contain "."
-            XCTAssertTrue(root["$$...hello"] == nil)
-
             root["$$hello"] = [] as [Any]
             let hello = root["$$hello"] as? JSONArray
             hello?.append(Int64(0))
