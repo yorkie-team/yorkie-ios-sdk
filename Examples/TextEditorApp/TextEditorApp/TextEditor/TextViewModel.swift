@@ -104,8 +104,13 @@ class TextViewModel {
     }
 
     func cleanup() async {
-        try! await self.client.detach(self.document)
-        try! await self.client.deactivate()
+        do {
+            try await self.client.detach(self.document)
+            try await self.client.deactivate()
+        } catch {
+            // handle error
+//            print(error.localizedDescription)
+        }
     }
 
     func edit(_ operaitions: [TextOperation]) async {
