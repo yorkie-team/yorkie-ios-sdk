@@ -408,7 +408,7 @@ extension Converter {
             pbTreeEditOperation.parentCreatedAt = toTimeTicket(treeEditOperation.parentCreatedAt)
             pbTreeEditOperation.from = toTreePos(treeEditOperation.fromPos)
             pbTreeEditOperation.to = toTreePos(treeEditOperation.toPos)
-            pbTreeEditOperation.contents = toTreeNodesWhenEdit(treeEditOperation.contents)
+            pbTreeEditOperation.content = toTreeNodes(treeEditOperation.contents![0])
             pbTreeEditOperation.executedAt = toTimeTicket(treeEditOperation.executedAt)
             pbOperation.treeEdit = pbTreeEditOperation
         } else if let treeStyleOperation = operation as? TreeStyleOperation {
@@ -486,10 +486,10 @@ extension Converter {
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
-                return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
+                return try TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
                                          toPos: fromTreePos(pbTreeEditOperation.to),
-                                         contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
+                                         contents: [fromTreeNodes(pbTreeEditOperation.content)!],
                                          executedAt: fromTimeTicket(pbTreeEditOperation.executedAt))
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
                 return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
@@ -837,11 +837,11 @@ extension Converter {
         
         return pbTreePos
     }
-
+/*
     /**
      * `toTreeNodesWhenEdit` converts the given model to Protobuf format.
      */
-    static func toTreeNodesWhenEdit(_ nodes: [CRDTTreeNode]?) -> [PbTreeNodes] {
+    static func toTreeNodesWhenEdit(_ nodes: [CRDTTreeNode]?) -> [PbTreeNode] {
         guard let nodes else {
             return []
         }
@@ -853,7 +853,7 @@ extension Converter {
             return pbTreeNodes
         }
     }
-
+*/
     /**
      * `toTreeNodes` converts the given model to Protobuf format.
      */
@@ -893,11 +893,11 @@ extension Converter {
     static func fromTreePos(_ pbTreePos: PbTreePos) -> CRDTTreePos {
         CRDTTreePos(createdAt: fromTimeTicket(pbTreePos.createdAt), offset: pbTreePos.offset)
     }
-
+/*
     /**
      * `fromTreeNodesWhenEdit` converts the given Protobuf format to model format.
      */
-    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNodes]) -> [CRDTTreeNode]? {
+    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNode]) -> [CRDTTreeNode]? {
         guard pbTreeNodes.isEmpty == false else {
             return nil
         }
@@ -905,6 +905,7 @@ extension Converter {
         return pbTreeNodes.compactMap { try? fromTreeNodes($0.content) }
     }
 
+    */
     /**
      * `fromTreeNodes` converts the given Protobuf format to model format.
      */
