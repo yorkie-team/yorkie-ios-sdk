@@ -313,7 +313,7 @@ public actor Document {
             removeds:\(self.root.removedElementSetSize)
             """)
 
-        Logger.trace(changes.map { "\($0.id.structureAsString)\t\($0.structureAsString)" }.joined(separator: "\n"))
+        Logger.trace(changes.map { "\($0.id.toTestString)\t\($0.toTestString)" }.joined(separator: "\n"))
 
         let clone = self.cloned
         try changes.forEach {

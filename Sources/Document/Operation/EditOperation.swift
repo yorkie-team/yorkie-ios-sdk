@@ -100,12 +100,12 @@ struct EditOperation: Operation {
     }
 
     /**
-     * `getStructureAsString` returns a string containing the meta data.
+     * `toTestString` returns a string containing the meta data.
      */
-    internal var structureAsString: String {
-        let parent = self.parentCreatedAt.structureAsString
-        let fromPos = self.fromPos.structureAsString
-        let toPos = self.toPos.structureAsString
+    internal var toTestString: String {
+        let parent = self.parentCreatedAt.toTestString
+        let fromPos = self.fromPos.toTestString
+        let toPos = self.toPos.toTestString
         let content = self.content
         return "\(parent).EDIT(\(fromPos),\(toPos),\(content)"
     }

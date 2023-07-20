@@ -65,7 +65,7 @@ public class JSONText {
             return false
         }
 
-        Logger.debug("EDIT: f:\(fromIdx)->\(range.0.structureAsString), t:\(toIdx)->\(range.1.structureAsString) c:\(content)")
+        Logger.debug("EDIT: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) c:\(content)")
 
         let ticket = context.issueTimeTicket
         guard let maxCreatedAtMapByActor = try? text.edit(range, content, ticket, attributes) else {
@@ -110,7 +110,7 @@ public class JSONText {
             return false
         }
 
-        Logger.debug("STYL: f:\(fromIdx)->\(range.0.structureAsString), t:\(toIdx)->\(range.1.structureAsString) a:\(attributes)")
+        Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
         let ticket = context.issueTimeTicket
         do {
@@ -144,7 +144,7 @@ public class JSONText {
             return false
         }
 
-        Logger.debug("SELT: f:\(fromIdx)->\(range.0.structureAsString), t:\(toIdx)->\(range.1.structureAsString)")
+        Logger.debug("SELT: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString)")
 
         let ticket = context.issueTimeTicket
         do {
@@ -160,16 +160,16 @@ public class JSONText {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data of the node
+     * `toTestString` returns a String containing the meta data of the node
      * for debugging purpose.
      */
-    public var structureAsString: String {
+    public var toTestString: String {
         guard self.context != nil, let text else {
             Logger.critical("it is not initialized yet")
             return ""
         }
 
-        return text.structureAsString
+        return text.toTestString
     }
 
     public var plainText: String {

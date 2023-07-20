@@ -93,12 +93,12 @@ struct TreeEditOperation: Operation {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data.
+     * `toTestString` returns a string containing the meta data.
      */
-    public var structureAsString: String {
-        let parent = self.parentCreatedAt.structureAsString
-        let fromPos = "\(self.fromPos.createdAt.structureAsString):\(self.fromPos.offset)"
-        let toPos = "\(self.toPos.createdAt.structureAsString):\(self.toPos.offset)"
+    public var toTestString: String {
+        let parent = self.parentCreatedAt.toTestString
+        let fromPos = "\(self.fromPos.createdAt.toTestString):\(self.fromPos.offset)"
+        let toPos = "\(self.toPos.createdAt.toTestString):\(self.toPos.offset)"
 
         return "\(parent).EDIT(\(fromPos),\(toPos),\(self.contents?.map { "\($0)" }.joined(separator: ",") ?? ""))"
     }

@@ -903,7 +903,7 @@ public actor Client {
             self.eventStream.send(event)
 
             let remoteSize = responsePack.getChangeSize()
-            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().structureAsString)")
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {

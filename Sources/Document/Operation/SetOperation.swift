@@ -73,9 +73,9 @@ struct SetOperation: Operation {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data.
+     * `toTestString` returns a String containing the meta data.
      */
-    var structureAsString: String {
-        return "\(self.parentCreatedAt.structureAsString).SET"
+    var toTestString: String {
+        return "\(self.parentCreatedAt.toTestString).SET"
     }
 }

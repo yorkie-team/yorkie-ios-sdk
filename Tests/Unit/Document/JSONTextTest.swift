@@ -38,22 +38,22 @@ final class JSONTextTest: XCTestCase {
         }
 
         try await doc.update { root in
-            XCTAssertEqual("[0:00:0:0 ][1:00:2:0 A][1:00:3:0 12]{1:00:2:1 BC}[1:00:2:3 D]", (root.k1 as? JSONText)?.structureAsString)
+            XCTAssertEqual("[0:00:0:0 ][1:00:2:0 A][1:00:3:0 12]{1:00:2:1 BC}[1:00:2:3 D]", (root.k1 as? JSONText)?.toTestString)
 
             var range = (root.k1 as? JSONText)?.createRange(0, 0)
-            XCTAssertEqual("0:00:0:0:0", range?.0.structureAsString)
+            XCTAssertEqual("0:00:0:0:0", range?.0.toTestString)
 
             range = (root.k1 as? JSONText)!.createRange(1, 1)
-            XCTAssertEqual("1:00:2:0:1", range?.0.structureAsString)
+            XCTAssertEqual("1:00:2:0:1", range?.0.toTestString)
 
             range = (root.k1 as? JSONText)!.createRange(2, 2)
-            XCTAssertEqual("1:00:3:0:1", range?.0.structureAsString)
+            XCTAssertEqual("1:00:3:0:1", range?.0.toTestString)
 
             range = (root.k1 as? JSONText)!.createRange(3, 3)
-            XCTAssertEqual("1:00:3:0:2", range?.0.structureAsString)
+            XCTAssertEqual("1:00:3:0:2", range?.0.toTestString)
 
             range = (root.k1 as? JSONText)!.createRange(4, 4)
-            XCTAssertEqual("1:00:2:3:1", range?.0.structureAsString)
+            XCTAssertEqual("1:00:2:3:1", range?.0.toTestString)
         }
 
         docContent = await doc.toSortedJSON()
@@ -79,7 +79,7 @@ final class JSONTextTest: XCTestCase {
         try await doc.update { root in
             XCTAssertEqual(
                 "[0:00:0:0 ][1:00:2:0 ABC][1:00:3:0 \n][1:00:2:3 D]",
-                (root.k1 as? JSONText)?.structureAsString
+                (root.k1 as? JSONText)?.toTestString
             )
         }
 
@@ -230,7 +230,7 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in
             XCTAssertEqual("[0:00:0:0 ][1:00:2:0 ABC][1:00:3:0 \n][1:00:2:3 D]",
-                           (root.k1 as? JSONText)?.structureAsString)
+                           (root.k1 as? JSONText)?.toTestString)
         }
 
         docContent = await doc.toSortedJSON()

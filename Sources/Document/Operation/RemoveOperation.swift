@@ -69,9 +69,9 @@ struct RemoveOperation: Operation {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data.
+     * `toTestString` returns a string containing the meta data.
      */
-    var structureAsString: String {
-        return "\(self.parentCreatedAt.structureAsString).REMOVE"
+    var toTestString: String {
+        return "\(self.parentCreatedAt.toTestString).REMOVE"
     }
 }

@@ -60,11 +60,11 @@ struct Change {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data of this change.
+     * `toTestString` returns a String containing the meta data of this change.
      */
-    var structureAsString: String {
+    var toTestString: String {
         return self.operations
-            .map { $0.structureAsString }
+            .map { $0.toTestString }
             .joined(separator: ",")
     }
 }

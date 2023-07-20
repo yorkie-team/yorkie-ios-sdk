@@ -86,15 +86,22 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     }
 
     /**
-     * `structureAsString` returns a String containing
+     * `toTestString` returns a String containing
      * the meta data of the node id for debugging purpose.
      */
-    public var structureAsString: String {
-        "\(self.createdAt.structureAsString):\(self.offset)"
+    public var toTestString: String {
+        "\(self.createdAt.toTestString):\(self.offset)"
+    }
+
+    /**
+     * `toIDString` returns a string that can be used as an ID for this node id.
+     */
+    public var toIDString: String {
+        "\(self.createdAt.toIDString):\(self.offset)"
     }
 
     var debugDescription: String {
-        self.structureAsString
+        self.toTestString
     }
 }
 
@@ -125,11 +132,11 @@ class RGATreeSplitNodePos: Equatable {
     }
 
     /**
-     *`structureAsString` returns a String containing
+     *`toTestString` returns a String containing
      * the meta data of the position for debugging purpose.
      */
-    var structureAsString: String {
-        "\(self.id.structureAsString):\(self.relativeOffset)"
+    var toTestString: String {
+        "\(self.id.toTestString):\(self.relativeOffset)"
     }
 
     /**
@@ -317,11 +324,11 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
-     * `structureAsString` returns a String containing
+     * `toTestString` returns a String containing
      * the meta data of the node for debugging purpose.
      */
-    public var structureAsString: String {
-        "\(self.id.structureAsString) \(String(describing: self.value))"
+    public var toTestString: String {
+        "\(self.id.toTestString) \(String(describing: self.value))"
     }
 
     private func splitValue(_ offset: Int32) -> T {
@@ -435,7 +442,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     public func findIdxFromNodePos(_ pos: RGATreeSplitNodePos, _ preferToLeft: Bool) throws -> Int {
         let absoluteID = pos.absoluteID
         guard let node = preferToLeft ? try? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
-            let message = "the node of the given id should be found: \(absoluteID.structureAsString)"
+            let message = "the node of the given id should be found: \(absoluteID.toTestString)"
             Logger.critical(message)
             throw YorkieError.noSuchElement(message: message)
         }
@@ -506,17 +513,17 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data of the node
+     * `toTestString` returns a String containing the meta data of the node
      * for debugging purpose.
      */
-    public var structureAsString: String {
+    public var toTestString: String {
         var result = [String]()
 
         self.forEach {
             if !$0.isRemoved {
-                result.append("[\($0.structureAsString)]")
+                result.append("[\($0.toTestString)]")
             } else {
-                result.append("{\($0.structureAsString)}")
+                result.append("{\($0.toTestString)}")
             }
         }
 
@@ -560,7 +567,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
     private func findFloorNodePreferToLeft(_ id: RGATreeSplitNodeID) throws -> RGATreeSplitNode<T> {
         guard let node = self.findFloorNode(id) else {
-            let message = "the node of the given id should be found: \(id.structureAsString)"
+            let message = "the node of the given id should be found: \(id.toTestString)"
             Logger.critical(message)
             throw YorkieError.noSuchElement(message: message)
         }
@@ -657,7 +664,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     createdAtMapByActor[actorID] = node.id.createdAt
                 }
             }
-            removedNodeMap[node.id.structureAsString] = node
+            removedNodeMap[node.id.toTestString] = node
             node.remove(editedAt)
         }
         // Finally remove index nodes of tombstones.
@@ -785,7 +792,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 self.treeByIndex.delete(node)
                 self.purge(node)
                 self.treeByID.remove(node.id)
-                self.removedNodeMap.removeValue(forKey: node.id.structureAsString)
+                self.removedNodeMap.removeValue(forKey: node.id.toTestString)
                 count += 1
             }
         }

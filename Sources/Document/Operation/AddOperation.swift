@@ -72,9 +72,9 @@ struct AddOperation: Operation {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data.
+     * `toTestString` returns a string containing the meta data.
      */
-    var structureAsString: String {
-        return "\(self.parentCreatedAt.structureAsString).ADD"
+    var toTestString: String {
+        return "\(self.parentCreatedAt.toTestString).ADD"
     }
 }

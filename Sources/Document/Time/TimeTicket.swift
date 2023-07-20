@@ -54,7 +54,7 @@ public struct TimeTicket: Comparable {
     /**
      * `toIDString` returns the lamport string for this Ticket.
      */
-    private func toIDString() -> String {
+    var toIDString: String {
         guard let actorID = self.actorID else {
             return "\(self.lamport):nil:\(self.delimiter)"
         }
@@ -62,10 +62,10 @@ public struct TimeTicket: Comparable {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data of the ticket
+     * `toTestString` returns a string containing the meta data of the ticket
      * for debugging purpose.
      */
-    var structureAsString: String {
+    var toTestString: String {
         guard let actorID = self.actorID else {
             return "\(self.lamport):nil:\(self.delimiter)"
         }
@@ -118,12 +118,12 @@ public struct TimeTicket: Comparable {
 
 extension TimeTicket: Hashable {
     public static func == (lhs: TimeTicket, rhs: TimeTicket) -> Bool {
-        return lhs.toIDString() == rhs.toIDString()
+        return lhs.toIDString == rhs.toIDString
     }
 }
 
 extension TimeTicket: CustomStringConvertible {
     public var description: String {
-        self.toIDString()
+        self.toIDString
     }
 }

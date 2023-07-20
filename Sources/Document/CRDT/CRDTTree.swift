@@ -121,6 +121,13 @@ struct CRDTTreePos: Equatable, Comparable {
      */
     let offset: Int32
 
+    /**
+     * `toIDString` returns a string that can be used as an ID for this position.
+     */
+    var toIDString: String {
+        "\(self.createdAt.toIDString):\(self.offset)"
+    }
+
     static func < (lhs: CRDTTreePos, rhs: CRDTTreePos) -> Bool {
         if lhs.createdAt == rhs.createdAt {
             return lhs.offset < rhs.offset
@@ -316,10 +323,6 @@ final class CRDTTreeNode: IndexTreeNode {
                                    size: node.size,
                                    isRemoved: node.isRemoved)
         }
-    }
-
-    var key: String {
-        "\(self.createdAt.structureAsString):\(self.pos.offset)"
     }
 
     var toJSONTreeNode: any JSONTreeNode {
@@ -555,7 +558,7 @@ class CRDTTree: CRDTGCElement {
                 node.remove(editedAt)
 
                 if node.isRemoved {
-                    self.removedNodeMap[node.key] = node
+                    self.removedNodeMap[node.pos.toIDString] = node
                 }
             }
 
@@ -675,7 +678,7 @@ class CRDTTree: CRDTGCElement {
         nodesToRemoved.forEach { node in
             self.nodeMapByPos.remove(node.pos)
             self.purge(node)
-            self.removedNodeMap.removeValue(forKey: node.key)
+            self.removedNodeMap.removeValue(forKey: node.pos.toIDString)
         }
 
         return count

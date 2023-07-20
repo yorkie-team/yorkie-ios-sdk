@@ -169,9 +169,9 @@ protocol Operation {
     var effectedCreatedAt: TimeTicket { get }
 
     /**
-     * `structureAsString` returns a string containing the meta data.
+     * `toTestString` returns a string containing the meta data.
      */
-    var structureAsString: String { get }
+    var toTestString: String { get }
 
     /**
      * `execute` executes this operation on the given document(`root`).

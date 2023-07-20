@@ -322,11 +322,11 @@ final class CRDTText: CRDTGCElement {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data of this value
+     * `toTestString` returns a String containing the meta data of this value
      * for debugging purpose.
      */
-    public var structureAsString: String {
-        self.rgaTreeSplit.structureAsString
+    public var toTestString: String {
+        self.rgaTreeSplit.toTestString
     }
 
     public var plainText: String {
