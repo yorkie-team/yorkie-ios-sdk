@@ -267,7 +267,7 @@ public class JSONTree {
     /**
      * `editByPath` edits this tree with the given node and path.
      */
-    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)?) throws -> Bool {
+    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -280,21 +280,16 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "path should not be empty")
         }
 
-        // For 0.4.5
-//        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
-        var crdtNode: [CRDTTreeNode]?
-        if let content {
-            crdtNode = try [createCRDTTreeNode(context: context, content: content)]
-        }
+        let crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
         let ticket = context.lastTimeTicket
-        try tree.edit((fromPos, toPos), crdtNode?.compactMap { $0.deepcopy() }, ticket)
+        try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
-                                                  contents: crdtNode,
+                                                  contents: (crdtNodes?.isEmpty ?? true) ? nil : crdtNodes,
                                                   executedAt: ticket)
         )
 
@@ -309,7 +304,7 @@ public class JSONTree {
      * `edit` edits this tree with the given node.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: (any JSONTreeNode)? = nil) throws -> Bool {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -318,21 +313,16 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "from should be less than or equal to to")
         }
 
-        // For 0.4.5
-//        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
-        var crdtNode: [CRDTTreeNode]?
-        if let content {
-            crdtNode = try [createCRDTTreeNode(context: context, content: content)]
-        }
+        let crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
         let ticket = context.lastTimeTicket
-        try tree.edit((fromPos, toPos), crdtNode?.compactMap { $0.deepcopy() }, ticket)
+        try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
-                                                  contents: crdtNode,
+                                                  contents: (crdtNodes?.isEmpty ?? true) ? nil : crdtNodes,
                                                   executedAt: ticket)
         )
 

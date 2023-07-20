@@ -830,7 +830,7 @@ struct Yorkie_V1_Operation {
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     mutating func clearTo() {self._to = nil}
 
-    var content: [Yorkie_V1_TreeNode] = []
+    var contents: [Yorkie_V1_TreeNodes] = []
 
     var executedAt: Yorkie_V1_TimeTicket {
       get {return _executedAt ?? Yorkie_V1_TimeTicket()}
@@ -1511,6 +1511,18 @@ struct Yorkie_V1_TreeNode {
   fileprivate var _insPrevPos: Yorkie_V1_TreePos? = nil
 }
 
+struct Yorkie_V1_TreeNodes {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var content: [Yorkie_V1_TreeNode] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct Yorkie_V1_TreePos {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1864,6 +1876,7 @@ extension Yorkie_V1_NodeAttr: @unchecked Sendable {}
 extension Yorkie_V1_TextNode: @unchecked Sendable {}
 extension Yorkie_V1_TextNodeID: @unchecked Sendable {}
 extension Yorkie_V1_TreeNode: @unchecked Sendable {}
+extension Yorkie_V1_TreeNodes: @unchecked Sendable {}
 extension Yorkie_V1_TreePos: @unchecked Sendable {}
 extension Yorkie_V1_User: @unchecked Sendable {}
 extension Yorkie_V1_Project: @unchecked Sendable {}
@@ -2934,7 +2947,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     1: .standard(proto: "parent_created_at"),
     2: .same(proto: "from"),
     3: .same(proto: "to"),
-    4: .same(proto: "content"),
+    4: .same(proto: "contents"),
     5: .standard(proto: "executed_at"),
   ]
 
@@ -2947,7 +2960,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       case 1: try { try decoder.decodeSingularMessageField(value: &self._parentCreatedAt) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._from) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._to) }()
-      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.content) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.contents) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._executedAt) }()
       default: break
       }
@@ -2968,8 +2981,8 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     try { if let v = self._to {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
-    if !self.content.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.content, fieldNumber: 4)
+    if !self.contents.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.contents, fieldNumber: 4)
     }
     try { if let v = self._executedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
@@ -2981,7 +2994,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     if lhs._parentCreatedAt != rhs._parentCreatedAt {return false}
     if lhs._from != rhs._from {return false}
     if lhs._to != rhs._to {return false}
-    if lhs.content != rhs.content {return false}
+    if lhs.contents != rhs.contents {return false}
     if lhs._executedAt != rhs._executedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -3915,6 +3928,38 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs._insPrevPos != rhs._insPrevPos {return false}
     if lhs.depth != rhs.depth {return false}
     if lhs.attributes != rhs.attributes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_TreeNodes: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".TreeNodes"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "content"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.content) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.content.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.content, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Yorkie_V1_TreeNodes, rhs: Yorkie_V1_TreeNodes) -> Bool {
+    if lhs.content != rhs.content {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
