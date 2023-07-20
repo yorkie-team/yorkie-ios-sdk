@@ -258,16 +258,16 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "path should not be empty")
         }
 
-        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        let crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
         let ticket = context.lastTimeTicket
-        try tree.edit((fromPos, toPos), crdtNode?.compactMap { $0.deepcopy() }, ticket)
+        try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
-                                                  contents: crdtNode,
+                                                  contents: (crdtNodes?.isEmpty ?? true) ? nil : crdtNodes,
                                                   executedAt: ticket)
         )
 
@@ -291,16 +291,16 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "from should be less than or equal to to")
         }
 
-        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        let crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
         let ticket = context.lastTimeTicket
-        try tree.edit((fromPos, toPos), crdtNode?.compactMap { $0.deepcopy() }, ticket)
+        try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
-                                                  contents: crdtNode,
+                                                  contents: (crdtNodes?.isEmpty ?? true) ? nil : crdtNodes,
                                                   executedAt: ticket)
         )
 
