@@ -359,17 +359,6 @@ public class JSONTree {
     }
 
     /**
-     * `pathToIndex` returns the index of given path.
-     */
-    public func pathToIndex(_ path: [Int]) throws -> Int {
-        guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
-        }
-
-        return try tree.pathToIndex(path)
-    }
-
-    /**
      * `createRange` returns pair of CRDTTreePos of the given integer offsets.
      */
     func createRange(_ fromIdx: Int, _ toIdx: Int) throws -> TreeRange? {
