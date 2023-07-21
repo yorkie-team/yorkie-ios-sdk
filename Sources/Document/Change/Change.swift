@@ -19,7 +19,7 @@ import Foundation
 /**
  * `Change` represents a unit of modification in the document.
  */
-struct Change {
+public struct Change {
     /// The ID of this change.
     private(set) var id: ChangeID
 

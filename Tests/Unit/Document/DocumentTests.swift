@@ -728,9 +728,21 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_object() async throws {
         let target = Document(key: "test-doc")
 
+        var eventCount = 0
+        let paths = [["$", "$.", "$..obj"], ["$..obj", "$..obj", "$..obj", "$."]]
+
         await target.subscribe { event in
             XCTAssertEqual(event.type, .localChange)
-            XCTAssertEqual((event as? LocalChangeEvent)?.value.operations.compactMap { $0.path }, ["$", "$.", "$..obj", "$..obj", "$..obj", "$..obj", "$."])
+            XCTAssertEqual((event as? LocalChangeEvent)?.value.operations.compactMap { $0.path }, paths[eventCount])
+            eventCount += 1
+        }
+
+        await target.subscribe(targetPath: "$.") { _ in
+            Task {
+                let array = try? await target.getValueByPath(path: "$.") as? JSONObject
+
+                XCTAssertTrue(array != nil)
+            }
         }
 
         try await target.update { root in
@@ -756,6 +768,15 @@ class DocumentTests: XCTestCase {
                            """
                            {"":{"obj":{"a":1}}}
                            """)
+        }
+
+        let value = try await target.getValueByPath(path: "$..obj.a") as? Int64
+
+        XCTAssertEqual(value, 1)
+
+        try await target.update { root in
+            let emptyKey = root[""] as? JSONObject
+            let obj = emptyKey!.obj as? JSONObject
 
             obj!.remove(key: "a")
 
@@ -764,14 +785,14 @@ class DocumentTests: XCTestCase {
                            {"":{"obj":{}}}
                            """)
 
-            obj!["$.hello"] = Int64(1)
+            obj!["$hello"] = Int64(1)
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"":{"obj":{"$.hello":1}}}
+                           {"":{"obj":{"$hello":1}}}
                            """)
 
-            obj!.remove(key: "$.hello")
+            obj!.remove(key: "$hello")
 
             XCTAssertEqual(root.debugDescription,
                            """
@@ -799,8 +820,8 @@ class DocumentTests: XCTestCase {
                 XCTAssertEqual(ops[1] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 0))
                 XCTAssertEqual(ops[2] as! AddOpInfo, AddOpInfo(path: "$.arr", index: 1))
                 XCTAssertEqual(ops[3] as! RemoveOpInfo, RemoveOpInfo(path: "$.arr", key: nil, index: 1))
-                XCTAssertEqual(ops[4] as! SetOpInfo, SetOpInfo(path: "$", key: "$$...hello"))
-                XCTAssertEqual(ops[5] as! AddOpInfo, AddOpInfo(path: "$.$$...hello", index: 0))
+                XCTAssertEqual(ops[4] as! SetOpInfo, SetOpInfo(path: "$", key: "$$hello"))
+                XCTAssertEqual(ops[5] as! AddOpInfo, AddOpInfo(path: "$.$$hello", index: 0))
             } else {
                 XCTAssert(false, "No operations.")
             }
@@ -824,13 +845,13 @@ class DocumentTests: XCTestCase {
             arr?.append(Int64(0))
             arr?.append(Int64(1))
             arr?.remove(index: 1)
-            root["$$...hello"] = [] as [String]
-            let hello = root["$$...hello"] as? JSONArray
+            root["$$hello"] = [] as [Any]
+            let hello = root["$$hello"] as? JSONArray
             hello?.append(Int64(0))
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"$$...hello":[0],"arr":[0]}
+                           {"$$hello":[0],"arr":[0]}
                            """)
         }
     }
@@ -857,6 +878,10 @@ class DocumentTests: XCTestCase {
             (root.cnt as? JSONCounter<Int64>)?.increase(value: 10)
             (root.cnt as? JSONCounter<Int64>)?.increase(value: -3)
         }
+
+        let cnt = try await target.getValueByPath(path: "$.cnt") as? JSONCounter<Int64>
+
+        XCTAssertEqual(cnt?.value, 8)
     }
 
     func test_change_paths_test_for_text() async throws {
@@ -880,6 +905,10 @@ class DocumentTests: XCTestCase {
             (root.text as? JSONText)?.edit(0, 0, "hello world")
             (root.text as? JSONText)?.select(0, 2)
         }
+
+        let text = try await target.getValueByPath(path: "$.text") as? JSONText
+
+        XCTAssertEqual(text?.plainText, "hello world")
     }
 
     func test_change_paths_test_for_text_with_attributes() async throws {
