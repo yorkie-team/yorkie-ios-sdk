@@ -507,7 +507,7 @@ public actor Client {
      * `pauseRemoteChanges` pauses the synchronization of remote changes,
      * allowing only local changes to be applied.
      */
-    public func pauseRemoteChanges(doc: Document) throws {
+    public func pauseRemoteChanges(_ doc: Document) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -525,7 +525,7 @@ public actor Client {
      * `resumeRemoteChanges` resumes the synchronization of remote changes,
      * allowing both local and remote changes to be applied.
      */
-    public func resumeRemoteChanges(doc: Document) throws {
+    public func resumeRemoteChanges(_ doc: Document) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -607,14 +607,14 @@ public actor Client {
     /**
      * `getPeerPresence` returns the presence of the given document and client.
      */
-    public func getPeerPresence(docKey: DocumentKey, clientID: ActorID) -> Presence? {
+    public func getPeerPresence(_ docKey: DocumentKey, _ clientID: ActorID) -> Presence? {
         self.attachmentMap[docKey]?.getPresence(clientID: clientID)
     }
 
     /**
      * `getPeersByDocKey` returns the peers of the given document.
      */
-    public func getPeersByDocKey(docKey: DocumentKey) throws -> PresenceMap {
+    public func getPeersByDocKey(_ docKey: DocumentKey) throws -> PresenceMap {
         guard let attachment = self.attachmentMap[docKey] else {
             throw YorkieError.documentNotAttached(message: "\(docKey) is not attached when \(#function).")
         }

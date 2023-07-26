@@ -80,7 +80,7 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject) -> Void, message: String? = nil) throws {
+    public func update(_ updater: (_ root: JSONObject) -> Void, _ message: String? = nil) throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -113,7 +113,7 @@ public actor Document {
      * `subscribe` registers a callback to subscribe to events on the document.
      * The callback will be called when the targetPath or any of its nested values change.
      */
-    public func subscribe(targetPath: String? = nil, callback: @escaping (DocEvent) -> Void) {
+    public func subscribe(_ targetPath: String? = nil, _ callback: @escaping (DocEvent) -> Void) {
         if let targetPath {
             self.subscribeCallbacks[targetPath] = callback
         } else {
@@ -124,7 +124,7 @@ public actor Document {
     /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
-    public func unsubscribe(targetPath: String? = nil) {
+    public func unsubscribe(_ targetPath: String? = nil) {
         if let targetPath {
             self.subscribeCallbacks[targetPath] = nil
         } else {
@@ -142,9 +142,9 @@ public actor Document {
      */
     func applyChangePack(_ pack: ChangePack) throws {
         if let snapshot = pack.getSnapshot() {
-            try self.applySnapshot(serverSeq: pack.getCheckpoint().getServerSeq(), snapshot: snapshot)
+            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
         } else if pack.hasChanges() {
-            try self.applyChanges(changes: pack.getChanges())
+            try self.applyChanges(pack.getChanges())
         }
 
         // 01. Remove local changes applied to server.
@@ -290,7 +290,7 @@ public actor Document {
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    public func applySnapshot(serverSeq: Int64, snapshot: Data) throws {
+    public func applySnapshot(_ serverSeq: Int64, _ snapshot: Data) throws {
         let obj = try Converter.bytesToObject(bytes: snapshot)
         self.root = CRDTRoot(rootObject: obj)
         self.changeID.syncLamport(with: serverSeq)
@@ -305,7 +305,7 @@ public actor Document {
     /**
      * `applyChanges` applies the given changes into this document.
      */
-    public func applyChanges(changes: [Change]) throws {
+    public func applyChanges(_ changes: [Change]) throws {
         Logger.debug(
             """
             trying to apply \(changes.count) remote changes.
@@ -351,7 +351,7 @@ public actor Document {
     /**
      * `getValueByPath` returns the JSONElement corresponding to the given path.
      */
-    public func getValueByPath(path: String) throws -> Any? {
+    public func getValueByPath(_ path: String) throws -> Any? {
         guard path.starts(with: JSONObject.rootKey) else {
             throw YorkieError.unexpected(message: "The path must start with \(JSONObject.rootKey)")
         }

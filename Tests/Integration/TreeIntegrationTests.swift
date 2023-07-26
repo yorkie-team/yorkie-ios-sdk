@@ -216,7 +216,7 @@ final class TreeIntegrationTests: XCTestCase {
 
         var treeOperations = [TreeEditOpInfo]()
 
-        await doc.subscribe(targetPath: "$.t") { event in
+        await doc.subscribe("$.t") { event in
             if let event = event as? LocalChangeEvent {
                 treeOperations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
             }
@@ -259,7 +259,7 @@ final class TreeIntegrationTests: XCTestCase {
 
         var treeOperations = [TreeEditOpInfo]()
 
-        await doc.subscribe(targetPath: "$.t") { event in
+        await doc.subscribe("$.t") { event in
             if let event = event as? LocalChangeEvent {
                 treeOperations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
             }
