@@ -854,7 +854,7 @@ public actor Client {
 
     private func disconnectWatchStream(_ docKey: DocumentKey) throws {
         guard self.attachmentMap[docKey] != nil else {
-            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached when \(#function).")
+            return
         }
 
         guard self.attachmentMap[docKey]?.remoteWatchStream != nil else {

@@ -113,7 +113,7 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        await doc.subscribe(targetPath: "$.text") {
+        await doc.subscribe("$.text") {
             view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
         }
 
@@ -140,7 +140,7 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        await doc.subscribe(targetPath: "$.text") {
+        await doc.subscribe("$.text") {
             view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
         }
 
@@ -175,7 +175,7 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root in root.text = JSONText() }
 
-        await doc.subscribe(targetPath: "$.text") {
+        await doc.subscribe("$.text") {
             view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
         }
 
@@ -209,7 +209,7 @@ final class JSONTextTest: XCTestCase {
             (root.text as? JSONText)?.edit(0, 0, "ABCD")
         }
 
-        await doc.subscribe(targetPath: "$.text") { event in
+        await doc.subscribe("$.text") { event in
             XCTAssertEqual((event as! ChangeEvent).value.operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
         }
 
