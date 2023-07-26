@@ -22,6 +22,7 @@
 		9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */; };
 		9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC744292DD82500C89478 /* YorkieCountable.swift */; };
 		9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
+		9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */ = {isa = PBXBuildFile; productRef = 9A5D9DDB2A710FB40096C40C /* Semaphore */; };
 		9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A6294C7E1E00BF27F5 /* Logging */; };
 		9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */; };
 		9A66B1A02955833E00D10B94 /* LLRBTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19F2955833E00D10B94 /* LLRBTree.swift */; };
@@ -252,6 +253,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */,
+				9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */,
 				CEEB17E828C84D6A004988DD /* GRPC in Frameworks */,
 				CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */,
 			);
@@ -660,6 +662,7 @@
 				CEEB17E728C84D6A004988DD /* GRPC */,
 				CEEB17EA28C84D7B004988DD /* SwiftProtobuf */,
 				9A6399A6294C7E1E00BF27F5 /* Logging */,
+				9A5D9DDB2A710FB40096C40C /* Semaphore */,
 			);
 			productName = Yorkie;
 			productReference = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */;
@@ -714,6 +717,7 @@
 				CEEB17E628C84D6A004988DD /* XCRemoteSwiftPackageReference "grpc-swift" */,
 				CEEB17E928C84D7B004988DD /* XCRemoteSwiftPackageReference "swift-protobuf" */,
 				9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */,
+				9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */,
 			);
 			productRefGroup = 96DA808328C5B7B400E2C1DA /* Products */;
 			projectDirPath = "";
@@ -1158,6 +1162,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/Semaphore.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.8;
+			};
+		};
 		9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-log.git";
@@ -1185,6 +1197,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9A5D9DDB2A710FB40096C40C /* Semaphore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */;
+			productName = Semaphore;
+		};
 		9A6399A6294C7E1E00BF27F5 /* Logging */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */;

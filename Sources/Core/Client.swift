@@ -19,6 +19,7 @@ import Foundation
 import GRPC
 import Logging
 import NIO
+import Semaphore
 
 public typealias PresenceMap = [ActorID: Presence]
 
@@ -191,6 +192,7 @@ public actor Client {
     private let group: EventLoopGroup
 
     private var semaphoresForInitialzation = [DocumentKey: DispatchSemaphore]()
+    private let syncSemaphore = AsyncSemaphore(value: 1)
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -544,21 +546,18 @@ public actor Client {
      * local documents.
      */
     @discardableResult
-    public func sync(_ syncModes: [DocumentKey: SyncMode] = [:]) async throws -> [Document] {
-        let attachments = self.attachmentMap.values
+    public func sync(_ doc: Document? = nil, _ syncMode: SyncMode = .pushPull) async throws -> [Document] {
+        var attachment: Attachment?
+
+        if let doc {
+            attachment = self.attachmentMap[doc.getKey()]
+            guard attachment != nil else {
+                throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached.")
+            }
+        }
 
         do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                attachments.forEach { attachment in
-                    group.addTask {
-                        try await self.syncInternal(attachment, syncModes[attachment.doc.getKey()] ?? .pushPull)
-                    }
-                }
-
-                try await group.waitForAll()
-            }
-
-            return attachments.compactMap { $0.doc }
+            return try await self.performSyncInternal(false, attachment, syncMode)
         } catch {
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
@@ -664,6 +663,45 @@ public actor Client {
         RunLoop.main.add(timer, forMode: .common)
     }
 
+    @discardableResult
+    private func performSyncInternal(_ isRealtimeSync: Bool, _ attachment: Attachment? = nil, _ syncMode: SyncMode = .pushPull) async throws -> [Document] {
+        await self.syncSemaphore.wait()
+
+        var result = [Document]()
+
+        do {
+            if isRealtimeSync {
+                for (key, attachment) in self.attachmentMap.filter({ $0.value.isRealtimeSync }) {
+                    let docChanged = await attachment.doc.hasLocalChanges()
+
+                    if docChanged || attachment.remoteChangeEventReceived {
+                        self.clearAttachmentRemoteChangeEventReceived(key)
+                        result.append(attachment.doc)
+                        try await self.syncInternal(attachment, attachment.realtimeSyncMode)
+                    }
+                }
+            } else {
+                if let attachment {
+                    result.append(attachment.doc)
+                    try await self.syncInternal(attachment, syncMode)
+                } else {
+                    for (_, attachment) in self.attachmentMap {
+                        result.append(attachment.doc)
+                        try await self.syncInternal(attachment, attachment.realtimeSyncMode)
+                    }
+                }
+            }
+        } catch {
+            self.syncSemaphore.signal()
+
+            throw error
+        }
+
+        self.syncSemaphore.signal()
+
+        return result
+    }
+
     private func doSyncLoop() async {
         guard self.isActive else {
             Logger.debug("[SL] c:\"\(self.key)\" exit sync loop")
@@ -671,20 +709,7 @@ public actor Client {
         }
 
         do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                for (key, attachment) in self.attachmentMap where attachment.isRealtimeSync {
-                    let docChanged = await attachment.doc.hasLocalChanges()
-
-                    if docChanged || attachment.remoteChangeEventReceived {
-                        self.clearAttachmentRemoteChangeEventReceived(key)
-                        group.addTask {
-                            try await self.syncInternal(attachment, attachment.realtimeSyncMode)
-                        }
-                    }
-                }
-
-                try await group.waitForAll()
-            }
+            try await self.performSyncInternal(true)
 
             self.setSyncTimer(false)
         } catch {
