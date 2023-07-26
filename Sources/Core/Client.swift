@@ -616,7 +616,7 @@ public actor Client {
      */
     public func getPeersByDocKey(docKey: DocumentKey) throws -> PresenceMap {
         guard let attachment = self.attachmentMap[docKey] else {
-            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached when \(#function).")
         }
 
         var peers = PresenceMap()
@@ -854,7 +854,7 @@ public actor Client {
 
     private func disconnectWatchStream(_ docKey: DocumentKey) throws {
         guard self.attachmentMap[docKey] != nil else {
-            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached when \(#function).")
         }
 
         guard self.attachmentMap[docKey]?.remoteWatchStream != nil else {
