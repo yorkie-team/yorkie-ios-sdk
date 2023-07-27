@@ -664,7 +664,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     createdAtMapByActor[actorID] = node.id.createdAt
                 }
             }
-            removedNodeMap[node.id.toTestString] = node
+            removedNodeMap[node.id.toIDString] = node
             node.remove(editedAt)
         }
         // Finally remove index nodes of tombstones.
@@ -792,7 +792,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 self.treeByIndex.delete(node)
                 self.purge(node)
                 self.treeByID.remove(node.id)
-                self.removedNodeMap.removeValue(forKey: node.id.toTestString)
+                self.removedNodeMap.removeValue(forKey: node.id.toIDString)
                 count += 1
             }
         }
