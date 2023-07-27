@@ -448,7 +448,7 @@ public class JSONTreeListIterator: IteratorProtocol {
  * It is used to serialize and deserialize the ticket.
  */
 struct TimeTicketStruct {
-    let lamport: Int64
+    let lamport: String
     let delimiter: UInt32
     let actorID: ActorID?
 }
@@ -472,15 +472,19 @@ extension TimeTicket {
     /**
      * `fromStruct` creates a new instance of TimeTicket from the given struct.
      */
-    static func fromStruct(_ value: TimeTicketStruct) -> TimeTicket {
-        TimeTicket(lamport: value.lamport, delimiter: value.delimiter, actorID: value.actorID)
+    static func fromStruct(_ value: TimeTicketStruct) throws -> TimeTicket {
+        guard let lamport = Int64(value.lamport) else {
+            throw YorkieError.unexpected(message: "Lamport is not a valid string representing Int64")
+        }
+
+        return TimeTicket(lamport: lamport, delimiter: value.delimiter, actorID: value.actorID)
     }
 
     /**
      * `toStructure` returns the structure of this Ticket.
      */
     var toStructure: TimeTicketStruct {
-        TimeTicketStruct(lamport: self.lamport, delimiter: self.delimiter, actorID: self.actorID)
+        TimeTicketStruct(lamport: String(self.lamport), delimiter: self.delimiter, actorID: self.actorID)
     }
 }
 
@@ -488,8 +492,8 @@ extension CRDTTreePos {
     /**
      * `fromStruct` creates a new instance of CRDTTreePos from the given struct.
      */
-    static func fromStruct(_ value: CRDTTreePosStruct) -> CRDTTreePos {
-        CRDTTreePos(createdAt: TimeTicket.fromStruct(value.createdAt), offset: value.offset)
+    static func fromStruct(_ value: CRDTTreePosStruct) throws -> CRDTTreePos {
+        try CRDTTreePos(createdAt: TimeTicket.fromStruct(value.createdAt), offset: value.offset)
     }
 
     /**
