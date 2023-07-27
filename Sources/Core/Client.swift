@@ -667,6 +667,10 @@ public actor Client {
     private func performSyncInternal(_ isRealtimeSync: Bool, _ attachment: Attachment? = nil, _ syncMode: SyncMode = .pushPull) async throws -> [Document] {
         await self.syncSemaphore.wait()
 
+        defer {
+            self.syncSemaphore.signal()
+        }
+
         var result = [Document]()
 
         do {
@@ -692,12 +696,8 @@ public actor Client {
                 }
             }
         } catch {
-            self.syncSemaphore.signal()
-
             throw error
         }
-
-        self.syncSemaphore.signal()
 
         return result
     }
