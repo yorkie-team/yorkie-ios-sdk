@@ -145,10 +145,6 @@ public class JSONTree {
     private var context: ChangeContext?
     private var tree: CRDTTree?
 
-    public convenience init() {
-        self.init(initialRoot: nil)
-    }
-
     public init(initialRoot: ElementNode? = nil) {
         self.initialRoot = initialRoot
     }
