@@ -104,7 +104,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
             try buildDescendants(treeNode: child, parent: elementNode, context: context)
         }
     } else {
-        assertionFailure("Must not here!")
+        preconditionFailure("Must not here!")
     }
 }
 
@@ -130,7 +130,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
             try buildDescendants(treeNode: child, parent: root, context: context)
         }
     } else {
-        throw YorkieError.unexpected(message: "Must not here!")
+        preconditionFailure("Must not here!")
     }
 
     return root
