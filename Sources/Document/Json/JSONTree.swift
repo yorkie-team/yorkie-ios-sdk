@@ -43,6 +43,24 @@ public struct ElementNode: JSONTreeNode {
             return false
         }
 
+        if lhs.attributes != rhs.attributes {
+            return false
+        }
+
+        if lhs.children.count != rhs.children.count {
+            return false
+        }
+
+        for (index, leftChild) in lhs.children.enumerated() {
+            if let leftChild = leftChild as? ElementNode, let rightChild = rhs.children[index] as? ElementNode {
+                return leftChild == rightChild
+            } else if let leftChild = leftChild as? TextNode, let rightChild = rhs.children[index] as? TextNode {
+                return leftChild == rightChild
+            } else {
+                return false
+            }
+        }
+
         return true
     }
 
