@@ -104,7 +104,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
             try buildDescendants(treeNode: child, parent: elementNode, context: context)
         }
     } else {
-        throw YorkieError.unexpected(message: "Must not here!")
+        assertionFailure("Must not here!")
     }
 }
 
