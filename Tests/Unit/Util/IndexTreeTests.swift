@@ -47,11 +47,11 @@ final class IndexTreeTests: XCTestCase {
         //    0   1 2 3 4 5 6    7   8 9  10 11 12 13    14
         // <r> <p> h e l l o </p> <p> w  o  r  l  d  </p>  </r>
         let tree = try await buildIndexTree(
-            ElementNode(type: "r",
-                        children: [
-                            ElementNode(type: "p", children: [TextNode(value: "hello")]),
-                            ElementNode(type: "p", children: [TextNode(value: "world")])
-                        ])
+            JSONTreeElementNode(type: "r",
+                                children: [
+                                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "hello")]),
+                                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "world")])
+                                ])
         )
 
         var pos = try tree?.findTreePos(0)
@@ -84,11 +84,11 @@ final class IndexTreeTests: XCTestCase {
         //       0   1 2 3    4   6 7     8
         // <root> <p> a b </p> <p> c d</p> </root>
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "p", children: [TextNode(value: "ab")]),
-                            ElementNode(type: "p", children: [TextNode(value: "cd")])
-                        ])
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ab")]),
+                                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return
@@ -106,14 +106,14 @@ final class IndexTreeTests: XCTestCase {
 
     func test_can_find_common_ancestor_of_two_given_nodes() async throws {
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "p",
-                                        children: [
-                                            ElementNode(type: "b", children: [TextNode(value: "ab")]),
-                                            ElementNode(type: "b", children: [TextNode(value: "cd")])
-                                        ])
-                        ])
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeElementNode(type: "b", children: [JSONTreeTextNode(value: "ab")]),
+                                                            JSONTreeElementNode(type: "b", children: [JSONTreeTextNode(value: "cd")])
+                                                        ])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return
@@ -131,16 +131,16 @@ final class IndexTreeTests: XCTestCase {
         //       0   1 2 3    4   5 6 7 8    9   10 11 12   13
         // <root> <p> a b </p> <p> c d e </p> <p>  f  g  </p>  </root>
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "a"),
-                                            TextNode(value: "b")
-                                        ]),
-                            ElementNode(type: "p", children: [TextNode(value: "cde")]),
-                            ElementNode(type: "p", children: [TextNode(value: "fg")])
-                        ])
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "a"),
+                                                            JSONTreeTextNode(value: "b")
+                                                        ]),
+                                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cde")]),
+                                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "fg")])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return
@@ -164,26 +164,26 @@ final class IndexTreeTests: XCTestCase {
         //       0   1 2 3 4    5   6 7 8 9 10 11 12  13  14 15 16  17 18 19 20   21
         // <root> <p> a b c </p> <p> c d e f  g  h </p> <p> i  j   k  l  m  n  </p>  </root>
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "ab"),
-                                            TextNode(value: "c")
-                                        ]),
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "cde"),
-                                            TextNode(value: "fgh")
-                                        ]),
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "ij"),
-                                            TextNode(value: "k"),
-                                            TextNode(value: "l"),
-                                            TextNode(value: "mn")
-                                        ])
-                        ])
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "ab"),
+                                                            JSONTreeTextNode(value: "c")
+                                                        ]),
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "cde"),
+                                                            JSONTreeTextNode(value: "fgh")
+                                                        ]),
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "ij"),
+                                                            JSONTreeTextNode(value: "k"),
+                                                            JSONTreeTextNode(value: "l"),
+                                                            JSONTreeTextNode(value: "mn")
+                                                        ])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return
@@ -199,22 +199,22 @@ final class IndexTreeTests: XCTestCase {
         //       0   1 2 3    4   5 6 7 8    9   10 11 12   13
         // <root> <p> a b </p> <p> c d e </p> <p>  f  g  </p>  </root>
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "a"),
-                                            TextNode(value: "b")
-                                        ]),
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "cde")
-                                        ]),
-                            ElementNode(type: "p",
-                                        children: [
-                                            TextNode(value: "fg")
-                                        ])
-                        ])
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "a"),
+                                                            JSONTreeTextNode(value: "b")
+                                                        ]),
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "cde")
+                                                        ]),
+                                    JSONTreeElementNode(type: "p",
+                                                        children: [
+                                                            JSONTreeTextNode(value: "fg")
+                                                        ])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return
@@ -281,25 +281,25 @@ final class IndexTreeTests: XCTestCase {
         //       0  1  2    3 4 5 6 7     8   9 10 11 12 13  14 15  16
         // <root><tc><p><tn> A B C D </tn><tn> E  F G  H </tn><p></tc></root>
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "tc",
-                                        children: [
-                                            ElementNode(type: "p",
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "tc",
                                                         children: [
-                                                            ElementNode(type: "tn",
-                                                                        children: [
-                                                                            TextNode(value: "AB"),
-                                                                            TextNode(value: "CD")
-                                                                        ]),
-                                                            ElementNode(type: "tn",
-                                                                        children: [
-                                                                            TextNode(value: "EF"),
-                                                                            TextNode(value: "GH")
-                                                                        ])
+                                                            JSONTreeElementNode(type: "p",
+                                                                                children: [
+                                                                                    JSONTreeElementNode(type: "tn",
+                                                                                                        children: [
+                                                                                                            JSONTreeTextNode(value: "AB"),
+                                                                                                            JSONTreeTextNode(value: "CD")
+                                                                                                        ]),
+                                                                                    JSONTreeElementNode(type: "tn",
+                                                                                                        children: [
+                                                                                                            JSONTreeTextNode(value: "EF"),
+                                                                                                            JSONTreeTextNode(value: "GH")
+                                                                                                        ])
+                                                                                ])
                                                         ])
-                                        ])
-                        ])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return
@@ -371,23 +371,23 @@ final class IndexTreeTests: XCTestCase {
         //       0    1   2    3 4 5     6    7 8 9     10   11     12
         // <root> <tc> <p> <tn> A B </tn> <tn> C D </tn>  <p>  </tc>  </root>
         guard let tree = try await buildIndexTree(
-            ElementNode(type: DefaultTreeNodeType.root.rawValue,
-                        children: [
-                            ElementNode(type: "tc",
-                                        children: [
-                                            ElementNode(type: "p",
+            JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                children: [
+                                    JSONTreeElementNode(type: "tc",
                                                         children: [
-                                                            ElementNode(type: "tn",
-                                                                        children: [
-                                                                            TextNode(value: "AB")
-                                                                        ]),
-                                                            ElementNode(type: "tn",
-                                                                        children: [
-                                                                            TextNode(value: "CD")
-                                                                        ])
+                                                            JSONTreeElementNode(type: "p",
+                                                                                children: [
+                                                                                    JSONTreeElementNode(type: "tn",
+                                                                                                        children: [
+                                                                                                            JSONTreeTextNode(value: "AB")
+                                                                                                        ]),
+                                                                                    JSONTreeElementNode(type: "tn",
+                                                                                                        children: [
+                                                                                                            JSONTreeTextNode(value: "CD")
+                                                                                                        ])
+                                                                                ])
                                                         ])
-                                        ])
-                        ])
+                                ])
         ) else {
             XCTAssertTrue(false, "Can't build tree")
             return

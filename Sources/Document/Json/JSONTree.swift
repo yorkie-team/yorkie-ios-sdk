@@ -33,12 +33,12 @@ struct TreeChangeWithPath {
 /**
  * `ElementNode` is a node that has children.
  */
-public struct ElementNode: JSONTreeNode {
+public struct JSONTreeElementNode: JSONTreeNode {
     public let type: TreeNodeType
     public let attributes: [String: String]?
     public let children: [any JSONTreeNode]
 
-    public static func == (lhs: ElementNode, rhs: ElementNode) -> Bool {
+    public static func == (lhs: JSONTreeElementNode, rhs: JSONTreeElementNode) -> Bool {
         if lhs.type != rhs.type {
             return false
         }
@@ -52,9 +52,9 @@ public struct ElementNode: JSONTreeNode {
         }
 
         for (index, leftChild) in lhs.children.enumerated() {
-            if let leftChild = leftChild as? ElementNode, let rightChild = rhs.children[index] as? ElementNode {
+            if let leftChild = leftChild as? JSONTreeElementNode, let rightChild = rhs.children[index] as? JSONTreeElementNode {
                 return leftChild == rightChild
-            } else if let leftChild = leftChild as? TextNode, let rightChild = rhs.children[index] as? TextNode {
+            } else if let leftChild = leftChild as? JSONTreeTextNode, let rightChild = rhs.children[index] as? JSONTreeTextNode {
                 return leftChild == rightChild
             } else {
                 return false
@@ -74,9 +74,13 @@ public struct ElementNode: JSONTreeNode {
 /**
  * `TextNode` is a node that has a value.
  */
-public struct TextNode: JSONTreeNode {
+public struct JSONTreeTextNode: JSONTreeNode {
     public let type = DefaultTreeNodeType.text.rawValue
     public let value: String
+
+    public init(value: String) {
+        self.value = value
+    }
 }
 
 /**
@@ -85,11 +89,11 @@ public struct TextNode: JSONTreeNode {
 func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context: ChangeContext) throws {
     let ticket = context.issueTimeTicket
 
-    if let node = treeNode as? TextNode {
+    if let node = treeNode as? JSONTreeTextNode {
         let textNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: DefaultTreeNodeType.text.rawValue, value: node.value)
 
         try parent.append(contentsOf: [textNode])
-    } else if let node = treeNode as? ElementNode {
+    } else if let node = treeNode as? JSONTreeElementNode {
         let attrs = RHT()
 
         node.attributes?.forEach { key, value in
@@ -115,9 +119,9 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
     let ticket = context.issueTimeTicket
 
     let root: CRDTTreeNode
-    if let node = content as? TextNode {
+    if let node = content as? JSONTreeTextNode {
         root = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type, value: node.value)
-    } else if let node = content as? ElementNode {
+    } else if let node = content as? JSONTreeElementNode {
         let attrs = RHT()
 
         node.attributes?.forEach { key, value in
@@ -141,11 +145,11 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
  * tree of text-based editor such as ProseMirror.
  */
 public class JSONTree {
-    private let initialRoot: ElementNode?
+    private let initialRoot: JSONTreeElementNode?
     private var context: ChangeContext?
     private var tree: CRDTTree?
 
-    public init(initialRoot: ElementNode? = nil) {
+    public init(initialRoot: JSONTreeElementNode? = nil) {
         self.initialRoot = initialRoot
     }
 
