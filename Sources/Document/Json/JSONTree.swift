@@ -263,7 +263,7 @@ public class JSONTree {
     /**
      * `editByPath` edits this tree with the given node and path.
      */
-    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?) throws -> Bool {
+    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)?) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -276,7 +276,12 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "path should not be empty")
         }
 
-        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        // For 0.4.5
+//        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        var crdtNode: [CRDTTreeNode]?
+        if let content {
+            crdtNode = try [createCRDTTreeNode(context: context, content: content)]
+        }
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
         let ticket = context.lastTimeTicket
@@ -300,7 +305,7 @@ public class JSONTree {
      * `edit` edits this tree with the given node.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil) throws -> Bool {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: (any JSONTreeNode)? = nil) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -309,7 +314,12 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "from should be less than or equal to to")
         }
 
-        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        // For 0.4.5
+//        let crdtNode = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        var crdtNode: [CRDTTreeNode]?
+        if let content {
+            crdtNode = try [createCRDTTreeNode(context: context, content: content)]
+        }
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
         let ticket = context.lastTimeTicket
