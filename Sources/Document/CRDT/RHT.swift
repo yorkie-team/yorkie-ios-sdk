@@ -23,12 +23,6 @@ struct RHTNode {
     var key: String
     var value: String
     var updatedAt: TimeTicket
-
-    init(key: String, value: String, updatedAt: TimeTicket) {
-        self.key = key
-        self.value = value
-        self.updatedAt = updatedAt
-    }
 }
 
 /**
