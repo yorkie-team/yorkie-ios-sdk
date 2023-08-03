@@ -408,7 +408,7 @@ extension Converter {
             pbTreeEditOperation.parentCreatedAt = toTimeTicket(treeEditOperation.parentCreatedAt)
             pbTreeEditOperation.from = toTreePos(treeEditOperation.fromPos)
             pbTreeEditOperation.to = toTreePos(treeEditOperation.toPos)
-            pbTreeEditOperation.content = toTreeNodes(treeEditOperation.contents![0])
+            pbTreeEditOperation.content = toTreeNodes(treeEditOperation.contents?[safe: 0])
             pbTreeEditOperation.executedAt = toTimeTicket(treeEditOperation.executedAt)
             pbOperation.treeEdit = pbTreeEditOperation
         } else if let treeStyleOperation = operation as? TreeStyleOperation {
@@ -857,8 +857,12 @@ extension Converter {
     /**
      * `toTreeNodes` converts the given model to Protobuf format.
      */
-    static func toTreeNodes(_ node: CRDTTreeNode) -> [PbTreeNode] {
+    static func toTreeNodes(_ node: CRDTTreeNode?) -> [PbTreeNode] {
         var pbTreeNodes = [PbTreeNode]()
+        
+        guard let node else {
+            return pbTreeNodes
+        }
         
         traverse(node: node) { node, depth in
             var pbTreeNode = PbTreeNode()
