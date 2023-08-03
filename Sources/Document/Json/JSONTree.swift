@@ -454,7 +454,7 @@ extension JSONTree: Sequence {
 }
 
 public class JSONTreeListIterator: IteratorProtocol {
-    private weak var treeIterator: CRDTTreeListIterator?
+    private var treeIterator: CRDTTreeListIterator?
 
     init(_ firstNode: CRDTTree?) {
         self.treeIterator = firstNode?.makeIterator()
