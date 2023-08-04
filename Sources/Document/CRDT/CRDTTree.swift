@@ -44,7 +44,7 @@ public struct TreeNode: Equatable {
 
                 let attrsString = sortedKeys.compactMap { key in
                     if let value = attributes[key] {
-                        return "\"\(key)\":\"\(value)\""
+                        return "\"\(key)\":\(value)"
                     } else {
                         return nil
                     }
@@ -295,8 +295,12 @@ final class CRDTTreeNode: IndexTreeNode {
         }
 
         var xml = "<\(node.type)"
-        if let attrs = node.attrs?.toXML() {
-            xml += attrs
+        if let attrs = node.attrs?.toObject() {
+            attrs.keys.sorted().forEach {
+                if let value = attrs[$0]?.value {
+                    xml += " \($0)=\(value)"
+                }
+            }
         }
         xml += ">"
 
@@ -335,7 +339,7 @@ final class CRDTTreeNode: IndexTreeNode {
             }
 
             return JSONTreeElementNode(type: self.type,
-                                       attributes: attrs.isEmpty ? nil : attrs,
+                                       attributes: attrs.anyValueTypeDictionary,
                                        children: self.children.compactMap { $0.toJSONTreeNode })
         }
     }

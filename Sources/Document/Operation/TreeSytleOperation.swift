@@ -76,7 +76,7 @@ class TreeStyleOperation: Operation {
                 from: change.from,
                 to: change.to,
                 fromPath: change.fromPath,
-                value: attributes
+                value: attributes.anyValueTypeDictionary
             )
         }
     }

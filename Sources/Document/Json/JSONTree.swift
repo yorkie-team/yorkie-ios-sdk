@@ -35,7 +35,7 @@ struct TreeChangeWithPath {
  */
 public struct JSONTreeElementNode: JSONTreeNode {
     public let type: TreeNodeType
-    public let attributes: [String: String]?
+    public let attributes: [String: Any]
     public let children: [any JSONTreeNode]
 
     public static func == (lhs: JSONTreeElementNode, rhs: JSONTreeElementNode) -> Bool {
@@ -43,7 +43,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
             return false
         }
 
-        if lhs.attributes != rhs.attributes {
+        if !(lhs.attributes == rhs.attributes) {
             return false
         }
 
@@ -64,7 +64,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
         return true
     }
 
-    public init(type: TreeNodeType, attributes: [String: String]? = nil, children: [any JSONTreeNode] = []) {
+    public init(type: TreeNodeType, attributes: [String: Any] = [:], children: [any JSONTreeNode] = []) {
         self.type = type
         self.attributes = attributes
         self.children = children
@@ -96,7 +96,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
     } else if let node = treeNode as? JSONTreeElementNode {
         let attrs = RHT()
 
-        node.attributes?.forEach { key, value in
+        node.attributes.stringValueTypeDictionary.forEach { key, value in
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
@@ -124,7 +124,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
     } else if let node = content as? JSONTreeElementNode {
         let attrs = RHT()
 
-        node.attributes?.forEach { key, value in
+        node.attributes.stringValueTypeDictionary.forEach { key, value in
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
@@ -211,7 +211,7 @@ public class JSONTree {
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
      */
-    public func styleByPath(_ path: [Int], _ attributes: [String: String]) throws {
+    public func styleByPath(_ path: [Int], _ attributes: [String: Any]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -223,13 +223,15 @@ public class JSONTree {
         let (fromPos, toPos) = try tree.pathToPosRange(path)
         let ticket = context.issueTimeTicket
 
-        try tree.style((fromPos, toPos), attributes, ticket)
+        let stringAttrs = attributes.stringValueTypeDictionary
+
+        try tree.style((fromPos, toPos), stringAttrs, ticket)
 
         // TreeStyleOperation
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
                                                    toPos: toPos,
-                                                   attributes: attributes,
+                                                   attributes: stringAttrs,
                                                    executedAt: ticket)
         )
     }
@@ -237,7 +239,7 @@ public class JSONTree {
     /**
      * `style` sets the attributes to the elements of the given range.
      */
-    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: String]) throws {
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -250,12 +252,14 @@ public class JSONTree {
         let toPos = try tree.findPos(toIdx)
         let ticket = context.issueTimeTicket
 
-        try tree.style((fromPos, toPos), attributes, ticket)
+        let stringAttrs = attributes.stringValueTypeDictionary
+
+        try tree.style((fromPos, toPos), stringAttrs, ticket)
 
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
                                                    toPos: toPos,
-                                                   attributes: attributes,
+                                                   attributes: stringAttrs,
                                                    executedAt: ticket)
         )
     }
