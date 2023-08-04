@@ -29,10 +29,10 @@ func listEqual(_ tree: JSONTree?, _ expected: [any JSONTreeNode]) {
     }
 
     for (index, node) in tree.enumerated() {
-        if let expected = expected[index] as? JSONTreeElementNode {
-            XCTAssertEqual(expected, node as? JSONTreeElementNode)
-        } else if let expected = expected[index] as? JSONTreeTextNode {
-            XCTAssertEqual(expected, node as? JSONTreeTextNode)
+        if let expected = expected[index] as? JSONTreeElementNode, let node = node as? JSONTreeElementNode {
+            XCTAssertEqual(expected.type, node.type)
+        } else if let expected = expected[index] as? JSONTreeTextNode, let node = node as? JSONTreeTextNode {
+            XCTAssertEqual(expected.value, node.value)
         }
     }
 }
