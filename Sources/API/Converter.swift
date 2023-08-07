@@ -486,10 +486,16 @@ extension Converter {
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
-                return try TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
+                var contents = [CRDTTreeNode]()
+                
+                if let content = try fromTreeNodes(pbTreeEditOperation.content) {
+                    contents.append(content)
+                }
+                
+                return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
                                          toPos: fromTreePos(pbTreeEditOperation.to),
-                                         contents: [fromTreeNodes(pbTreeEditOperation.content)!],
+                                         contents: contents,
                                          executedAt: fromTimeTicket(pbTreeEditOperation.executedAt))
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
                 return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
