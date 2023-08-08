@@ -86,8 +86,10 @@ extension StringValueTypeDictionary {
                 result[$0.key] = value
             } else if let value = Double($0.value) {
                 result[$0.key] = value
-            } else if let value = Bool($0.value) {
-                result[$0.key] = value
+            } else if $0.value.lowercased() == "true" {
+                result[$0.key] = true
+            } else if $0.value.lowercased() == "false" {
+                result[$0.key] = false
             } else if let data = $0.value.data(using: .utf8),
                       let object = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
             {
