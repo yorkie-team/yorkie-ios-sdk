@@ -335,10 +335,6 @@ public actor Document {
             self.processDocEvent(RemoteChangeEvent(value: $0))
         }
 
-        changeInfos.forEach {
-            self.processDocEvent(RemoteChangeEvent(value: $0))
-        }
-
         Logger.debug(
             """
             after appling \(changes.count) remote changes.
