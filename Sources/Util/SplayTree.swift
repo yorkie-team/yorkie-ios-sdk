@@ -20,7 +20,7 @@ import Foundation
  * `SplayNode` is a node of SplayTree.
  */
 class SplayNode<V>: CustomDebugStringConvertible {
-    internal var value: V
+    var value: V
 
     fileprivate var left: SplayNode<V>?
     fileprivate var right: SplayNode<V>?

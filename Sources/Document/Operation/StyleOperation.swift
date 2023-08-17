@@ -17,8 +17,8 @@
 import Foundation
 
 struct StyleOperation: Operation {
-    internal var parentCreatedAt: TimeTicket
-    internal var executedAt: TimeTicket
+    var parentCreatedAt: TimeTicket
+    var executedAt: TimeTicket
 
     /**
      * `fromPos` returns the start point of the editing range.
@@ -74,14 +74,14 @@ struct StyleOperation: Operation {
     /**
      * `effectedCreatedAt` returns the creation time of the effected element.
      */
-    internal var effectedCreatedAt: TimeTicket {
+    var effectedCreatedAt: TimeTicket {
         self.parentCreatedAt
     }
 
     /**
      * `toTestString` returns a string containing the meta data.
      */
-    internal var toTestString: String {
+    var toTestString: String {
         let parent = self.parentCreatedAt.toTestString
         let fromPos = self.fromPos.toTestString
         let toPos = self.toPos.toTestString

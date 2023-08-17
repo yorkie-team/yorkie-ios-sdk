@@ -20,7 +20,7 @@ class PeerSelectionDisplayLayoutManager: NSLayoutManager {
     private static let AttributeKeyPrefix = "PEER_SELECT_"
 
     static func createKey(_ id: String) -> NSAttributedString.Key {
-        NSAttributedString.Key(rawValue: "\(Self.AttributeKeyPrefix)\(id)")
+        NSAttributedString.Key(rawValue: "\(self.AttributeKeyPrefix)\(id)")
     }
 
     override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {

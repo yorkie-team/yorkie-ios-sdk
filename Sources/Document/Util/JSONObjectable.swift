@@ -51,7 +51,7 @@ public extension JSONObjectable {
     }
 }
 
-internal extension Array {
+extension Array {
     /// `toJsonArray` provides a way to make an array including types confiming``JSONObjectable``, arrys, and values.
     var toJsonArray: [Any] {
         self.map {
