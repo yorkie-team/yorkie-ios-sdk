@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Setup Docker on macOS using Colima, Lima-VM, and Homebrew.
-      uses: 7hong13/setup-docker-macos-action@fix_formular_paths
+      uses: 7hong13/setup-docker-macos-action@fix_formula_paths
       id: docker
     - run: docker-compose -f docker/docker-compose-ci.yml up --build -d
     - name: Run tests
