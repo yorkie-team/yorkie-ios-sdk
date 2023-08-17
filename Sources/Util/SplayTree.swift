@@ -361,10 +361,10 @@ class SplayTree<V> {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data of the Node
+     * `toTestString` returns a string containing the meta data of the Node
      * for debugging purpose.
      */
-    var structureAsString: String {
+    var toTestString: String {
         var metaString: [SplayNode<V>] = []
         self.traverseInorder(self.root!, stack: &metaString)
         return metaString

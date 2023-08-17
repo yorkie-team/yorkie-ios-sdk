@@ -99,9 +99,9 @@ struct ChangeID {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data of this ID.
+     * `toTestString` returns a string containing the meta data of this ID.
      */
-    var structureAsString: String {
+    var toTestString: String {
         var actor: String
         if let value = self.actor {
             actor = String(value.suffix(2))

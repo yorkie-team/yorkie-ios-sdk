@@ -93,7 +93,7 @@ class MoveOperationTests: XCTestCase {
         try target.execute(root: root)
 
         XCTAssertEqual(root.debugDescription, "{\"k-a1\":\"a1\",\"k-a3\":[\"b1\",\"value-to-move\",{\"k-c1\":\"c1\"}]}")
-        XCTAssertEqual(target.structureAsString, "4:actor-1:0.MOVE")
+        XCTAssertEqual(target.toTestString, "4:actor-1:0.MOVE")
         XCTAssertEqual(target.effectedCreatedAt, target.createdAt)
     }
 }

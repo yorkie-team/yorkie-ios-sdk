@@ -737,9 +737,9 @@ class DocumentTests: XCTestCase {
             eventCount += 1
         }
 
-        await target.subscribe(targetPath: "$.") { _ in
+        await target.subscribe("$.") { _ in
             Task {
-                let array = try? await target.getValueByPath(path: "$.") as? JSONObject
+                let array = try? await target.getValueByPath("$.") as? JSONObject
 
                 XCTAssertTrue(array != nil)
             }
@@ -770,7 +770,7 @@ class DocumentTests: XCTestCase {
                            """)
         }
 
-        let value = try await target.getValueByPath(path: "$..obj.a") as? Int64
+        let value = try await target.getValueByPath("$..obj.a") as? Int64
 
         XCTAssertEqual(value, 1)
 
@@ -827,7 +827,7 @@ class DocumentTests: XCTestCase {
             }
         }
 
-        await target.subscribe(targetPath: "$.arr") { event in
+        await target.subscribe("$.arr") { event in
             XCTAssertEqual(event.type, .localChange)
 
             if let ops = (event as? LocalChangeEvent)?.value.operations {
@@ -879,7 +879,7 @@ class DocumentTests: XCTestCase {
             (root.cnt as? JSONCounter<Int64>)?.increase(value: -3)
         }
 
-        let cnt = try await target.getValueByPath(path: "$.cnt") as? JSONCounter<Int64>
+        let cnt = try await target.getValueByPath("$.cnt") as? JSONCounter<Int64>
 
         XCTAssertEqual(cnt?.value, 8)
     }
@@ -906,7 +906,7 @@ class DocumentTests: XCTestCase {
             (root.text as? JSONText)?.select(0, 2)
         }
 
-        let text = try await target.getValueByPath(path: "$.text") as? JSONText
+        let text = try await target.getValueByPath("$.text") as? JSONText
 
         XCTAssertEqual(text?.plainText, "hello world")
     }

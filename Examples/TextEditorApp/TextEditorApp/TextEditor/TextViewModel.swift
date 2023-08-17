@@ -67,7 +67,7 @@ class TextViewModel {
                 }
             }
 
-            await self.document.subscribe(targetPath: "$.content") { event in
+            await self.document.subscribe("$.content") { [weak self] event in
                 guard let event = event as? RemoteChangeEvent else {
                     return
                 }
@@ -89,7 +89,7 @@ class TextViewModel {
                 }
 
                 if textChanges.isEmpty == false {
-                    self.operationSubject?.send(textChanges)
+                    self?.operationSubject?.send(textChanges)
                 }
             }
 
@@ -139,10 +139,10 @@ class TextViewModel {
     }
 
     func pause() async {
-        try? await self.client.pauseRemoteChanges(doc: self.document)
+        try? await self.client.pauseRemoteChanges(self.document)
     }
 
     func resume() async {
-        try? await self.client.resumeRemoteChanges(doc: self.document)
+        try? await self.client.resumeRemoteChanges(self.document)
     }
 }

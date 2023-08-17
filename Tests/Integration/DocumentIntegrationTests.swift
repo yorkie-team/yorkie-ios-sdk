@@ -390,11 +390,11 @@ final class DocumentIntegrationTests: XCTestCase {
             d1Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        await self.d1.subscribe(targetPath: "$.todos") { event in
+        await self.d1.subscribe("$.todos") { event in
             d2Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        await self.d1.subscribe(targetPath: "$.counter") { event in
+        await self.d1.subscribe("$.counter") { event in
             d3Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
@@ -442,7 +442,7 @@ final class DocumentIntegrationTests: XCTestCase {
         d1Events = []
         d2Events = []
 
-        await self.d1.unsubscribe(targetPath: "$.todos")
+        await self.d1.unsubscribe("$.todos")
 
         try await self.d2.update { root in
             (root.todos as? JSONArray)?.append("todo4")
@@ -456,7 +456,7 @@ final class DocumentIntegrationTests: XCTestCase {
 
         d1Events = []
 
-        await self.d1.unsubscribe(targetPath: "$.counter")
+        await self.d1.unsubscribe("$.counter")
 
         try await self.d2.update { root in
             (root.counter as? JSONCounter<Int32>)?.increase(value: 10)

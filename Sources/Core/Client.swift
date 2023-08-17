@@ -19,6 +19,7 @@ import Foundation
 import GRPC
 import Logging
 import NIO
+import Semaphore
 
 public typealias PresenceMap = [ActorID: Presence]
 
@@ -191,6 +192,7 @@ public actor Client {
     private let group: EventLoopGroup
 
     private var semaphoresForInitialzation = [DocumentKey: DispatchSemaphore]()
+    private let syncSemaphore = AsyncSemaphore(value: 1)
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -341,7 +343,7 @@ public actor Client {
             let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack)
 
             if await doc.status == .removed {
                 throw YorkieError.documentRemoved(message: "\(doc) is removed.")
@@ -386,7 +388,7 @@ public actor Client {
         }
 
         guard let attachment = attachmentMap[doc.getKey()] else {
-            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
+            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         var detachDocumentRequest = DetachDocumentRequest()
@@ -399,7 +401,7 @@ public actor Client {
             let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack)
 
             if await doc.status != .removed {
                 await doc.setStatus(.detached)
@@ -454,7 +456,7 @@ public actor Client {
         }
 
         guard let attachment = attachmentMap[doc.getKey()] else {
-            throw YorkieError.documentNotAttached(message: "\(doc) is not attached.")
+            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         var removeDocumentRequest = RemoveDocumentRequest()
@@ -467,7 +469,7 @@ public actor Client {
             let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
 
             let pack = try Converter.fromChangePack(result.changePack)
-            try await doc.applyChangePack(pack: pack)
+            try await doc.applyChangePack(pack)
 
             try self.stopWatchLoop(doc.getKey())
 
@@ -505,7 +507,7 @@ public actor Client {
      * `pauseRemoteChanges` pauses the synchronization of remote changes,
      * allowing only local changes to be applied.
      */
-    public func pauseRemoteChanges(doc: Document) throws {
+    public func pauseRemoteChanges(_ doc: Document) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -513,7 +515,7 @@ public actor Client {
         let docKey = doc.getKey()
 
         guard self.attachmentMap[docKey] != nil else {
-            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         self.attachmentMap[docKey]?.realtimeSyncMode = .pushOnly
@@ -523,7 +525,7 @@ public actor Client {
      * `resumeRemoteChanges` resumes the synchronization of remote changes,
      * allowing both local and remote changes to be applied.
      */
-    public func resumeRemoteChanges(doc: Document) throws {
+    public func resumeRemoteChanges(_ doc: Document) throws {
         guard self.isActive else {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
@@ -531,7 +533,7 @@ public actor Client {
         let docKey = doc.getKey()
 
         guard self.attachmentMap[docKey] != nil else {
-            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         self.attachmentMap[docKey]?.realtimeSyncMode = .pushPull
@@ -544,21 +546,18 @@ public actor Client {
      * local documents.
      */
     @discardableResult
-    public func sync(_ syncModes: [DocumentKey: SyncMode] = [:]) async throws -> [Document] {
-        let attachments = self.attachmentMap.values
+    public func sync(_ doc: Document? = nil, _ syncMode: SyncMode = .pushPull) async throws -> [Document] {
+        var attachment: Attachment?
+
+        if let doc {
+            attachment = self.attachmentMap[doc.getKey()]
+            guard attachment != nil else {
+                throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
+            }
+        }
 
         do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                attachments.forEach { attachment in
-                    group.addTask {
-                        try await self.syncInternal(attachment, syncModes[attachment.doc.getKey()] ?? .pushPull)
-                    }
-                }
-
-                try await group.waitForAll()
-            }
-
-            return attachments.compactMap { $0.doc }
+            return try await self.performSyncInternal(false, attachment, syncMode)
         } catch {
             let event = DocumentSyncedEvent(value: .syncFailed)
             self.eventStream.send(event)
@@ -608,16 +607,16 @@ public actor Client {
     /**
      * `getPeerPresence` returns the presence of the given document and client.
      */
-    public func getPeerPresence(docKey: DocumentKey, clientID: ActorID) -> Presence? {
+    public func getPeerPresence(_ docKey: DocumentKey, _ clientID: ActorID) -> Presence? {
         self.attachmentMap[docKey]?.getPresence(clientID: clientID)
     }
 
     /**
      * `getPeersByDocKey` returns the peers of the given document.
      */
-    public func getPeersByDocKey(docKey: DocumentKey) throws -> PresenceMap {
+    public func getPeersByDocKey(_ docKey: DocumentKey) throws -> PresenceMap {
         guard let attachment = self.attachmentMap[docKey] else {
-            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached.")
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached when \(#function).")
         }
 
         var peers = PresenceMap()
@@ -664,6 +663,45 @@ public actor Client {
         RunLoop.main.add(timer, forMode: .common)
     }
 
+    @discardableResult
+    private func performSyncInternal(_ isRealtimeSync: Bool, _ attachment: Attachment? = nil, _ syncMode: SyncMode = .pushPull) async throws -> [Document] {
+        await self.syncSemaphore.wait()
+
+        defer {
+            self.syncSemaphore.signal()
+        }
+
+        var result = [Document]()
+
+        do {
+            if isRealtimeSync {
+                for (key, attachment) in self.attachmentMap.filter({ $0.value.isRealtimeSync }) {
+                    let docChanged = await attachment.doc.hasLocalChanges()
+
+                    if docChanged || attachment.remoteChangeEventReceived {
+                        self.clearAttachmentRemoteChangeEventReceived(key)
+                        result.append(attachment.doc)
+                        try await self.syncInternal(attachment, attachment.realtimeSyncMode)
+                    }
+                }
+            } else {
+                if let attachment {
+                    result.append(attachment.doc)
+                    try await self.syncInternal(attachment, syncMode)
+                } else {
+                    for (_, attachment) in self.attachmentMap {
+                        result.append(attachment.doc)
+                        try await self.syncInternal(attachment, attachment.realtimeSyncMode)
+                    }
+                }
+            }
+        } catch {
+            throw error
+        }
+
+        return result
+    }
+
     private func doSyncLoop() async {
         guard self.isActive else {
             Logger.debug("[SL] c:\"\(self.key)\" exit sync loop")
@@ -671,20 +709,7 @@ public actor Client {
         }
 
         do {
-            try await withThrowingTaskGroup(of: Void.self) { group in
-                for (key, attachment) in self.attachmentMap where attachment.isRealtimeSync {
-                    let docChanged = await attachment.doc.hasLocalChanges()
-
-                    if docChanged || attachment.remoteChangeEventReceived {
-                        self.clearAttachmentRemoteChangeEventReceived(key)
-                        group.addTask {
-                            try await self.syncInternal(attachment, attachment.realtimeSyncMode)
-                        }
-                    }
-                }
-
-                try await group.waitForAll()
-            }
+            try await self.performSyncInternal(true)
 
             self.setSyncTimer(false)
         } catch {
@@ -829,7 +854,7 @@ public actor Client {
 
     private func disconnectWatchStream(_ docKey: DocumentKey) throws {
         guard self.attachmentMap[docKey] != nil else {
-            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached.")
+            return
         }
 
         guard self.attachmentMap[docKey]?.remoteWatchStream != nil else {
@@ -893,7 +918,7 @@ public actor Client {
                 return doc
             }
 
-            try await doc.applyChangePack(pack: responsePack)
+            try await doc.applyChangePack(responsePack)
 
             if await doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: docKey)
@@ -903,7 +928,7 @@ public actor Client {
             self.eventStream.send(event)
 
             let remoteSize = responsePack.getChangeSize()
-            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().structureAsString)")
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {

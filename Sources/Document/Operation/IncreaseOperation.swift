@@ -36,8 +36,8 @@ struct IncreaseOperation: Operation {
         self.parentCreatedAt
     }
 
-    var structureAsString: String {
-        "\(self.parentCreatedAt.structureAsString).INCREASE"
+    var toTestString: String {
+        "\(self.parentCreatedAt.toTestString).INCREASE"
     }
 
     /**

@@ -28,3 +28,13 @@ extension Encodable {
         return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 }
+
+extension Encodable where Self == String {
+    var createdDictionary: [String: Any] {
+        guard let data = self.data(using: .utf8) else {
+            return [:]
+        }
+
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+}

@@ -51,7 +51,7 @@ public class JSONObject {
             return
         }
 
-        let ticket = self.context.issueTimeTicket()
+        let ticket = self.context.issueTimeTicket
 
         if let optionalValue = value as? OptionalValue, optionalValue.isNil {
             self.setValueNull(key: key, ticket: ticket)
@@ -100,6 +100,15 @@ public class JSONObject {
             let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: ticket)
             element.initialize(context: self.context, text: text)
             self.setValue(key: key, value: text, ticket: ticket)
+        } else if let element = value as? JSONTree {
+            guard let root = try? element.buildRoot(context) else {
+                Logger.error("Can't build root!")
+                assertionFailure()
+                return
+            }
+            let tree = CRDTTree(root: root, createdAt: ticket)
+            element.initialize(context: self.context, tree: tree)
+            self.setValue(key: key, value: tree, ticket: ticket)
         } else {
             Logger.error("The value is not supported. - key: \(key): value: \(value)")
             assertionFailure()
@@ -115,7 +124,7 @@ public class JSONObject {
     }
 
     private func setPrimitive(key: String, value: PrimitiveValue, ticket: TimeTicket) {
-        let primitive = Primitive(value: value, createdAt: context.issueTimeTicket())
+        let primitive = Primitive(value: value, createdAt: context.issueTimeTicket)
         self.setToCRDTObject(key: key, value: primitive)
 
         let operation = SetOperation(key: key,
@@ -200,14 +209,14 @@ public class JSONObject {
     public func remove(key: String) {
         Logger.trace("obj[\(key)]")
 
-        let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket())
+        let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket)
         guard let removed else {
             return
         }
 
         let removeOperation = RemoveOperation(parentCreatedAt: self.target.createdAt,
                                               createdAt: removed.createdAt,
-                                              executedAt: self.context.issueTimeTicket())
+                                              executedAt: self.context.issueTimeTicket)
         self.context.push(operation: removeOperation)
         self.context.registerRemovedElement(removed)
     }
@@ -235,7 +244,7 @@ public class JSONObject {
     /**
      * `toJSON` returns the JSON encoding of this object.
      */
-    func toJson() -> String {
+    func toJSON() -> String {
         self.target.toJSON()
     }
 
@@ -252,7 +261,7 @@ public class JSONObject {
 
 extension JSONObject: CustomStringConvertible {
     public var description: String {
-        self.toJson()
+        self.toJSON()
     }
 }
 

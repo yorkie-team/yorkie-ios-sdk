@@ -18,6 +18,7 @@ disabled_rules:
   - file_length
   - opening_brace
   - large_tuple
+  - todo
 opt_in_rules:
   - empty_count
 # Rewrited rules

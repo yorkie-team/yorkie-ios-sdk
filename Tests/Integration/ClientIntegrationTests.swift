@@ -290,7 +290,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.sync()
         try await c2.sync()
 
-        let presence1: PresenceType = self.decodePresence(await c2.getPeerPresence(docKey: docKey, clientID: c1.id!)!)!
+        let presence1: PresenceType = self.decodePresence(await c2.getPeerPresence(docKey, c1.id!)!)!
 
         XCTAssert(c1Name == presence1.name)
 
@@ -300,12 +300,12 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.sync()
         try await c1.sync()
 
-        let presence2: PresenceType = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)!
+        let presence2: PresenceType = self.decodePresence(await c1.getPeerPresence(docKey, c2.id!)!)!
 
         XCTAssert(c2Name == presence2.name)
 
-        let c1Peer = try await c1.getPeersByDocKey(docKey: d1.getKey()) as NSDictionary
-        let c2Peer = try (await c2.getPeersByDocKey(docKey: d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
+        let c1Peer = try await c1.getPeersByDocKey(d1.getKey()) as NSDictionary
+        let c2Peer = try (await c2.getPeersByDocKey(d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
 
         XCTAssert(c1Peer.isEqual(to: c2Peer))
 
@@ -400,8 +400,8 @@ final class ClientIntegrationTests: XCTestCase {
         // 03. c1 and c2 sync with push-only mode. So, the changes of c1 and c2
         // are not reflected to each other.
         // But, c can get the changes of c1 and c2, because c3 sync with push-pull mode.
-        try await c1.pauseRemoteChanges(doc: d1)
-        try await c2.pauseRemoteChanges(doc: d2)
+        try await c1.pauseRemoteChanges(d1)
+        try await c2.pauseRemoteChanges(d2)
 
         try await d1.update { root in
             root.c1 = Int64(1)
@@ -422,8 +422,8 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertEqual(d3Doc, "{\"c1\":1,\"c2\":1}")
 
         // 04. c1 and c2 sync with push-pull mode.
-        try await c1.resumeRemoteChanges(doc: d1)
-        try await c2.resumeRemoteChanges(doc: d2)
+        try await c1.resumeRemoteChanges(d1)
+        try await c2.resumeRemoteChanges(d2)
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
@@ -474,7 +474,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await c1.attach(d1)
 
-        let presence1 = await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)
+        let presence1 = await c1.getPeerPresence(docKey, c2.id!)
 
         XCTAssert(presence1 == nil)
 
@@ -482,7 +482,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await Task.sleep(nanoseconds: 1_500_000_000)
 
-        let presence2: PresenceType? = self.decodePresence(await c1.getPeerPresence(docKey: docKey, clientID: c2.id!)!)
+        let presence2: PresenceType? = self.decodePresence(await c1.getPeerPresence(docKey, c2.id!)!)
 
         XCTAssertTrue(presence2 == PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)))
 

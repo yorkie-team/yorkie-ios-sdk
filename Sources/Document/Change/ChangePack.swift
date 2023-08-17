@@ -49,7 +49,7 @@ struct ChangePack {
      */
     let isRemoved: Bool
 
-    init(key: String, checkpoint: Checkpoint, changes: [Change], snapshot: Data? = nil, minSyncedTicket: TimeTicket? = nil, isRemoved: Bool) {
+    init(key: String, checkpoint: Checkpoint, isRemoved: Bool, changes: [Change], snapshot: Data? = nil, minSyncedTicket: TimeTicket? = nil) {
         self.documentKey = key
         self.checkpoint = checkpoint
         self.changes = changes

@@ -10,6 +10,7 @@
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
 		9A20CE86299F61CD00E4CE7E /* Auth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A20CE85299F61CD00E4CE7E /* Auth.swift */; };
+		9A232B772A7D0C0F0041C826 /* Dictionary+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A232B762A7D0C0F0041C826 /* Dictionary+Extension.swift */; };
 		9A30D40429514F150036F732 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		9A3CF3E9296583050024E3DD /* StyleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3E8296583050024E3DD /* StyleOperation.swift */; };
 		9A3CF3EB29658C840024E3DD /* SelectOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3EA29658C840024E3DD /* SelectOperation.swift */; };
@@ -22,11 +23,21 @@
 		9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */; };
 		9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC744292DD82500C89478 /* YorkieCountable.swift */; };
 		9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
+		9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */ = {isa = PBXBuildFile; productRef = 9A5D9DDB2A710FB40096C40C /* Semaphore */; };
 		9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A6294C7E1E00BF27F5 /* Logging */; };
 		9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */; };
 		9A66B1A02955833E00D10B94 /* LLRBTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19F2955833E00D10B94 /* LLRBTree.swift */; };
 		9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7C75E92A0261DD000B6E5A /* Version.swift */; };
+		9A7E88BE2A49600B00AF8997 /* JSONTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BD2A49600B00AF8997 /* JSONTree.swift */; };
+		9A7E88C02A4962A700AF8997 /* IndexTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BF2A4962A700AF8997 /* IndexTree.swift */; };
 		9A8150522967FCD700DFADFB /* Helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8150512967FCD700DFADFB /* Helper.swift */; };
+		9A82C47E2A6126570002D09A /* CRDTTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */; };
+		9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */; };
+		9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */; };
+		9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */; };
+		9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */; };
+		9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */; };
+		9AD11BF52A544362005C84D2 /* TreeSytleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */; };
 		9AD6E7E329C190E7001A1F89 /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */; };
 		9AD6E7E529C190E7001A1F89 /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7E029C190E7001A1F89 /* yorkie.grpc.swift */; };
 		9AD6E7E629C190E7001A1F89 /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7E129C190E7001A1F89 /* yorkie.pb.swift */; };
@@ -128,6 +139,7 @@
 		96DA809028C5B7B400E2C1DA /* GRPCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GRPCTests.swift; sourceTree = "<group>"; };
 		96DA809228C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9A20CE85299F61CD00E4CE7E /* Auth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Auth.swift; sourceTree = "<group>"; };
+		9A232B762A7D0C0F0041C826 /* Dictionary+Extension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Dictionary+Extension.swift"; sourceTree = "<group>"; };
 		9A3CF3E8296583050024E3DD /* StyleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleOperation.swift; sourceTree = "<group>"; };
 		9A3CF3EA29658C840024E3DD /* SelectOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectOperation.swift; sourceTree = "<group>"; };
 		9A3CF3EC29666AB30024E3DD /* JSONTextTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTextTest.swift; sourceTree = "<group>"; };
@@ -141,7 +153,16 @@
 		9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGATreeSplit.swift; sourceTree = "<group>"; };
 		9A66B19F2955833E00D10B94 /* LLRBTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLRBTree.swift; sourceTree = "<group>"; };
 		9A7C75E92A0261DD000B6E5A /* Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Version.swift; sourceTree = "<group>"; };
+		9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTTree.swift; sourceTree = "<group>"; };
+		9A7E88BD2A49600B00AF8997 /* JSONTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONTree.swift; sourceTree = "<group>"; };
+		9A7E88BF2A4962A700AF8997 /* IndexTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTree.swift; sourceTree = "<group>"; };
 		9A8150512967FCD700DFADFB /* Helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Helper.swift; sourceTree = "<group>"; };
+		9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTTreeTests.swift; sourceTree = "<group>"; };
+		9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeIntegrationTests.swift; sourceTree = "<group>"; };
+		9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationHelper.swift; sourceTree = "<group>"; };
+		9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTreeTests.swift; sourceTree = "<group>"; };
+		9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeEditOperation.swift; sourceTree = "<group>"; };
+		9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeSytleOperation.swift; sourceTree = "<group>"; };
 		9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
 		9AD6E7DF29C190E7001A1F89 /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
 		9AD6E7E029C190E7001A1F89 /* yorkie.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.grpc.swift; sourceTree = "<group>"; };
@@ -234,6 +255,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */,
+				9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */,
 				CEEB17E828C84D6A004988DD /* GRPC in Frameworks */,
 				CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */,
 			);
@@ -330,6 +352,8 @@
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
 				9AEA80DB296FE38D000672FC /* TextIntegrationTests.swift */,
 				9AD6E7E829C19E0A001A1F89 /* DocumentIntegrationTests.swift */,
+				9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */,
+				9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */,
 			);
 			path = Integration;
 			sourceTree = "<group>";
@@ -361,6 +385,7 @@
 				CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */,
 				CEA2DA4B28F693F500431B61 /* StringExtensionsTests.swift */,
 				CE9557C929066D8700DF4DFA /* TrieTests.swift */,
+				9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -386,6 +411,7 @@
 				CEC631D828F02B1200915A85 /* CRDTRootTests.swift */,
 				CE370E5B28EEBFA6008FCABD /* RHTTests.swift */,
 				9A3CF3EE2966A7370024E3DD /* CRDTTextTests.swift */,
+				9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -474,6 +500,8 @@
 				CEA2DA4928F6938700431B61 /* String+Extensions.swift */,
 				CE9557C7290666CE00DF4DFA /* Trie.swift */,
 				CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */,
+				9A7E88BF2A4962A700AF8997 /* IndexTree.swift */,
+				9A232B762A7D0C0F0041C826 /* Dictionary+Extension.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -504,6 +532,7 @@
 				CE6BD03B28E6BA9C00E97B8C /* ElementRHT.swift */,
 				CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */,
 				9ADAEE5329654377007E9F9F /* CRDTText.swift */,
+				9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */,
 			);
 			path = CRDT;
 			sourceTree = "<group>";
@@ -519,6 +548,7 @@
 				CE7B996F28E1453E00D56198 /* Strings.swift */,
 				9A4DC73D2923203700C89478 /* JSONCounter.swift */,
 				9ADAEE5729657696007E9F9F /* JSONText.swift */,
+				9A7E88BD2A49600B00AF8997 /* JSONTree.swift */,
 			);
 			path = Json;
 			sourceTree = "<group>";
@@ -535,6 +565,8 @@
 				9ADAEE5929657E03007E9F9F /* EditOperation.swift */,
 				9A3CF3E8296583050024E3DD /* StyleOperation.swift */,
 				9A3CF3EA29658C840024E3DD /* SelectOperation.swift */,
+				9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */,
+				9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */,
 			);
 			path = Operation;
 			sourceTree = "<group>";
@@ -633,6 +665,7 @@
 				CEEB17E728C84D6A004988DD /* GRPC */,
 				CEEB17EA28C84D7B004988DD /* SwiftProtobuf */,
 				9A6399A6294C7E1E00BF27F5 /* Logging */,
+				9A5D9DDB2A710FB40096C40C /* Semaphore */,
 			);
 			productName = Yorkie;
 			productReference = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */;
@@ -687,6 +720,7 @@
 				CEEB17E628C84D6A004988DD /* XCRemoteSwiftPackageReference "grpc-swift" */,
 				CEEB17E928C84D7B004988DD /* XCRemoteSwiftPackageReference "swift-protobuf" */,
 				9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */,
+				9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */,
 			);
 			productRefGroup = 96DA808328C5B7B400E2C1DA /* Products */;
 			projectDirPath = "";
@@ -776,11 +810,14 @@
 				CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */,
 				9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */,
 				9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */,
+				9A7E88C02A4962A700AF8997 /* IndexTree.swift in Sources */,
 				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */,
+				9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */,
 				CE72E85228EE531C00D1331C /* Collection+Extensions.swift in Sources */,
 				CE3EC97528D41903009471BC /* Primitive.swift in Sources */,
+				9AD11BF52A544362005C84D2 /* TreeSytleOperation.swift in Sources */,
 				9ADAEE56296571D8007E9F9F /* CRDTText.swift in Sources */,
 				CE8C22EF28C9E85900432DE5 /* Change.swift in Sources */,
 				CE7B997E28E2FD7000D56198 /* CRDTArray.swift in Sources */,
@@ -804,9 +841,12 @@
 				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
 				9A4DC73E2923203700C89478 /* JSONCounter.swift in Sources */,
 				CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */,
+				9A7E88BE2A49600B00AF8997 /* JSONTree.swift in Sources */,
 				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
 				9AD6E7E629C190E7001A1F89 /* yorkie.pb.swift in Sources */,
+				9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */,
+				9A232B772A7D0C0F0041C826 /* Dictionary+Extension.swift in Sources */,
 				CE3EC96728D30E74009471BC /* CRDTElement.swift in Sources */,
 				9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */,
 				CE8BB74B28FE71550020F62A /* Document.swift in Sources */,
@@ -839,6 +879,8 @@
 				9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */,
 				CE8ED31A28F55F42009A5419 /* SetOperationTests.swift in Sources */,
 				CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */,
+				9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */,
+				9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */,
 				9A30D40429514F150036F732 /* ClientTests.swift in Sources */,
 				9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */,
 				CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */,
@@ -848,6 +890,7 @@
 				CE9F6FAE2910FBBA002F776D /* DocumentConcurrentAccessTests.swift in Sources */,
 				CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */,
 				CEDDE2722914EB5C0032B16A /* YorkieJSONObjectableTests.swift in Sources */,
+				9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */,
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
 				CE8BB74628FE5AC40020F62A /* ChangePackTests.swift in Sources */,
@@ -855,6 +898,7 @@
 				CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */,
 				CE7B997C28E2DB5000D56198 /* RGATreeListTests.swift in Sources */,
 				9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */,
+				9A82C47E2A6126570002D09A /* CRDTTreeTests.swift in Sources */,
 				9A3CF3ED29666AB30024E3DD /* JSONTextTest.swift in Sources */,
 				CE3EC97328D40498009471BC /* CRDTElementTests.swift in Sources */,
 				9AEA80DC296FE38D000672FC /* TextIntegrationTests.swift in Sources */,
@@ -1122,6 +1166,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/Semaphore.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.0.8;
+			};
+		};
 		9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-log.git";
@@ -1149,6 +1201,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9A5D9DDB2A710FB40096C40C /* Semaphore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */;
+			productName = Semaphore;
+		};
 		9A6399A6294C7E1E00BF27F5 /* Logging */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */;

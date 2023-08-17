@@ -81,10 +81,10 @@ struct Checkpoint: Equatable {
     }
 
     /**
-     * `structureAsString` returns a string containing the meta data of this
+     * `toTestString` returns a string containing the meta data of this
      * checkpoint.
      */
-    var structureAsString: String {
+    var toTestString: String {
         return "serverSeq=\(self.serverSeq), clientSeq=\(self.clientSeq)"
     }
 

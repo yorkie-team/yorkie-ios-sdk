@@ -141,7 +141,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 }
 
-final class CRDTText: CRDTTextElement {
+final class CRDTText: CRDTGCElement {
     public typealias TextVal = (attributes: TextAttributes, content: String)
 
     var createdAt: TimeTicket
@@ -322,11 +322,11 @@ final class CRDTText: CRDTTextElement {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data of this value
+     * `toTestString` returns a String containing the meta data of this value
      * for debugging purpose.
      */
-    public var structureAsString: String {
-        self.rgaTreeSplit.structureAsString
+    public var toTestString: String {
+        self.rgaTreeSplit.toTestString
     }
 
     public var plainText: String {
@@ -345,10 +345,10 @@ final class CRDTText: CRDTTextElement {
     }
 
     /**
-     * `purgeTextNodesWithGarbage` physically purges nodes that have been removed.
+     * `purgeRemovedNodesBefore` purges removed nodes before the given time.
      */
-    public func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int {
-        self.rgaTreeSplit.purgeTextNodesWithGarbage(ticket)
+    public func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
+        self.rgaTreeSplit.purgeRemovedNodesBefore(ticket)
     }
 
     /**

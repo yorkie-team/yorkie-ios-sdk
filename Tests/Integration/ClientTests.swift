@@ -181,7 +181,7 @@ class ClientTests: XCTestCase {
             root.c1 = Int64(0)
         }
 
-        try await d1.update { root in
+        try await d2.update { root in
             root.c2 = Int64(0)
         }
 
@@ -205,8 +205,8 @@ class ClientTests: XCTestCase {
             root.c2 = Int64(1)
         }
 
-        try await c1.sync([docKey: .pushOnly])
-        try await c2.sync([docKey: .pushOnly])
+        try await c1.sync(d1, .pushOnly)
+        try await c2.sync(d2, .pushOnly)
         try await c3.sync()
 
         result1 = await d1.getRoot().debugDescription
@@ -273,7 +273,7 @@ class ClientTests: XCTestCase {
 
         XCTAssertEqual(changePack.getChanges().count, 1)
 
-        try await c1.sync([docKey: .pushOnly])
+        try await c1.sync(d1, .pushOnly)
 
         checkpoint = await d1.checkpoint
         XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 2), checkpoint)

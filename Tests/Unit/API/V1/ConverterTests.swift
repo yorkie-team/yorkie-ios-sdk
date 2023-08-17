@@ -74,7 +74,7 @@ class ConverterTests: XCTestCase {
         XCTAssertEqual(changeID.getClientSeq(), converted.getClientSeq())
         XCTAssertEqual(changeID.getLamport(), converted.getLamport())
         XCTAssertEqual(changeID.getActorID(), converted.getActorID())
-        XCTAssertEqual(changeID.structureAsString, converted.structureAsString)
+        XCTAssertEqual(changeID.toTestString, converted.toTestString)
         XCTAssertEqual(changeID.getLamportAsString(), converted.getLamportAsString())
     }
 
@@ -94,7 +94,7 @@ class ConverterTests: XCTestCase {
         let change = Change(id: ChangeID.initial, operations: [addOperation], message: "AddOperation")
         do {
             let converted = try Converter.fromChanges([Converter.toChange(change)]).first
-            XCTAssertEqual(change.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(change.toTestString, converted?.toTestString)
         } catch {
             XCTFail("\(error)")
         }
@@ -114,8 +114,8 @@ class ConverterTests: XCTestCase {
         let addChange = Change(id: setChange.id.next(), operations: [addOperation], message: "AddOperation")
         do {
             let convertedArray = try Converter.fromChanges(Converter.toChanges([setChange, addChange]))
-            XCTAssertEqual(setChange.structureAsString, convertedArray[0].structureAsString)
-            XCTAssertEqual(addChange.structureAsString, convertedArray[1].structureAsString)
+            XCTAssertEqual(setChange.toTestString, convertedArray[0].toTestString)
+            XCTAssertEqual(addChange.toTestString, convertedArray[1].toTestString)
         } catch {
             XCTFail("\(error)")
         }
@@ -127,12 +127,12 @@ class ConverterTests: XCTestCase {
                                         value: Primitive(value: .null, createdAt: TimeTicket.initial),
                                         executedAt: TimeTicket.initial)
         let change = Change(id: ChangeID.initial, operations: [addOperation], message: "AddOperation")
-        let changePack = ChangePack(key: "sample", checkpoint: Checkpoint.initial, changes: [change], isRemoved: false)
+        let changePack = ChangePack(key: "sample", checkpoint: Checkpoint.initial, isRemoved: false, changes: [change])
 
         do {
             let converted = try Converter.fromChangePack(Converter.toChangePack(pack: changePack))
             XCTAssertEqual(changePack.getChangeSize(), converted.getChangeSize())
-            XCTAssertEqual(changePack.getChanges().first?.structureAsString, converted.getChanges().first?.structureAsString)
+            XCTAssertEqual(changePack.getChanges().first?.toTestString, converted.getChanges().first?.toTestString)
             XCTAssertEqual(changePack.getCheckpoint(), converted.getCheckpoint())
             XCTAssertEqual(changePack.getDocumentKey(), converted.getDocumentKey())
             XCTAssertEqual(changePack.getMinSyncedTicket(), converted.getMinSyncedTicket())
@@ -149,7 +149,7 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(setOperation)]).first as? SetOperation
-            XCTAssertEqual(setOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(setOperation.toTestString, converted?.toTestString)
             XCTAssertEqual(setOperation.value.toJSON(), converted?.value.toJSON())
             XCTAssertEqual(setOperation.key, converted?.key)
             XCTAssertEqual(setOperation.effectedCreatedAt, converted?.effectedCreatedAt)
@@ -166,7 +166,7 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(addOperation)]).first as? AddOperation
-            XCTAssertEqual(addOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(addOperation.toTestString, converted?.toTestString)
             XCTAssertEqual(addOperation.value.toJSON(), converted?.value.toJSON())
             XCTAssertEqual(addOperation.previousCreatedAt, converted?.previousCreatedAt)
             XCTAssertEqual(addOperation.effectedCreatedAt, converted?.effectedCreatedAt)
@@ -183,7 +183,7 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(moveOperation)]).first as? MoveOperation
-            XCTAssertEqual(moveOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(moveOperation.toTestString, converted?.toTestString)
             XCTAssertEqual(moveOperation.previousCreatedAt, converted?.previousCreatedAt)
             XCTAssertEqual(moveOperation.effectedCreatedAt, converted?.effectedCreatedAt)
             XCTAssertEqual(moveOperation.createdAt, converted?.createdAt)
@@ -199,7 +199,7 @@ class ConverterTests: XCTestCase {
 
         do {
             let converted = try Converter.fromOperations([Converter.toOperation(removeOperation)]).first as? RemoveOperation
-            XCTAssertEqual(removeOperation.structureAsString, converted?.structureAsString)
+            XCTAssertEqual(removeOperation.toTestString, converted?.toTestString)
             XCTAssertEqual(removeOperation.effectedCreatedAt, converted?.effectedCreatedAt)
             XCTAssertEqual(removeOperation.createdAt, converted?.createdAt)
             XCTAssertEqual(removeOperation.executedAt, converted?.executedAt)
@@ -233,7 +233,7 @@ class ConverterTests: XCTestCase {
             let convertedArray = try Converter.fromOperations(Converter.toOperations([setOperation, addOperation, moveOperation, removeOperation]))
 
             if let converted = convertedArray[0] as? SetOperation {
-                XCTAssertEqual(setOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(setOperation.toTestString, converted.toTestString)
                 XCTAssertEqual(setOperation.value.toJSON(), converted.value.toJSON())
                 XCTAssertEqual(setOperation.key, converted.key)
                 XCTAssertEqual(setOperation.effectedCreatedAt, converted.effectedCreatedAt)
@@ -244,7 +244,7 @@ class ConverterTests: XCTestCase {
             }
 
             if let converted = convertedArray[1] as? AddOperation {
-                XCTAssertEqual(addOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(addOperation.toTestString, converted.toTestString)
                 XCTAssertEqual(addOperation.value.toJSON(), converted.value.toJSON())
                 XCTAssertEqual(addOperation.previousCreatedAt, converted.previousCreatedAt)
                 XCTAssertEqual(addOperation.effectedCreatedAt, converted.effectedCreatedAt)
@@ -255,7 +255,7 @@ class ConverterTests: XCTestCase {
             }
 
             if let converted = convertedArray[2] as? MoveOperation {
-                XCTAssertEqual(moveOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(moveOperation.toTestString, converted.toTestString)
                 XCTAssertEqual(moveOperation.previousCreatedAt, converted.previousCreatedAt)
                 XCTAssertEqual(moveOperation.effectedCreatedAt, converted.effectedCreatedAt)
                 XCTAssertEqual(moveOperation.createdAt, converted.createdAt)
@@ -266,7 +266,7 @@ class ConverterTests: XCTestCase {
             }
 
             if let converted = convertedArray[3] as? RemoveOperation {
-                XCTAssertEqual(removeOperation.structureAsString, converted.structureAsString)
+                XCTAssertEqual(removeOperation.toTestString, converted.toTestString)
                 XCTAssertEqual(removeOperation.effectedCreatedAt, converted.effectedCreatedAt)
                 XCTAssertEqual(removeOperation.createdAt, converted.createdAt)
                 XCTAssertEqual(removeOperation.executedAt, converted.executedAt)

@@ -112,10 +112,10 @@ protocol CRDTContainer: CRDTElement {
 }
 
 /**
- * `CRDTTextElement` represents CRDTText or CRDTRichText.
+ * `CRDTGCElement` represents element which has garbage collecting method.
  */
-protocol CRDTTextElement: CRDTElement {
+protocol CRDTGCElement: CRDTElement {
     var removedNodesLength: Int { get }
 
-    func purgeTextNodesWithGarbage(ticket: TimeTicket) -> Int
+    func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int
 }

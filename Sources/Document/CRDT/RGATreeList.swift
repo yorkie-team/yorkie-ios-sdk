@@ -366,10 +366,10 @@ class RGATreeList {
     }
 
     /**
-     * `structureAsString` returns a String containing the meta data of the node id
+     * `toTestString` returns a String containing the meta data of the node id
      * for debugging purpose.
      */
-    var structureAsString: String {
+    var toTestString: String {
         var result: [String] = []
 
         for node in self {

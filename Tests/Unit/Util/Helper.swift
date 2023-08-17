@@ -15,7 +15,7 @@
  */
 
 import Foundation
-import Yorkie
+@testable import Yorkie
 
 /**
  * TextView emulates an external editor like CodeMirror to test whether change
@@ -63,4 +63,15 @@ private extension String {
 
         return String(self[range])
     }
+}
+
+/**
+ * `buildIndexTree` builds an index tree from the given element node.
+ */
+func buildIndexTree(_ node: JSONTreeElementNode) async throws -> IndexTree<CRDTTreeNode>? {
+    let doc = Document(key: "test")
+    try await doc.update { root in
+        root.t = JSONTree(initialRoot: node)
+    }
+    return try await(doc.getRoot().t as? JSONTree)?.getIndexTree()
 }

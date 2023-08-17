@@ -20,15 +20,9 @@ import Foundation
  * `RHTNode` is a node of RHT(Replicated Hashtable).
  */
 struct RHTNode {
-    fileprivate var key: String
-    fileprivate var value: String
-    fileprivate var updatedAt: TimeTicket
-
-    init(key: String, value: String, updatedAt: TimeTicket) {
-        self.key = key
-        self.value = value
-        self.updatedAt = updatedAt
-    }
+    var key: String
+    var value: String
+    var updatedAt: TimeTicket
 }
 
 /**
@@ -93,6 +87,34 @@ class RHT {
         }
 
         return result.isEmpty ? "" : "{\(result.joined(separator: ","))}"
+    }
+
+    /**
+     * `toXML` converts the given RHT to XML string.
+     */
+    public func toXML() -> String {
+        if self.nodeMapByKey.isEmpty {
+            return ""
+        }
+
+        let sortedKeys = self.nodeMapByKey.keys.sorted()
+
+        let xmlAttributes = sortedKeys.compactMap { key in
+            if let value = self.nodeMapByKey[key] {
+                return "\(key)=\"\(value.value)\""
+            } else {
+                return nil
+            }
+        }.joined(separator: " ")
+
+        return " \(xmlAttributes)"
+    }
+
+    /**
+     * `size` returns the size of RHT
+     */
+    public var size: Int {
+        self.nodeMapByKey.count
     }
 
     /**

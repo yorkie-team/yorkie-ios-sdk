@@ -28,6 +28,8 @@ public enum OperationInfoType: String {
     case edit
     case style
     case select
+    case treeEdit
+    case treeStyle
 }
 
 /**
@@ -132,6 +134,49 @@ public struct SelectOpInfo: OperationInfo {
     public let to: Int
 }
 
+public struct TreeEditOpInfo: OperationInfo {
+    public let type: OperationInfoType = .treeEdit
+    public let path: String
+    public let from: Int
+    public let to: Int
+    public let fromPath: [Int]
+    public let toPath: [Int]
+    public let value: [TreeNode]
+}
+
+public struct TreeStyleOpInfo: OperationInfo {
+    public let type: OperationInfoType = .treeStyle
+    public let path: String
+    public let from: Int
+    public let to: Int
+    public let fromPath: [Int]
+    public let value: [String: Any]
+
+    public static func == (lhs: TreeStyleOpInfo, rhs: TreeStyleOpInfo) -> Bool {
+        if lhs.type != lhs.type {
+            return false
+        }
+        if lhs.path != lhs.path {
+            return false
+        }
+        if lhs.from != lhs.from {
+            return false
+        }
+        if lhs.to != lhs.to {
+            return false
+        }
+        if lhs.fromPath != lhs.fromPath {
+            return false
+        }
+
+        if !(lhs.value == rhs.value) {
+            return false
+        }
+
+        return true
+    }
+}
+
 /**
  * `Operation` represents an operation to be executed on a document.
  *  Types confiming ``Operation`` must be struct to avoid data racing.
@@ -148,9 +193,9 @@ protocol Operation {
     var effectedCreatedAt: TimeTicket { get }
 
     /**
-     * `structureAsString` returns a string containing the meta data.
+     * `toTestString` returns a string containing the meta data.
      */
-    var structureAsString: String { get }
+    var toTestString: String { get }
 
     /**
      * `execute` executes this operation on the given document(`root`).
