@@ -128,7 +128,6 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
   case documentsChanged // = 0
   case documentsWatched // = 1
   case documentsUnwatched // = 2
-  case presenceChanged // = 3
   case UNRECOGNIZED(Int)
 
   init() {
@@ -140,7 +139,6 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
     case 0: self = .documentsChanged
     case 1: self = .documentsWatched
     case 2: self = .documentsUnwatched
-    case 3: self = .presenceChanged
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -150,7 +148,6 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
     case .documentsChanged: return 0
     case .documentsWatched: return 1
     case .documentsUnwatched: return 2
-    case .presenceChanged: return 3
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -165,11 +162,36 @@ extension Yorkie_V1_DocEventType: CaseIterable {
     .documentsChanged,
     .documentsWatched,
     .documentsUnwatched,
-    .presenceChanged,
   ]
 }
 
 #endif  // swift(>=4.2)
+
+//////////////////////////////////////////
+/// Messages for Snapshot               //
+//////////////////////////////////////////
+struct Yorkie_V1_Snapshot {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var root: Yorkie_V1_JSONElement {
+    get {return _root ?? Yorkie_V1_JSONElement()}
+    set {_root = newValue}
+  }
+  /// Returns true if `root` has been explicitly set.
+  var hasRoot: Bool {return self._root != nil}
+  /// Clears the value of `root`. Subsequent reads from it will return its default value.
+  mutating func clearRoot() {self._root = nil}
+
+  var presences: Dictionary<String,Yorkie_V1_Presence> = [:]
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _root: Yorkie_V1_JSONElement? = nil
+}
 
 /// ChangePack is a message that contains all changes that occurred in a document.
 /// It is used to synchronize changes between clients and servers.
@@ -230,11 +252,21 @@ struct Yorkie_V1_Change {
 
   var operations: [Yorkie_V1_Operation] = []
 
+  var presenceChange: Yorkie_V1_PresenceChange {
+    get {return _presenceChange ?? Yorkie_V1_PresenceChange()}
+    set {_presenceChange = newValue}
+  }
+  /// Returns true if `presenceChange` has been explicitly set.
+  var hasPresenceChange: Bool {return self._presenceChange != nil}
+  /// Clears the value of `presenceChange`. Subsequent reads from it will return its default value.
+  mutating func clearPresenceChange() {self._presenceChange = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
   fileprivate var _id: Yorkie_V1_ChangeID? = nil
+  fileprivate var _presenceChange: Yorkie_V1_PresenceChange? = nil
 }
 
 struct Yorkie_V1_ChangeID {
@@ -1726,26 +1758,12 @@ struct Yorkie_V1_DocumentSummary {
   fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-struct Yorkie_V1_Presence {
+struct Yorkie_V1_PresenceChange {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clock: Int32 = 0
-
-  var data: Dictionary<String,String> = [:]
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-}
-
-struct Yorkie_V1_Client {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var id: Data = Data()
+  var type: Yorkie_V1_PresenceChange.ChangeType = .unspecified
 
   var presence: Yorkie_V1_Presence {
     get {return _presence ?? Yorkie_V1_Presence()}
@@ -1758,9 +1776,69 @@ struct Yorkie_V1_Client {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
+  enum ChangeType: SwiftProtobuf.Enum {
+    typealias RawValue = Int
+    case unspecified // = 0
+    case put // = 1
+    case delete // = 2
+    case clear // = 3
+    case UNRECOGNIZED(Int)
+
+    init() {
+      self = .unspecified
+    }
+
+    init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .put
+      case 2: self = .delete
+      case 3: self = .clear
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .put: return 1
+      case .delete: return 2
+      case .clear: return 3
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+  }
+
   init() {}
 
   fileprivate var _presence: Yorkie_V1_Presence? = nil
+}
+
+#if swift(>=4.2)
+
+extension Yorkie_V1_PresenceChange.ChangeType: CaseIterable {
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  static var allCases: [Yorkie_V1_PresenceChange.ChangeType] = [
+    .unspecified,
+    .put,
+    .delete,
+    .clear,
+  ]
+}
+
+#endif  // swift(>=4.2)
+
+struct Yorkie_V1_Presence {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var data: Dictionary<String,String> = [:]
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
 }
 
 struct Yorkie_V1_Checkpoint {
@@ -1825,27 +1903,17 @@ struct Yorkie_V1_DocEvent {
 
   var type: Yorkie_V1_DocEventType = .documentsChanged
 
-  var publisher: Yorkie_V1_Client {
-    get {return _publisher ?? Yorkie_V1_Client()}
-    set {_publisher = newValue}
-  }
-  /// Returns true if `publisher` has been explicitly set.
-  var hasPublisher: Bool {return self._publisher != nil}
-  /// Clears the value of `publisher`. Subsequent reads from it will return its default value.
-  mutating func clearPublisher() {self._publisher = nil}
-
-  var documentID: String = String()
+  var publisher: Data = Data()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
-
-  fileprivate var _publisher: Yorkie_V1_Client? = nil
 }
 
 #if swift(>=5.5) && canImport(_Concurrency)
 extension Yorkie_V1_ValueType: @unchecked Sendable {}
 extension Yorkie_V1_DocEventType: @unchecked Sendable {}
+extension Yorkie_V1_Snapshot: @unchecked Sendable {}
 extension Yorkie_V1_ChangePack: @unchecked Sendable {}
 extension Yorkie_V1_Change: @unchecked Sendable {}
 extension Yorkie_V1_ChangeID: @unchecked Sendable {}
@@ -1883,8 +1951,9 @@ extension Yorkie_V1_Project: @unchecked Sendable {}
 extension Yorkie_V1_UpdatableProjectFields: @unchecked Sendable {}
 extension Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods: @unchecked Sendable {}
 extension Yorkie_V1_DocumentSummary: @unchecked Sendable {}
+extension Yorkie_V1_PresenceChange: @unchecked Sendable {}
+extension Yorkie_V1_PresenceChange.ChangeType: @unchecked Sendable {}
 extension Yorkie_V1_Presence: @unchecked Sendable {}
-extension Yorkie_V1_Client: @unchecked Sendable {}
 extension Yorkie_V1_Checkpoint: @unchecked Sendable {}
 extension Yorkie_V1_TextNodePos: @unchecked Sendable {}
 extension Yorkie_V1_TimeTicket: @unchecked Sendable {}
@@ -1919,8 +1988,49 @@ extension Yorkie_V1_DocEventType: SwiftProtobuf._ProtoNameProviding {
     0: .same(proto: "DOC_EVENT_TYPE_DOCUMENTS_CHANGED"),
     1: .same(proto: "DOC_EVENT_TYPE_DOCUMENTS_WATCHED"),
     2: .same(proto: "DOC_EVENT_TYPE_DOCUMENTS_UNWATCHED"),
-    3: .same(proto: "DOC_EVENT_TYPE_PRESENCE_CHANGED"),
   ]
+}
+
+extension Yorkie_V1_Snapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".Snapshot"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "root"),
+    2: .same(proto: "presences"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._root) }()
+      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_Presence>.self, value: &self.presences) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._root {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if !self.presences.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_Presence>.self, value: self.presences, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Yorkie_V1_Snapshot, rhs: Yorkie_V1_Snapshot) -> Bool {
+    if lhs._root != rhs._root {return false}
+    if lhs.presences != rhs.presences {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
 }
 
 extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -1995,6 +2105,7 @@ extension Yorkie_V1_Change: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     1: .same(proto: "id"),
     2: .same(proto: "message"),
     3: .same(proto: "operations"),
+    4: .standard(proto: "presence_change"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2006,6 +2117,7 @@ extension Yorkie_V1_Change: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       case 1: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.message) }()
       case 3: try { try decoder.decodeRepeatedMessageField(value: &self.operations) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._presenceChange) }()
       default: break
       }
     }
@@ -2025,6 +2137,9 @@ extension Yorkie_V1_Change: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     if !self.operations.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.operations, fieldNumber: 3)
     }
+    try { if let v = self._presenceChange {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2032,6 +2147,7 @@ extension Yorkie_V1_Change: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     if lhs._id != rhs._id {return false}
     if lhs.message != rhs.message {return false}
     if lhs.operations != rhs.operations {return false}
+    if lhs._presenceChange != rhs._presenceChange {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4291,48 +4407,10 @@ extension Yorkie_V1_DocumentSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension Yorkie_V1_Presence: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".Presence"
+extension Yorkie_V1_PresenceChange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".PresenceChange"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "clock"),
-    2: .same(proto: "data"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.clock) }()
-      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.data) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.clock != 0 {
-      try visitor.visitSingularInt32Field(value: self.clock, fieldNumber: 1)
-    }
-    if !self.data.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.data, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: Yorkie_V1_Presence, rhs: Yorkie_V1_Presence) -> Bool {
-    if lhs.clock != rhs.clock {return false}
-    if lhs.data != rhs.data {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_Client: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = _protobuf_package + ".Client"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "id"),
+    1: .same(proto: "type"),
     2: .same(proto: "presence"),
   ]
 
@@ -4342,7 +4420,7 @@ extension Yorkie_V1_Client: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.id) }()
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._presence) }()
       default: break
       }
@@ -4354,8 +4432,8 @@ extension Yorkie_V1_Client: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.id.isEmpty {
-      try visitor.visitSingularBytesField(value: self.id, fieldNumber: 1)
+    if self.type != .unspecified {
+      try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
     try { if let v = self._presence {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
@@ -4363,9 +4441,50 @@ extension Yorkie_V1_Client: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: Yorkie_V1_Client, rhs: Yorkie_V1_Client) -> Bool {
-    if lhs.id != rhs.id {return false}
+  static func ==(lhs: Yorkie_V1_PresenceChange, rhs: Yorkie_V1_PresenceChange) -> Bool {
+    if lhs.type != rhs.type {return false}
     if lhs._presence != rhs._presence {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_PresenceChange.ChangeType: SwiftProtobuf._ProtoNameProviding {
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    0: .same(proto: "CHANGE_TYPE_UNSPECIFIED"),
+    1: .same(proto: "CHANGE_TYPE_PUT"),
+    2: .same(proto: "CHANGE_TYPE_DELETE"),
+    3: .same(proto: "CHANGE_TYPE_CLEAR"),
+  ]
+}
+
+extension Yorkie_V1_Presence: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".Presence"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "data"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.data) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.data.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.data, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Yorkie_V1_Presence, rhs: Yorkie_V1_Presence) -> Bool {
+    if lhs.data != rhs.data {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4506,7 +4625,6 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "type"),
     2: .same(proto: "publisher"),
-    3: .standard(proto: "document_id"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4516,34 +4634,25 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._publisher) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeSingularBytesField(value: &self.publisher) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if self.type != .documentsChanged {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
-    try { if let v = self._publisher {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.documentID.isEmpty {
-      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 3)
+    if !self.publisher.isEmpty {
+      try visitor.visitSingularBytesField(value: self.publisher, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_DocEvent, rhs: Yorkie_V1_DocEvent) -> Bool {
     if lhs.type != rhs.type {return false}
-    if lhs._publisher != rhs._publisher {return false}
-    if lhs.documentID != rhs.documentID {return false}
+    if lhs.publisher != rhs.publisher {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

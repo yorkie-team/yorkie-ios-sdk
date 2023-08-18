@@ -72,7 +72,7 @@ final class DocumentIntegrationTests: XCTestCase {
 
         // 04. try to update a removed document.
         do {
-            try await self.d1.update { root in
+            try await self.d1.update { root, _ in
                 root.k1 = String("v1")
             }
         } catch {
@@ -108,7 +108,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 create d1 and remove it.
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -149,7 +149,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 creates d1 and c2 syncs.
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -168,7 +168,7 @@ final class DocumentIntegrationTests: XCTestCase {
         XCTAssertEqual(doc1Content, doc2Content)
 
         // 02. c1 updates d1 and removes it.
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.k1 = "v2"
         }
 
@@ -199,7 +199,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 creates d1 and c2 syncs.
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -244,7 +244,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 creates d1 and c2 syncs.
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -398,7 +398,7 @@ final class DocumentIntegrationTests: XCTestCase {
             d3Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        try await self.d2.update { root in
+        try await self.d2.update { root, _ in
             root.counter = JSONCounter(value: Int32(0))
             root.todos = ["todo1", "todo2"]
         }
@@ -416,7 +416,7 @@ final class DocumentIntegrationTests: XCTestCase {
         d1Events = []
         d2Events = []
 
-        try await self.d2.update { root in
+        try await self.d2.update { root, _ in
             (root.counter as? JSONCounter<Int32>)?.increase(value: 10)
         }
 
@@ -429,7 +429,7 @@ final class DocumentIntegrationTests: XCTestCase {
         d1Events = []
         d3Events = []
 
-        try await self.d2.update { root in
+        try await self.d2.update { root, _ in
             (root.todos as? JSONArray)?.append("todo3")
         }
 
@@ -444,7 +444,7 @@ final class DocumentIntegrationTests: XCTestCase {
 
         await self.d1.unsubscribe("$.todos")
 
-        try await self.d2.update { root in
+        try await self.d2.update { root, _ in
             (root.todos as? JSONArray)?.append("todo4")
         }
 
@@ -458,7 +458,7 @@ final class DocumentIntegrationTests: XCTestCase {
 
         await self.d1.unsubscribe("$.counter")
 
-        try await self.d2.update { root in
+        try await self.d2.update { root, _ in
             (root.counter as? JSONCounter<Int32>)?.increase(value: 10)
         }
 

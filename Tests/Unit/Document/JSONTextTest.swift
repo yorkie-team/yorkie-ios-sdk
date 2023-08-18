@@ -31,13 +31,13 @@ final class JSONTextTest: XCTestCase {
         //           ------ ins links ----
         //           |            |      |
         // [init] - [A] - [12] - {BC} - [D]
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "ABCD")
             (root.k1 as? JSONText)?.edit(1, 3, "12")
         }
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             XCTAssertEqual("[0:00:0:0 ][1:00:2:0 A][1:00:3:0 12]{1:00:2:1 BC}[1:00:2:3 D]", (root.k1 as? JSONText)?.toTestString)
 
             var range = (root.k1 as? JSONText)?.createRange(0, 0)
@@ -70,13 +70,13 @@ final class JSONTextTest: XCTestCase {
         //           -- ins links ---
         //           |              |
         // [init] - [ABC] - [\n] - [D]
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "ABCD")
             (root.k1 as? JSONText)?.edit(3, 3, "\n")
         }
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             XCTAssertEqual(
                 "[0:00:0:0 ][1:00:2:0 ABC][1:00:3:0 \n][1:00:2:3 D]",
                 (root.k1 as? JSONText)?.toTestString
@@ -93,7 +93,7 @@ final class JSONTextTest: XCTestCase {
         var docContent = await doc.toSortedJSON()
         XCTAssertEqual("{}", docContent)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "ㅎ")
             (root.k1 as? JSONText)?.edit(0, 1, "하")
@@ -111,7 +111,7 @@ final class JSONTextTest: XCTestCase {
         let doc = Document(key: "test-doc")
         let view = TextView()
 
-        try await doc.update { root in root.text = JSONText() }
+        try await doc.update { root, _ in root.text = JSONText() }
 
         await doc.subscribe("$.text") {
             view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
@@ -125,7 +125,7 @@ final class JSONTextTest: XCTestCase {
         ]
 
         for cmd in commands {
-            try await doc.update { root in
+            try await doc.update { root, _ in
                 (root.text as? JSONText)?.edit(cmd.from, cmd.to, cmd.content)
             }
 
@@ -138,7 +138,7 @@ final class JSONTextTest: XCTestCase {
         let doc = Document(key: "test-doc")
         let view = TextView()
 
-        try await doc.update { root in root.text = JSONText() }
+        try await doc.update { root, _ in root.text = JSONText() }
 
         await doc.subscribe("$.text") {
             view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
@@ -160,7 +160,7 @@ final class JSONTextTest: XCTestCase {
         ]
 
         for cmd in commands {
-            try await doc.update { root in
+            try await doc.update { root, _ in
                 (root.text as? JSONText)?.edit(cmd.from, cmd.to, cmd.content)
             }
 
@@ -173,7 +173,7 @@ final class JSONTextTest: XCTestCase {
         let doc = Document(key: "test-doc")
         let view = TextView()
 
-        try await doc.update { root in root.text = JSONText() }
+        try await doc.update { root, _ in root.text = JSONText() }
 
         await doc.subscribe("$.text") {
             view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
@@ -192,7 +192,7 @@ final class JSONTextTest: XCTestCase {
         ]
 
         for cmd in commands {
-            try await doc.update { root in
+            try await doc.update { root, _ in
                 (root.text as? JSONText)?.edit(cmd.from, cmd.to, cmd.content)
             }
 
@@ -204,7 +204,7 @@ final class JSONTextTest: XCTestCase {
     func test_should_handle_select_operations() async throws {
         let doc = Document(key: "test-doc")
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "ABCD")
         }
@@ -213,7 +213,7 @@ final class JSONTextTest: XCTestCase {
             XCTAssertEqual((event as! ChangeEvent).value.operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
         }
 
-        try await doc.update { root in (root.text as? JSONText)?.select(2, 4) }
+        try await doc.update { root, _ in (root.text as? JSONText)?.select(2, 4) }
     }
 
     func test_should_handle_rich_text_edit_operations() async throws {
@@ -222,13 +222,13 @@ final class JSONTextTest: XCTestCase {
         var docContent = await doc.toSortedJSON()
         XCTAssertEqual("{}", docContent)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "ABCD", ["b": 1])
             (root.k1 as? JSONText)?.edit(3, 3, "\n")
         }
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             XCTAssertEqual("[0:00:0:0 ][1:00:2:0 ABC][1:00:3:0 \n][1:00:2:3 D]",
                            (root.k1 as? JSONText)?.toTestString)
         }

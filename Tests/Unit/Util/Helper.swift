@@ -70,7 +70,7 @@ private extension String {
  */
 func buildIndexTree(_ node: JSONTreeElementNode) async throws -> IndexTree<CRDTTreeNode>? {
     let doc = Document(key: "test")
-    try await doc.update { root in
+    try await doc.update { root, _ in
         root.t = JSONTree(initialRoot: node)
     }
     return try await(doc.getRoot().t as? JSONTree)?.getIndexTree()

@@ -29,10 +29,6 @@ public enum ClientEventType: String {
      */
     case documentsChanged = "documents-changed"
     /**
-     * client event type when peers changed.
-     */
-    case peersChanged = "peers-changed"
-    /**
      * client event type when stream connection changed.
      */
     case streamConnectionStatusChanged = "stream-connection-status-changed"
@@ -73,45 +69,6 @@ struct DocumentsChangedEvent: BaseClientEvent {
      * `DocumentsChangedEvent` value
      */
     var value: [String]
-}
-
-/**
- * `PeersChangedValue` represents the value of the PeersChanged event.
- */
-struct PeersChangedValue: Equatable {
-    enum `Type`: String {
-        case initialized
-        case watched
-        case unwatched
-        case presenceChanged = "presence-changed"
-    }
-
-    let type: `Type`
-    let peers: [DocumentKey: PresenceMap]
-
-    static func == (lhs: Yorkie.PeersChangedValue, rhs: Yorkie.PeersChangedValue) -> Bool {
-        if lhs.type == rhs.type {
-            return NSDictionary(dictionary: lhs.peers).isEqual(to: rhs.peers)
-        }
-
-        return false
-    }
-}
-
-/**
- * `PeersChangedEvent` is an event that occurs when the states of another peers
- * of the attached documents changes.
- */
-struct PeerChangedEvent: BaseClientEvent {
-    /**
-     * `PeerChangedEvent` type
-     * enum {@link ClientEventType}.PeersChangedEvent
-     */
-    var type: ClientEventType = .peersChanged
-    /**
-     * `PeersChangedEvent` value
-     */
-    var value: PeersChangedValue
 }
 
 /**

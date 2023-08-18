@@ -32,6 +32,12 @@ public enum DocEventType: String {
      * remote document change event type
      */
     case remoteChange = "remote-change"
+    /**
+     * `PeersChanged` means that the presences of the peer clients has changed.
+     * // TODO(hackerwins): We'll use peers means others. We need to find a better
+     * // name for this event.
+     */
+    case peersChanged = "peers-changed"
 }
 
 /**
@@ -103,4 +109,54 @@ public struct RemoteChangeEvent: ChangeEvent {
      * RemoteChangeEvent type
      */
     public var value: ChangeInfo
+}
+
+/**
+ * `PeersChangedEventType` is peers changed event types
+ */
+enum PeersChangedEventType {
+    case initialized
+    case watched
+    case unwatched
+    case presenceChanged
+}
+
+/**
+ * `PeersChangedValue` represents the value of the PeersChanged event.
+ */
+public typealias PeerElement = (clientID: ActorID, presence: PresenceData)
+
+public enum PeersChangedValue {
+    /**
+     * `Initialized` means that the peer list has been initialized.
+     */
+    case initialized(peers: [PeerElement])
+    /**
+     * `Watched` means that the peer has established a connection with the server,
+     * enabling real-time synchronization.
+     */
+    case watched(peer: PeerElement)
+    /**
+     * `Unwatched` means that the connection has been disconnected.
+     */
+    case unwatched(peer: PeerElement)
+    /**
+     * `PeersChanged` means that the presences of the peer has updated.
+     */
+    case presenceChanged(peer: PeerElement)
+}
+
+/**
+ * `PeersChangedEvent` is an event that occurs when the states of another peers
+ * of the attached documents changes. *
+ */
+public struct PeersChangedEvent: DocEvent {
+    /**
+     * ``DocEventType/peersChanged``
+     */
+    public let type: DocEventType = .peersChanged
+    /**
+     * RemoteChangeEvent type
+     */
+    public var value: PeersChangedValue
 }

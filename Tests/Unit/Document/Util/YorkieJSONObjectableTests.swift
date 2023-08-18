@@ -41,7 +41,7 @@ class YorkieJSONObjectableTests: XCTestCase {
         ]
 
         let doc = Document(key: "test")
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.lists = lists
 
             XCTAssertEqual(root.debugDescription,

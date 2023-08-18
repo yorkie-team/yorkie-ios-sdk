@@ -34,6 +34,7 @@
 		9A82C47E2A6126570002D09A /* CRDTTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */; };
 		9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */; };
 		9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */; };
+		9A97C18C2A8F32CE002AEFC5 /* Presence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A97C18B2A8F32CE002AEFC5 /* Presence.swift */; };
 		9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */; };
 		9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */; };
 		9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */; };
@@ -47,7 +48,6 @@
 		9ADAEE5A29657E03007E9F9F /* EditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5929657E03007E9F9F /* EditOperation.swift */; };
 		9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */; };
 		9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */; };
-		9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */; };
 		9AEA80DC296FE38D000672FC /* TextIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80DB296FE38D000672FC /* TextIntegrationTests.swift */; };
 		9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF55ED0290684BD006B7146 /* ConverterTests.swift */; };
 		CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE370E5B28EEBFA6008FCABD /* RHTTests.swift */; };
@@ -160,6 +160,7 @@
 		9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTTreeTests.swift; sourceTree = "<group>"; };
 		9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeIntegrationTests.swift; sourceTree = "<group>"; };
 		9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationHelper.swift; sourceTree = "<group>"; };
+		9A97C18B2A8F32CE002AEFC5 /* Presence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presence.swift; sourceTree = "<group>"; };
 		9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTreeTests.swift; sourceTree = "<group>"; };
 		9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeEditOperation.swift; sourceTree = "<group>"; };
 		9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeSytleOperation.swift; sourceTree = "<group>"; };
@@ -313,6 +314,14 @@
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		9A97C18A2A8F32BA002AEFC5 /* Presence */ = {
+			isa = PBXGroup;
+			children = (
+				9A97C18B2A8F32CE002AEFC5 /* Presence.swift */,
+			);
+			path = Presence;
 			sourceTree = "<group>";
 		};
 		9AD6E7DB29C18897001A1F89 /* V1 */ = {
@@ -477,6 +486,7 @@
 		CE8C22E428C9E53E00432DE5 /* Document */ = {
 			isa = PBXGroup;
 			children = (
+				9A97C18A2A8F32BA002AEFC5 /* Presence */,
 				CEDDE26C2914EABA0032B16A /* Util */,
 				CE8C22E628C9E55300432DE5 /* Change */,
 				CE8C22E728C9E55800432DE5 /* CRDT */,
@@ -826,6 +836,7 @@
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
 				CEA2DA5128F69D3800431B61 /* ChangeContext.swift in Sources */,
 				CEA2DA4F28F6967500431B61 /* Checkpoint.swift in Sources */,
+				9A97C18C2A8F32CE002AEFC5 /* Presence.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8BB74328FE59240020F62A /* ChangePack.swift in Sources */,
 				CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */,
@@ -882,7 +893,6 @@
 				9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */,
 				9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */,
 				9A30D40429514F150036F732 /* ClientTests.swift in Sources */,
-				9ADECA02291A148B006BA331 /* ClientIntegrationTests.swift in Sources */,
 				CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
 				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,

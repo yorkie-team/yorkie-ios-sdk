@@ -25,6 +25,7 @@ class ChangeContext {
     private let id: ChangeID
     private let root: CRDTRoot
     private var operations: [Operation]
+    var presenceChange: PresenceChange?
     private let message: String?
     private var delimiter: UInt32
 
@@ -69,14 +70,14 @@ class ChangeContext {
      * `getChange` creates a new instance of Change in this context.
      */
     func getChange() -> Change {
-        return Change(id: self.id, operations: self.operations, message: self.message)
+        return Change(id: self.id, operations: self.operations, presenceChange: self.presenceChange, message: self.message)
     }
 
     /**
-     * `hasOperations` returns the whether this context has operations or not.
+     * `hasChange` returns whether this context has change or not.
      */
-    func hasOperations() -> Bool {
-        return self.operations.isEmpty == false
+    var hasChange: Bool {
+        self.operations.isEmpty == false || self.presenceChange != nil
     }
 
     /**
