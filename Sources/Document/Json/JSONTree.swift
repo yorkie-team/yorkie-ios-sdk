@@ -289,7 +289,7 @@ public class JSONTree {
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
-                                                  contents: (crdtNodes?.isEmpty ?? true) ? nil : crdtNodes,
+                                                  contents: crdtNodes,
                                                   executedAt: ticket)
         )
 
@@ -322,7 +322,7 @@ public class JSONTree {
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
-                                                  contents: (crdtNodes?.isEmpty ?? true) ? nil : crdtNodes,
+                                                  contents: crdtNodes,
                                                   executedAt: ticket)
         )
 
