@@ -467,8 +467,8 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1)
-        try await client2.attach(doc2)
+        try await client1.attach(doc1, false)
+        try await client2.attach(doc2, false)
 
         try await doc1.update({ root in
             root["1"] = Int64(1)
@@ -556,8 +556,8 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1)
-        try await client2.attach(doc2)
+        try await client1.attach(doc1, false)
+        try await client2.attach(doc2, false)
 
         try await doc1.update({ root in
             root.text = JSONText()
@@ -649,8 +649,8 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1)
-        try await client2.attach(doc2)
+        try await client1.attach(doc1, false)
+        try await client2.attach(doc2, false)
 
         try await doc1.update({ root in
             root["1"] = Int64(1)
