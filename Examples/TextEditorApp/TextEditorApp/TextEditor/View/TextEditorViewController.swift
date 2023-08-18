@@ -100,7 +100,7 @@ class TextEditorViewController: UIViewController {
         // Receive events from TextView Model.
         let subject = PassthroughSubject<[TextOperation], Never>()
 
-        subject.sink { elements in
+        subject.sink { [weak self] elements in
             Task {
                 await MainActor.run { [weak self] in
                     self?.updateTextStorage(elements)
