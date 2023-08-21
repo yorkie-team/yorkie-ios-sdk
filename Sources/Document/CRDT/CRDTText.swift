@@ -334,7 +334,7 @@ final class CRDTText: CRDTGCElement {
     }
 
     public var values: [TextValue]? {
-        self.rgaTreeSplit.compactMap { $0.value }
+        self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value }
     }
 
     /**

@@ -215,7 +215,9 @@ public actor Document {
             return clone
         }
 
-        return (self.root.deepcopy(), self.presences)
+        self.clone = (self.root.deepcopy(), self.presences)
+
+        return self.clone!
     }
 
     /**

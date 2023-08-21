@@ -250,21 +250,21 @@ class ClientTests: XCTestCase {
         try await c1.attach(d1, [:], false)
 
         // 02. cli update the document with creating a counter
-        //     and sync with push-pull mode: CP(0, 0) -> CP(1, 1)
+        //     and sync with push-pull mode: CP(1, 1) -> CP(2, 2)
         try await d1.update { root, _ in
             root.counter = JSONCounter(value: Int64(0))
         }
 
         var checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 0, clientSeq: 0), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 1), checkpoint)
 
         try await c1.sync()
 
         checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 1), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 2, clientSeq: 2), checkpoint)
 
         // 03. cli update the document with increasing the counter(0 -> 1)
-        //     and sync with push-only mode: CP(1, 1) -> CP(2, 1)
+        //     and sync with push-only mode: CP(2, 2) -> CP(2, 3)
         try await d1.update { root, _ in
             (root.counter as? JSONCounter<Int64>)!.increase(value: 1)
         }
@@ -276,10 +276,10 @@ class ClientTests: XCTestCase {
         try await c1.sync(d1, .pushOnly)
 
         checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 2), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 2, clientSeq: 3), checkpoint)
 
         // 04. cli update the document with increasing the counter(1 -> 2)
-        //     and sync with push-pull mode. CP(2, 1) -> CP(3, 3)
+        //     and sync with push-pull mode. CP(2, 3) -> CP(4, 4)
         try await d1.update { root, _ in
             (root.counter as? JSONCounter<Int64>)!.increase(value: 1)
         }
@@ -293,7 +293,7 @@ class ClientTests: XCTestCase {
         try await c1.sync()
 
         checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 3, clientSeq: 3), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 4, clientSeq: 4), checkpoint)
 
         let counter = await(d1.getRoot().get(key: "counter") as? JSONCounter<Int64>)!
 

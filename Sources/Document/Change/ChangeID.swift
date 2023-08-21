@@ -51,12 +51,12 @@ struct ChangeID {
      *
      * {@link https://en.wikipedia.org/wiki/Lamport_timestamps#Algorithm}
      */
+    @discardableResult
     mutating func syncLamport(with otherLamport: Int64) -> ChangeID {
-        if otherLamport > self.lamport {
-            return ChangeID(clientSeq: self.clientSeq, lamport: otherLamport, actor: self.actor)
-        }
+        let lamport = otherLamport > self.lamport ? otherLamport : self.lamport + 1
+        self.lamport = lamport
 
-        return ChangeID(clientSeq: self.clientSeq, lamport: self.lamport + 1, actor: self.actor)
+        return ChangeID(clientSeq: self.clientSeq, lamport: self.lamport, actor: self.actor)
     }
 
     /**

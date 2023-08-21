@@ -113,7 +113,7 @@ final class DocumentIntegrationTests: XCTestCase {
         }
 
         try await self.c1.attach(self.d1)
-        try await self.c1.detach(self.d1) // remove(self.d1)
+        try await self.c1.remove(self.d1)
 
         // 02. c2 creates d2 with the same key.
         self.d2 = Document(key: docKey)
