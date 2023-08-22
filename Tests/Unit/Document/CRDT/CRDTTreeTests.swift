@@ -128,7 +128,7 @@ final class CRDTTreeTests: XCTestCase {
         //       0   1 2 3 4 5 6    7   8 9  10 11 12 13    14
         // <root> <p> h e l l o </p> <p> w  o  r  l  d  </p>  </root>
         let para = CRDTTreeNode(pos: issuePos(), type: "p")
-        try para.insertAt(newNode: CRDTTreeNode(pos: issuePos(), type: DefaultTreeNodeType.text.rawValue, value: "world"), offset: 0)
+        try para.insertAt(CRDTTreeNode(pos: issuePos(), type: DefaultTreeNodeType.text.rawValue, value: "world"), 0)
         try tree.editByIndex((7, 7), [para], issueTime)
         XCTAssertEqual(tree.toXML(), "<r><p>hello</p><p>world</p></r>")
         listEqual(tree, ["text.hello", "p", "text.world", "p", "r"])

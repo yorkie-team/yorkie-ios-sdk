@@ -89,7 +89,7 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) -> Void, _ message: String? = nil) throws {
+    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -109,7 +109,7 @@ public actor Document {
 
         var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
 
-        updater(proxy, &presence)
+        try updater(proxy, &presence)
 
         self.clone?.presences[actorID] = presence.presence
 

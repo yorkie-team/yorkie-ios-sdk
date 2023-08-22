@@ -267,7 +267,7 @@ extension IndexTreeNode {
     /**
      * `insertBefore` inserts the given node before the given child.
      */
-    func insertBefore(newNode: Self, referenceNode: Self) throws {
+    func insertBefore(_ newNode: Self, _ referenceNode: Self) throws {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
@@ -283,7 +283,7 @@ extension IndexTreeNode {
     /**
      * `insertAfter` inserts the given node after the given child.
      */
-    func insertAfter(newNode: Self, referenceNode: Self) throws {
+    func insertAfter(_ newNode: Self, _ referenceNode: Self) throws {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
@@ -299,7 +299,7 @@ extension IndexTreeNode {
     /**
      * `insertAt` inserts the given node at the given offset.
      */
-    func insertAt(newNode: Self, offset: Int) throws {
+    func insertAt(_ newNode: Self, _ offset: Int) throws {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
