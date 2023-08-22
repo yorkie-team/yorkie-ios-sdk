@@ -393,16 +393,6 @@ final class CRDTTreeTests: XCTestCase {
         XCTAssertEqual(fromIdx, 5)
         XCTAssertEqual(toIdx, 6)
         XCTAssertEqual(tree.size, 8)
-
-        var range = try tree.toPosRange((0, 5))
-        var rangeResult = try tree.toIndexRange(range)
-        XCTAssertEqual(rangeResult.0, 0)
-        XCTAssertEqual(rangeResult.1, 5)
-
-        range = try tree.toPosRange((5, 7))
-        rangeResult = try tree.toIndexRange(range)
-        XCTAssertEqual(rangeResult.0, 5)
-        XCTAssertEqual(rangeResult.1, 7)
     }
 }
 

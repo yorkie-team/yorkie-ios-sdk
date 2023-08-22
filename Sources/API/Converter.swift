@@ -358,7 +358,7 @@ extension Converter {
     /**
      * `toTextNodePos` converts the given model to Protobuf format.
      */
-    static func toTextNodePos(pos: RGATreeSplitNodePos) -> PbTextNodePos {
+    static func toTextNodePos(pos: RGATreeSplitPos) -> PbTextNodePos {
         var pbTextNodePos = PbTextNodePos()
         pbTextNodePos.createdAt = toTimeTicket(pos.id.createdAt)
         pbTextNodePos.offset = pos.id.offset
@@ -369,8 +369,8 @@ extension Converter {
     /**
      * `fromTextNodePos` converts the given Protobuf format to model format.
      */
-    static func fromTextNodePos(_ pbTextNodePos: PbTextNodePos) -> RGATreeSplitNodePos {
-        RGATreeSplitNodePos(RGATreeSplitNodeID(Self.fromTimeTicket(pbTextNodePos.createdAt), pbTextNodePos.offset), pbTextNodePos.relativeOffset)
+    static func fromTextNodePos(_ pbTextNodePos: PbTextNodePos) -> RGATreeSplitPos {
+        RGATreeSplitPos(RGATreeSplitNodeID(Self.fromTimeTicket(pbTextNodePos.createdAt), pbTextNodePos.offset), pbTextNodePos.relativeOffset)
     }
 }
 

@@ -167,25 +167,11 @@ final class CRDTText: CRDTGCElement {
      * `edit` edits the given range with the given content and attributes.
      */
     @discardableResult
-    public func edit(_ range: RGATreeSplitNodeRange,
-                     _ content: String,
-                     _ editedAt: TimeTicket,
-                     _ attributes: TextAttributes? = nil,
-                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> [String: TimeTicket]
-    {
-        return try self.edit(range,
-                             content,
-                             editedAt,
-                             attributes != nil ? stringifyAttributes(attributes!) : nil,
-                             latestCreatedAtMapByActor).0
-    }
-
-    @discardableResult
-    func edit(_ range: RGATreeSplitNodeRange,
+    func edit(_ range: RGATreeSplitPosRange,
               _ content: String,
               _ editedAt: TimeTicket,
               _ attributes: [String: String]? = nil,
-              _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange])
+              _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange], RGATreeSplitPosRange)
     {
         let value = !content.isEmpty ? TextValue(content) : nil
         if !content.isEmpty, let attributes {
@@ -201,7 +187,7 @@ final class CRDTText: CRDTGCElement {
             latestCreatedAtMapByActor
         )
 
-        var changes = contentChanges.compactMap { TextChange(type: .content, actor: $0.actor, from: $0.from, to: $0.to, content: $0.content?.toString) }
+        let changes = contentChanges.compactMap { TextChange(type: .content, actor: $0.actor, from: $0.from, to: $0.to, content: $0.content?.toString) }
 
         if !content.isEmpty, let attributes {
             if let change = changes[safe: changes.count - 1] {
@@ -209,11 +195,7 @@ final class CRDTText: CRDTGCElement {
             }
         }
 
-        if let selectionChange = try self.selectPriv((caretPos, caretPos), editedAt) {
-            changes.append(selectionChange)
-        }
-
-        return (latestCreatedAtMap, changes)
+        return (latestCreatedAtMap, changes, (caretPos, caretPos))
     }
 
     /**
@@ -225,7 +207,7 @@ final class CRDTText: CRDTGCElement {
      * @param attributes - style attributes
      * @param editedAt - edited time
      */
-    public func setStyle(_ range: RGATreeSplitNodeRange,
+    public func setStyle(_ range: RGATreeSplitPosRange,
                          _ attributes: TextAttributes,
                          _ editedAt: TimeTicket) throws
     {
@@ -233,7 +215,7 @@ final class CRDTText: CRDTGCElement {
     }
 
     @discardableResult
-    func setStyle(_ range: RGATreeSplitNodeRange,
+    func setStyle(_ range: RGATreeSplitPosRange,
                   _ attributes: [String: String],
                   _ editedAt: TimeTicket) throws -> [TextChange]
     {
@@ -249,7 +231,7 @@ final class CRDTText: CRDTGCElement {
                 continue
             }
 
-            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createRange)
+            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
             changes.append(TextChange(type: .style,
                                       actor: editedAt.actorID!,
                                       from: fromIdx,
@@ -269,7 +251,7 @@ final class CRDTText: CRDTGCElement {
      * `select` stores that the given range has been selected.
      */
     @discardableResult
-    public func select(_ range: RGATreeSplitNodeRange, _ updatedAt: TimeTicket) throws -> TextChange? {
+    public func select(_ range: RGATreeSplitPosRange, _ updatedAt: TimeTicket) throws -> TextChange? {
         if self.remoteChangeLock {
             return nil
         }
@@ -285,15 +267,30 @@ final class CRDTText: CRDTGCElement {
     }
 
     /**
-     * `createRange` returns pair of RGATreeSplitNodePos of the given integer offsets.
+     * `indexRangeToPosRange` returns the position range of the given index range.
      */
-    public func createRange(_ fromIdx: Int, _ toIdx: Int) throws -> RGATreeSplitNodeRange {
-        let fromPos = try self.rgaTreeSplit.findNodePos(fromIdx)
+    public func indexRangeToPosRange(_ fromIdx: Int, _ toIdx: Int) throws -> RGATreeSplitPosRange {
+        let fromPos = try self.rgaTreeSplit.indexToPos(fromIdx)
         if fromIdx == toIdx {
             return (fromPos, fromPos)
         }
 
-        return try (fromPos, self.rgaTreeSplit.findNodePos(toIdx))
+        return try (fromPos, self.rgaTreeSplit.indexToPos(toIdx))
+    }
+
+    /**
+     * `length` returns size of RGATreeList.
+     */
+    public var length: Int {
+        self.rgaTreeSplit.length
+    }
+
+    /**
+     * `checkWeight` returns false when there is an incorrect weight node.
+     * for debugging purpose.
+     */
+    public func checkWeight() -> Bool {
+        self.rgaTreeSplit.checkWeight()
     }
 
     /**
@@ -360,7 +357,14 @@ final class CRDTText: CRDTGCElement {
         return text
     }
 
-    private func selectPriv(_ range: RGATreeSplitNodeRange, _ updatedAt: TimeTicket) throws -> TextChange? {
+    /**
+     * `findIndexesFromRange` returns pair of integer offsets of the given range.
+     */
+    public func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
+        try self.rgaTreeSplit.findIndexesFromRange(range)
+    }
+
+    private func selectPriv(_ range: RGATreeSplitPosRange, _ updatedAt: TimeTicket) throws -> TextChange? {
         guard let actorID = updatedAt.actorID else {
             return nil
         }

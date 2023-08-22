@@ -23,13 +23,13 @@ struct SelectOperation: Operation {
     /**
      * `fromPos` returns the start point of the editing range.
      */
-    private(set) var fromPos: RGATreeSplitNodePos
+    private(set) var fromPos: RGATreeSplitPos
     /**
      * `toPos` returns the end point of the editing range.
      */
-    private(set) var toPos: RGATreeSplitNodePos
+    private(set) var toPos: RGATreeSplitPos
 
-    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitNodePos, toPos: RGATreeSplitNodePos, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitPos, toPos: RGATreeSplitPos, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos

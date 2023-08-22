@@ -137,10 +137,40 @@ struct CRDTTreePos: Equatable, Comparable {
     }
 }
 
+extension CRDTTreePos {
+    /**
+     * `fromStruct` creates a new instance of RGATreeSplitPos from the given struct.
+     */
+    static func fromStruct(_ value: CRDTTreePosStruct) throws -> CRDTTreePos {
+        try CRDTTreePos(createdAt: TimeTicket.fromStruct(value.createdAt), offset: value.offset)
+    }
+
+    /**
+     * `toStruct` returns the structure of this position.
+     */
+    var toStruct: CRDTTreePosStruct {
+        CRDTTreePosStruct(createdAt: self.createdAt.toStruct, offset: self.offset)
+    }
+}
+
 /**
- * `TreeRange` represents a pair of CRDTTreePos.
+ * `CRDTTreePosStruct` represents the structure of CRDTTreePos.
+ * It is used to serialize and deserialize the CRDTTreePos.
  */
-typealias TreeRange = (CRDTTreePos, CRDTTreePos)
+struct CRDTTreePosStruct {
+    let createdAt: TimeTicketStruct
+    let offset: Int32
+}
+
+/**
+ * `TreePosRange` represents a pair of CRDTTreePos.
+ */
+typealias TreePosRange = (CRDTTreePos, CRDTTreePos)
+
+/**
+ * `TreePosStructRange` represents a pair of CRDTTreePosStruct.
+ */
+typealias TreePosStructRange = (CRDTTreePosStruct, CRDTTreePosStruct)
 
 /**
  * `CRDTTreeNode` is a node of CRDTTree. It is includes the logical clock and
@@ -476,7 +506,7 @@ class CRDTTree: CRDTGCElement {
      * `style` applies the given attributes of the given range.
      */
     @discardableResult
-    func style(_ range: TreeRange, _ attributes: [String: String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
+    func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
         let (_, toRight) = try self.findTreePos(range.1, editedAt)
         let (_, fromRight) = try self.findTreePos(range.0, editedAt)
         var changes: [TreeChange] = []
@@ -520,7 +550,7 @@ class CRDTTree: CRDTGCElement {
      * If the content is undefined, the range will be removed.
      */
     @discardableResult
-    func edit(_ range: TreeRange, _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
+    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
         // 01. split text nodes at the given range if needed.
         let (toPos, toRight) = try self.findTreePosWithSplitText(range.1, editedAt)
         let (fromPos, fromRight) = try self.findTreePosWithSplitText(range.0, editedAt)
@@ -753,9 +783,9 @@ class CRDTTree: CRDTGCElement {
     }
 
     /**
-     * `pathToPosRange` finds the range of pos from given path.
+     * `pathToPosRange` converts the given path of the node to the range of the position.
      */
-    func pathToPosRange(_ path: [Int]) throws -> TreeRange {
+    func pathToPosRange(_ path: [Int]) throws -> TreePosRange {
         let index = try self.pathToIndex(path)
         let pos = try self.pathToTreePos(path)
         let parentNode = pos.node
@@ -874,52 +904,41 @@ class CRDTTree: CRDTGCElement {
     }
 
     /**
-     * `indexToPath` converts the given path to index.
+     * `pathToIndex` converts the given path to index.
      */
     func pathToIndex(_ path: [Int]) throws -> Int {
         try self.indexTree.pathToIndex(path)
     }
 
     /**
-     * `createRange` returns pair of RGATreeSplitNodePos of the given integer offsets.
+     * `indexRangeToPosRange` returns the position range from the given index range.
      */
-    func createRange(_ fromIdx: Int, _ toIdx: Int) throws -> TreeRange {
-        let fromPos = try self.findPos(fromIdx)
-        if fromIdx == toIdx {
+    func indexRangeToPosRange(_ range: (Int, Int)) throws -> TreePosRange {
+        let fromPos = try self.findPos(range.0)
+        if range.0 == range.1 {
             return (fromPos, fromPos)
         }
 
-        return try (fromPos, self.findPos(toIdx))
+        return try (fromPos, self.findPos(range.1))
     }
 
     /**
-     * `toPosRange` converts the integer index range into the Tree position range structure.
+     * `indexRangeToPosStructRange` converts the integer index range into the Tree position range structure.
      */
-    func toPosRange(_ range: (Int, Int)) throws -> TreeRange {
+    func indexRangeToPosStructRange(_ range: (Int, Int)) throws -> TreePosStructRange {
         let (fromIdx, toIdx) = range
-        let fromPos = try self.findPos(fromIdx)
+        let fromPos = try self.findPos(fromIdx).toStruct
         if fromIdx == toIdx {
             return (fromPos, fromPos)
         }
 
-        return try (fromPos, self.findPos(toIdx))
+        return try (fromPos, self.findPos(toIdx).toStruct)
     }
 
     /**
-     * `toIndexRange` converts the Tree position range into the integer index range.
+     * `posRangeToPathRange` converts the given position range to the path range.
      */
-    func toIndexRange(_ range: TreeRange) throws -> (Int, Int) {
-        let (fromPosStruct, toPosStruct) = range
-        let fromPos = CRDTTreePos(createdAt: TimeTicket(lamport: fromPosStruct.createdAt.lamport, delimiter: fromPosStruct.createdAt.delimiter, actorID: fromPosStruct.createdAt.actorID), offset: fromPosStruct.offset)
-        let toPos = CRDTTreePos(createdAt: TimeTicket(lamport: toPosStruct.createdAt.lamport, delimiter: toPosStruct.createdAt.delimiter, actorID: toPosStruct.createdAt.actorID), offset: toPosStruct.offset)
-
-        return try (self.toIndex(fromPos), self.toIndex(toPos))
-    }
-
-    /**
-     * `rangeToPath` returns pair of integer offsets of the given Tree.
-     */
-    func rangeToPath(_ range: TreeRange) throws -> ([Int], [Int]) {
+    func posRangeToPathRange(_ range: TreePosRange) throws -> ([Int], [Int]) {
         let fromPath = try self.indexTree.indexToPath(self.toIndex(range.0))
         let toPath = try self.indexTree.indexToPath(self.toIndex(range.1))
 

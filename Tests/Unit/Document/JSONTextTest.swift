@@ -40,19 +40,19 @@ final class JSONTextTest: XCTestCase {
         try await doc.update { root, _ in
             XCTAssertEqual("[0:00:0:0 ][1:00:2:0 A][1:00:3:0 12]{1:00:2:1 BC}[1:00:2:3 D]", (root.k1 as? JSONText)?.toTestString)
 
-            var range = (root.k1 as? JSONText)?.createRange(0, 0)
+            var range = (root.k1 as? JSONText)?.createRangeForTest(0, 0)
             XCTAssertEqual("0:00:0:0:0", range?.0.toTestString)
 
-            range = (root.k1 as? JSONText)!.createRange(1, 1)
+            range = (root.k1 as? JSONText)!.createRangeForTest(1, 1)
             XCTAssertEqual("1:00:2:0:1", range?.0.toTestString)
 
-            range = (root.k1 as? JSONText)!.createRange(2, 2)
+            range = (root.k1 as? JSONText)!.createRangeForTest(2, 2)
             XCTAssertEqual("1:00:3:0:1", range?.0.toTestString)
 
-            range = (root.k1 as? JSONText)!.createRange(3, 3)
+            range = (root.k1 as? JSONText)!.createRangeForTest(3, 3)
             XCTAssertEqual("1:00:3:0:2", range?.0.toTestString)
 
-            range = (root.k1 as? JSONText)!.createRange(4, 4)
+            range = (root.k1 as? JSONText)!.createRangeForTest(4, 4)
             XCTAssertEqual("1:00:2:3:1", range?.0.toTestString)
         }
 

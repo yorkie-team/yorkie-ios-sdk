@@ -24,20 +24,37 @@ public enum DocEventType: String {
      * snapshot event type
      */
     case snapshot
+
     /**
      * local document change event type
      */
     case localChange = "local-change"
+
     /**
      * remote document change event type
      */
     case remoteChange = "remote-change"
+
     /**
-     * `PeersChanged` means that the presences of the peer clients has changed.
-     * // TODO(hackerwins): We'll use peers means others. We need to find a better
-     * // name for this event.
+     * `initialized` means that online clients have been loaded from the server.
      */
-    case peersChanged = "peers-changed"
+    case initialized
+
+    /**
+     * `watched` means that the client has established a connection with the server,
+     * enabling real-time synchronization.
+     */
+    case watched
+
+    /**
+     * `unwatched` means that the connection has been disconnected.
+     */
+    case unwatched
+
+    /**
+     * `presenceChanged` means that the presences of the client has updated.
+     */
+    case presenceChanged = "presence-changed"
 }
 
 /**
@@ -112,51 +129,50 @@ public struct RemoteChangeEvent: ChangeEvent {
 }
 
 /**
- * `PeersChangedEventType` is peers changed event types
- */
-enum PeersChangedEventType {
-    case initialized
-    case watched
-    case unwatched
-    case presenceChanged
-}
-
-/**
  * `PeersChangedValue` represents the value of the PeersChanged event.
  */
 public typealias PeerElement = (clientID: ActorID, presence: PresenceData)
 
-public enum PeersChangedValue {
+public struct InitializedEvent: DocEvent {
     /**
-     * `Initialized` means that the peer list has been initialized.
+     * ``DocEventType/initialized``
      */
-    case initialized(peers: [PeerElement])
+    public let type: DocEventType = .initialized
     /**
-     * `Watched` means that the peer has established a connection with the server,
-     * enabling real-time synchronization.
+     * InitializedEvent type
      */
-    case watched(peer: PeerElement)
-    /**
-     * `Unwatched` means that the connection has been disconnected.
-     */
-    case unwatched(peer: PeerElement)
-    /**
-     * `PeersChanged` means that the presences of the peer has updated.
-     */
-    case presenceChanged(peer: PeerElement)
+    public var value: [PeerElement]
 }
 
-/**
- * `PeersChangedEvent` is an event that occurs when the states of another peers
- * of the attached documents changes. *
- */
-public struct PeersChangedEvent: DocEvent {
+public struct WatchedEvent: DocEvent {
     /**
-     * ``DocEventType/peersChanged``
+     * ``DocEventType/watched``
      */
-    public let type: DocEventType = .peersChanged
+    public let type: DocEventType = .watched
     /**
-     * RemoteChangeEvent type
+     * WatchedEvent type
      */
-    public var value: PeersChangedValue
+    public var value: PeerElement
+}
+
+public struct UnwatchedEvent: DocEvent {
+    /**
+     * ``DocEventType/unwatched``
+     */
+    public let type: DocEventType = .unwatched
+    /**
+     * UnwatchedEvent type
+     */
+    public var value: ActorID
+}
+
+public struct PresenceChangedEvent: DocEvent {
+    /**
+     * ``DocEventType/presenceChanged``
+     */
+    public let type: DocEventType = .presenceChanged
+    /**
+     * PresenceChangedEvent type
+     */
+    public var value: PeerElement
 }

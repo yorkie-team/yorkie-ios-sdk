@@ -677,6 +677,52 @@ final class TreeIntegrationEditTests: XCTestCase {
 
         try await syncTwoTreeDocsAndAssertEqual(docA, docB, /* html */ "<r><p>12BA</p></r>")
     }
+
+    func test_get_correct_range_from_index() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let doc = Document(key: docKey)
+
+        try await doc.update { root, _ in
+            root.t = JSONTree(
+                initialRoot: JSONTreeElementNode(
+                    type: DefaultTreeNodeType.root.rawValue,
+                    children: [
+                        JSONTreeElementNode(
+                            type: "p",
+                            children: [
+                                JSONTreeElementNode(
+                                    type: "b",
+                                    children: [
+                                        JSONTreeElementNode(
+                                            type: "i",
+                                            children: [JSONTreeTextNode(value: "ab")]
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
+                    ]
+                )
+            )
+        }
+
+        if let tree = await doc.getRoot().t as? JSONTree {
+            let docXML = tree.toXML()
+            XCTAssertEqual(docXML, /* html */ "<root><p><b><i>ab</i></b></p></root>")
+
+            var range = try tree.indexRangeToPosRange((0, 5))
+            var resultRange = try tree.posRangeToIndexRange(range)
+            XCTAssertEqual(resultRange.0, 0)
+            XCTAssertEqual(resultRange.1, 5)
+
+            range = try tree.indexRangeToPosRange((5, 7))
+            resultRange = try tree.posRangeToIndexRange(range)
+            XCTAssertEqual(resultRange.0, 5)
+            XCTAssertEqual(resultRange.1, 7)
+        } else {
+            XCTAssert(false)
+        }
+    }
 }
 
 final class TreeIntegrationStyleTests: XCTestCase {

@@ -47,8 +47,8 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
 
-        try await c1.attach(d1, false)
-        try await c2.attach(d2, false)
+        try await c1.attach(d1, [:], false)
+        try await c2.attach(d2, [:], false)
 
         try await d1.update { root, _ in
             root.k1 = "v1"
@@ -111,8 +111,8 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
 
-        try await c1.attach(d1, true)
-        try await c2.attach(d2, true)
+        try await c1.attach(d1)
+        try await c2.attach(d2)
 
         try await d1.update { root, _ in
             root.k1 = "v1"
@@ -201,126 +201,6 @@ final class ClientIntegrationTests: XCTestCase {
 
         XCTAssertEqual(eventCount, 2)
     }
-
-    // swiftlint: disable force_cast
-    func test_send_peer_changed_event_to_the_user_who_updated_presence() async throws {
-        struct Cursor: Codable {
-            // swiftlint: disable identifier_name
-            var x: Int
-            var y: Int
-            // swiftlint: enable identifier_name
-        }
-
-        struct PresenceType: Codable {
-            var name: String
-            var cursor: Cursor
-        }
-
-        var option = ClientOptions()
-        option.presence = PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary
-
-        let c1 = Client(rpcAddress: rpcAddress, options: option)
-
-        option.presence = PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary
-
-        let c2 = Client(rpcAddress: rpcAddress, options: option)
-
-        try await c1.activate()
-        try await c2.activate()
-
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
-
-        let c1ActorID = await c1.id!
-        let c2ActorID = await c2.id!
-
-        let d1 = Document(key: docKey)
-        let d2 = Document(key: docKey)
-
-        var c1Name = "c1"
-        var c2Name = "c2"
-
-        var c1NumberOfEvents = 0
-        var c2NumberOfEvents = 0
-        let c1ExpectedValues = [
-            PeersChangedValue(type: .initialized, peers: [docKey: [c1ActorID: PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
-            PeersChangedValue(type: .watched, peers: [docKey: [c2ActorID: PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
-            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
-            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c2ActorID: PresenceType(name: "c2+", cursor: Cursor(x: 1, y: 1)).createdDictionary]])
-        ]
-        let c2ExpectedValues = [
-            PeersChangedValue(type: .initialized, peers: [docKey: [c1ActorID: PresenceType(name: "c1", cursor: Cursor(x: 0, y: 0)).createdDictionary,
-                                                                   c2ActorID: PresenceType(name: "c2", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
-            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]]),
-            PeersChangedValue(type: .presenceChanged, peers: [docKey: [c2ActorID: PresenceType(name: "c2+", cursor: Cursor(x: 1, y: 1)).createdDictionary]]),
-            PeersChangedValue(type: .unwatched, peers: [docKey: [c1ActorID: PresenceType(name: "c1+", cursor: Cursor(x: 0, y: 0)).createdDictionary]])
-        ]
-
-        c1.eventStream.sink { event in
-            switch event {
-            case let event as PeerChangedEvent:
-                print("#### c1 \(event)")
-                XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
-                c1NumberOfEvents += 1
-            default:
-                break
-            }
-        }.store(in: &self.cancellables)
-
-        c2.eventStream.sink { event in
-            switch event {
-            case let event as PeerChangedEvent:
-                print("#### c2 \(event)")
-                XCTAssertEqual(event.value, c2ExpectedValues[c2NumberOfEvents])
-                c2NumberOfEvents += 1
-
-            default:
-                break
-            }
-        }.store(in: &self.cancellables)
-
-        try await c1.attach(d1)
-        try await c2.attach(d2)
-
-        // To catch the watched event first.
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        c1Name = "c1+"
-        try await c1.updatePresence("name", c1Name)
-
-        try await c1.sync()
-        try await c2.sync()
-
-        let presence1: PresenceType = self.decodePresence(await c2.getPeerPresence(docKey, c1.id!)!)!
-
-        XCTAssert(c1Name == presence1.name)
-
-        c2Name = "c2+"
-        try await c2.updatePresence("name", c2Name)
-
-        try await c2.sync()
-        try await c1.sync()
-
-        let presence2: PresenceType = self.decodePresence(await c1.getPeerPresence(docKey, c2.id!)!)!
-
-        XCTAssert(c2Name == presence2.name)
-
-        let c1Peer = try await c1.getPeersByDocKey(d1.getKey()) as NSDictionary
-        let c2Peer = try (await c2.getPeersByDocKey(d2.getKey()) as NSDictionary) as! [AnyHashable: Any]
-
-        XCTAssert(c1Peer.isEqual(to: c2Peer))
-
-        try await c1.detach(d1)
-
-        // Keep the watchLoop of c2 for catch the detach event of c1.
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        try await c2.detach(d2)
-
-        try await c1.deactivate()
-        try await c2.deactivate()
-    }
-
-    // swiftlint: enable force_cast
 
     func test_client_pause_resume() async throws {
         let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
@@ -436,61 +316,6 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
         try await c2.deactivate()
         try await c3.deactivate()
-    }
-
-    func test_can_get_peers_presence() async throws {
-        struct Cursor: Codable, Equatable {
-            // swiftlint: disable identifier_name
-            var x: Int
-            var y: Int
-            // swiftlint: enable identifier_name
-        }
-
-        struct PresenceType: Codable, Equatable {
-            static func == (lhs: PresenceType, rhs: PresenceType) -> Bool {
-                lhs.name == rhs.name && lhs.cursor == rhs.cursor
-            }
-
-            var name: String
-            var cursor: Cursor
-        }
-
-        var option = ClientOptions()
-        option.presence = PresenceType(name: "a", cursor: Cursor(x: 0, y: 0)).createdDictionary
-
-        let c1 = Client(rpcAddress: rpcAddress, options: option)
-
-        option.presence = PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)).createdDictionary
-
-        let c2 = Client(rpcAddress: rpcAddress, options: option)
-
-        try await c1.activate()
-        try await c2.activate()
-
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
-
-        let d1 = Document(key: docKey)
-        let d2 = Document(key: docKey)
-
-        try await c1.attach(d1)
-
-        let presence1 = await c1.getPeerPresence(docKey, c2.id!)
-
-        XCTAssert(presence1 == nil)
-
-        try await c2.attach(d2)
-
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        let presence2: PresenceType? = self.decodePresence(await c1.getPeerPresence(docKey, c2.id!)!)
-
-        XCTAssertTrue(presence2 == PresenceType(name: "b", cursor: Cursor(x: 1, y: 1)))
-
-        try await c1.detach(d1)
-        try await c2.detach(d2)
-
-        try await c1.deactivate()
-        try await c2.deactivate()
     }
 
     private func decodePresence<T: Decodable>(_ dictionary: [String: Any]) -> T? {

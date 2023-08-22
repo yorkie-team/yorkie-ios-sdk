@@ -37,6 +37,24 @@ protocol RGATreeSplitValue {
 }
 
 /**
+ * `RGATreeSplitPosStruct` is a structure represents the meta data of the node pos.
+ * It is used to serialize and deserialize the node pos.
+ */
+public struct RGATreeSplitPosStruct {
+    let id: RGATreeSplitNodeIDStruct
+    let relativeOffset: Int32
+}
+
+/**
+ * `RGATreeSplitNodeIDStruct` is a structure represents the meta data of the node id.
+ * It is used to serialize and deserialize the node id.
+ */
+public struct RGATreeSplitNodeIDStruct {
+    let createdAt: TimeTicketStruct
+    let offset: Int32
+}
+
+/**
  * `RGATreeSplitNodeID` is an ID of RGATreeSplitNode.
  */
 class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
@@ -105,10 +123,26 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     }
 }
 
+extension RGATreeSplitNodeID {
+    /**
+     * `fromStruct` creates a new instance of RGATreeSplitPos from the given struct.
+     */
+    static func fromStruct(_ value: RGATreeSplitNodeIDStruct) throws -> RGATreeSplitNodeID {
+        try RGATreeSplitNodeID(TimeTicket.fromStruct(value.createdAt), value.offset)
+    }
+
+    /**
+     * `toStruct` returns the structure of this position.
+     */
+    var toStruct: RGATreeSplitNodeIDStruct {
+        RGATreeSplitNodeIDStruct(createdAt: self.createdAt.toStruct, offset: self.offset)
+    }
+}
+
 /**
  * `RGATreeSplitNodePos` is the position of the text inside the node.
  */
-class RGATreeSplitNodePos: Equatable {
+class RGATreeSplitPos: Equatable {
     /**
      * `id` returns the ID of this RGATreeSplitNodePos.
      */
@@ -142,12 +176,28 @@ class RGATreeSplitNodePos: Equatable {
     /**
      * `==` returns whether given pos equal to this pos or not.
      */
-    static func == (lhs: RGATreeSplitNodePos, rhs: RGATreeSplitNodePos) -> Bool {
+    public static func == (lhs: RGATreeSplitPos, rhs: RGATreeSplitPos) -> Bool {
         lhs.id == rhs.id && lhs.relativeOffset == rhs.relativeOffset
     }
 }
 
-typealias RGATreeSplitNodeRange = (RGATreeSplitNodePos, RGATreeSplitNodePos)
+extension RGATreeSplitPos {
+    /**
+     * `fromStruct` creates a new instance of RGATreeSplitPos from the given struct.
+     */
+    static func fromStruct(_ value: RGATreeSplitPosStruct) throws -> RGATreeSplitPos {
+        try RGATreeSplitPos(RGATreeSplitNodeID.fromStruct(value.id), value.relativeOffset)
+    }
+
+    /**
+     * `toStruct` returns the structure of this position.
+     */
+    var toStruct: RGATreeSplitPosStruct {
+        RGATreeSplitPosStruct(id: self.id.toStruct, relativeOffset: self.relativeOffset)
+    }
+}
+
+typealias RGATreeSplitPosRange = (RGATreeSplitPos, RGATreeSplitPos)
 
 /**
  * `RGATreeSplitNode` is a node of RGATreeSplit.
@@ -312,8 +362,8 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `createRange` creates ranges of RGATreeSplitNodePos.
      */
-    public var createRange: RGATreeSplitNodeRange {
-        (RGATreeSplitNodePos(self.id, 0), RGATreeSplitNodePos(self.id, Int32(self.length)))
+    public var createPosRange: RGATreeSplitPosRange {
+        (RGATreeSplitPos(self.id, 0), RGATreeSplitPos(self.id, Int32(self.length)))
     }
 
     /**
@@ -374,10 +424,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * @returns `[RGATreeSplitNodePos, Map<string, TimeTicket>, Array<Change>]`
      */
     @discardableResult
-    public func edit(_ range: RGATreeSplitNodeRange,
+    public func edit(_ range: RGATreeSplitPosRange,
                      _ editedAt: TimeTicket,
                      _ value: T?,
-                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> (RGATreeSplitNodePos, [String: TimeTicket], [ContentChange<T>])
+                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> (RGATreeSplitPos, [String: TimeTicket], [ContentChange<T>])
     {
         // 01. split nodes with from and to
         let (toLeft, toRight) = try self.findNodeWithSplit(range.1, editedAt)
@@ -388,11 +438,11 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var (changes, latestCreatedAtMap, removedNodeMapByNodeKey) = try self.deleteNodes(nodesToDelete, editedAt, latestCreatedAtMapByActor)
 
         let caretID = toRight?.id ?? toLeft.id
-        var caretPos = RGATreeSplitNodePos(caretID, 0)
+        var caretPos = RGATreeSplitPos(caretID, 0)
 
         // 03. insert a new node
         if let value {
-            let idx = try self.findIdxFromNodePos(fromLeft.createRange.1, true)
+            let idx = try self.posToIndex(fromLeft.createPosRange.1, true)
 
             let inserted = self.insertAfter(
                 fromLeft,
@@ -405,7 +455,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 changes.append(ContentChange<T>(actor: editedAt.actorID!, from: idx, to: idx, content: value))
             }
 
-            caretPos = RGATreeSplitNodePos(inserted.id, Int32(inserted.contentLength))
+            caretPos = RGATreeSplitPos(inserted.id, Int32(inserted.contentLength))
         }
 
         // 04. add removed node
@@ -419,27 +469,27 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodePos` finds RGATreeSplitNodePos of given offset.
      */
-    public func findNodePos(_ idx: Int) throws -> RGATreeSplitNodePos {
+    public func indexToPos(_ idx: Int) throws -> RGATreeSplitPos {
         let (node, offset) = self.treeByIndex.find(idx)
         guard let splitNode = node as? RGATreeSplitNode<T> else {
             throw YorkieError.noSuchElement(message: "no element for index \(idx)")
         }
 
-        return RGATreeSplitNodePos(splitNode.id, Int32(offset))
+        return RGATreeSplitPos(splitNode.id, Int32(offset))
     }
 
     /**
      * `findIndexesFromRange` finds indexes based on range.
      */
-    public func findIndexesFromRange(_ range: RGATreeSplitNodeRange) throws -> (Int, Int) {
+    public func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
         let (fromPos, toPos) = range
-        return try (self.findIdxFromNodePos(fromPos, false), self.findIdxFromNodePos(toPos, true))
+        return try (self.posToIndex(fromPos, false), self.posToIndex(toPos, true))
     }
 
     /**
-     * `findIdxFromNodePos` finds index based on node position.
+     * `posToIndex` finds index based on node position.
      */
-    public func findIdxFromNodePos(_ pos: RGATreeSplitNodePos, _ preferToLeft: Bool) throws -> Int {
+    public func posToIndex(_ pos: RGATreeSplitPos, _ preferToLeft: Bool) throws -> Int {
         let absoluteID = pos.absoluteID
         guard let node = preferToLeft ? try? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
             let message = "the node of the given id should be found: \(absoluteID.toTestString)"
@@ -551,7 +601,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodeWithSplit` splits and return nodes of the given position.
      */
-    public func findNodeWithSplit(_ pos: RGATreeSplitNodePos, _ editedAt: TimeTicket) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
+    public func findNodeWithSplit(_ pos: RGATreeSplitPos, _ editedAt: TimeTicket) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
         let absoluteID = pos.absoluteID
         var node = try self.findFloorNodePreferToLeft(absoluteID)
         let relativeOffset = absoluteID.offset - node.id.offset
@@ -736,13 +786,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 continue
             }
 
-            guard let range = leftBoundary.next?.createRange else {
+            guard let range = leftBoundary.next?.createPosRange else {
                 throw YorkieError.noSuchElement(message: "The next node of leftBoundary is nil")
             }
 
             fromIdx = try self.findIndexesFromRange(range).0
             if rightBoundary != nil {
-                guard let range = rightBoundary!.prev?.createRange else {
+                guard let range = rightBoundary!.prev?.createPosRange else {
                     throw YorkieError.noSuchElement(message: "The prev node of rightBoundary is nil")
                 }
 
@@ -846,20 +896,20 @@ extension RGATreeSplit: Sequence {
  * `Selection` represents the selection of text range in the editor.
  */
 class Selection {
-    private let from: RGATreeSplitNodePos
-    private let to: RGATreeSplitNodePos
+    private let from: RGATreeSplitPos
+    private let to: RGATreeSplitPos
     /**
      * `updatedAt` returns update time of this selection.
      */
     public let updatedAt: TimeTicket
 
-    init(_ from: RGATreeSplitNodePos, _ to: RGATreeSplitNodePos, _ updatedAt: TimeTicket) {
+    init(_ from: RGATreeSplitPos, _ to: RGATreeSplitPos, _ updatedAt: TimeTicket) {
         self.from = from
         self.to = to
         self.updatedAt = updatedAt
     }
 
-    convenience init(_ range: RGATreeSplitNodeRange, _ updatedAt: TimeTicket) {
+    convenience init(_ range: RGATreeSplitPosRange, _ updatedAt: TimeTicket) {
         self.init(range.0, range.1, updatedAt)
     }
 }
