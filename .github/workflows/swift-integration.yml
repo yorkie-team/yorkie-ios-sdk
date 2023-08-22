@@ -10,6 +10,9 @@ jobs:
   build:
     runs-on: macos-13
     steps:
+    - uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '14.3.1'
     - uses: actions/checkout@v3
     - name: Setup Docker on macOS using Colima, Lima-VM, and Homebrew.
       uses: 7hong13/setup-docker-macos-action@fix_formula_paths
