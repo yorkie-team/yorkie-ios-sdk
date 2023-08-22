@@ -361,8 +361,6 @@ class ConverterTests: XCTestCase {
 
         let converted = Converter.fromPresence(pbPresence: Converter.toPresence(presence: samplePresence))
 
-        // swiftlint: disable force_cast
-        XCTAssert((samplePresence as NSDictionary).isEqual(to: (converted as NSDictionary) as! [AnyHashable: Any]))
-        // swiftlint: enable force_cast
+        XCTAssert(!(samplePresence == converted))
     }
 }

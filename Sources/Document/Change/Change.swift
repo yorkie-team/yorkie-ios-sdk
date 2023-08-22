@@ -57,12 +57,10 @@ public struct Change {
      * `execute` executes the operations of this change to the given root.
      */
     @discardableResult
-    func execute(root: CRDTRoot, presences: [ActorID: PresenceData]) throws -> (opInfos: [any OperationInfo], presences: [ActorID: PresenceData]) {
+    func execute(root: CRDTRoot, presences: inout [ActorID: PresenceData]) throws -> [any OperationInfo] {
         let opInfos = try self.operations.flatMap {
             try $0.execute(root: root)
         }
-
-        var presences = presences
 
         if let actorID = self.id.getActorID() {
             switch self.presenceChange {
@@ -73,7 +71,7 @@ public struct Change {
             }
         }
 
-        return (opInfos, presences)
+        return opInfos
     }
 
     /**

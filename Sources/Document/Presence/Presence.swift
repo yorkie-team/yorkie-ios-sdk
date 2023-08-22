@@ -40,14 +40,14 @@ enum PresenceChange {
  */
 public class Presence {
     private var changeContext: ChangeContext
-    private var presence: PresenceData
+    private(set) var presence: PresenceData
 
     init(changeContext: ChangeContext, presence: PresenceData) {
         self.changeContext = changeContext
         self.presence = presence
     }
 
-    func set(presence: PresenceData?) {
+    func set(_ presence: PresenceData?) {
         guard let presence else {
             fatalError("presence is not initialized")
         }

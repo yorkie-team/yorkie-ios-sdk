@@ -93,7 +93,11 @@ extension Converter {
         var pbPresence = PbPresence()
         
         for (key, value) in presence {
-            if value is String {
+            if value is AnyValueTypeDictionary || value is [Any],
+               let jsonObject = try? JSONSerialization.data(withJSONObject: value),
+               let jsonString = String(data: jsonObject, encoding: .utf8) {
+                pbPresence.data[key] = jsonString
+            } else if value is String {
                 pbPresence.data[key] = "\"\(value)\""
             } else {
                 pbPresence.data[key] = "\(value)"
@@ -127,11 +131,16 @@ extension Converter {
         var data = PresenceData()
 
         pbPresence.data.forEach { (key, value) in
-            if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) {
+            if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) as? AnyValueTypeDictionary {
                 data[key] = jsonValue
             } else {
                 if value.first == "\"" && value.last == "\"" {
+                    // Sring.
                     data[key] = value.substring(from: 1, to: value.count - 2)
+                } else if value.first == "[", value.last == "]",
+                          let dataValue = "{\"\(key)\":\(value)}".data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) as? AnyValueTypeDictionary {
+                    // Array. eg. "[\"a\", \"b\"]"
+                    data.merge(jsonValue, uniquingKeysWith: { _, last in last })
                 } else {
                     if let intValue = Int(value) {
                         data[key] = intValue
@@ -142,7 +151,8 @@ extension Converter {
                     } else if "\(false)" == value.lowercased() {
                         data[key] = false
                     } else {
-                        assertionFailure("Invalid Presence Value [\(key)]:[\(value)")
+                        data[key] = value
+                        assertionFailure("Invalid Presence Value [\(key)]:[\(value)]")
                     }
                 }
             }

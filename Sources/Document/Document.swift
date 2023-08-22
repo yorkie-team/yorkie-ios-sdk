@@ -62,6 +62,7 @@ public actor Document {
 
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
+    private var peersSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -110,15 +111,13 @@ public actor Document {
 
         updater(proxy, &presence)
 
+        self.clone?.presences[actorID] = presence.presence
+
         if context.hasChange {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
             let change = context.getChange()
-            var opInfos = [any OperationInfo]()
-            if let result = try? change.execute(root: self.root, presences: self.presences) {
-                opInfos.append(contentsOf: result.opInfos)
-                self.presences = result.presences
-            }
+            let opInfos = (try? change.execute(root: self.root, presences: &self.presences)) ?? []
             self.localChanges.append(change)
             self.changeID = change.id
 
@@ -153,6 +152,14 @@ public actor Document {
     }
 
     /**
+     * `subscribePeers` registers a callback to subscribe to events on the document.
+     * The callback will be called when the targetPath or any of its nested values change.
+     */
+    public func subscribePeers(_ callback: @escaping (DocEvent) -> Void) {
+        self.peersSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -161,6 +168,13 @@ public actor Document {
         } else {
             self.defaultSubscribeCallback = nil
         }
+    }
+
+    /**
+     * `unsubscribePeers` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribePeers() {
+        self.peersSubscribeCallback = nil
     }
 
     /**
@@ -350,9 +364,7 @@ public actor Document {
         let clone = self.cloned
 
         for change in changes {
-            if let result = try? change.execute(root: clone.root, presences: clone.presences) {
-                self.clone?.presences = result.presences
-            }
+            try change.execute(root: clone.root, presences: &self.clone!.presences)
         }
 
         for change in changes {
@@ -374,11 +386,7 @@ public actor Document {
                 }
             }
 
-            var opInfos = [any OperationInfo]()
-            if let result = try? change.execute(root: self.root, presences: self.presences) {
-                opInfos.append(contentsOf: result.opInfos)
-                self.presences = result.presences
-            }
+            let opInfos = try change.execute(root: self.root, presences: &self.presences)
 
             if change.hasOperations {
                 updates.changeInfo = ChangeInfo(message: change.message ?? "", operations: opInfos, actorID: actorID)
@@ -473,7 +481,7 @@ public actor Document {
             }
         case .unwatched:
             if let peerActorID {
-                self.processDocEvent(PeersChangedEvent(value: .watched(peer: (peerActorID, [:]))))
+                self.processDocEvent(PeersChangedEvent(value: .unwatched(peer: (peerActorID, [:]))))
             }
         default:
             break
@@ -507,6 +515,10 @@ public actor Document {
         }
 
         self.defaultSubscribeCallback?(event)
+
+        if event.type == .peersChanged {
+            self.peersSubscribeCallback?(event)
+        }
     }
 
     private func isSameElementOrChildOf(_ elem: String, _ parent: String) -> Bool {

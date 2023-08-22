@@ -303,7 +303,7 @@ public actor Client {
 
         await doc.setActor(clientID)
         try await doc.update { _, presence in
-            presence.set(presence: initialPresence)
+            presence.set(initialPresence)
         }
 
         var attachDocumentRequest = AttachDocumentRequest()
