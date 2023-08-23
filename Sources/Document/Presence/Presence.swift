@@ -47,11 +47,10 @@ public class Presence {
         self.presence = presence
     }
 
-    func set(_ presence: PresenceData?) {
-        guard let presence else {
-            fatalError("presence is not initialized")
-        }
-
+    /**
+     * `set` updates the presence based on the partial presence.
+     */
+    func set(_ presence: PresenceData) {
         for (key, value) in presence {
             self.presence[key] = value
         }
@@ -60,6 +59,16 @@ public class Presence {
         self.changeContext.presenceChange = presenceChange
     }
 
+    /**
+     * `get` returns the presence value of the given key.
+     */
+    public func get(_ key: PresenceData.Key) -> Any? {
+        self.presence[key]
+    }
+
+    /**
+     * `clear` clears the presence.
+     */
     func clear() {
         self.presence = [:]
 

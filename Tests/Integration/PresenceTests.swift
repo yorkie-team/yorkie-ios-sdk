@@ -214,6 +214,38 @@ final class PresenceTests: XCTestCase {
         try await c2.deactivate()
         try await c3.deactivate()
     }
+
+    func test_can_get_presence_value_using_p_get_within_doc_update_function() async throws {
+        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        try await c1.activate()
+        try await c2.activate()
+        let c1ID = await c1.id!
+        let c2ID = await c2.id!
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        try await c1.attach(doc1, ["counter": 0], false)
+
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, ["counter": 0], false)
+
+        try await doc1.update { _, presence in
+            if let counter = presence.get("counter") as? Int {
+                presence.set(["counter": counter + 1])
+            }
+        }
+
+        var result = await doc1.getPresenceForTest(c1ID)?["counter"] as? Int
+        XCTAssertEqual(result, 1)
+
+        try await c1.sync()
+        try await c2.sync()
+
+        result = await doc1.getPresenceForTest(c1ID)?["counter"] as? Int
+        XCTAssertEqual(result, 1)
+    }
 }
 
 final class PresenceSubscribeTests: XCTestCase {
