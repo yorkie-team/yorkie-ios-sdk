@@ -729,19 +729,19 @@ final class TreeIntegrationStyleTests: XCTestCase {
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(4, 5, ["c": "d"])
+            try (root.t as? JSONTree)?.style(1, 2, ["c": "d"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"d\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(4, 5, ["c": "q"])
+            try (root.t as? JSONTree)?.style(1, 2, ["c": "q"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(3, 4, ["z": "m"])
+            try (root.t as? JSONTree)?.style(2, 3, ["z": "m"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"m\"></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(3, 4, ["z": 100])
+            try (root.t as? JSONTree)?.style(2, 3, ["z": 100])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=100></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(3, 4, ["z": true])
+            try (root.t as? JSONTree)?.style(2, 3, ["z": true])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=true></tn></p></tc></doc>")
         }
     }
@@ -796,7 +796,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<doc><p italic=\"true\">hello</p></doc>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.style(6, 7, ["bold": "true"])
+                try (root.t as? JSONTree)?.style(0, 1, ["bold": "true"])
             }
 
             try await c1.sync()
