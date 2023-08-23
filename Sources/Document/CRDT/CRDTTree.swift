@@ -162,6 +162,10 @@ struct CRDTTreeNodeID: Equatable, Comparable {
             return lhs.createdAt < rhs.createdAt
         }
     }
+    
+    static func == (lhs: CRDTTreeNodeID, rhs: CRDTTreeNodeID) -> Bool {
+        lhs.createdAt == rhs.createdAt && lhs.offset == rhs.offset
+    }
 }
 
 extension CRDTTreeNodeID {
@@ -243,14 +247,14 @@ final class CRDTTreeNode: IndexTreeNode {
     var attrs: RHT?
 
     /**
-     * `insPrev` is the previous node of this node in the list.
+     * `insPrevID` is the previous node of this node in the list.
      */
-    var insPrev: CRDTTreeNode?
+    var insPrevID: CRDTTreeNodeID?
 
     /**
-     * `insNext` is the previous node of this node after the node is split.
+     * `insNextID` is the previous node of this node after the node is split.
      */
-    var insNext: CRDTTreeNode?
+    var insNextID: CRDTTreeNodeID?
 
     init(id: CRDTTreeNodeID, type: TreeNodeType, value: String? = nil, children: [CRDTTreeNode]? = nil, attributes: RHT? = nil) {
         self.size = 0
@@ -441,6 +445,17 @@ class CRDTTree: CRDTGCElement {
             self.nodeMapByID.put(node.id, node)
         }
     }
+    
+    /**
+     * `findFloorNode` finds node of given id.
+     */
+    private func findFloorNode(_ id: CRDTTreeNodeID) -> CRDTTreeNode? {
+        guard let entry = self.nodeMapByID.floorEntry(id), entry.key.createdAt == id.createdAt else {
+            return nil
+        }
+        
+        return entry.value
+    }
 
     /**
      * `findNodesAndSplitText` finds `TreePos` of the given `CRDTTreeNodeID` and
@@ -465,14 +480,16 @@ class CRDTTree: CRDTGCElement {
             let absOffset = leftSiblingNode.id.offset
             let split = try leftSiblingNode.split(pos.leftSiblingID.offset - absOffset, absOffset)
             if split != nil {
-                split!.insPrev = leftSiblingNode
+                split!.insPrevID = leftSiblingNode.id
                 self.nodeMapByID.put(split!.id, split!)
 
-                if leftSiblingNode.insNext != nil {
-                    leftSiblingNode.insNext!.insPrev = split!
-                    split!.insNext = leftSiblingNode.insNext
+                if leftSiblingNode.insNextID != nil {
+                    let insNext = self.findFloorNode(leftSiblingNode.insNextID!)
+                    
+                    insNext?.insPrevID = split!.id
+                    split!.insNextID = leftSiblingNode.insNextID
                 }
-                leftSiblingNode.insNext = split!
+                leftSiblingNode.insNextID = split!.id
             }
         }
 
@@ -760,18 +777,15 @@ class CRDTTree: CRDTGCElement {
      * `purge` physically purges the given node from RGATreeSplit.
      */
     func purge(_ node: CRDTTreeNode) {
-        let insPrev = node.insPrev
-        let insNext = node.insNext
-
-        if insPrev != nil {
-            insPrev?.insNext = insNext
+        if let insPrevID = node.insPrevID {
+            self.findFloorNode(insPrevID)?.insNextID = node.insNextID
         }
-        if insNext != nil {
-            insNext?.insPrev = insPrev
+        if let insNextID = node.insNextID {
+            self.findFloorNode(insNextID)?.insPrevID = node.insPrevID
         }
 
-        node.insPrev = nil
-        node.insNext = nil
+        node.insPrevID = nil
+        node.insNextID = nil
     }
 
     /**
@@ -911,22 +925,20 @@ class CRDTTree: CRDTGCElement {
     private func toTreeNodes(_ pos: CRDTTreePos) -> (CRDTTreeNode, CRDTTreeNode)? {
         let parentID = pos.parentID
         let leftSiblingID = pos.leftSiblingID
-        guard let parentEntry = self.nodeMapByID.floorEntry(parentID),
-              let leftSiblingEntry = self.nodeMapByID.floorEntry(leftSiblingID)
+        guard let parentNode = self.findFloorNode(parentID),
+              var leftSiblingNode = self.findFloorNode(leftSiblingID)
         else {
             return nil
         }
 
-        var leftSiblingNode = leftSiblingEntry.value
-
         if leftSiblingID.offset > 0,
            leftSiblingID.offset == leftSiblingNode.id.offset,
-           leftSiblingNode.insPrev != nil
+           leftSiblingNode.insPrevID != nil
         {
-            leftSiblingNode = leftSiblingNode.insPrev!
+            leftSiblingNode = self.findFloorNode(leftSiblingNode.insPrevID!) ?? leftSiblingNode
         }
 
-        return (parentEntry.value, leftSiblingNode)
+        return (parentNode, leftSiblingNode)
     }
 
     /**
