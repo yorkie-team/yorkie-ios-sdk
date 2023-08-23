@@ -133,11 +133,11 @@ public actor Document {
                                             operations: opInfos,
                                             actorID: change.id.getActorID())
                 let changeEvent = LocalChangeEvent(value: changeInfo)
-                self.processDocEvent(changeEvent)
+                self.publish(changeEvent)
             }
 
             if change.presenceChange != nil, let presence = self.presences[actorID] {
-                self.processDocEvent(PresenceChangedEvent(value: (actorID, presence)))
+                self.publish(PresenceChangedEvent(value: (actorID, presence)))
             }
 
             Logger.trace("after update a local change: \(self.toJSON())")
@@ -350,7 +350,7 @@ public actor Document {
         self.clone = nil
 
         let snapshotEvent = SnapshotEvent(value: snapshot)
-        self.processDocEvent(snapshotEvent)
+        self.publish(snapshotEvent)
     }
 
     /**
@@ -372,7 +372,7 @@ public actor Document {
             try change.execute(root: clone.root, presences: &self.clone!.presences)
 
             var changeInfo: ChangeInfo?
-            var docEvent: DocEvent?
+            var presenceEvent: DocEvent?
 
             guard let actorID = change.id.getActorID() else {
                 throw YorkieError.unexpected(message: "ActorID is null")
@@ -388,9 +388,9 @@ public actor Document {
                         let peer = (actorID, presence)
 
                         if self.presences[actorID] != nil {
-                            docEvent = PresenceChangedEvent(value: peer)
+                            presenceEvent = PresenceChangedEvent(value: peer)
                         } else {
-                            docEvent = WatchedEvent(value: peer)
+                            presenceEvent = WatchedEvent(value: peer)
                         }
                     }
                 case .clear:
@@ -403,7 +403,7 @@ public actor Document {
                         throw YorkieError.unexpected(message: "No presence!")
                     }
 
-                    docEvent = UnwatchedEvent(value: (actorID, presence))
+                    presenceEvent = UnwatchedEvent(value: (actorID, presence))
 
                     self.removeOnlineClient(actorID)
                 }
@@ -421,11 +421,11 @@ public actor Document {
             // asynchronously, the model can be changed and breaking consistency.
             if let info = changeInfo {
                 let remoteChangeEvent = RemoteChangeEvent(value: info)
-                self.processDocEvent(remoteChangeEvent)
+                self.publish(remoteChangeEvent)
             }
 
-            if let docEvent = docEvent {
-                self.processDocEvent(docEvent)
+            if let presenceEvent {
+                self.publish(presenceEvent)
             }
 
             self.changeID = self.changeID.syncLamport(with: change.id.getLamport())
@@ -488,28 +488,28 @@ public actor Document {
         "[\(self.key)]"
     }
 
+    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID?) {
+        switch eventType {
+        case .initialized:
+            self.publish(InitializedEvent(value: self.getPresences()))
+        case .watched:
+            if let peerActorID, let presence = self.getPresence(peerActorID) {
+                self.publish(WatchedEvent(value: (peerActorID, presence)))
+            }
+        case .unwatched:
+            if let peerActorID, let presence = self.getPresence(peerActorID) {
+                self.publish(UnwatchedEvent(value: (peerActorID, presence)))
+            }
+        default:
+            assertionFailure("Not presence Event type. \(eventType)")
+        }
+    }
+
     /**
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    func publish(_ eventType: DocEventType, _ peerActorID: ActorID?) {
-        switch eventType {
-        case .initialized:
-            self.processDocEvent(InitializedEvent(value: self.getPresences()))
-        case .watched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
-                self.processDocEvent(WatchedEvent(value: (peerActorID, presence)))
-            }
-        case .unwatched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
-                self.processDocEvent(UnwatchedEvent(value: (peerActorID, presence)))
-            }
-        default:
-            break
-        }
-    }
-
-    private func processDocEvent(_ event: DocEvent) {
+    private func publish(_ event: DocEvent) {
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
         if presenceEvents.contains(event.type) {
