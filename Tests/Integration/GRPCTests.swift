@@ -44,16 +44,14 @@ class GRPCTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(activateResponse.clientKey, testClientKey)
+        XCTAssertEqual(activateResponse.clientID, testClientKey)
 
         var deactivateRequest = DeactivateClientRequest()
         deactivateRequest.clientID = activateResponse.clientID
-        guard let deactivatedResponse = try? client.deactivateClient(deactivateRequest).response.wait() else {
+        guard (try? client.deactivateClient(deactivateRequest).response.wait()) != nil else {
             XCTFail("The response of deactivate is nil.")
             return
         }
-
-        XCTAssertEqual(deactivatedResponse.clientID, activateResponse.clientID)
     }
 
     func test_connect_yorkie_with_async() async throws {
@@ -80,15 +78,13 @@ class GRPCTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(activateResponse.clientKey, testClientKey)
+        XCTAssertEqual(activateResponse.clientID, testClientKey)
 
         var deactivateRequest = DeactivateClientRequest()
         deactivateRequest.clientID = activateResponse.clientID
-        guard let deactivatedResponse = try? await client.deactivateClient(deactivateRequest) else {
+        guard (try? await client.deactivateClient(deactivateRequest)) != nil else {
             XCTFail("The response of deactivate is nil.")
             return
         }
-
-        XCTAssertEqual(deactivatedResponse.clientID, activateResponse.clientID)
     }
 }

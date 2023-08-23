@@ -92,7 +92,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
     if let node = treeNode as? JSONTreeTextNode {
         try validateTextNode(node)
 
-        let textNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: DefaultTreeNodeType.text.rawValue, value: node.value)
+        let textNode = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: ticket, offset: 0), type: DefaultTreeNodeType.text.rawValue, value: node.value)
 
         try parent.append(contentsOf: [textNode])
     } else if let node = treeNode as? JSONTreeElementNode {
@@ -102,7 +102,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
-        let elementNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type, attributes: attrs.size == 0 ? nil : attrs)
+        let elementNode = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: ticket, offset: 0), type: node.type, attributes: attrs.size == 0 ? nil : attrs)
 
         try parent.append(contentsOf: [elementNode])
 
@@ -122,7 +122,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
 
     let root: CRDTTreeNode
     if let node = content as? JSONTreeTextNode {
-        root = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type, value: node.value)
+        root = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: ticket, offset: 0), type: node.type, value: node.value)
     } else if let node = content as? JSONTreeElementNode {
         let attrs = RHT()
 
@@ -130,7 +130,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
-        root = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: node.type, attributes: attrs.size == 0 ? nil : attrs)
+        root = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: ticket, offset: 0), type: node.type, attributes: attrs.size == 0 ? nil : attrs)
 
         try node.children.forEach { child in
             try buildDescendants(treeNode: child, parent: root, context: context)
@@ -205,11 +205,11 @@ public class JSONTree {
      */
     func buildRoot(_ context: ChangeContext) throws -> CRDTTreeNode {
         guard let initialRoot else {
-            return CRDTTreeNode(pos: CRDTTreePos(createdAt: context.issueTimeTicket, offset: 0), type: DefaultTreeNodeType.root.rawValue)
+            return CRDTTreeNode(id: CRDTTreeNodeID(createdAt: context.issueTimeTicket, offset: 0), type: DefaultTreeNodeType.root.rawValue)
         }
 
         // TODO(hackerwins): Need to use the ticket of operation of creating tree.
-        let root = CRDTTreeNode(pos: CRDTTreePos(createdAt: context.issueTimeTicket, offset: 0), type: initialRoot.type)
+        let root = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: context.issueTimeTicket, offset: 0), type: initialRoot.type)
 
         try self.initialRoot?.children.forEach { child in
             try buildDescendants(treeNode: child, parent: root, context: context)
@@ -325,13 +325,14 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
+        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
                                                   contents: crdtNodes,
-                                                  executedAt: ticket)
+                                                  executedAt: ticket,
+                                                  maxCreatedAtMapByActor: maxCreatedAtMapByActor)
         )
 
         if fromPos != toPos {
@@ -470,48 +471,26 @@ public class JSONTree {
      * `posRangeToIndexRange` converts the position range into the index range.
      */
     func posRangeToIndexRange(_ range: TreePosStructRange) throws -> (Int, Int) {
-        guard self.context != nil, let tree else {
+        guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
         let posRange = try (CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1))
 
-        return try (tree.toIndex(posRange.0), tree.toIndex(posRange.1))
+        return try tree.posRangeToIndexRange(posRange, context.lastTimeTicket)
     }
 
     /**
      * `posRangeToPathRange` converts the position range into the path range.
      */
     func posRangeToPathRange(_ range: TreePosStructRange) throws -> ([Int], [Int]) {
-        guard self.context != nil, let tree else {
+        guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
         let posRange = try (CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1))
 
-        return try tree.posRangeToPathRange(posRange)
-    }
-}
-
-extension JSONTree: Sequence {
-    public func makeIterator() -> JSONTreeListIterator {
-        return JSONTreeListIterator(self.tree)
-    }
-}
-
-public class JSONTreeListIterator: IteratorProtocol {
-    private var treeIterator: CRDTTreeListIterator?
-
-    init(_ firstNode: CRDTTree?) {
-        self.treeIterator = firstNode?.makeIterator()
-    }
-
-    public func next() -> (any JSONTreeNode)? {
-        guard let node = self.treeIterator?.next() else {
-            return nil
-        }
-
-        return node.toJSONTreeNode
+        return try tree.posRangeToPathRange(posRange, context.lastTimeTicket)
     }
 }
 
