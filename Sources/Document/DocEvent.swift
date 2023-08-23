@@ -163,7 +163,7 @@ public struct UnwatchedEvent: DocEvent {
     /**
      * UnwatchedEvent type
      */
-    public var value: ActorID
+    public var value: PeerElement
 }
 
 public struct PresenceChangedEvent: DocEvent {

@@ -730,10 +730,14 @@ public actor Client {
                 self.eventStream.send(event)
             case .documentsWatched:
                 await self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
+                // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
+                // unless we also know their initial presence data at this point.
                 await self.attachmentMap[docKey]?.doc.publish(.watched, publisher)
             case .documentsUnwatched:
-                await self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
+                // NOTE(chacha912): There is no presence, when PresenceChange(clear) is applied before unwatching.
+                // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
                 await self.attachmentMap[docKey]?.doc.publish(.unwatched, publisher)
+                await self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
             case .UNRECOGNIZED:
                 break
             }
