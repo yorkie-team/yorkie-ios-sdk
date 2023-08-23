@@ -44,7 +44,6 @@ class TextChange {
      */
     public enum TextChangeType {
         case content
-        case selection
         case style
     }
 
@@ -153,12 +152,10 @@ final class CRDTText: CRDTGCElement {
      *
      **/
     private(set) var rgaTreeSplit: RGATreeSplit<TextValue>
-    private var selectionMap: [String: Selection]
     private var remoteChangeLock: Bool
 
     init(rgaTreeSplit: RGATreeSplit<TextValue>, createdAt: TimeTicket) {
         self.rgaTreeSplit = rgaTreeSplit
-        self.selectionMap = [String: Selection]()
         self.remoteChangeLock = false
         self.createdAt = createdAt
     }
@@ -245,18 +242,6 @@ final class CRDTText: CRDTGCElement {
         }
 
         return changes
-    }
-
-    /**
-     * `select` stores that the given range has been selected.
-     */
-    @discardableResult
-    public func select(_ range: RGATreeSplitPosRange, _ updatedAt: TimeTicket) throws -> TextChange? {
-        if self.remoteChangeLock {
-            return nil
-        }
-
-        return try self.selectPriv(range, updatedAt)
     }
 
     /**
@@ -362,28 +347,5 @@ final class CRDTText: CRDTGCElement {
      */
     public func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
         try self.rgaTreeSplit.findIndexesFromRange(range)
-    }
-
-    private func selectPriv(_ range: RGATreeSplitPosRange, _ updatedAt: TimeTicket) throws -> TextChange? {
-        guard let actorID = updatedAt.actorID else {
-            return nil
-        }
-
-        let postProcess = {
-            self.selectionMap[actorID] = Selection(range, updatedAt)
-
-            let (from, to) = try self.rgaTreeSplit.findIndexesFromRange(range)
-            return TextChange(type: .selection, actor: actorID, from: from, to: to)
-        }
-
-        if let prevSelection = self.selectionMap[actorID] {
-            if updatedAt.after(prevSelection.updatedAt) {
-                return try postProcess()
-            }
-        } else {
-            return try postProcess()
-        }
-
-        return nil
     }
 }

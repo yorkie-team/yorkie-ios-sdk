@@ -423,13 +423,6 @@ extension Converter {
             }
             pbEditOperation.executedAt = toTimeTicket(editOperation.executedAt)
             pbOperation.edit = pbEditOperation
-        } else if let selectOperaion = operation as? SelectOperation {
-            var pbSelectOperation = PbOperation.Select()
-            pbSelectOperation.parentCreatedAt = toTimeTicket(selectOperaion.parentCreatedAt)
-            pbSelectOperation.from = toTextNodePos(pos: selectOperaion.fromPos)
-            pbSelectOperation.to = toTextNodePos(pos: selectOperaion.toPos)
-            pbSelectOperation.executedAt = toTimeTicket(selectOperaion.executedAt)
-            pbOperation.select = pbSelectOperation
         } else if let styleOperation = operation as? StyleOperation {
             var pbStyleOperation = PbOperation.Style()
             pbStyleOperation.parentCreatedAt = toTimeTicket(styleOperation.parentCreatedAt)
@@ -516,11 +509,6 @@ extension Converter {
                                      content: pbEditOperation.content,
                                      attributes: pbEditOperation.attributes,
                                      executedAt: fromTimeTicket(pbEditOperation.executedAt))
-            } else if case let .select(pbSelectOperation) = pbOperation.body {
-                return SelectOperation(parentCreatedAt: fromTimeTicket(pbSelectOperation.parentCreatedAt),
-                                       fromPos: fromTextNodePos(pbSelectOperation.from),
-                                       toPos: fromTextNodePos(pbSelectOperation.to),
-                                       executedAt: fromTimeTicket(pbSelectOperation.executedAt))
             } else if case let .style(pbStyleOperation) = pbOperation.body {
                 return StyleOperation(parentCreatedAt: fromTimeTicket(pbStyleOperation.parentCreatedAt),
                                       fromPos: fromTextNodePos(pbStyleOperation.from),
