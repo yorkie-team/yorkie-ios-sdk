@@ -21,7 +21,7 @@ func withTwoClientsAndDocuments(_ title: String, _ callback: (Client, Document, 
     let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
     let options = ClientOptions()
-    let docKey = "\(title)-\(Date().description)".toDocKey
+    let docKey = "\(Date().description)-\(title)".toDocKey
 
     let c1 = Client(rpcAddress: rpcAddress, options: options)
     let c2 = Client(rpcAddress: rpcAddress, options: options)
@@ -32,8 +32,8 @@ func withTwoClientsAndDocuments(_ title: String, _ callback: (Client, Document, 
     let d1 = Document(key: docKey)
     let d2 = Document(key: docKey)
 
-    try await c1.attach(d1)
-    try await c2.attach(d2)
+    try await c1.attach(d1, [:], false)
+    try await c2.attach(d2, [:], false)
 
     try await callback(c1, d1, c2, d2)
 
