@@ -267,6 +267,7 @@ public class JSONTree {
     /**
      * `editByPath` edits this tree with the given node and path.
      */
+    @discardableResult
     public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)?) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
