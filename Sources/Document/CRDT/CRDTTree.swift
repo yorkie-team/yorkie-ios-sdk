@@ -323,7 +323,18 @@ final class CRDTTreeNode: IndexTreeNode {
      * `clone` clones this node with the given offset.
      */
     func clone(offset: Int32) -> CRDTTreeNode {
-        CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset), type: self.type)
+        let clone = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset), type: self.type, attributes:  self.attrs)
+        clone.removedAt = self.removedAt
+        clone.value = self.value
+        clone.size = self.size
+        clone.innerChildren = self.innerChildren.compactMap {
+            let childClone = $0.deepcopy()
+            childClone?.parent = clone
+            
+            return childClone
+        }
+        
+        return clone
     }
 
     /**
@@ -376,7 +387,11 @@ final class CRDTTreeNode: IndexTreeNode {
         if let attrs = node.attrs?.toObject() {
             attrs.keys.sorted().forEach {
                 if let value = attrs[$0]?.value {
-                    xml += " \($0)=\(value)"
+                    if value.first == "\"", value.last == "\"" {
+                        xml += " \($0)=\(value)"
+                    } else {
+                        xml += " \($0)=\"\(value)\""
+                    }
                 }
             }
         }
@@ -501,13 +516,15 @@ class CRDTTree: CRDTGCElement {
             index = firstIndex + 1
         }
 
-        for idx in index ..< parentNode.innerChildren.count {
-            let next = parentNode.innerChildren[idx]
-
-            if next.id.createdAt.after(editedAt) {
-                leftSiblingNode = next
-            } else {
-                break
+        if index <= parentNode.innerChildren.count {
+            for idx in index ..< parentNode.innerChildren.count {
+                let next = parentNode.innerChildren[idx]
+                
+                if next.id.createdAt.after(editedAt) {
+                    leftSiblingNode = next
+                } else {
+                    break
+                }
             }
         }
 
@@ -584,7 +601,7 @@ class CRDTTree: CRDTGCElement {
      * If the content is undefined, the range will be removed.
      */
     @discardableResult
-    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket, _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([TreeChange], [String: TimeTicket]) {
+    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket, _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([TreeChange], [String: TimeTicket]) {
         // 01. split text nodes at the given range if needed.
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -640,23 +657,23 @@ class CRDTTree: CRDTGCElement {
                         throw YorkieError.unexpected(message: "Can't get actorID")
                     }
 
-                    let latestCreatedAt = latestCreatedAtMapByActor != nil ? latestCreatedAtMapByActor?[actorID] ?? TimeTicket.initial : TimeTicket.max
+                    let latestCreatedAt = latestCreatedAtMapByActor.isEmpty == false ? latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
 
                     if node.canDelete(editedAt, latestCreatedAt) {
+                        let latestCreatedAt = latestCreatedAtMap[actorID]
                         let createdAt = node.createdAt
-                        if let latestCreatedAt = latestCreatedAtMap[actorID] {
-                            if createdAt.after(latestCreatedAt) {
-                                latestCreatedAtMap[actorID] = createdAt
-                            }
+
+                        if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
+                            latestCreatedAtMap[actorID] = createdAt
                         }
 
                         traverseAll(node: node) { node, _ in
                             if node.canDelete(editedAt, TimeTicket.max) {
+                                let latestCreatedAt = latestCreatedAtMap[actorID]
                                 let createdAt = node.createdAt
-                                if let latestCreatedAt = latestCreatedAtMap[actorID] {
-                                    if createdAt.after(latestCreatedAt) {
-                                        latestCreatedAtMap[actorID] = createdAt
-                                    }
+
+                                if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
+                                    latestCreatedAtMap[actorID] = createdAt
                                 }
                             }
 
