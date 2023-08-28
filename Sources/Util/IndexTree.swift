@@ -407,9 +407,9 @@ extension IndexTreeNode {
 
             // If nodes are removed, the offset of the removed node is the number of
             // nodes before the node excluding the removed nodes.
-            let refined = self.innerChildren[0 ..< index].filter { $0.isRemoved == false }.count - 1
+            let refined = self.innerChildren[0 ..< index].filter { $0.isRemoved == false }.count
 
-            return refined < 0 ? 0 : refined
+            return refined
         }
 
         return self.children.firstIndex { $0 === node }
@@ -477,15 +477,26 @@ func ancestorOf<T: IndexTreeNode>(ancestor: T, node: T) -> Bool {
     return false
 }
 
+// TagContained represents whether the opening or closing tag of a element is selected.
+enum TagContained: String {
+    // All represents that both opening and closing tag of a element are selected.
+    case all = "All"
+    // Opening represents that only the opening tag is selected.
+    case opening = "Opening"
+    // Closing represents that only the closing tag is selected.
+    case closing = "Closing"
+}
+
 /**
  * `nodesBetween` iterates the nodes between the given range.
  * If the given range is collapsed, the callback is not called.
  * It traverses the tree with postorder traversal.
+ * NOTE(sejongk): Nodes should not be removed in callback, because it leads wrong behaviors.
  */
 func nodesBetween<T: IndexTreeNode>(root: T,
                                     from: Int,
                                     to: Int,
-                                    callback: @escaping (T) -> Void) throws
+                                    callback: @escaping (T, TagContained) throws -> Void) throws
 {
     if from > to {
         throw YorkieError.unexpected(message: "from is greater than to: \(from) > \(to)")
@@ -512,6 +523,7 @@ func nodesBetween<T: IndexTreeNode>(root: T,
             // the open tag to the close tag.
             let fromChild = child.isText ? from - pos : from - pos - 1
             let toChild = child.isText ? to - pos : to - pos - 1
+
             try nodesBetween(
                 root: child,
                 from: max(0, fromChild),
@@ -522,7 +534,15 @@ func nodesBetween<T: IndexTreeNode>(root: T,
             // If the range spans outside the child,
             // the callback is called with the child.
             if fromChild < 0 || toChild > child.size || child.isText {
-                callback(child)
+                var contain = TagContained.all
+                if (fromChild < 0 && toChild > child.size) || child.isText {
+                    contain = .all
+                } else if fromChild < 0 {
+                    contain = .opening
+                } else {
+                    contain = .closing
+                }
+                try callback(child, contain)
             }
         }
         pos += child.paddedSize
@@ -693,7 +713,7 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `nodeBetween` returns the nodes between the given range.
      */
-    func nodesBetween(_ from: Int, _ to: Int, _ callback: @escaping (T) -> Void) throws {
+    func nodesBetween(_ from: Int, _ to: Int, _ callback: @escaping (T, TagContained) throws -> Void) throws {
         try Yorkie.nodesBetween(root: self.root, from: from, to: to, callback: callback)
     }
 

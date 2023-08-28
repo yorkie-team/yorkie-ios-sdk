@@ -18,13 +18,13 @@ final class IndexTreeTests: XCTestCase {
                            _ to: Int,
                            _ expected: [String]) throws
     {
-        var nodes = [CRDTTreeNode]()
-        try tree.nodesBetween(from, to) {
-            nodes.append($0)
+        var actual = [String]()
+        try tree.nodesBetween(from, to) { node, contain in
+            actual.append("\(self.toDiagnostic(node)):\(contain.rawValue)")
         }
 
-        for (index, node) in nodes.enumerated() {
-            XCTAssertEqual(self.toDiagnostic(node), expected[index])
+        for (index, actualValue) in actual.enumerated() {
+            XCTAssertEqual(actualValue, expected[index])
         }
     }
 
@@ -147,17 +147,21 @@ final class IndexTreeTests: XCTestCase {
         }
 
         try self.nodesBetweenEqual(tree, 2, 11, [
-            "text.b",
-            "p",
-            "text.cde",
-            "p",
-            "text.fg",
-            "p"
+            "text.b:All",
+            "p:Closing",
+            "text.cde:All",
+            "p:All",
+            "text.fg:All",
+            "p:Opening"
         ])
-        try self.nodesBetweenEqual(tree, 2, 6, ["text.b", "p", "text.cde", "p"])
-        try self.nodesBetweenEqual(tree, 0, 1, ["p"])
-        try self.nodesBetweenEqual(tree, 3, 4, ["p"])
-        try self.nodesBetweenEqual(tree, 3, 5, ["p", "p"])
+        try self.nodesBetweenEqual(tree, 2, 6, [
+            "text.b:All",
+            "p:Closing",
+            "text.cde:All",
+            "p:Opening"])
+        try self.nodesBetweenEqual(tree, 0, 1, ["p:Opening"])
+        try self.nodesBetweenEqual(tree, 3, 4, ["p:Closing"])
+        try self.nodesBetweenEqual(tree, 3, 5, ["p:Closing", "p:Opening"])
     }
 
     func test_can_convert_index_to_pos() async throws {
