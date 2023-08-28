@@ -55,7 +55,7 @@ class ElementRHT {
     // nodeMapByKey is a map with values of nodes by key.
     private var nodeMapByKey: [String: ElementRHTNode] = [:]
     // nodeMapByCreatedAt is a map with values of nodes by creation time.
-    private var nodeMapByCreatedAt: [TimeTicket: ElementRHTNode] = [:]
+    private var nodeMapByCreatedAt: [String: ElementRHTNode] = [:]
 
     /**
      * `set` sets the value of the given key.
@@ -70,7 +70,7 @@ class ElementRHT {
         }
 
         let newNode = ElementRHTNode(key: key, value: value)
-        self.nodeMapByCreatedAt[value.createdAt] = newNode
+        self.nodeMapByCreatedAt[value.createdAt.toIDString] = newNode
 
         if node == nil || value.createdAt.after(node!.value.createdAt) {
             self.nodeMapByKey[key] = newNode
@@ -80,11 +80,11 @@ class ElementRHT {
     }
 
     /**
-     * `remove` removes  the Element of the given creation time
+     * `delete` deletes  the Element of the given creation time
      */
     @discardableResult
-    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
-        guard let node = nodeMapByCreatedAt[createdAt] else {
+    func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+        guard let node = nodeMapByCreatedAt[createdAt.toIDString] else {
             throw YorkieError.noSuchElement(message: "Can't find node of given createdAt [\(createdAt)] or executedAt [\(executedAt)]")
         }
 
@@ -96,7 +96,7 @@ class ElementRHT {
      * `subPath` returns the sub path of the given element.
      */
     func subPath(createdAt: TimeTicket) throws -> String {
-        guard let node = self.nodeMapByCreatedAt[createdAt] else {
+        guard let node = self.nodeMapByCreatedAt[createdAt.toIDString] else {
             let log = "can't find the given node: \(createdAt)"
             Logger.critical(log)
             throw YorkieError.unexpected(message: log)
@@ -109,7 +109,7 @@ class ElementRHT {
      * purge physically purge child element.
      */
     func purge(element: CRDTElement) {
-        guard let node = nodeMapByCreatedAt[element.createdAt] else {
+        guard let node = nodeMapByCreatedAt[element.createdAt.toIDString] else {
             Logger.critical("fail to find: \(element.createdAt)")
             return
         }
@@ -118,14 +118,14 @@ class ElementRHT {
             self.nodeMapByKey.removeValue(forKey: self.nodeMapByKey[node.key]!.key)
         }
 
-        self.nodeMapByCreatedAt.removeValue(forKey: node.value.createdAt)
+        self.nodeMapByCreatedAt.removeValue(forKey: node.value.createdAt.toIDString)
     }
 
     /**
-     * `remove` removes  the Element of the given key.
+     * `deleteByKey` deletes the Element of the given key and removed time.
      */
     @discardableResult
-    func remove(key: String, executedAt: TimeTicket) throws -> CRDTElement {
+    func deleteByKey(key: String, executedAt: TimeTicket) throws -> CRDTElement {
         guard let node = nodeMapByKey[key] else {
             throw YorkieError.noSuchElement(message: "Can't find node of given key [\(key)] or executedAt [\(executedAt)]")
         }
@@ -149,26 +149,8 @@ class ElementRHT {
     /**
      * `get` returns the value of the given key.
      */
-    func get(key: String) throws -> CRDTElement {
-        if let node = nodeMapByKey[key] {
-            return node.value
-        }
-
-        throw YorkieError.noSuchElement(message: "Can't find node of given key [\(key)]")
-    }
-
-    /**
-     * `delete` physically deletes child element.
-     */
-    func delete(value: CRDTElement) throws {
-        guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
-            let log = "can't find the given node: \(value.createdAt)"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
-        }
-
-        self.nodeMapByKey.removeValue(forKey: node.key)
-        self.nodeMapByCreatedAt.removeValue(forKey: node.value.createdAt)
+    func get(key: String) -> CRDTElement? {
+        nodeMapByKey[key]?.value
     }
 }
 

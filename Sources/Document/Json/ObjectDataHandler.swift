@@ -133,7 +133,7 @@ class ObjectDataHandler {
     }
 
     func get(key: String) throws -> Any? {
-        let value = try self.target.get(key: key)
+        let value = self.target.get(key: key)
         if let value = value as? Primitive {
             switch value.value {
             case .null:
@@ -165,7 +165,7 @@ class ObjectDataHandler {
     }
 
     func remove(key: String) throws {
-        let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket)
+        let removed = try? self.target.deleteByKey(key: key, executedAt: self.context.issueTimeTicket)
         guard let removed else {
             return
         }

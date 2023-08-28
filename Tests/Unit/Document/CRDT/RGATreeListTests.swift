@@ -190,7 +190,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        try target.delete(e1)
+        try target.purge(e1)
         XCTAssertEqual(target.toTestString,
                        "[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
     }
@@ -209,7 +209,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        try target.delete(e2)
+        try target.purge(e2)
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[3:999:0:\"C123\"]")
     }
@@ -228,7 +228,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        try target.delete(e3)
+        try target.purge(e3)
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]")
     }
@@ -267,7 +267,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        let result = try target.remove(createdAt: e2.createdAt, executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
+        let result = try target.delete(createdAt: e2.createdAt, executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
 
         XCTAssertEqual(result.isRemoved, true)
         XCTAssertEqual(target.toTestString,
@@ -288,7 +288,7 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B12\"]-[3:999:0:\"C123\"]")
 
-        let result = try target.remove(index: 1, executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
+        let result = try target.deleteByIndex(index: 1, executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
 
         XCTAssertEqual(result.isRemoved, true)
         XCTAssertEqual(target.toTestString,

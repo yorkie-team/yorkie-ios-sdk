@@ -182,7 +182,7 @@ public class JSONObject {
             return nil
         }
 
-        guard let value = try? self.target.get(key: key) else {
+        guard let value = self.target.get(key: key) else {
             Logger.error("The value does not exist. - key: \(key)")
             return nil
         }
@@ -206,10 +206,13 @@ public class JSONObject {
         return nested
     }
 
+    /**
+     * `remove` deletes the value of the given key.
+     */
     public func remove(key: String) {
         Logger.trace("obj[\(key)]")
 
-        let removed = try? self.target.remove(key: key, executedAt: self.context.issueTimeTicket)
+        let removed = try? self.target.deleteByKey(key: key, executedAt: self.context.issueTimeTicket)
         guard let removed else {
             return
         }

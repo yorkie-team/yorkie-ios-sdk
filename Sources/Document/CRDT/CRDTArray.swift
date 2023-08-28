@@ -89,10 +89,10 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `remove` removes the element of given index and executedAt.
+     * `deleteByIndex` deletes the element of given index and executedAt.
      */
-    func remove(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(index: index, executedAt: executedAt)
+    func deleteByIndex(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.deleteByIndex(index: index, executedAt: executedAt)
     }
 
     /**
@@ -158,18 +158,18 @@ extension CRDTArray {
     }
 
     /**
-     * `delete` physically deletes the given element.
+     * `purge` physically purges the given element.
      */
-    func delete(element: CRDTElement) throws {
-        try self.elements.delete(element)
+    func purge(element: CRDTElement) throws {
+        try self.elements.purge(element)
     }
 
     /**
-     * `remove` removes  the element of the given creation time.
+     * `delete` deletes  the element of the given creation time.
      */
     @discardableResult
-    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
-        return try self.elements.remove(createdAt: createdAt, executedAt: executedAt)
+    func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.elements.delete(createdAt: createdAt, executedAt: executedAt)
     }
 
     /**

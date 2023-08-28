@@ -40,18 +40,18 @@ class CRDTObject: CRDTContainer {
     }
 
     /**
-     * `remove` removes the element of the given key and execution time.
+     * `deleteByKey` deletes the element of the given key and execution time.
      */
     @discardableResult
-    func remove(key: String, executedAt: TimeTicket) throws -> CRDTElement {
-        return try self.memberNodes.remove(key: key, executedAt: executedAt)
+    func deleteByKey(key: String, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.memberNodes.deleteByKey(key: key, executedAt: executedAt)
     }
 
     /**
      * `get` returns the value of the given key.
      */
-    func get(key: String) throws -> CRDTElement {
-        return try self.memberNodes.get(key: key)
+    func get(key: String) -> CRDTElement? {
+        self.memberNodes.get(key: key)
     }
 
     /**
@@ -95,7 +95,7 @@ extension CRDTObject {
     func toSortedJSON() -> String {
         let value = self.keys.sorted()
             .compactMap {
-                guard let node = try? self.memberNodes.get(key: $0) else {
+                guard let node = self.memberNodes.get(key: $0) else {
                     return nil
                 }
 
@@ -129,15 +129,15 @@ extension CRDTObject {
     /**
      * `delete` physically deletes the given element.
      */
-    func delete(element: CRDTElement) throws {
-        try self.memberNodes.delete(value: element)
+    func purge(element: CRDTElement) {
+        self.memberNodes.purge(element: element)
     }
 
     /**
-     * `remove` removes the element of the given key.
+     * `delete` deletes the element of the given key.
      */
-    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
-        return try self.memberNodes.remove(createdAt: createdAt, executedAt: executedAt)
+    func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+        return try self.memberNodes.delete(createdAt: createdAt, executedAt: executedAt)
     }
 
     /**
