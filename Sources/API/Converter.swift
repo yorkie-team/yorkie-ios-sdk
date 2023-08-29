@@ -89,21 +89,13 @@ extension Converter {
     /**
      * `toPresence` converts the given model to Protobuf format.
      */
-    static func toPresence(presence: PresenceData) -> PbPresence {
+    static func toPresence(presence: StringValueTypeDictionary) -> PbPresence {
         var pbPresence = PbPresence()
         
         for (key, value) in presence {
-            if value is AnyValueTypeDictionary || value is [Any],
-               let jsonObject = try? JSONSerialization.data(withJSONObject: value),
-               let jsonString = String(data: jsonObject, encoding: .utf8) {
-                pbPresence.data[key] = jsonString
-            } else if value is String {
-                pbPresence.data[key] = "\"\(value)\""
-            } else {
-                pbPresence.data[key] = "\(value)"
-            }
+            pbPresence.data[key] = value
         }
-
+        
         return pbPresence
     }
 
@@ -127,35 +119,11 @@ extension Converter {
     /**
      * `fromPresence` converts the given Protobuf format to model format.
      */
-    static func fromPresence(pbPresence: PbPresence) -> PresenceData {
-        var data = PresenceData()
+    static func fromPresence(pbPresence: PbPresence) -> StringValueTypeDictionary {
+        var data = StringValueTypeDictionary()
 
         pbPresence.data.forEach { (key, value) in
-            if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) as? AnyValueTypeDictionary {
-                data[key] = jsonValue
-            } else {
-                if value.first == "\"" && value.last == "\"" {
-                    // Sring.
-                    data[key] = value.substring(from: 1, to: value.count - 2)
-                } else if value.first == "[", value.last == "]",
-                          let dataValue = "{\"\(key)\":\(value)}".data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) as? AnyValueTypeDictionary {
-                    // Array. eg. "[\"a\", \"b\"]"
-                    data.merge(jsonValue, uniquingKeysWith: { _, last in last })
-                } else {
-                    if let intValue = Int(value) {
-                        data[key] = intValue
-                    } else if let doubleValue = Double(value) {
-                        data[key] = doubleValue
-                    } else if "\(true)" == value.lowercased() {
-                        data[key] = true
-                    } else if "\(false)" == value.lowercased() {
-                        data[key] = false
-                    } else {
-                        data[key] = value
-                        assertionFailure("Invalid Presence Value [\(key)]:[\(value)]")
-                    }
-                }
-            }
+            data[key] = value
         }
 
         return data
@@ -178,7 +146,7 @@ extension Converter {
     /**
      * `fromPresences` converts the given Protobuf format to model format.
      */
-    static func fromPresences(_ pbPresences: [String: PbPresence]) -> [ActorID: PresenceData] {
+    static func fromPresences(_ pbPresences: [String: PbPresence]) -> [ActorID: StringValueTypeDictionary] {
         pbPresences.mapValues { fromPresence(pbPresence: $0) }
     }
 }
@@ -1166,7 +1134,7 @@ extension Converter {
     /**
      * `bytesToSnapshot` creates a Snapshot from the given byte array.
      */
-    static func bytesToSnapshot(bytes: Data) throws -> (root: CRDTObject, presences: [ActorID: PresenceData]) {
+    static func bytesToSnapshot(bytes: Data) throws -> (root: CRDTObject, presences: [ActorID: StringValueTypeDictionary]) {
         if bytes.isEmpty {
             return (CRDTObject(createdAt: TimeTicket.initial), [:])
         }

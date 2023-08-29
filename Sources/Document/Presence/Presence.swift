@@ -20,7 +20,7 @@ import Foundation
  * PresenceData key, value dictionary
  * Similar to an Indexable in JS SDK
  */
-public typealias PresenceData = [String: Any]
+public typealias PresenceData = [String: Codable]
 
 /**
  * `PresenceChangeType` represents the type of presence change.
@@ -31,7 +31,7 @@ enum PresenceChangeType {
 }
 
 enum PresenceChange {
-    case put(presence: PresenceData)
+    case put(presence: StringValueTypeDictionary)
     case clear
 }
 
@@ -40,9 +40,9 @@ enum PresenceChange {
  */
 public class Presence {
     private var changeContext: ChangeContext
-    private(set) var presence: PresenceData
+    private(set) var presence: StringValueTypeDictionary
 
-    init(changeContext: ChangeContext, presence: PresenceData) {
+    init(changeContext: ChangeContext, presence: StringValueTypeDictionary) {
         self.changeContext = changeContext
         self.presence = presence
     }
@@ -50,9 +50,9 @@ public class Presence {
     /**
      * `set` updates the presence based on the partial presence.
      */
-    func set(_ presence: PresenceData) {
+    public func set(_ presence: PresenceData) {
         for (key, value) in presence {
-            self.presence[key] = value
+            self.presence[key] = value.toJSONString ?? ""
         }
 
         let presenceChange = PresenceChange.put(presence: self.presence)
@@ -62,8 +62,12 @@ public class Presence {
     /**
      * `get` returns the presence value of the given key.
      */
-    public func get(_ key: PresenceData.Key) -> Any? {
-        self.presence[key]
+    public func get<T: Codable>(_ key: PresenceData.Key) -> T? {
+        if let data = self.presence[key]?.data(using: .utf8) {
+            return try? JSONDecoder().decode(T.self, from: data)
+        }
+
+        return nil
     }
 
     /**

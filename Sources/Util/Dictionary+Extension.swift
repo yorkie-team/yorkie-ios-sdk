@@ -99,4 +99,8 @@ extension StringValueTypeDictionary {
 
         return result
     }
+
+    var toJSONObejct: AnyValueTypeDictionary {
+        self.mapValues { $0.toJSONObject }
+    }
 }

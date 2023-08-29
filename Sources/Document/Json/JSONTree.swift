@@ -500,7 +500,7 @@ public class JSONTree {
  * `TimeTicketStruct` is a structure represents the meta data of the ticket.
  * It is used to serialize and deserialize the ticket.
  */
-struct TimeTicketStruct {
+struct TimeTicketStruct: Codable {
     let lamport: String
     let delimiter: UInt32
     let actorID: ActorID?

@@ -57,7 +57,7 @@ public struct Change {
      * `execute` executes the operations of this change to the given root.
      */
     @discardableResult
-    func execute(root: CRDTRoot, presences: inout [ActorID: PresenceData]) throws -> [any OperationInfo] {
+    func execute(root: CRDTRoot, presences: inout [ActorID: StringValueTypeDictionary]) throws -> [any OperationInfo] {
         let opInfos = try self.operations.flatMap {
             try $0.execute(root: root)
         }

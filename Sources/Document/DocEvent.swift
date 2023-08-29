@@ -131,7 +131,7 @@ public struct RemoteChangeEvent: ChangeEvent {
 /**
  * `PeersChangedValue` represents the value of the PeersChanged event.
  */
-public typealias PeerElement = (clientID: ActorID, presence: PresenceData)
+public typealias PeerElement = (clientID: ActorID, presence: [String: Any])
 
 public struct InitializedEvent: DocEvent {
     /**
