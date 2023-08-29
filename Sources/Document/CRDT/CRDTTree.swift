@@ -463,16 +463,15 @@ class CRDTTree: CRDTGCElement {
 
         if leftSiblingNode.isText {
             let absOffset = leftSiblingNode.id.offset
-            let split = try leftSiblingNode.split(pos.leftSiblingID.offset - absOffset, absOffset)
-            if split != nil {
-                split!.insPrev = leftSiblingNode
-                self.nodeMapByID.put(split!.id, split!)
+            if let split = try leftSiblingNode.split(pos.leftSiblingID.offset - absOffset, absOffset) {
+                split.insPrev = leftSiblingNode
+                self.nodeMapByID.put(split.id, split)
 
                 if leftSiblingNode.insNext != nil {
-                    leftSiblingNode.insNext!.insPrev = split!
-                    split!.insNext = leftSiblingNode.insNext
+                    leftSiblingNode.insNext!.insPrev = split
+                    split.insNext = leftSiblingNode.insNext
                 }
-                leftSiblingNode.insNext = split!
+                leftSiblingNode.insNext = split
             }
         }
 
