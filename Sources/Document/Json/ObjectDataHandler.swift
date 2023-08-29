@@ -165,8 +165,7 @@ class ObjectDataHandler {
     }
 
     func remove(key: String) throws {
-        let removed = try? self.target.deleteByKey(key: key, executedAt: self.context.issueTimeTicket)
-        guard let removed else {
+        guard let removed = try? self.target.deleteByKey(key: key, executedAt: self.context.issueTimeTicket) else {
             return
         }
 

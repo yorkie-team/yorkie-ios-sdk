@@ -381,9 +381,7 @@ public class JSONArray {
     @discardableResult
     private func removeInternal(byIndex index: Int) -> CRDTElement? {
         let ticket = self.context.issueTimeTicket
-        let removed = try? self.target.deleteByIndex(index: index, executedAt: ticket)
-
-        guard let removed else {
+        guard let removed = try? self.target.deleteByIndex(index: index, executedAt: ticket) else {
             return nil
         }
 
