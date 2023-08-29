@@ -210,10 +210,7 @@ public class JSONObject {
      * `remove` deletes the value of the given key.
      */
     public func remove(key: String) {
-        Logger.trace("obj[\(key)]")
-
-        let removed = try? self.target.deleteByKey(key: key, executedAt: self.context.issueTimeTicket)
-        guard let removed else {
+        guard let removed = try? self.target.deleteByKey(key: key, executedAt: self.context.issueTimeTicket) else {
             return
         }
 
