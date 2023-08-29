@@ -492,16 +492,16 @@ public actor Document {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    func publish(_ eventType: DocEventType, _ peerActorID: ActorID?) {
+    func publish(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: PresenceData? = nil) {
         switch eventType {
         case .initialized:
             self.processDocEvent(InitializedEvent(value: self.getPresences()))
         case .watched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
+            if let peerActorID, let presence = presence {
                 self.processDocEvent(WatchedEvent(value: (peerActorID, presence)))
             }
         case .unwatched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
+            if let peerActorID, let presence = presence {
                 self.processDocEvent(UnwatchedEvent(value: (peerActorID, presence)))
             }
         default:
