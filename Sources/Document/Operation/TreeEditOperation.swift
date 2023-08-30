@@ -72,9 +72,13 @@ struct TreeEditOperation: Operation {
         }
 
         return changes.compactMap { change in
-            guard case .nodes(let nodes) = change.value else {
-                return nil
-            }
+            let value: [TreeNode] = {
+                if case .nodes(let nodes) = change.value {
+                    return nodes
+                } else {
+                    return []
+                }
+            }()
 
             return TreeEditOpInfo(
                 path: path,
@@ -82,7 +86,7 @@ struct TreeEditOperation: Operation {
                 to: change.to,
                 fromPath: change.fromPath,
                 toPath: change.toPath,
-                value: nodes
+                value: value
             )
         }
     }
