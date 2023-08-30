@@ -27,21 +27,10 @@ extension AnyValueTypeDictionary {
         var convertedDictionary: [String: String] = [:]
 
         for (key, value) in dictionary {
-            if let stringValue = value as? String {
-                let jsonString = "\"\(stringValue)\""
-                convertedDictionary[key] = jsonString
-            } else if let convertibleToString = value as? CustomStringConvertible {
-                let jsonString = "\(convertibleToString.description)"
-                convertedDictionary[key] = jsonString
-            } else if let nestedDictionary = value as? [String: Any] {
-                // If the value is a nested dictionary, recursively convert it
-                let nestedConverted = self.convertToDictionaryStringValues(nestedDictionary)
-                // Convert the nested dictionary to its JSON representation
-                if let jsonString = try? JSONSerialization.data(withJSONObject: nestedConverted) {
-                    convertedDictionary[key] = String(data: jsonString, encoding: .utf8)
-                } else {
-                    convertedDictionary[key] = "null"
-                }
+            if let value = value as? Encodable,
+               let jsonData = try? JSONEncoder().encode(value),
+               let stringValue = String(data: jsonData, encoding: .utf8) {
+                convertedDictionary[key] = stringValue
             } else {
                 print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
             }
@@ -100,7 +89,30 @@ extension StringValueTypeDictionary {
         return result
     }
 
-    var toJSONObejct: AnyValueTypeDictionary {
-        self.mapValues { $0.toJSONObject }
+    var toJSONObejct: [String: Any] {
+        self.compactMapValues { $0.toJSONObject }
+    }
+}
+
+typealias CodableValueTypeDictionary = [String: Codable]
+
+extension CodableValueTypeDictionary {
+    var stringValueTypeDictionary: [String: String] {
+        self.convertToDictionaryStringValues(self)
+    }
+    
+    func convertToDictionaryStringValues(_ dictionary: [String: Codable]) -> [String: String] {
+        var convertedDictionary: [String: String] = [:]
+        
+        for (key, value) in dictionary {
+            if let jsonData = try? JSONEncoder().encode(value),
+               let stringValue = String(data: jsonData, encoding: .utf8) {
+                convertedDictionary[key] = stringValue
+            } else {
+                print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
+            }
+        }
+        
+        return convertedDictionary
     }
 }

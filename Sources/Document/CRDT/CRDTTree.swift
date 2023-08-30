@@ -432,7 +432,7 @@ final class CRDTTreeNode: IndexTreeNode {
             }
 
             return JSONTreeElementNode(type: self.type,
-                                       attributes: attrs.anyValueTypeDictionary,
+                                       attributes: attrs.toJSONObejct,
                                        children: self.children.compactMap { $0.toJSONTreeNode })
         }
     }
