@@ -893,7 +893,6 @@ class DocumentTests: XCTestCase {
             if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "text"))
                 XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.text", from: 0, to: 0, attributes: nil, content: "hello world"))
-                XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 0, to: 2))
             } else {
                 XCTAssert(false, "No operations.")
             }
@@ -902,7 +901,6 @@ class DocumentTests: XCTestCase {
         try await target.update { root, _ in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "hello world")
-            (root.text as? JSONText)?.select(0, 2)
         }
 
         let text = try await target.getValueByPath("$.text") as? JSONText

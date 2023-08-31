@@ -162,36 +162,6 @@ public class JSONText {
     }
 
     /**
-     * `select` selects the given range.
-     */
-    @discardableResult
-    public func select(_ fromIdx: Int, _ toIdx: Int) -> Bool {
-        guard let context, let text else {
-            Logger.critical("it is not initialized yet")
-            return false
-        }
-
-        guard let range = try? text.indexRangeToPosRange(fromIdx, toIdx) else {
-            Logger.critical("can't create range")
-            return false
-        }
-
-        Logger.debug("SELT: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString)")
-
-        let ticket = context.issueTimeTicket
-        do {
-            try text.select(range, ticket)
-        } catch {
-            Logger.critical("\(error.localizedDescription)")
-            return false
-        }
-
-        context.push(operation: SelectOperation(parentCreatedAt: text.createdAt, fromPos: range.0, toPos: range.1, executedAt: ticket))
-
-        return true
-    }
-
-    /**
      * `indexRangeToPosRange` returns TextPosStructRange of the given index range.
      */
     public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TextPosStructRange {

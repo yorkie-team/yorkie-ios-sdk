@@ -162,7 +162,7 @@ struct CRDTTreeNodeID: Equatable, Comparable {
             return lhs.createdAt < rhs.createdAt
         }
     }
-    
+
     static func == (lhs: CRDTTreeNodeID, rhs: CRDTTreeNodeID) -> Bool {
         lhs.createdAt == rhs.createdAt && lhs.offset == rhs.offset
     }
@@ -453,7 +453,7 @@ class CRDTTree: CRDTGCElement {
         guard let entry = self.nodeMapByID.floorEntry(id), entry.key.createdAt == id.createdAt else {
             return nil
         }
-        
+
         return entry.value
     }
 
@@ -482,11 +482,11 @@ class CRDTTree: CRDTGCElement {
                 split.insPrevID = leftSiblingNode.id
                 self.nodeMapByID.put(split.id, split)
 
-                if leftSiblingNode.insNextID != nil {
-                    let insNext = self.findFloorNode(leftSiblingNode.insNextID!)
-                    
+                if let id = leftSiblingNode.insNextID {
+                    let insNext = self.findFloorNode(id)
+
                     insNext?.insPrevID = split.id
-                    split.insNextID = leftSiblingNode.insNextID
+                    split.insNextID = id
                 }
                 leftSiblingNode.insNextID = split.id
             }

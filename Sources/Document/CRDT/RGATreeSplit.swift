@@ -891,25 +891,3 @@ extension RGATreeSplit: Sequence {
         // swiftlint: enable nesting
     }
 }
-
-/**
- * `Selection` represents the selection of text range in the editor.
- */
-class Selection {
-    private let from: RGATreeSplitPos
-    private let to: RGATreeSplitPos
-    /**
-     * `updatedAt` returns update time of this selection.
-     */
-    public let updatedAt: TimeTicket
-
-    init(_ from: RGATreeSplitPos, _ to: RGATreeSplitPos, _ updatedAt: TimeTicket) {
-        self.from = from
-        self.to = to
-        self.updatedAt = updatedAt
-    }
-
-    convenience init(_ range: RGATreeSplitPosRange, _ updatedAt: TimeTicket) {
-        self.init(range.0, range.1, updatedAt)
-    }
-}
