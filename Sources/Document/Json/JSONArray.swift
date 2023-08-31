@@ -146,6 +146,16 @@ public class JSONArray {
         self.push(values: values)
     }
 
+    @discardableResult
+    public func remove(at index: Int) -> Any? {
+        Logger.trace("array[\(index)]")
+        if let value = self.removeInternal(byIndex: index) {
+            return toJSONElement(from: value)
+        }
+
+        return nil
+    }
+
     func push(values: [Any]) {
         values.forEach { value in
             self.push(value)

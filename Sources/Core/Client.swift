@@ -711,7 +711,7 @@ public actor Client {
             self.semaphoresForInitialzation[docKey]?.signal()
 
             await self.attachmentMap[docKey]?.doc.setOnlineClients(onlineClients)
-            await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized, nil)
+            await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized)
         case .event(let pbWatchEvent):
             let publisher = pbWatchEvent.publisher
 
@@ -725,12 +725,19 @@ public actor Client {
                 await self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
                 // unless we also know their initial presence data at this point.
-                await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.watched, publisher)
+                if let presence = await self.attachmentMap[docKey]?.doc.getPresence(publisher) {
+                    await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.watched, publisher, presence)
+                }
             case .documentUnwatched:
                 // NOTE(chacha912): There is no presence, when PresenceChange(clear) is applied before unwatching.
                 // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
-                await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher)
+                let presence = await self.attachmentMap[docKey]?.doc.getPresence(publisher)
+                
                 await self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
+                
+                if let presence {
+                    await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
+                }
             case .UNRECOGNIZED:
                 break
             }
