@@ -558,36 +558,13 @@ class CRDTTree: CRDTGCElement {
                                       value: value)
         )
 
-        if fromLeft !== toLeft {
-            var fromChildIndex: Int
-            var parent: CRDTTreeNode
-
-            if fromLeft.parent === toLeft.parent {
-                parent = fromLeft.parent!
-
-                let firstIndex = parent.innerChildren.firstIndex(where: { $0 === fromLeft }) ?? -1
-
-                fromChildIndex = firstIndex + 1
-            } else {
-                parent = fromLeft
-                fromChildIndex = 0
-            }
-
-            let toChildIndex = parent.innerChildren.firstIndex(where: { $0 === toLeft }) ?? -1
-
-            if fromChildIndex <= toChildIndex {
-                for idx in fromChildIndex ... toChildIndex {
-                    let node = parent.innerChildren[idx]
-
-                    if node.isRemoved == false, let attributes {
-                        if node.attrs == nil {
-                            node.attrs = RHT()
-                        }
-
-                        for (key, value) in attributes {
-                            node.attrs?.set(key: key, value: value, executedAt: editedAt)
-                        }
-                    }
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { node, _ in
+            if node.isRemoved == false, node.isText == false, let attributes {
+                if node.attrs == nil {
+                    node.attrs = RHT()
+                }
+                for (key, value) in attributes {
+                    node.attrs?.set(key: key, value: value, executedAt: editedAt)
                 }
             }
         }
@@ -631,57 +608,36 @@ class CRDTTree: CRDTGCElement {
         var toBeRemoveds = [CRDTTreeNode]()
         var latestCreatedAtMap = [String: TimeTicket]()
 
-        if fromLeft !== toLeft {
-            var fromChildIndex: Int
-            var parent: CRDTTreeNode
-
-            if fromLeft.parent === toLeft.parent {
-                parent = fromLeft.parent!
-
-                let firstIndex = parent.innerChildren.firstIndex(where: { $0 === fromLeft }) ?? -1
-
-                fromChildIndex = firstIndex + 1
-            } else {
-                parent = fromLeft
-                fromChildIndex = 0
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { node, contain in
+            // If node is a element node and half-contained in the range,
+            // it should not be removed.
+            if node.isText == false, contain != .all {
+                return
             }
-
-            let toChildIndex = parent.innerChildren.firstIndex(where: { $0 === toLeft }) ?? -1
-
-            if fromChildIndex <= toChildIndex {
-                for idx in fromChildIndex ... toChildIndex {
-                    let node = parent.innerChildren[idx]
-
-                    guard let actorID = node.createdAt.actorID else {
-                        throw YorkieError.unexpected(message: "Can't get actorID")
-                    }
-
-                    let latestCreatedAt = latestCreatedAtMapByActor.isEmpty == false ? latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
-
-                    if node.canDelete(editedAt, latestCreatedAt) {
-                        let latestCreatedAt = latestCreatedAtMap[actorID]
-                        let createdAt = node.createdAt
-
-                        if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
-                            latestCreatedAtMap[actorID] = createdAt
-                        }
-
-                        traverseAll(node: node) { node, _ in
-                            if node.canDelete(editedAt, TimeTicket.max) {
-                                let latestCreatedAt = latestCreatedAtMap[actorID]
-                                let createdAt = node.createdAt
-
-                                if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
-                                    latestCreatedAtMap[actorID] = createdAt
-                                }
-                            }
-
-                            if node.isRemoved == false {
-                                toBeRemoveds.append(node)
-                            }
-                        }
-                    }
+            
+            guard let actorID = node.createdAt.actorID else {
+                throw YorkieError.unexpected(message: "Can't get actorID")
+            }
+            
+            let latestCreatedAt = latestCreatedAtMapByActor.isEmpty == false ? latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
+            
+            if node.canDelete(editedAt, latestCreatedAt) {
+                let latestCreatedAt = latestCreatedAtMap[actorID]
+                let createdAt = node.createdAt
+                
+                if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
+                    latestCreatedAtMap[actorID] = createdAt
                 }
+                
+                toBeRemoveds.append(node)
+            }
+        }
+
+        for node in toBeRemoveds {
+            node.remove(editedAt)
+
+            if node.isRemoved {
+                self.removedNodeMap[node.id.toIDString] = node
             }
         }
 
@@ -725,6 +681,17 @@ class CRDTTree: CRDTGCElement {
         return (changes, latestCreatedAtMap)
     }
 
+    private func traverseInPosRange(_ fromParent: CRDTTreeNode,
+                                    _ fromLeft: CRDTTreeNode,
+                                    _ toParent: CRDTTreeNode,
+                                    _ toLeft: CRDTTreeNode,
+                                    callback: @escaping (CRDTTreeNode, TagContained) throws -> Void) throws {
+       let fromIdx = try self.toIndex(fromParent, fromLeft)
+       let toIdx = try self.toIndex(toParent, toLeft)
+
+       return try self.indexTree.nodesBetween(fromIdx, toIdx, callback)
+     }
+    
     /**
      * `editByIndex` edits the given range with the given value.
      * This method uses indexes instead of a pair of TreePos for testing.

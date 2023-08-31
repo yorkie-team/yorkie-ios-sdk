@@ -216,3 +216,45 @@ final class CRDTTreeTests: XCTestCase {
         XCTAssertEqual(try tree.toIndex(parent, left), 0)
     }
 }
+
+final class CRDTTreeMoveTests: XCTestCase {
+    func test_can_delete_nodes_between_element_nodes_with_edit() async throws {
+      // 01. Create a tree with 2 paragraphs.
+      //       0   1 2 3    4   5 6 7    8
+      // <root> <p> a b </p> <p> c d </p> </root>
+        let tree = CRDTTree(root: CRDTTreeNode(id: issuePos(), type: DefaultTreeNodeType.root.rawValue), createdAt: issueTime)
+        try tree.editByIndex((0, 0), [CRDTTreeNode(id: issuePos(), type: "p")], issueTime)
+        try tree.editByIndex((1, 1),
+                         [CRDTTreeNode(id: issuePos(), type: DefaultTreeNodeType.text.rawValue, value: "ab")],
+                         issueTime)
+        try tree.editByIndex((4, 4), [CRDTTreeNode(id: issuePos(), type: "p")], issueTime)
+        try tree.editByIndex((5, 5),
+                             [CRDTTreeNode(id: issuePos(), type: DefaultTreeNodeType.text.rawValue, value: "cd")],
+                             issueTime)
+        
+        XCTAssertEqual(tree.toXML(), /*html*/ "<root><p>ab</p><p>cd</p></root>")
+
+      // 02. delete b, c and first paragraph.
+      //       0   1 2 3    4
+      // <root> <p> a d </p> </root>
+        try tree.editByIndex((2, 6), nil, issueTime)
+        XCTAssertEqual(tree.toXML(), /*html*/ "<root><p>a</p><p>d</p></root>")
+
+      // TODO(sejongk): Use the below assertion after implementing Tree.Move.
+      // assert.deepEqual(tree.toXML(), /*html*/ `<root><p>ad</p></root>`);
+
+      // const treeNode = tree.toTestTreeNode();
+      // assert.equal(treeNode.size, 4); // root
+      // assert.equal(treeNode.children![0].size, 2); // p
+      // assert.equal(treeNode.children![0].children![0].size, 1); // a
+      // assert.equal(treeNode.children![0].children![1].size, 1); // d
+
+      // // 03. insert a new text node at the start of the first paragraph.
+      // tree.editByIndex(
+      //   [1, 1],
+      //   [new CRDTTreeNode(issuePos(), 'text', '@')],
+      //   issueTime(),
+      // );
+      // assert.deepEqual(tree.toXML(), /*html*/ `<root><p>@ad</p></root>`);
+    }
+}

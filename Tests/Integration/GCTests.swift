@@ -109,8 +109,8 @@ class GCTests: XCTestCase {
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
 
-        let root = try await(doc.getRootObject().get(key: "list") as? CRDTArray)?.getElements().toTestString
-        let clone = try await(doc.getCloneRoot()?.get(key: "list") as? CRDTArray)?.getElements().toTestString
+        let root = await(doc.getRootObject().get(key: "list") as? CRDTArray)?.getElements().toTestString
+        let clone = await(doc.getCloneRoot()?.get(key: "list") as? CRDTArray)?.getElements().toTestString
 
         XCTAssertEqual(root, clone)
     }
