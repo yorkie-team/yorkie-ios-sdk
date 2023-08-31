@@ -232,7 +232,7 @@ final class JSONTextTest: XCTestCase {
         }
 
         docContent = await doc.toSortedJSON()
-        XCTAssertEqual("{\"k1\":[{\"attrs\":{\"b\":\"1\"},\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"D\"}]}",
+        XCTAssertEqual("{\"k1\":[{\"attrs\":{\"b\":1},\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"attrs\":{\"b\":1},\"val\":\"D\"}]}",
                        docContent)
     }
     // swiftlint: enable force_cast
