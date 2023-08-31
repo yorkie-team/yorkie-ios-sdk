@@ -24,8 +24,8 @@ import Foundation
 public typealias TextPosStruct = RGATreeSplitPosStruct
 
 /**
- * `TextPosStructRange` represents the structure of RGATreeSplitNodeRange.
- * It is used to serialize and deserialize the RGATreeSplitNodeRange.
+ * `TextPosStructRange` represents the structure of RGATreeSplitPosRange.
+ * It is used to serialize and deserialize the RGATreeSplitPosRange.
  */
 public typealias TextPosStructRange = (TextPosStruct, TextPosStruct)
 
