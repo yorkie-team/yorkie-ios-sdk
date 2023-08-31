@@ -278,8 +278,7 @@ public actor Document {
     }
 
     /**
-     * `getClone` return clone object.
-     *
+     * `getCloneRoot` return clone object.
      */
     func getCloneRoot() -> CRDTObject? {
         return self.clone?.root.object
@@ -500,18 +499,12 @@ public actor Document {
                 var isMine = false
                 var isOthers = false
 
-                if let event = event as? WatchedEvent {
-                    if event.value.clientID == id {
-                        isMine = true
-                    } else {
-                        isOthers = true
-                    }
-                } else if let event = event as? UnwatchedEvent {
-                    if event.value == id {
-                        isMine = true
-                    } else {
-                        isOthers = true
-                    }
+                if event is InitializedEvent {
+                    isMine = true
+                } else if event is WatchedEvent {
+                    isOthers = true
+                } else if event is UnwatchedEvent {
+                    isOthers = true
                 } else if let event = event as? PresenceChangedEvent {
                     if event.value.clientID == id {
                         isMine = true
@@ -601,17 +594,6 @@ public actor Document {
      */
     public func hasPresence(_ clientID: ActorID) -> Bool {
         self.presences[clientID] != nil
-    }
-
-    /**
-     * `getMyPresence` returns the presence of the current client.
-     */
-    public func getMyPresence() -> PresenceData? {
-        guard self.status == .attached, let id = self.changeID.getActorID() else {
-            return nil
-        }
-
-        return self.presences[id]
     }
 
     /**

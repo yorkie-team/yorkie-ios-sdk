@@ -690,31 +690,22 @@ class CRDTTree: CRDTGCElement {
      * `purgeRemovedNodesBefore` physically purges nodes that have been removed.
      */
     func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
-        var nodesToRemoved = [CRDTTreeNode]()
+        var nodesToBeRemoved = [CRDTTreeNode]()
         var count = 0
 
         self.removedNodeMap.forEach { _, node in
             if node.removedAt != nil, ticket >= node.removedAt! {
-                nodesToRemoved.append(node)
+                nodesToBeRemoved.append(node)
                 count += 1
             }
         }
 
-        self.indexTree.traverseAll { treeNode, _ in
-            if nodesToRemoved.contains(where: { $0 === treeNode }) {
-                let parent = treeNode.parent
-
-                if parent != nil {
-                    nodesToRemoved.removeAll(where: { $0 === treeNode })
-                    count -= 1
-                    return
-                }
-
-                try? parent?.removeChild(child: treeNode)
+        nodesToBeRemoved.forEach { node in
+            do {
+                try node.parent?.removeChild(child: node)
+            } catch {
+                assertionFailure("Can't remove Child from parents.")
             }
-        }
-
-        nodesToRemoved.forEach { node in
             self.nodeMapByPos.remove(node.pos)
             self.purge(node)
             self.removedNodeMap.removeValue(forKey: node.pos.toIDString)

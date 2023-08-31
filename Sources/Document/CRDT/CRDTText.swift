@@ -118,11 +118,27 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
      * `toJSON` returns the JSON encoding of this .
      */
     public var toJSON: String {
-        let attrs = self.attributes.toJSON()
-        let attrsString = attrs.isEmpty ? "" : "\"attrs\":\(self.attributes.toJSON()),"
+        let attrs = self.attributes.toObject()
+
+        var attrsString = ""
+
+        if attrs.isEmpty == false {
+            var data = [String]()
+
+            attrs.forEach { key, value in
+                if value.value.count > 2, value.value.first == "\"", value.value.last == "\"" {
+                    data.append("\"\(key)\":\(value.value)")
+                } else {
+                    data.append("\"\(key)\":\(value.value)")
+                }
+            }
+
+            attrsString = "\"attrs\":{\(data.joined(separator: ","))},"
+        }
+
         let valString = self.toString.escaped()
 
-        if attrs.isEmpty && valString.isEmpty {
+        if attrsString.isEmpty && valString.isEmpty {
             return ""
         } else {
             return "{\(attrsString)\"val\":\"\(valString)\"}"
