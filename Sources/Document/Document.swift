@@ -273,8 +273,7 @@ public actor Document {
     }
 
     /**
-     * `getClone` return clone object.
-     *
+     * `getCloneRoot` return clone object.
      */
     func getCloneRoot() -> CRDTObject? {
         return self.clone?.root.object
