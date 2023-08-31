@@ -360,8 +360,8 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1)
-        try await client2.attach(doc2)
+        try await client1.attach(doc1, [:], false)
+        try await client2.attach(doc2, [:], false)
 
         try await doc1.update { root, _ in
             root.t = JSONTree(initialRoot:
