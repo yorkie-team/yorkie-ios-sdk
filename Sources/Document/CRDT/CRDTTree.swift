@@ -445,7 +445,7 @@ class CRDTTree: CRDTGCElement {
             self.nodeMapByID.put(node.id, node)
         }
     }
-
+    
     /**
      * `findFloorNode` finds node of given id.
      */
