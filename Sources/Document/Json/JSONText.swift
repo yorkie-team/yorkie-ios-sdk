@@ -18,16 +18,16 @@ import Combine
 import Foundation
 
 /**
- * `TextPosStruct` represents the structure of RGATreeSplitNodePos.
- * It is used to serialize and deserialize the RGATreeSplitNodePos.
+ * `TextPosStruct` represents the structure of RGATreeSplitPos.
+ * It is used to serialize and deserialize the RGATreeSplitPos.
  */
 public typealias TextPosStruct = RGATreeSplitPosStruct
 
 /**
- * `TextRangeStruct` represents the structure of RGATreeSplitNodeRange.
- * It is used to serialize and deserialize the RGATreeSplitNodeRange.
+ * `TextPosStructRange` represents the structure of RGATreeSplitPosRange.
+ * It is used to serialize and deserialize the RGATreeSplitPosRange.
  */
-public typealias TextRangeStruct = (TextPosStruct, TextPosStruct)
+public typealias TextPosStructRange = (TextPosStruct, TextPosStruct)
 
 public class JSONText {
     private var context: ChangeContext?
@@ -192,9 +192,9 @@ public class JSONText {
     }
 
     /**
-     * `indexRangeToPosRange` returns TextRangeStruct of the given index range.
+     * `indexRangeToPosRange` returns TextPosStructRange of the given index range.
      */
-    public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TextRangeStruct {
+    public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TextPosStructRange {
         guard self.context != nil, let text else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -204,9 +204,9 @@ public class JSONText {
     }
 
     /**
-     * `posRangeToIndexRange` returns indexes of the given TextRangeStruct.
+     * `posRangeToIndexRange` returns indexes of the given TextPosStructRange.
      */
-    public func posRangeToIndexRange(_ range: TextRangeStruct) throws -> (Int, Int) {
+    public func posRangeToIndexRange(_ range: TextPosStructRange) throws -> (Int, Int) {
         guard self.context != nil, let text else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
