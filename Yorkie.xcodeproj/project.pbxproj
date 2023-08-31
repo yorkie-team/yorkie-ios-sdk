@@ -15,6 +15,7 @@
 		9A3CF3E9296583050024E3DD /* StyleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3E8296583050024E3DD /* StyleOperation.swift */; };
 		9A3CF3ED29666AB30024E3DD /* JSONTextTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3EC29666AB30024E3DD /* JSONTextTest.swift */; };
 		9A3CF3EF2966A7370024E3DD /* CRDTTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3EE2966A7370024E3DD /* CRDTTextTests.swift */; };
+		9A4BC6042AA08D6A00A9D436 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4928F6938700431B61 /* String+Extensions.swift */; };
 		9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC736292273D200C89478 /* CRDTCounter.swift */; };
 		9A4DC73A292273F900C89478 /* CRDTCountTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC738292273E400C89478 /* CRDTCountTests.swift */; };
 		9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC73B2922741200C89478 /* IncreaseOperation.swift */; };
@@ -885,6 +886,7 @@
 				CE8BB74028FE2F000020F62A /* ChangeContextTests.swift in Sources */,
 				CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */,
 				CE8BB74128FE2F030020F62A /* CheckpointTests.swift in Sources */,
+				9A4BC6042AA08D6A00A9D436 /* String+Extensions.swift in Sources */,
 				9A3CF3EF2966A7370024E3DD /* CRDTTextTests.swift in Sources */,
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* ElementRHTTests.swift in Sources */,
