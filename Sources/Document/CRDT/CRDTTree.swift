@@ -460,7 +460,7 @@ class CRDTTree: CRDTGCElement {
             self.nodeMapByID.put(node.id, node)
         }
     }
-
+    
     /**
      * `findFloorNode` finds node of given id.
      */
@@ -630,6 +630,14 @@ class CRDTTree: CRDTGCElement {
                 }
                 
                 toBeRemoveds.append(node)
+            }
+        }
+
+        for node in toBeRemoveds {
+            node.remove(editedAt)
+
+            if node.isRemoved {
+                self.removedNodeMap[node.id.toIDString] = node
             }
         }
 
