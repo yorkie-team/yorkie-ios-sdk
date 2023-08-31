@@ -49,22 +49,6 @@ class TextView {
     }
 }
 
-private extension String {
-    func substring(from: Int, to: Int) -> String {
-        guard from <= to, from < self.count, from >= 0 else {
-            return ""
-        }
-
-        let adaptedTo = min(to, self.count - 1)
-
-        let start = index(self.startIndex, offsetBy: from)
-        let end = index(self.startIndex, offsetBy: adaptedTo)
-        let range = start ... end
-
-        return String(self[range])
-    }
-}
-
 /**
  * `buildIndexTree` builds an index tree from the given element node.
  */
