@@ -38,10 +38,10 @@ final class TextIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, false)
-        try await self.c2.attach(self.d2, false)
+        try await self.c1.attach(self.d1, [:], false)
+        try await self.c2.attach(self.d2, [:], false)
 
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "Hello")
             (root.text as? JSONText)?.edit(1, 3, "12")
@@ -68,10 +68,10 @@ final class TextIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, false)
-        try await self.c2.attach(self.d2, false)
+        try await self.c1.attach(self.d1, [:], false)
+        try await self.c2.attach(self.d2, [:], false)
 
-        try await self.d1.update { root in
+        try await self.d1.update { root, _ in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "Hello", ["bold": true])
             (root.text as? JSONText)?.edit(1, 3, "12")
@@ -81,7 +81,7 @@ final class TextIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        try await self.d2.update { root in
+        try await self.d2.update { root, _ in
             (root.text as? JSONText)?.setStyle(1, 3, ["italic": true])
         }
 

@@ -26,12 +26,16 @@ public struct Change {
     // `operations` represent a series of user edits.
     private(set) var operations: [Operation]
 
+    // `presenceChange` represents the presenceChange of the user who made the change.
+    private(set) var presenceChange: PresenceChange?
+
     // `message` is used to save a description of the change.
     let message: String?
 
-    init(id: ChangeID, operations: [Operation], message: String? = nil) {
+    init(id: ChangeID, operations: [Operation], presenceChange: PresenceChange? = nil, message: String? = nil) {
         self.id = id
         self.operations = operations
+        self.presenceChange = presenceChange
         self.message = message
     }
 
@@ -53,10 +57,21 @@ public struct Change {
      * `execute` executes the operations of this change to the given root.
      */
     @discardableResult
-    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
-        try self.operations.flatMap {
+    func execute(root: CRDTRoot, presences: inout [ActorID: PresenceData]) throws -> [any OperationInfo] {
+        let opInfos = try self.operations.flatMap {
             try $0.execute(root: root)
         }
+
+        if let actorID = self.id.getActorID() {
+            switch self.presenceChange {
+            case .put(let presence):
+                presences[actorID] = presence
+            default:
+                presences.removeValue(forKey: actorID)
+            }
+        }
+
+        return opInfos
     }
 
     /**
@@ -66,5 +81,9 @@ public struct Change {
         return self.operations
             .map { $0.toTestString }
             .joined(separator: ",")
+    }
+
+    var hasOperations: Bool {
+        self.operations.isEmpty == false
     }
 }

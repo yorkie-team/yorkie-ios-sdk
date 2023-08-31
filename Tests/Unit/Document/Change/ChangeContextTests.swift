@@ -47,7 +47,7 @@ class ChangeContextTests: XCTestCase {
 
         target.push(operation: setOperation)
 
-        XCTAssertTrue(target.hasOperations())
+        XCTAssertTrue(target.hasChange)
 
         XCTAssertEqual(target.getChange().toTestString, "4:actor-1:0.SET")
     }

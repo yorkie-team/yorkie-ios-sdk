@@ -83,10 +83,6 @@ final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtoco
         [AuthClientInterceptor<DeactivateClientRequest, DeactivateClientResponse>(apiKey: self.apiKey, token: self.token)]
     }
 
-    func makeUpdatePresenceInterceptors() -> [GRPC.ClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>] {
-        [AuthClientInterceptor<UpdatePresenceRequest, UpdatePresenceResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
-    }
-
     func makeAttachDocumentInterceptors() -> [GRPC.ClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>] {
         [AuthClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }

@@ -45,13 +45,13 @@ class GCTests: XCTestCase {
         var result = await doc.toSortedJSON()
         XCTAssertEqual("{}", result)
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root["1"] = Int64(1)
             root["2"] = [Int64(1), Int64(2), Int64(3)]
             root["3"] = Int64(3)
         }, "set 1, 2, 3")
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root.remove(key: "2")
         }, "deletes 2")
 
@@ -70,11 +70,11 @@ class GCTests: XCTestCase {
         let size = 10000
         let doc = Document(key: "test-doc")
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root["1"] = Array(Int64(0) ..< Int64(size))
         }, "set big array")
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root.remove(key: "1")
         }, "deltes the array")
 
@@ -88,14 +88,14 @@ class GCTests: XCTestCase {
         var result = await doc.toSortedJSON()
         XCTAssertEqual("{}", result)
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root["list"] = [Int64(1), Int64(2), Int64(3)]
         }, "set 1, 2, 3")
 
         result = await doc.toSortedJSON()
         XCTAssertEqual("{\"list\":[1,2,3]}", result)
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             (root["list"] as? JSONArray)?.remove(at: 1)
         }, "deletes 2")
 
@@ -118,13 +118,13 @@ class GCTests: XCTestCase {
     func test_text_garbage_collection_test() async throws {
         let doc = Document(key: "test-doc")
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.text = JSONText()
         }
-        try await doc.update { root in
+        try await doc.update { root, _ in
             (root.text as? JSONText)?.edit(0, 0, "ABCD")
         }
-        try await doc.update { root in
+        try await doc.update { root, _ in
             (root.text as? JSONText)?.edit(0, 2, "12")
         }
 
@@ -140,7 +140,7 @@ class GCTests: XCTestCase {
         result = (await doc.getRoot().text as? JSONText)?.toTestString
         XCTAssertEqual("[0:00:0:0 ][3:00:1:0 12][2:00:1:2 CD]", result)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             (root.text as? JSONText)?.edit(2, 4, "")
         }
 
@@ -156,7 +156,7 @@ class GCTests: XCTestCase {
 
         var expectedMessage = "{\"k1\":[{\"val\":\"Hello \"},{\"val\":\"mario\"}]}"
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "Hello world")
             (root.k1 as? JSONText)?.edit(6, 11, "mario")
@@ -172,7 +172,7 @@ class GCTests: XCTestCase {
 
         expectedMessage = "{\"k1\":[{\"val\":\"Hi\"},{\"val\":\" \"},{\"val\":\"j\"},{\"val\":\"ane\"}]}"
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             if let text = root.k1 as? JSONText {
                 text.edit(0, 5, "Hi")
                 text.edit(3, 4, "j")
@@ -204,7 +204,7 @@ class GCTests: XCTestCase {
 
         var expectedMessage = "{\"k1\":[{\"attrs\":{\"b\":\"1\"},\"val\":\"Hello \"},{\"val\":\"mario\"}]}"
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "Hello world", ["b": "1"])
             (root.k1 as? JSONText)?.edit(6, 11, "mario")
@@ -220,7 +220,7 @@ class GCTests: XCTestCase {
 
         expectedMessage = "{\"k1\":[{\"attrs\":{\"b\":\"1\"},\"val\":\"Hi\"},{\"attrs\":{\"b\":\"1\"},\"val\":\" \"},{\"val\":\"j\"},{\"attrs\":{\"b\":\"1\"},\"val\":\"ane\"}]}"
 
-        try await doc.update({ root in
+        try await doc.update({ root, _ in
             if let text = root.k1 as? JSONText {
                 text.edit(0, 5, "Hi", ["b": "1"])
                 text.edit(3, 4, "j")
@@ -250,7 +250,7 @@ class GCTests: XCTestCase {
         let result = await doc.toSortedJSON()
         XCTAssertEqual("{}", result)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc",
                                                                children: [
                                                                    JSONTreeElementNode(type: "p",
@@ -269,9 +269,9 @@ class GCTests: XCTestCase {
             )
         }
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             do {
-                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "gh"))
+                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], [JSONTreeTextNode(value: "gh")])
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -293,9 +293,9 @@ class GCTests: XCTestCase {
 
         XCTAssertEqual(nodeLengthBeforeGC - nodeLengthAfterGC, 2)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             do {
-                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "cv"))
+                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], [JSONTreeTextNode(value: "cv")])
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -317,14 +317,14 @@ class GCTests: XCTestCase {
 
         XCTAssertEqual(nodeLengthBeforeGC - nodeLengthAfterGC, 1)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             do {
                 try (root.t as? JSONTree)?.editByPath([0], [1],
-                                                      JSONTreeElementNode(type: "p",
+                                                      [JSONTreeElementNode(type: "p",
                                                                           children: [
                                                                               JSONTreeElementNode(type: "tn",
                                                                                                   children: [JSONTreeTextNode(value: "ab")])
-                                                                          ]))
+                                                                          ])])
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -363,7 +363,7 @@ class GCTests: XCTestCase {
         try await client1.attach(doc1)
         try await client2.attach(doc2)
 
-        try await doc1.update { root in
+        try await doc1.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc",
                                     children: [
@@ -394,9 +394,9 @@ class GCTests: XCTestCase {
         // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
 
-        try await doc2.update({ root in
+        try await doc2.update({ root, _ in
             do {
-                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "gh"))
+                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], [JSONTreeTextNode(value: "gh")])
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -467,10 +467,10 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, false)
-        try await client2.attach(doc2, false)
+        try await client1.attach(doc1, [:], false)
+        try await client2.attach(doc2, [:], false)
 
-        try await doc1.update({ root in
+        try await doc1.update({ root, _ in
             root["1"] = Int64(1)
             root["2"] = [Int64(1), Int64(2), Int64(3)]
             root["3"] = Int64(3)
@@ -487,7 +487,7 @@ class GCTests: XCTestCase {
         // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
 
-        try await doc2.update({ root in
+        try await doc2.update({ root, _ in
             root.remove(key: "2")
         }, "removes 2")
 
@@ -556,10 +556,10 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, false)
-        try await client2.attach(doc2, false)
+        try await client1.attach(doc1, [:], false)
+        try await client2.attach(doc2, [:], false)
 
-        try await doc1.update({ root in
+        try await doc1.update({ root, _ in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "Hello World")
             root.textWithAttr = JSONText()
@@ -577,7 +577,7 @@ class GCTests: XCTestCase {
         // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
 
-        try await doc2.update({ root in
+        try await doc2.update({ root, _ in
             (root.text as? JSONText)?.edit(0, 1, "a")
             (root.text as? JSONText)?.edit(1, 2, "b")
             (root.textWithAttr as? JSONText)?.edit(0, 1, "a", ["b": "1"])
@@ -649,10 +649,10 @@ class GCTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, false)
-        try await client2.attach(doc2, false)
+        try await client1.attach(doc1, [:], false)
+        try await client2.attach(doc2, [:], false)
 
-        try await doc1.update({ root in
+        try await doc1.update({ root, _ in
             root["1"] = Int64(1)
             root["2"] = [Int64(1), Int64(2), Int64(3)]
             root["3"] = Int64(3)
@@ -673,7 +673,7 @@ class GCTests: XCTestCase {
         // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
 
-        try await doc1.update({ root in
+        try await doc1.update({ root, _ in
             root.remove(key: "2")
             (root["4"] as? JSONText)?.edit(0, 1, "h")
             (root["5"] as? JSONText)?.edit(0, 1, "h", ["b": "1"])

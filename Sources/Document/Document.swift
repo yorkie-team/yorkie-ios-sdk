@@ -40,12 +40,6 @@ public enum DocumentStatus: String {
     case removed
 }
 
-/**
- * Presence key, value dictionary
- * Similar to an Indexable in JS SDK
- */
-public typealias Presence = [String: Any]
-
 public typealias DocumentKey = String
 public typealias DocumentID = String
 
@@ -59,13 +53,26 @@ public actor Document {
 
     private let key: DocumentKey
     private(set) var status: DocumentStatus
-    private var root: CRDTRoot
-    private var clone: CRDTRoot?
     private var changeID: ChangeID
     var checkpoint: Checkpoint
     private var localChanges: [Change]
+
+    private var root: CRDTRoot
+    private var clone: (root: CRDTRoot, presences: [ActorID: PresenceData])?
+
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
+    private var peersSubscribeCallback: SubscribeCallback?
+
+    /**
+     * `onlineClients` is a set of client IDs that are currently online.
+     */
+    public var onlineClients: Set<ActorID>
+
+    /**
+     * `presences` is a map of client IDs to their presence information.
+     */
+    private var presences: [ActorID: PresenceData]
 
     public init(key: String) {
         self.key = key
@@ -75,35 +82,58 @@ public actor Document {
         self.checkpoint = Checkpoint.initial
         self.localChanges = []
         self.subscribeCallbacks = [:]
+        self.onlineClients = Set<ActorID>()
+        self.presences = [:]
     }
 
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject) -> Void, _ message: String? = nil) throws {
+    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) -> Void, _ message: String? = nil) throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
 
         let clone = self.cloned
-        let context = ChangeContext(id: self.changeID.next(), root: clone, message: message)
+        let context = ChangeContext(id: self.changeID.next(), root: clone.root, message: message)
 
-        let proxy = JSONObject(target: clone.object, context: context)
-        updater(proxy)
+        guard let actorID = self.changeID.getActorID() else {
+            throw YorkieError.unexpected(message: "actor ID is null.")
+        }
 
-        if context.hasOperations() {
+        let proxy = JSONObject(target: clone.root.object, context: context)
+
+        if self.presences[actorID] == nil {
+            self.clone?.presences[actorID] = [:]
+        }
+
+        var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
+
+        updater(proxy, &presence)
+
+        self.clone?.presences[actorID] = presence.presence
+
+        if context.hasChange {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
             let change = context.getChange()
-            let opInfos = (try? change.execute(root: self.root)) ?? []
+            let opInfos = (try? change.execute(root: self.root, presences: &self.presences)) ?? []
             self.localChanges.append(change)
             self.changeID = change.id
 
-            let changeInfo = ChangeInfo(message: change.message ?? "",
-                                        operations: opInfos,
-                                        actorID: change.id.getActorID())
-            let changeEvent = LocalChangeEvent(value: changeInfo)
-            self.processDocEvent(changeEvent)
+            if change.hasOperations {
+                let changeInfo = ChangeInfo(message: change.message ?? "",
+                                            operations: opInfos,
+                                            actorID: change.id.getActorID())
+                let changeEvent = LocalChangeEvent(value: changeInfo)
+                self.processDocEvent(changeEvent)
+            }
+
+            if change.presenceChange != nil, let presence = self.presences[actorID] {
+                let peerChangedInfo = PeersChangedValue.presenceChanged(peer: (actorID, presence))
+                let peerChangedEvent = PeersChangedEvent(value: peerChangedInfo)
+                self.processDocEvent(peerChangedEvent)
+            }
 
             Logger.trace("after update a local change: \(self.toJSON())")
         }
@@ -122,6 +152,14 @@ public actor Document {
     }
 
     /**
+     * `subscribePeers` registers a callback to subscribe to events on the document.
+     * The callback will be called when the targetPath or any of its nested values change.
+     */
+    public func subscribePeers(_ callback: @escaping (DocEvent) -> Void) {
+        self.peersSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -130,6 +168,13 @@ public actor Document {
         } else {
             self.defaultSubscribeCallback = nil
         }
+    }
+
+    /**
+     * `unsubscribePeers` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribePeers() {
+        self.peersSubscribeCallback = nil
     }
 
     /**
@@ -179,14 +224,14 @@ public actor Document {
     /**
      * `ensureClone` make a clone of root.
      */
-    var cloned: CRDTRoot {
+    var cloned: (root: CRDTRoot, presences: [ActorID: PresenceData]) {
         if let clone = self.clone {
             return clone
         }
 
-        let clone = self.root.deepcopy()
-        self.clone = clone
-        return clone
+        self.clone = (self.root.deepcopy(), self.presences)
+
+        return self.clone!
     }
 
     /**
@@ -231,7 +276,7 @@ public actor Document {
      * `getCloneRoot` return clone object.
      */
     func getCloneRoot() -> CRDTObject? {
-        self.clone?.object
+        return self.clone?.root.object
     }
 
     /**
@@ -239,9 +284,9 @@ public actor Document {
      */
     public func getRoot() -> JSONObject {
         let clone = self.cloned
-        let context = ChangeContext(id: self.changeID.next(), root: clone)
+        let context = ChangeContext(id: self.changeID.next(), root: clone.root)
 
-        return JSONObject(target: clone.object, context: context)
+        return JSONObject(target: clone.root.object, context: context)
     }
 
     /**
@@ -251,7 +296,7 @@ public actor Document {
     @discardableResult
     func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
         if let clone = self.clone {
-            clone.garbageCollect(lessThanOrEqualTo: ticket)
+            clone.root.garbageCollect(lessThanOrEqualTo: ticket)
         }
         return self.root.garbageCollect(lessThanOrEqualTo: ticket)
     }
@@ -290,9 +335,10 @@ public actor Document {
      * `applySnapshot` applies the given snapshot into this document.
      */
     public func applySnapshot(_ serverSeq: Int64, _ snapshot: Data) throws {
-        let obj = try Converter.bytesToObject(bytes: snapshot)
-        self.root = CRDTRoot(rootObject: obj)
-        self.changeID.syncLamport(with: serverSeq)
+        let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
+        self.root = CRDTRoot(rootObject: root)
+        self.presences = presences
+        self.changeID = self.changeID.syncLamport(with: serverSeq)
 
         // drop clone because it is contaminated.
         self.clone = nil
@@ -315,23 +361,52 @@ public actor Document {
         Logger.trace(changes.map { "\($0.id.toTestString)\t\($0.toTestString)" }.joined(separator: "\n"))
 
         let clone = self.cloned
-        try changes.forEach {
-            try $0.execute(root: clone)
+
+        for change in changes {
+            try change.execute(root: clone.root, presences: &self.clone!.presences)
         }
 
-        var changeInfos = [ChangeInfo]()
-        try changes.forEach {
-            let opInfos = try $0.execute(root: self.root)
+        for change in changes {
+            var updates: (changeInfo: ChangeInfo?, peer: PeersChangedValue?)
 
-            changeInfos.append(ChangeInfo(message: $0.message ?? "",
-                                          operations: opInfos,
-                                          actorID: $0.id.getActorID()))
+            guard let actorID = change.id.getActorID() else {
+                throw YorkieError.unexpected(message: "ActorID is null")
+            }
 
-            self.changeID.syncLamport(with: $0.id.getLamport())
-        }
+            if case .put(let presence) = change.presenceChange {
+                if self.onlineClients.contains(actorID) {
+                    let peer = (actorID, presence)
 
-        changeInfos.forEach {
-            self.processDocEvent(RemoteChangeEvent(value: $0))
+                    if self.presences[actorID] != nil {
+                        updates.peer = PeersChangedValue.presenceChanged(peer: peer)
+                    } else {
+                        updates.peer = PeersChangedValue.watched(peer: peer)
+                    }
+                }
+            }
+
+            let opInfos = try change.execute(root: self.root, presences: &self.presences)
+
+            if change.hasOperations {
+                updates.changeInfo = ChangeInfo(message: change.message ?? "", operations: opInfos, actorID: actorID)
+            }
+
+            // NOTE: RemoteChange event should be emitted synchronously with
+            // applying changes. This is because 3rd party model should be synced
+            // with the Document after RemoteChange event is emitted. If the event
+            // is emitted asynchronously, the model can be changed and breaking
+            // consistency.
+            if let info = updates.changeInfo {
+                let remoteChangeEvent = RemoteChangeEvent(value: info)
+                self.processDocEvent(remoteChangeEvent)
+            }
+
+            if let peer = updates.peer {
+                let peerChangedEvent = PeersChangedEvent(value: peer)
+                self.processDocEvent(peerChangedEvent)
+            }
+
+            self.changeID = self.changeID.syncLamport(with: change.id.getLamport())
         }
 
         Logger.debug(
@@ -391,21 +466,25 @@ public actor Document {
         "[\(self.key)]"
     }
 
-    private func isSameElementOrChildOf(_ elem: String, _ parent: String) -> Bool {
-        if parent == elem {
-            return true
+    /**
+     * `publish` triggers an event in this document, which can be received by
+     * callback functions from document.subscribe().
+     */
+    func publish(_ eventType: PeersChangedEventType, _ peerActorID: ActorID?) {
+        switch eventType {
+        case .initialized:
+            self.processDocEvent(PeersChangedEvent(value: .initialized(peers: self.getPresences())))
+        case .watched:
+            if let peerActorID, let presence = self.getPresence(peerActorID) {
+                self.processDocEvent(PeersChangedEvent(value: .watched(peer: (peerActorID, presence))))
+            }
+        case .unwatched:
+            if let peerActorID {
+                self.processDocEvent(PeersChangedEvent(value: .unwatched(peer: (peerActorID, [:]))))
+            }
+        default:
+            break
         }
-
-        let nodePath = elem.components(separatedBy: ".")
-        let targetPath = parent.components(separatedBy: ".")
-
-        var result = true
-
-        for (index, path) in targetPath.enumerated() where path != nodePath[safe: index] {
-            result = false
-        }
-
-        return result
     }
 
     private func processDocEvent(_ event: DocEvent) {
@@ -435,5 +514,76 @@ public actor Document {
         }
 
         self.defaultSubscribeCallback?(event)
+
+        if event.type == .peersChanged {
+            self.peersSubscribeCallback?(event)
+        }
+    }
+
+    private func isSameElementOrChildOf(_ elem: String, _ parent: String) -> Bool {
+        if parent == elem {
+            return true
+        }
+
+        let nodePath = elem.components(separatedBy: ".")
+        let targetPath = parent.components(separatedBy: ".")
+
+        var result = true
+
+        for (index, path) in targetPath.enumerated() where path != nodePath[safe: index] {
+            result = false
+        }
+
+        return result
+    }
+
+    /**
+     * `setOnlineClients` sets the given online client set.
+     */
+    func setOnlineClients(_ onlineClients: Set<ActorID>) {
+        self.onlineClients = onlineClients
+    }
+
+    /**
+     * `addOnlineClient` adds the given clientID into the online client set.
+     */
+    func addOnlineClient(_ clientID: ActorID) {
+        self.onlineClients.insert(clientID)
+    }
+
+    /**
+     * `removeOnlineClient` removes the clientID from the online client set.
+     */
+    func removeOnlineClient(_ clientID: ActorID) {
+        self.onlineClients.remove(clientID)
+    }
+
+    /**
+     * `hasPresence` returns whether the given clientID has a presence or not.
+     */
+    public func hasPresence(_ clientID: ActorID) -> Bool {
+        self.presences[clientID] != nil
+    }
+
+    /**
+     * `getPresence` returns the presence of the given clientID.
+     */
+    public func getPresence(_ clientID: ActorID) -> PresenceData? {
+        self.presences[clientID]
+    }
+
+    /**
+     * `getPresences` returns the presences of online clients.
+     */
+    public func getPresences() -> [PeerElement] {
+        var presences = [PeerElement]()
+
+        for clientID in self.onlineClients {
+            if let presence = self.presences[clientID] {
+                presences.append((clientID, presence))
+            }
+        }
+
+        return presences
     }
 }

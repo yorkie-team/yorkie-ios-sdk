@@ -28,7 +28,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
 
         for index in 0 ..< testLoopCount {
             Task.detached(priority: .utility) {
-                try await target.update { root in
+                try await target.update { root, _ in
                     root.k1 = "\(index)"
                 }
 
@@ -36,7 +36,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
             }
 
             Task.detached(priority: .userInitiated) {
-                try await target.update { root in
+                try await target.update { root, _ in
                     root.k1 = "\(index)"
                 }
 
@@ -44,7 +44,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
             }
 
             Task.detached(priority: .low) {
-                try await target.update { root in
+                try await target.update { root, _ in
                     root.k1 = "\(index)"
                 }
 
@@ -52,7 +52,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
             }
 
             Task.detached(priority: .high) {
-                try await target.update { root in
+                try await target.update { root, _ in
                     root.k1 = "\(index)"
                 }
 
@@ -60,7 +60,7 @@ class DocumentConcurrentAccessTests: XCTestCase {
             }
 
             Task.detached(priority: .background) {
-                try await target.update { root in
+                try await target.update { root, _ in
                     root.k1 = "\(index)"
                 }
 
@@ -68,6 +68,6 @@ class DocumentConcurrentAccessTests: XCTestCase {
             }
         }
 
-        wait(for: [expect], timeout: 100)
+        await fulfillment(of: [expect], timeout: 2, enforceOrder: true)
     }
 }

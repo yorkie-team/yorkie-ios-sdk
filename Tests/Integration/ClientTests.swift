@@ -170,18 +170,18 @@ class ClientTests: XCTestCase {
 
         // 01. c1, c2, c3 attach to the same document.
         let d1 = Document(key: docKey)
-        try await c1.attach(d1, false)
+        try await c1.attach(d1, [:], false)
         let d2 = Document(key: docKey)
-        try await c2.attach(d2, false)
+        try await c2.attach(d2, [:], false)
         let d3 = Document(key: docKey)
-        try await c3.attach(d3, false)
+        try await c3.attach(d3, [:], false)
 
         // 02. c1, c2 sync with push-pull mode.
-        try await d1.update { root in
+        try await d1.update { root, _ in
             root.c1 = Int64(0)
         }
 
-        try await d2.update { root in
+        try await d2.update { root, _ in
             root.c2 = Int64(0)
         }
 
@@ -197,11 +197,11 @@ class ClientTests: XCTestCase {
         // 03. c1 and c2 sync with push-only mode. So, the changes of c1 and c2
         // are not reflected to each other.
         // But, c3 can get the changes of c1 and c2, because c3 sync with pull-pull mode.
-        try await d1.update { root in
+        try await d1.update { root, _ in
             root.c1 = Int64(1)
         }
 
-        try await d2.update { root in
+        try await d2.update { root, _ in
             root.c2 = Int64(1)
         }
 
@@ -247,25 +247,25 @@ class ClientTests: XCTestCase {
 
         // 01. cli attach to the same document having counter.
         let d1 = Document(key: docKey)
-        try await c1.attach(d1, false)
+        try await c1.attach(d1, [:], false)
 
         // 02. cli update the document with creating a counter
-        //     and sync with push-pull mode: CP(0, 0) -> CP(1, 1)
-        try await d1.update { root in
+        //     and sync with push-pull mode: CP(1, 1) -> CP(2, 2)
+        try await d1.update { root, _ in
             root.counter = JSONCounter(value: Int64(0))
         }
 
         var checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 0, clientSeq: 0), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 1), checkpoint)
 
         try await c1.sync()
 
         checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 1), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 2, clientSeq: 2), checkpoint)
 
         // 03. cli update the document with increasing the counter(0 -> 1)
-        //     and sync with push-only mode: CP(1, 1) -> CP(2, 1)
-        try await d1.update { root in
+        //     and sync with push-only mode: CP(2, 2) -> CP(2, 3)
+        try await d1.update { root, _ in
             (root.counter as? JSONCounter<Int64>)!.increase(value: 1)
         }
 
@@ -276,11 +276,11 @@ class ClientTests: XCTestCase {
         try await c1.sync(d1, .pushOnly)
 
         checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 1, clientSeq: 2), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 2, clientSeq: 3), checkpoint)
 
         // 04. cli update the document with increasing the counter(1 -> 2)
-        //     and sync with push-pull mode. CP(2, 1) -> CP(3, 3)
-        try await d1.update { root in
+        //     and sync with push-pull mode. CP(2, 3) -> CP(4, 4)
+        try await d1.update { root, _ in
             (root.counter as? JSONCounter<Int64>)!.increase(value: 1)
         }
 
@@ -293,7 +293,7 @@ class ClientTests: XCTestCase {
         try await c1.sync()
 
         checkpoint = await d1.checkpoint
-        XCTAssertEqual(Checkpoint(serverSeq: 3, clientSeq: 3), checkpoint)
+        XCTAssertEqual(Checkpoint(serverSeq: 4, clientSeq: 4), checkpoint)
 
         let counter = await(d1.getRoot().get(key: "counter") as? JSONCounter<Int64>)!
 

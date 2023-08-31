@@ -82,7 +82,9 @@ class ChangeTests: XCTestCase {
                        {"k-a1":"a1","k-a3":{"k-b1":"b1"}}
                        """)
 
-        try target.execute(root: root)
+        var presences = [ActorID: PresenceData]()
+
+        try target.execute(root: root, presences: &presences)
 
         XCTAssertEqual(root.debugDescription,
                        """

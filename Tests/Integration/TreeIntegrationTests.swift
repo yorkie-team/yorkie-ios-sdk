@@ -71,7 +71,7 @@ func createTwoTreeDocs(_ key: String, _ initial: JSONTreeElementNode) async thro
     await doc1.setActor("A")
     await doc2.setActor("B")
 
-    try await doc1.update { root in
+    try await doc1.update { root, _ in
         root.t = JSONTree(initialRoot: initial)
     }
 
@@ -100,7 +100,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree()
             _ = try? (root.t as? JSONTree)?.edit(0, 0, [JSONTreeElementNode(type: "p")])
@@ -128,7 +128,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "p",
@@ -162,7 +162,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc",
                                                                children: [JSONTreeElementNode(type: "p",
@@ -185,7 +185,7 @@ final class TreeIntegrationTests: XCTestCase {
         let tree = await doc.getRoot().t as? JSONTree
         XCTAssertEqual(tree?.toXML(), /* html */ "<doc><p>ab</p></doc>")
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc",
                                                                children: [JSONTreeElementNode(type: "p",
                                                                                               children: [JSONTreeTextNode(value: "ab")])]))
@@ -206,7 +206,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc",
                                                                children: [JSONTreeElementNode(type: "p",
@@ -222,7 +222,7 @@ final class TreeIntegrationTests: XCTestCase {
             }
         }
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "X")])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>Xab</p></doc>")
         }
@@ -237,7 +237,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(
@@ -265,7 +265,7 @@ final class TreeIntegrationTests: XCTestCase {
             }
         }
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             _ = try? (root.t as? JSONTree)?.editByPath([0, 0, 0, 1], [0, 0, 0, 1], [JSONTreeTextNode(value: "X")])
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb</tn></p></tc></doc>")
@@ -281,7 +281,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(
@@ -334,7 +334,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(
@@ -381,7 +381,7 @@ final class TreeIntegrationTests: XCTestCase {
 
     func test_can_sync_its_content_with_other_replicas() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
-            try await d1.update { root in
+            try await d1.update { root, _ in
                 root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "hello")])]))
             }
 
@@ -394,7 +394,7 @@ final class TreeIntegrationTests: XCTestCase {
             XCTAssertEqual(d1XML, /* html */ "<doc><p>hello</p></doc>")
             XCTAssertEqual(d2XML, /* html */ "<doc><p>hello</p></doc>")
 
-            try await d1.update { root in
+            try await d1.update { root, _ in
                 _ = try? (root.t as? JSONTree)?.edit(7, 7, [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "yorkie")])])
             }
 
@@ -423,10 +423,10 @@ final class TreeIntegrationEditTests: XCTestCase {
 
         XCTAssertEqual(docAXML, /* html */ "<r><p>12</p></r>")
 
-        try await docA.update { root in
+        try await docA.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "A")])
         }
-        try await docB.update { root in
+        try await docB.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "B")])
         }
 
@@ -450,10 +450,10 @@ final class TreeIntegrationEditTests: XCTestCase {
 
         XCTAssertEqual(docAXML, /* html */ "<r><p>12</p></r>")
 
-        try await docA.update { root in
+        try await docA.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "A")])
         }
-        try await docB.update { root in
+        try await docB.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "B")])
         }
 
@@ -475,10 +475,10 @@ final class TreeIntegrationEditTests: XCTestCase {
                                                                            ]))
         var docAXML = await(docA.getRoot().t as? JSONTree)?.toXML()
 
-        try await docA.update { root in
+        try await docA.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "A")])
         }
-        try await docB.update { root in
+        try await docB.update { root, _ in
             _ = try? (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "B")])
         }
 
@@ -497,7 +497,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "p",
@@ -516,7 +516,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "tc",
@@ -549,7 +549,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update { root in
+        try await doc.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "tc",
@@ -576,7 +576,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
 
     func test_can_sync_its_content_containing_attributes_with_other_replicas() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
-            try await d1.update { root in
+            try await d1.update { root, _ in
                 root.t = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc",
                                         children: [JSONTreeElementNode(type: "p",
@@ -594,7 +594,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
             XCTAssertEqual(d1XML, /* html */ "<doc><p italic=\"true\">hello</p></doc>")
             XCTAssertEqual(d2XML, /* html */ "<doc><p italic=\"true\">hello</p></doc>")
 
-            try await d1.update { root in
+            try await d1.update { root, _ in
                 _ = try? (root.t as? JSONTree)?.style(6, 7, ["bold": "true"])
             }
 

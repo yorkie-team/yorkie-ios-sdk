@@ -87,17 +87,60 @@ enum Converter {
 // MARK: Presence
 extension Converter {
     /**
+     * `toPresence` converts the given model to Protobuf format.
+     */
+    static func toPresence(presence: PresenceData) -> PbPresence {
+        var pbPresence = PbPresence()
+        
+        for (key, value) in presence {
+            if value is AnyValueTypeDictionary || value is [Any],
+               let jsonObject = try? JSONSerialization.data(withJSONObject: value),
+               let jsonString = String(data: jsonObject, encoding: .utf8) {
+                pbPresence.data[key] = jsonString
+            } else if value is String {
+                pbPresence.data[key] = "\"\(value)\""
+            } else {
+                pbPresence.data[key] = "\(value)"
+            }
+        }
+
+        return pbPresence
+    }
+
+    /**
+     * `toPresenceChange` converts the given model to Protobuf format.
+     */
+    static func toPresenceChange(presenceChange: PresenceChange) -> PbPresenceChange {
+      var pbPresenceChange = PbPresenceChange()
+        
+        switch presenceChange {
+        case .put(let presence):
+            pbPresenceChange.type = .put
+            pbPresenceChange.presence = toPresence(presence: presence)
+        case .clear:
+            pbPresenceChange.type = .clear
+        }
+        
+        return pbPresenceChange
+    }
+
+    /**
      * `fromPresence` converts the given Protobuf format to model format.
      */
-    static func fromPresence(pbPresence: PbPresence) -> PresenceInfo {
-        var data = [String: Any]()
+    static func fromPresence(pbPresence: PbPresence) -> PresenceData {
+        var data = PresenceData()
 
         pbPresence.data.forEach { (key, value) in
-            if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) {
+            if let dataValue = value.data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) as? AnyValueTypeDictionary {
                 data[key] = jsonValue
             } else {
                 if value.first == "\"" && value.last == "\"" {
+                    // Sring.
                     data[key] = value.substring(from: 1, to: value.count - 2)
+                } else if value.first == "[", value.last == "]",
+                          let dataValue = "{\"\(key)\":\(value)}".data(using: .utf8), let jsonValue = try? JSONSerialization.jsonObject(with: dataValue) as? AnyValueTypeDictionary {
+                    // Array. eg. "[\"a\", \"b\"]"
+                    data.merge(jsonValue, uniquingKeysWith: { _, last in last })
                 } else {
                     if let intValue = Int(value) {
                         data[key] = intValue
@@ -108,35 +151,35 @@ extension Converter {
                     } else if "\(false)" == value.lowercased() {
                         data[key] = false
                     } else {
-                        assertionFailure("Invalid Presence Value [\(key)]:[\(value)")
+                        data[key] = value
+                        assertionFailure("Invalid Presence Value [\(key)]:[\(value)]")
                     }
                 }
             }
         }
 
-        return PresenceInfo(clock: pbPresence.clock, data: data)
+        return data
     }
-
+    
     /**
-     * `toClient` converts the given model to Protobuf format.
+     * `fromPresenceChange` converts the given model to Protobuf format.
      */
-    static func toClient(id: String, presence: PresenceInfo) -> PbClient {
-        var pbPresence = PbPresence()
-        pbPresence.clock = presence.clock
-
-       presence.data.forEach { (key, value) in
-            if JSONSerialization.isValidJSONObject(value), let jsonData = try? JSONSerialization.data(withJSONObject: value) {
-                pbPresence.data[key] = String(bytes: jsonData, encoding: .utf8)
-            } else {
-                // emulate JSON.stringify() in JavaScript.
-                pbPresence.data[key] = value is String ? "\"\(value)\"" : "\(value)"
-            }
+    static func fromPresenceChange(pbPresenceChange: PbPresenceChange) throws -> PresenceChange {
+        switch pbPresenceChange.type {
+        case .put:
+            return .put(presence: fromPresence(pbPresence: pbPresenceChange.presence))
+        case .clear:
+            return .clear
+        default:
+            throw YorkieError.unimplemented(message: "Unknown type: \(pbPresenceChange.type)")
         }
-
-        var pbClient = PbClient()
-        pbClient.id = id.toData ?? Data()
-        pbClient.presence = pbPresence
-        return pbClient
+    }
+    
+    /**
+     * `fromPresences` converts the given Protobuf format to model format.
+     */
+    static func fromPresences(_ pbPresences: [String: PbPresence]) -> [ActorID: PresenceData] {
+        pbPresences.mapValues { fromPresence(pbPresence: $0) }
     }
 }
 
@@ -1042,7 +1085,13 @@ extension Converter {
         var pbChange = PbChange()
         pbChange.id = toChangeID(change.id)
         pbChange.message = change.message ?? ""
-        pbChange.operations = toOperations(change.operations)
+        if change.hasOperations {
+            pbChange.operations = toOperations(change.operations)
+        }
+        if let presenceChange = change.presenceChange {
+            pbChange.presenceChange = toPresenceChange(presenceChange: presenceChange)
+        }
+        
         return pbChange
     }
 
@@ -1062,6 +1111,7 @@ extension Converter {
         try pbChanges.compactMap {
             Change(id: fromChangeID($0.id),
                    operations: try fromOperations($0.operations),
+                   presenceChange: $0.hasPresenceChange ? try fromPresenceChange(pbPresenceChange: $0.presenceChange) : nil,
                    message: $0.message.isEmpty ? nil : $0.message)
         }
     }
@@ -1088,6 +1138,18 @@ extension Converter {
         try toTree(tree).serializedData()
     }
 
+    /**
+     * `bytesToSnapshot` creates a Snapshot from the given byte array.
+     */
+    static func bytesToSnapshot(bytes: Data) throws -> (root: CRDTObject, presences: [ActorID: PresenceData]) {
+        if bytes.isEmpty {
+            return (CRDTObject(createdAt: TimeTicket.initial), [:])
+        }
+        
+        let snapshot = try PbSnapshot(serializedData: bytes)
+        return (try fromObject(snapshot.root.jsonObject), fromPresences(snapshot.presences))
+    }
+    
     /**
      * `bytesToObject` creates an JSONObject from the given byte array.
      */
