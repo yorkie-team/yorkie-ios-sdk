@@ -934,6 +934,12 @@ extension Converter {
             if node.isText {
                 pbTreeNode.value = node.value
             }
+            if let id = node.insPrevID {
+                pbTreeNode.insPrevID = toTreeNodeID(id)
+            }
+            if let id = node.insNextID {
+                pbTreeNode.insNextID = toTreeNodeID(id)
+            }
             if let ticket = node.removedAt {
                 pbTreeNode.removedAt = toTimeTicket(ticket)
             } else {
@@ -1024,6 +1030,8 @@ extension Converter {
             }
         }
         
+        node.insPrevID = pbTreeNode.hasInsPrevID ? fromTreeNodeID(pbTreeNode.insPrevID) : nil
+        node.insNextID = pbTreeNode.hasInsNextID ? fromTreeNodeID(pbTreeNode.insNextID) : nil
         node.removedAt = pbTreeNode.hasRemovedAt ? fromTimeTicket(pbTreeNode.removedAt) : nil
         
         return node

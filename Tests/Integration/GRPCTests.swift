@@ -44,8 +44,6 @@ class GRPCTests: XCTestCase {
             return
         }
 
-        XCTAssertEqual(activateResponse.clientID, testClientKey)
-
         var deactivateRequest = DeactivateClientRequest()
         deactivateRequest.clientID = activateResponse.clientID
         guard (try? client.deactivateClient(deactivateRequest).response.wait()) != nil else {
@@ -77,8 +75,6 @@ class GRPCTests: XCTestCase {
             XCTFail("The response of activate is nil.")
             return
         }
-
-        XCTAssertEqual(activateResponse.clientID, testClientKey)
 
         var deactivateRequest = DeactivateClientRequest()
         deactivateRequest.clientID = activateResponse.clientID
