@@ -616,6 +616,17 @@ public actor Document {
     }
 
     /**
+     * `getMyPresence` returns the presence of the current client.
+     */
+    public func getMyPresence() -> PresenceData? {
+        guard self.status == .attached, let id = self.changeID.getActorID() else {
+            return nil
+        }
+
+        return self.presences[id]
+    }
+
+    /**
      * `getPresence` returns the presence of the given clientID.
      */
     public func getPresence(_ clientID: ActorID) -> PresenceData? {
