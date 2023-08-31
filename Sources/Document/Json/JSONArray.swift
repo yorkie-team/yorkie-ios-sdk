@@ -146,6 +146,16 @@ public class JSONArray {
         self.push(values: values)
     }
 
+    @discardableResult
+    public func remove(at index: Int) -> Any? {
+        Logger.trace("array[\(index)]")
+        if let value = self.removeInternal(byIndex: index) {
+            return toJSONElement(from: value)
+        }
+
+        return nil
+    }
+
     func push(values: [Any]) {
         values.forEach { value in
             self.push(value)
@@ -381,9 +391,7 @@ public class JSONArray {
     @discardableResult
     private func removeInternal(byIndex index: Int) -> CRDTElement? {
         let ticket = self.context.issueTimeTicket
-        let removed = try? self.target.deleteByIndex(index: index, executedAt: ticket)
-
-        guard let removed else {
+        guard let removed = try? self.target.deleteByIndex(index: index, executedAt: ticket) else {
             return nil
         }
 
