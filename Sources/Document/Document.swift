@@ -278,8 +278,7 @@ public actor Document {
     }
 
     /**
-     * `getClone` return clone object.
-     *
+     * `getCloneRoot` return clone object.
      */
     func getCloneRoot() -> CRDTObject? {
         return self.clone?.root.object
@@ -488,16 +487,16 @@ public actor Document {
         "[\(self.key)]"
     }
 
-    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID?) {
+    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: PresenceData? = nil) {
         switch eventType {
         case .initialized:
             self.publish(InitializedEvent(value: self.getPresences()))
         case .watched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
+            if let peerActorID, let presence = presence {
                 self.publish(WatchedEvent(value: (peerActorID, presence)))
             }
         case .unwatched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
+            if let peerActorID, let presence = presence {
                 self.publish(UnwatchedEvent(value: (peerActorID, presence)))
             }
         default:
@@ -519,18 +518,12 @@ public actor Document {
                 var isMine = false
                 var isOthers = false
 
-                if let event = event as? WatchedEvent {
-                    if event.value.clientID == id {
-                        isMine = true
-                    } else {
-                        isOthers = true
-                    }
-                } else if let event = event as? UnwatchedEvent {
-                    if event.value.clientID == id {
-                        isMine = true
-                    } else {
-                        isOthers = true
-                    }
+                if event is InitializedEvent {
+                    isMine = true
+                } else if event is WatchedEvent {
+                    isOthers = true
+                } else if event is UnwatchedEvent {
+                    isOthers = true
                 } else if let event = event as? PresenceChangedEvent {
                     if event.value.clientID == id {
                         isMine = true
@@ -629,7 +622,7 @@ public actor Document {
         guard self.status == .attached, let id = self.changeID.getActorID() else {
             return nil
         }
-
+        
         return self.presences[id]
     }
 
