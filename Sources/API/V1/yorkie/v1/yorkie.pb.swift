@@ -52,9 +52,7 @@ struct Yorkie_V1_ActivateClientResponse {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientKey: String = String()
-
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -66,7 +64,7 @@ struct Yorkie_V1_DeactivateClientRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -78,8 +76,6 @@ struct Yorkie_V1_DeactivateClientResponse {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -90,7 +86,7 @@ struct Yorkie_V1_AttachDocumentRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
@@ -112,8 +108,6 @@ struct Yorkie_V1_AttachDocumentResponse {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
-
-  var clientID: Data = Data()
 
   var documentID: String = String()
 
@@ -138,7 +132,7 @@ struct Yorkie_V1_DetachDocumentRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var documentID: String = String()
 
@@ -163,8 +157,6 @@ struct Yorkie_V1_DetachDocumentResponse {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientKey: String = String()
-
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
@@ -186,7 +178,7 @@ struct Yorkie_V1_WatchDocumentRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var documentID: String = String()
 
@@ -249,7 +241,7 @@ struct Yorkie_V1_WatchDocumentResponse {
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    var clientIds: [Data] = []
+    var clientIds: [String] = []
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -264,7 +256,7 @@ struct Yorkie_V1_RemoveDocumentRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var documentID: String = String()
 
@@ -289,8 +281,6 @@ struct Yorkie_V1_RemoveDocumentResponse {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientKey: String = String()
-
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
@@ -312,7 +302,7 @@ struct Yorkie_V1_PushPullChangesRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var clientID: Data = Data()
+  var clientID: String = String()
 
   var documentID: String = String()
 
@@ -338,8 +328,6 @@ struct Yorkie_V1_PushPullChangesResponse {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
-
-  var clientID: Data = Data()
 
   var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
@@ -415,8 +403,7 @@ extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf.
 extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".ActivateClientResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_key"),
-    2: .standard(proto: "client_id"),
+    1: .standard(proto: "client_id"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -425,25 +412,20 @@ extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.clientKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 1)
-    }
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 2)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_ActivateClientResponse, rhs: Yorkie_V1_ActivateClientResponse) -> Bool {
-    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -462,7 +444,7 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       default: break
       }
     }
@@ -470,7 +452,7 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -484,31 +466,18 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
 
 extension Yorkie_V1_DeactivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DeactivateClientResponse"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-  ]
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
-      default: break
-      }
+    while let _ = try decoder.nextFieldNumber() {
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_DeactivateClientResponse, rhs: Yorkie_V1_DeactivateClientResponse) -> Bool {
-    if lhs.clientID != rhs.clientID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -527,7 +496,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
@@ -540,7 +509,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
@@ -559,9 +528,8 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AttachDocumentResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "document_id"),
-    3: .standard(proto: "change_pack"),
+    1: .standard(proto: "document_id"),
+    2: .standard(proto: "change_pack"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -570,9 +538,8 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
     }
@@ -583,20 +550,16 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
-    }
     if !self.documentID.isEmpty {
-      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 1)
     }
     try { if let v = self._changePack {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_AttachDocumentResponse, rhs: Yorkie_V1_AttachDocumentResponse) -> Bool {
-    if lhs.clientID != rhs.clientID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -618,7 +581,7 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
@@ -632,7 +595,7 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
@@ -655,7 +618,6 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DetachDocumentResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_key"),
     2: .standard(proto: "change_pack"),
   ]
 
@@ -665,7 +627,6 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
@@ -677,9 +638,6 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.clientKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 1)
-    }
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
@@ -687,7 +645,6 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
   }
 
   static func ==(lhs: Yorkie_V1_DetachDocumentResponse, rhs: Yorkie_V1_DetachDocumentResponse) -> Bool {
-    if lhs.clientKey != rhs.clientKey {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -707,7 +664,7 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       default: break
       }
@@ -716,7 +673,7 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
@@ -814,7 +771,7 @@ extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message,
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedBytesField(value: &self.clientIds) }()
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.clientIds) }()
       default: break
       }
     }
@@ -822,7 +779,7 @@ extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message,
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.clientIds.isEmpty {
-      try visitor.visitRepeatedBytesField(value: self.clientIds, fieldNumber: 1)
+      try visitor.visitRepeatedStringField(value: self.clientIds, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -848,7 +805,7 @@ extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
@@ -862,7 +819,7 @@ extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
@@ -885,8 +842,7 @@ extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".RemoveDocumentResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_key"),
-    2: .standard(proto: "change_pack"),
+    1: .standard(proto: "change_pack"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -895,8 +851,7 @@ extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
     }
@@ -907,17 +862,13 @@ extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.clientKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 1)
-    }
     try { if let v = self._changePack {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_RemoveDocumentResponse, rhs: Yorkie_V1_RemoveDocumentResponse) -> Bool {
-    if lhs.clientKey != rhs.clientKey {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -939,7 +890,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.pushOnly) }()
@@ -954,7 +905,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
     if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
@@ -981,8 +932,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
 extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".PushPullChangesResponse"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "change_pack"),
+    1: .standard(proto: "change_pack"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -991,8 +941,7 @@ extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBytesField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       default: break
       }
     }
@@ -1003,17 +952,13 @@ extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobu
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.clientID.isEmpty {
-      try visitor.visitSingularBytesField(value: self.clientID, fieldNumber: 1)
-    }
     try { if let v = self._changePack {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_PushPullChangesResponse, rhs: Yorkie_V1_PushPullChangesResponse) -> Bool {
-    if lhs.clientID != rhs.clientID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

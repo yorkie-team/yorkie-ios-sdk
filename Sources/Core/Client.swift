@@ -233,7 +233,7 @@ public actor Client {
             self.changeDocKeyOfAuthInterceptors(nil)
             let activateResponse = try await self.rpcClient.activateClient(activateRequest, callOptions: nil)
 
-            self.id = activateResponse.clientID.toHexString
+            self.id = activateResponse.clientID
 
             self.status = .activated
             await self.runSyncLoop()
@@ -262,10 +262,7 @@ public actor Client {
 
         var deactivateRequest = DeactivateClientRequest()
 
-        guard let clientIDData = clientID.toData else {
-            throw YorkieError.unexpected(message: "ClientID is not Hex String!")
-        }
-        deactivateRequest.clientID = clientIDData
+        deactivateRequest.clientID = clientID
 
         do {
             self.changeDocKeyOfAuthInterceptors(nil)
@@ -293,7 +290,7 @@ public actor Client {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
 
-        guard let clientID = self.id, let clientIDData = clientID.toData else {
+        guard let clientID = self.id else {
             throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
@@ -307,7 +304,7 @@ public actor Client {
         }
 
         var attachDocumentRequest = AttachDocumentRequest()
-        attachDocumentRequest.clientID = clientIDData
+        attachDocumentRequest.clientID = clientID
         attachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
@@ -360,7 +357,7 @@ public actor Client {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
 
-        guard let clientID = self.id, let clientIDData = clientID.toData else {
+        guard let clientID = self.id else {
             throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
@@ -373,7 +370,7 @@ public actor Client {
         }
 
         var detachDocumentRequest = DetachDocumentRequest()
-        detachDocumentRequest.clientID = clientIDData
+        detachDocumentRequest.clientID = clientID
         detachDocumentRequest.documentID = attachment.docID
         detachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
@@ -432,7 +429,7 @@ public actor Client {
             throw YorkieError.clientNotActive(message: "\(self.key) is not active")
         }
 
-        guard let clientID = self.id, let clientIDData = clientID.toData else {
+        guard let clientID = self.id else {
             throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
@@ -441,7 +438,7 @@ public actor Client {
         }
 
         var removeDocumentRequest = RemoveDocumentRequest()
-        removeDocumentRequest.clientID = clientIDData
+        removeDocumentRequest.clientID = clientID
         removeDocumentRequest.documentID = attachment.docID
         removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
 
@@ -642,13 +639,9 @@ public actor Client {
             return
         }
 
-        guard let idData = id.toData else {
-            throw YorkieError.unexpected(message: "Can't convert id to Data \(id)")
-        }
-
         var request = WatchDocumentRequest()
 
-        request.clientID = idData
+        request.clientID = id
         request.documentID = docID
 
         self.changeDocKeyOfAuthInterceptors(docKey)
@@ -712,7 +705,7 @@ public actor Client {
         case .initialization(let initialization):
             var onlineClients = Set<ActorID>()
             initialization.clientIds.forEach { pbClientID in
-                onlineClients.insert(pbClientID.toHexString)
+                onlineClients.insert(pbClientID)
             }
 
             self.semaphoresForInitialzation[docKey]?.signal()
@@ -720,7 +713,7 @@ public actor Client {
             await self.attachmentMap[docKey]?.doc.setOnlineClients(onlineClients)
             await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized)
         case .event(let pbWatchEvent):
-            let publisher = pbWatchEvent.publisher.toHexString
+            let publisher = pbWatchEvent.publisher
 
             switch pbWatchEvent.type {
             case .documentChanged:
@@ -788,12 +781,12 @@ public actor Client {
 
     @discardableResult
     private func syncInternal(_ attachment: Attachment, _ syncMode: SyncMode) async throws -> Document {
-        guard let clientID = self.id, let clientIDData = clientID.toData else {
+        guard let clientID = self.id else {
             throw YorkieError.unexpected(message: "Invalid Client ID!")
         }
 
         var pushPullRequest = PushPullChangeRequest()
-        pushPullRequest.clientID = clientIDData
+        pushPullRequest.clientID = clientID
 
         let doc = attachment.doc
         let requestPack = await doc.createChangePack()

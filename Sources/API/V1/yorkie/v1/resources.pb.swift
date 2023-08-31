@@ -1903,7 +1903,7 @@ struct Yorkie_V1_DocEvent {
 
   var type: Yorkie_V1_DocEventType = .documentChanged
 
-  var publisher: Data = Data()
+  var publisher: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -4634,7 +4634,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 2: try { try decoder.decodeSingularBytesField(value: &self.publisher) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.publisher) }()
       default: break
       }
     }
@@ -4645,7 +4645,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
     if !self.publisher.isEmpty {
-      try visitor.visitSingularBytesField(value: self.publisher, fieldNumber: 2)
+      try visitor.visitSingularStringField(value: self.publisher, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
