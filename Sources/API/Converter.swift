@@ -488,10 +488,10 @@ extension Converter {
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
-                var cratedAtMapByActor = [String: TimeTicket]()
+                var createdAtMapByActor = [String: TimeTicket]()
                 
                 pbTreeEditOperation.createdAtMapByActor.forEach { key, value in
-                    cratedAtMapByActor[key] = fromTimeTicket(value)
+                    createdAtMapByActor[key] = fromTimeTicket(value)
                 }
                 
                 return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
@@ -499,7 +499,7 @@ extension Converter {
                                          toPos: fromTreePos(pbTreeEditOperation.to),
                                          contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
                                          executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
-                                         maxCreatedAtMapByActor: cratedAtMapByActor)
+                                         maxCreatedAtMapByActor: createdAtMapByActor)
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
                 return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
                                           fromPos: fromTreePos(pbTreeStyleOperation.from),

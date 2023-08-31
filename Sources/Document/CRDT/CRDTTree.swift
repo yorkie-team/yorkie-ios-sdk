@@ -493,18 +493,17 @@ class CRDTTree: CRDTGCElement {
 
         if leftSiblingNode.isText {
             let absOffset = leftSiblingNode.id.offset
-            let split = try leftSiblingNode.split(pos.leftSiblingID.offset - absOffset, absOffset)
-            if split != nil {
-                split!.insPrevID = leftSiblingNode.id
-                self.nodeMapByID.put(split!.id, split!)
+            if let split = try leftSiblingNode.split(pos.leftSiblingID.offset - absOffset, absOffset) {
+                split.insPrevID = leftSiblingNode.id
+                self.nodeMapByID.put(split.id, split)
 
-                if leftSiblingNode.insNextID != nil {
-                    let insNext = self.findFloorNode(leftSiblingNode.insNextID!)
+                if let id = leftSiblingNode.insNextID {
+                    let insNext = self.findFloorNode(id)
 
-                    insNext?.insPrevID = split!.id
-                    split!.insNextID = leftSiblingNode.insNextID
+                    insNext?.insPrevID = split.id
+                    split.insNextID = id
                 }
-                leftSiblingNode.insNextID = split!.id
+                leftSiblingNode.insNextID = split.id
             }
         }
 
@@ -725,22 +724,21 @@ class CRDTTree: CRDTGCElement {
      * `purgeRemovedNodesBefore` physically purges nodes that have been removed.
      */
     func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
-        var nodesToRemoved = [CRDTTreeNode]()
-
+        var nodesToBeRemoved = [CRDTTreeNode]()
         var count = 0
 
         self.removedNodeMap.forEach { _, node in
             if node.removedAt != nil, ticket >= node.removedAt! {
-                nodesToRemoved.append(node)
+                nodesToBeRemoved.append(node)
                 count += 1
             }
         }
 
-        nodesToRemoved.forEach { node in
+        nodesToBeRemoved.forEach { node in
             do {
                 try node.parent?.removeChild(child: node)
             } catch {
-                assertionFailure("Can't remove child from parent.")
+                assertionFailure("Can't remove Child from parents.")
             }
             self.nodeMapByID.remove(node.id)
             self.purge(node)
