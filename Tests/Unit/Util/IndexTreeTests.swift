@@ -158,7 +158,8 @@ final class IndexTreeTests: XCTestCase {
             "text.b:All",
             "p:Closing",
             "text.cde:All",
-            "p:Opening"])
+            "p:Opening"
+        ])
         try self.nodesBetweenEqual(tree, 0, 1, ["p:Opening"])
         try self.nodesBetweenEqual(tree, 3, 4, ["p:Closing"])
         try self.nodesBetweenEqual(tree, 3, 5, ["p:Closing", "p:Opening"])

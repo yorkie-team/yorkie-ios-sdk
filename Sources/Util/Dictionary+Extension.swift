@@ -29,7 +29,8 @@ extension AnyValueTypeDictionary {
         for (key, value) in dictionary {
             if let value = value as? Encodable,
                let jsonData = try? JSONEncoder().encode(value),
-               let stringValue = String(data: jsonData, encoding: .utf8) {
+               let stringValue = String(data: jsonData, encoding: .utf8)
+            {
                 convertedDictionary[key] = stringValue
             } else {
                 print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
@@ -100,19 +101,20 @@ extension CodableValueTypeDictionary {
     var stringValueTypeDictionary: [String: String] {
         self.convertToDictionaryStringValues(self)
     }
-    
+
     func convertToDictionaryStringValues(_ dictionary: [String: Codable]) -> [String: String] {
         var convertedDictionary: [String: String] = [:]
-        
+
         for (key, value) in dictionary {
             if let jsonData = try? JSONEncoder().encode(value),
-               let stringValue = String(data: jsonData, encoding: .utf8) {
+               let stringValue = String(data: jsonData, encoding: .utf8)
+            {
                 convertedDictionary[key] = stringValue
             } else {
                 print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
             }
         }
-        
+
         return convertedDictionary
     }
 }

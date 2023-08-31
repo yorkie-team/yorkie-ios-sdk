@@ -321,10 +321,10 @@ class GCTests: XCTestCase {
             do {
                 try (root.t as? JSONTree)?.editByPath([0], [1],
                                                       [JSONTreeElementNode(type: "p",
-                                                                          children: [
-                                                                              JSONTreeElementNode(type: "tn",
-                                                                                                  children: [JSONTreeTextNode(value: "ab")])
-                                                                          ])])
+                                                                           children: [
+                                                                               JSONTreeElementNode(type: "tn",
+                                                                                                   children: [JSONTreeTextNode(value: "ab")])
+                                                                           ])])
             } catch {
                 assertionFailure("Can't editByPath")
             }
