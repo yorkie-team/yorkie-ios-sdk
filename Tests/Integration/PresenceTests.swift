@@ -42,13 +42,13 @@ final class PresenceTests: XCTestCase {
             }
         }
 
-        var presence = await doc1.getPresence(c1.id!)?["key"] as? Int
+        var presence = await doc1.getPresenceForTest(c1.id!)?["key"] as? Int
         XCTAssertEqual(presence, snapshotThreshold - 1)
 
         try await c1.sync()
         try await c2.sync()
 
-        presence = await doc2.getPresence(c1.id!)?["key"] as? Int
+        presence = await doc2.getPresenceForTest(c1.id!)?["key"] as? Int
         XCTAssertEqual(presence, snapshotThreshold - 1)
     }
 
@@ -66,17 +66,17 @@ final class PresenceTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["key": "key2"], false)
 
-        var presence = await doc1.getPresence(c1.id!)?["key"] as? String
+        var presence = await doc1.getPresenceForTest(c1.id!)?["key"] as? String
         XCTAssertEqual(presence, "key1")
-        presence = await doc1.getPresence(c2.id!)?["key"] as? String
+        presence = await doc1.getPresenceForTest(c2.id!)?["key"] as? String
         XCTAssertEqual(presence, nil)
-        presence = await doc2.getPresence(c2.id!)?["key"] as? String
+        presence = await doc2.getPresenceForTest(c2.id!)?["key"] as? String
         XCTAssertEqual(presence, "key2")
-        presence = await doc2.getPresence(c1.id!)?["key"] as? String
+        presence = await doc2.getPresenceForTest(c1.id!)?["key"] as? String
         XCTAssertEqual(presence, "key1")
 
         try await c1.sync()
-        presence = await doc1.getPresence(c2.id!)?["key"] as? String
+        presence = await doc1.getPresenceForTest(c2.id!)?["key"] as? String
         XCTAssertEqual(presence, "key2")
 
         try await c2.detach(doc2)
@@ -100,18 +100,18 @@ final class PresenceTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, [:], false)
 
-        var presence = await doc1.getPresence(c1.id!)
+        var presence = await doc1.getPresenceForTest(c1.id!)
         XCTAssertTrue(presence!.isEmpty)
-        presence = await doc1.getPresence(c2.id!)
+        presence = await doc1.getPresenceForTest(c2.id!)
         XCTAssertTrue(presence == nil)
-        presence = await doc2.getPresence(c2.id!)
+        presence = await doc2.getPresenceForTest(c2.id!)
         XCTAssertTrue(presence!.isEmpty)
-        presence = await doc2.getPresence(c1.id!)
+        presence = await doc2.getPresenceForTest(c1.id!)
         XCTAssertTrue(presence!.isEmpty)
 
         try await c1.sync()
 
-        presence = await doc2.getPresence(c1.id!)
+        presence = await doc2.getPresenceForTest(c1.id!)
         XCTAssertTrue(presence!.isEmpty)
     }
 
@@ -126,31 +126,93 @@ final class PresenceTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["key": "key1", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePresence { event in
-            print("@@@@ event 1 \(event)")
-        }
-
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["key": "key2", "cursor": ["x": 0, "y": 0]])
-
-        await doc2.subscribePresence { event in
-            print("@@@@ event 2 \(event)")
-        }
 
         try await doc1.update { _, presence in
             presence.set(["cursor": ["x": 1, "y": 1]])
         }
 
-        var presence = await doc1.getPresence(c1.id!)
+        var presence = await doc1.getPresenceForTest(c1.id!)
         XCTAssertEqual(presence?["key"] as? String, "key1")
         XCTAssertEqual(presence?["cursor"] as? [String: Int], ["x": 1, "y": 1])
 
         try await c1.sync()
         try await c2.sync()
 
-        presence = await doc2.getPresence(c1.id!)
+        presence = await doc2.getPresenceForTest(c1.id!)
         XCTAssertEqual(presence?["key"] as? String, "key1")
         XCTAssertEqual(presence?["cursor"] as? [String: Int], ["x": 1, "y": 1])
+    }
+
+    func test_should_return_only_online_clients() async throws {
+        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c3 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        try await c1.activate()
+        try await c2.activate()
+        try await c3.activate()
+        let c1ID = await c1.id!
+        let c2ID = await c2.id!
+        let c3ID = await c3.id!
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        var eventCount1 = 0
+        let expect1 = expectation(description: "sub 1")
+        let expect2 = expectation(description: "sub 2")
+        let expect3 = expectation(description: "sub 3")
+
+        let doc1 = Document(key: docKey)
+        try await c1.attach(doc1, ["name": "a1", "cursor": ["x": 0, "y": 0]])
+
+        await doc1.subscribePresence { _ in
+            eventCount1 += 1
+
+            if eventCount1 == 1 {
+                expect1.fulfill()
+            }
+            if eventCount1 == 2 {
+                expect2.fulfill()
+            }
+            if eventCount1 == 3 {
+                expect3.fulfill()
+            }
+        }
+
+        // 01. c2 attaches doc in realtime sync, and c3 attached doc in manual sync.
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, ["name": "b1", "cursor": ["x": 0, "y": 0]])
+        let doc3 = Document(key: docKey)
+        try await c3.attach(doc3, ["name": "c1", "cursor": ["x": 0, "y": 0]], false)
+
+        await fulfillment(of: [expect1], timeout: 5)
+
+        var resultPresences1 = await doc1.getPresences()
+        var doc1Presence = (await doc1.getMyPresence())!
+        let doc2Presence = (await doc2.getMyPresence())!
+
+        XCTAssert(resultPresences1.first { $0.clientID == c1ID }!.presence == doc1Presence)
+        XCTAssert(resultPresences1.first { $0.clientID == c2ID }!.presence == doc2Presence)
+        XCTAssert(resultPresences1.first { $0.clientID == c3ID } == nil)
+
+        // 02. c2 pauses the document (in manual sync), c3 resumes the document (in realtime sync).
+        try await c2.pause(doc2)
+        await fulfillment(of: [expect2], timeout: 5) // c2 unwatched
+        try await c3.resume(doc3)
+        await fulfillment(of: [expect3], timeout: 5) // c3 watched
+
+        resultPresences1 = await doc1.getPresences()
+        doc1Presence = (await doc1.getMyPresence())!
+        let doc3Presence = (await doc3.getMyPresence())!
+
+        XCTAssert(resultPresences1.first { $0.clientID == c1ID }!.presence == doc1Presence)
+        XCTAssert(resultPresences1.first { $0.clientID == c3ID }!.presence == doc3Presence)
+        XCTAssert(resultPresences1.first { $0.clientID == c2ID } == nil)
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+        try await c3.deactivate()
     }
 }
 
@@ -170,7 +232,7 @@ final class PresenceSubscribeTests: XCTestCase {
                 self.elements = [event.value]
             } else if let event = event as? UnwatchedEvent {
                 self.type = .unwatched
-                self.elements = [PeerElement(event.value, [:])]
+                self.elements = [PeerElement(event.value)]
             } else if let event = event as? PresenceChangedEvent {
                 self.type = .presenceChanged
                 self.elements = [event.value]
@@ -245,8 +307,6 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c1.attach(doc1, ["name": "a"])
 
         await doc1.subscribePresence { event in
-            print("@@@@ event 1 \(event)")
-
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
@@ -260,8 +320,6 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.attach(doc2, ["name": "b"])
 
         await doc2.subscribePresence { event in
-            print("@@@@ event 2 \(event)")
-
             eventCount2 += 1
 
             eventReceived2.append(EventResult(event))
@@ -312,7 +370,7 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.deactivate()
     }
 
-    func test_should_receive_PeersChangedEventType_PresenceChanged_event_for_final_presence_if_there_are_multiple_presence_changes_within_doc_update() async throws {
+    func test_should_receive_presence_changed_event_for_final_presence_if_there_are_multiple_presence_changes_within_doc_update() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
@@ -334,8 +392,6 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c1.attach(doc1, ["name": "a", "cursor": ["x": 0, "y": 0]])
 
         await doc1.subscribePresence { event in
-            print("@@@@ event 1 \(event)")
-
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
@@ -349,8 +405,6 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.attach(doc2, ["name": "b", "cursor": ["x": 0, "y": 0]])
 
         await doc2.subscribePresence { event in
-            print("@@@@ event 2 \(event)")
-
             eventCount2 += 1
 
             eventReceived2.append(EventResult(event))
@@ -408,8 +462,6 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c1.attach(doc1, ["name": "a"])
 
         await doc1.subscribePresence { event in
-            print("@@@@ event 1 \(event)")
-
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
@@ -434,7 +486,7 @@ final class PresenceSubscribeTests: XCTestCase {
 
         let result1 = [
             EventResult(.watched, [PeerElement(c2ID, ["name": "b"])]),
-            EventResult(.unwatched, [PeerElement(c2ID, [:])])
+            EventResult(.unwatched, [PeerElement(c2ID, ["name": "b"])])
         ]
 
         for (index, value) in result1.enumerated() {
@@ -450,5 +502,131 @@ final class PresenceSubscribeTests: XCTestCase {
 
         try await c1.deactivate()
         try await c2.deactivate()
+    }
+
+    func test_can_receive_presence_related_event_only_when_using_realtime_sync() async throws {
+        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c3 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        try await c1.activate()
+        try await c2.activate()
+        try await c3.activate()
+        let c2ID = await c2.id!
+        let c3ID = await c3.id!
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        var eventCount1 = 0
+        var eventReceived1 = [EventResult]()
+        let expect1 = expectation(description: "sub 1")
+        let expect2 = expectation(description: "sub 2")
+        let expect3 = expectation(description: "sub 3")
+        let expect5 = expectation(description: "sub 5")
+        let expect6 = expectation(description: "sub 6")
+        let expect7 = expectation(description: "sub 7")
+        let expect8 = expectation(description: "sub 8")
+
+        let doc1 = Document(key: docKey)
+        try await c1.attach(doc1, ["name": "a1", "cursor": ["x": 0, "y": 0]])
+
+        await doc1.subscribePresence { event in
+            eventCount1 += 1
+
+            eventReceived1.append(EventResult(event))
+
+            if eventCount1 == 1 {
+                expect1.fulfill()
+            }
+            if eventCount1 == 2 {
+                expect2.fulfill()
+            }
+            if eventCount1 == 3 {
+                expect3.fulfill()
+            }
+            if eventCount1 == 5 {
+                expect5.fulfill()
+            }
+            if eventCount1 == 6 {
+                expect6.fulfill()
+            }
+            if eventCount1 == 7 {
+                expect7.fulfill()
+            }
+            if eventCount1 == 8 {
+                expect8.fulfill()
+            }
+        }
+
+        // 01. c2 attaches doc in realtime sync, and c3 attached doc in manual sync.
+        //     c1 receives the watched event from c2.
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, ["name": "b1", "cursor": ["x": 0, "y": 0]])
+        let doc3 = Document(key: docKey)
+        try await c3.attach(doc3, ["name": "c1", "cursor": ["x": 0, "y": 0]], false)
+
+        await fulfillment(of: [expect1], timeout: 5) // c2 watched
+
+        // 02. c2 and c3 update the presence.
+        //     c1 receives the presence-changed event from c2.
+        try await doc2.update { _, presence in
+            presence.set(["name": "b2"])
+        }
+        try await doc3.update { _, presence in
+            presence.set(["name": "c2"])
+        }
+
+        await fulfillment(of: [expect2], timeout: 5) // c2 presence-changed
+
+        // 03. c2 pauses the document (in manual sync), c3 resumes the document (in realtime sync).
+        //     c1 receives an unwatched event from c2 and a watched event from c3.
+        try await c2.pause(doc2)
+        await fulfillment(of: [expect3], timeout: 5) // c2 unwatched
+        try await c3.resume(doc3)
+        await fulfillment(of: [expect5], timeout: 5) // c3 watched, c3 presence-changed
+
+        // 04. c2 and c3 update the presence.
+        //     c1 receives the presence-changed event from c3.
+        try await doc2.update { _, presence in
+            presence.set(["name": "b3"])
+        }
+        try await doc3.update { _, presence in
+            presence.set(["name": "c3"])
+        }
+
+        await fulfillment(of: [expect6], timeout: 5) // c3 presence-changed
+
+        // 05. c3 pauses the document (in manual sync),
+        //     c1 receives an unwatched event from c3.
+        try await c3.pause(doc3)
+        await fulfillment(of: [expect7], timeout: 5) // c3 unwatched
+
+        // 06. c2 performs manual sync and then resumes(switches to realtime sync).
+        //     After applying all changes, only the watched event is triggered.
+
+        // TODO(hackerwins): This is workaround for some non-deterministic behavior.
+        // We need to fix this issue.
+        try await c2.sync()
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        try await c2.resume(doc2)
+        await fulfillment(of: [expect8], timeout: 5) // c2 watched
+
+        let result1 = [
+            EventResult(.watched, [PeerElement(c2ID, ["name": "b1", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.presenceChanged, [PeerElement(c2ID, ["name": "b2", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.unwatched, [PeerElement(c2ID, ["name": "b2", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.watched, [PeerElement(c3ID, ["name": "c1", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.presenceChanged, [PeerElement(c3ID, ["name": "c2", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.presenceChanged, [PeerElement(c3ID, ["name": "c3", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.unwatched, [PeerElement(c3ID, ["name": "c3", "cursor": ["x": 0, "y": 0]])]),
+            EventResult(.watched, [PeerElement(c2ID, ["name": "b3", "cursor": ["x": 0, "y": 0]])])
+        ]
+
+        for (index, value) in result1.enumerated() {
+            XCTAssertEqual(value, eventReceived1[index])
+        }
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+        try await c3.deactivate()
     }
 }

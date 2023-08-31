@@ -377,15 +377,34 @@ public actor Document {
                 throw YorkieError.unexpected(message: "ActorID is null")
             }
 
-            if case .put(let presence) = change.presenceChange {
-                if self.onlineClients.contains(actorID) {
-                    let peer = (actorID, presence)
+            if let presenceChange = change.presenceChange, self.onlineClients.contains(actorID) {
+                switch presenceChange {
+                case .put(let presence):
+                    // NOTE(chacha912): When the user exists in onlineClients, but
+                    // their presence was initially absent, we can consider that we have
+                    // received their initial presence, so trigger the 'watched' event
+                    if self.onlineClients.contains(actorID) {
+                        let peer = (actorID, presence)
 
-                    if self.presences[actorID] != nil {
-                        docEvent = PresenceChangedEvent(value: peer)
-                    } else {
-                        docEvent = WatchedEvent(value: peer)
+                        if self.presences[actorID] != nil {
+                            docEvent = PresenceChangedEvent(value: peer)
+                        } else {
+                            docEvent = WatchedEvent(value: peer)
+                        }
                     }
+                case .clear:
+                    // NOTE(chacha912): When the user exists in onlineClients, but
+                    // PresenceChange(clear) is received, we can consider it as detachment
+                    // occurring before unwatching.
+                    // Detached user is no longer participating in the document, we remove
+                    // them from the online clients and trigger the 'unwatched' event.
+                    guard let presence = self.getPresence(actorID) else {
+                        throw YorkieError.unexpected(message: "No presence!")
+                    }
+
+                    docEvent = UnwatchedEvent(value: (actorID, presence))
+
+                    self.removeOnlineClient(actorID)
                 }
             }
 
@@ -472,17 +491,17 @@ public actor Document {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    func publish(_ eventType: DocEventType, _ peerActorID: ActorID?) {
+    func publish(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: PresenceData? = nil) {
         switch eventType {
         case .initialized:
             self.processDocEvent(InitializedEvent(value: self.getPresences()))
         case .watched:
-            if let peerActorID, let presence = self.getPresence(peerActorID) {
+            if let peerActorID, let presence = presence {
                 self.processDocEvent(WatchedEvent(value: (peerActorID, presence)))
             }
         case .unwatched:
-            if let peerActorID {
-                self.processDocEvent(UnwatchedEvent(value: peerActorID))
+            if let peerActorID, let presence = presence {
+                self.processDocEvent(UnwatchedEvent(value: (peerActorID, presence)))
             }
         default:
             break
@@ -597,9 +616,31 @@ public actor Document {
     }
 
     /**
+     * `getMyPresence` returns the presence of the current client.
+     */
+    public func getMyPresence() -> PresenceData? {
+        guard self.status == .attached, let id = self.changeID.getActorID() else {
+            return nil
+        }
+
+        return self.presences[id]
+    }
+
+    /**
      * `getPresence` returns the presence of the given clientID.
      */
     public func getPresence(_ clientID: ActorID) -> PresenceData? {
+        guard self.onlineClients.contains(clientID) else {
+            return nil
+        }
+
+        return self.presences[clientID]
+    }
+
+    /**
+     * `getPresenceForTest` returns the presence of the given clientID.
+     */
+    public func getPresenceForTest(_ clientID: ActorID) -> PresenceData? {
         self.presences[clientID]
     }
 
