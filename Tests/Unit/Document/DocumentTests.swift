@@ -893,8 +893,7 @@ class DocumentTests: XCTestCase {
             if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "text"))
                 XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.text", from: 0, to: 0, attributes: nil, content: "hello world"))
-                XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 11, to: 11))
-                XCTAssertEqual(ops[3] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 0, to: 2))
+                XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 0, to: 2))
             } else {
                 XCTAssert(false, "No operations.")
             }
@@ -920,8 +919,7 @@ class DocumentTests: XCTestCase {
             if let ops = (event as? LocalChangeEvent)?.value.operations {
                 XCTAssertEqual(ops[0] as! SetOpInfo, SetOpInfo(path: "$", key: "textWithAttr"))
                 XCTAssertEqual(ops[1] as! EditOpInfo, EditOpInfo(path: "$.textWithAttr", from: 0, to: 0, attributes: nil, content: "hello world"))
-                XCTAssertEqual(ops[2] as! SelectOpInfo, SelectOpInfo(path: "$.textWithAttr", from: 11, to: 11))
-                XCTAssertEqual(ops[3] as! StyleOpInfo, StyleOpInfo(path: "$.textWithAttr", from: 0, to: 1, attributes: ["bold": "true"]))
+                XCTAssertEqual(ops[2] as! StyleOpInfo, StyleOpInfo(path: "$.textWithAttr", from: 0, to: 1, attributes: ["bold": "true"]))
             } else {
                 XCTAssert(false, "No operations.")
             }

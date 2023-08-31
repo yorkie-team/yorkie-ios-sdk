@@ -17,6 +17,18 @@
 import Combine
 import Foundation
 
+/**
+ * `TextPosStruct` represents the structure of RGATreeSplitNodePos.
+ * It is used to serialize and deserialize the RGATreeSplitNodePos.
+ */
+public typealias TextPosStruct = RGATreeSplitPosStruct
+
+/**
+ * `TextRangeStruct` represents the structure of RGATreeSplitNodeRange.
+ * It is used to serialize and deserialize the RGATreeSplitNodeRange.
+ */
+public typealias TextRangeStruct = (TextPosStruct, TextPosStruct)
+
 public class JSONText {
     private var context: ChangeContext?
     private var text: CRDTText?
@@ -49,28 +61,34 @@ public class JSONText {
      * `edit` edits this text with the given content.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: TextAttributes? = nil) -> Bool {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: TextAttributes? = nil) -> (Int, Int)? {
         guard let context, let text else {
             Logger.critical("it is not initialized yet")
-            return false
+            return nil
         }
 
         if fromIdx > toIdx {
             Logger.critical("from should be less than or equal to to")
-            return false
+            return nil
         }
 
-        guard let range = try? text.createRange(fromIdx, toIdx) else {
+        guard let range = try? text.indexRangeToPosRange(fromIdx, toIdx) else {
             Logger.critical("can't create range")
-            return false
+            return nil
         }
 
         Logger.debug("EDIT: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) c:\(content)")
 
         let ticket = context.issueTimeTicket
-        guard let maxCreatedAtMapByActor = try? text.edit(range, content, ticket, attributes) else {
+
+        var attrs: [String: String]?
+        if let attributes {
+            attrs = stringifyAttributes(attributes)
+        }
+
+        guard let (maxCreatedAtMapByActor, _, rangeAfterEdit) = try? text.edit(range, content, ticket, attrs) else {
             Logger.critical("can't edit Text")
-            return false
+            return nil
         }
 
         context.push(
@@ -87,7 +105,21 @@ public class JSONText {
             context.registerElementHasRemovedNodes(text)
         }
 
-        return true
+        return try? self.text?.findIndexesFromRange(rangeAfterEdit)
+    }
+
+    /**
+     * `delete` deletes the text in the given range.
+     */
+    public func delete(_ fromIdx: Int, _ toIdx: Int) -> (Int, Int)? {
+        self.edit(fromIdx, toIdx, "")
+    }
+
+    /**
+     * `empty` makes the text empty.
+     */
+    public func empty() -> (Int, Int)? {
+        self.edit(0, self.length, "")
     }
 
     /**
@@ -105,7 +137,7 @@ public class JSONText {
             return false
         }
 
-        guard let range = try? text.createRange(fromIdx, toIdx) else {
+        guard let range = try? text.indexRangeToPosRange(fromIdx, toIdx) else {
             Logger.critical("can't create range")
             return false
         }
@@ -139,7 +171,7 @@ public class JSONText {
             return false
         }
 
-        guard let range = try? text.createRange(fromIdx, toIdx) else {
+        guard let range = try? text.indexRangeToPosRange(fromIdx, toIdx) else {
             Logger.critical("can't create range")
             return false
         }
@@ -157,6 +189,30 @@ public class JSONText {
         context.push(operation: SelectOperation(parentCreatedAt: text.createdAt, fromPos: range.0, toPos: range.1, executedAt: ticket))
 
         return true
+    }
+
+    /**
+     * `indexRangeToPosRange` returns TextRangeStruct of the given index range.
+     */
+    public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TextRangeStruct {
+        guard self.context != nil, let text else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        let textRange = try text.indexRangeToPosRange(range.0, range.1)
+        return (textRange.0.toStruct, textRange.1.toStruct)
+    }
+
+    /**
+     * `posRangeToIndexRange` returns indexes of the given TextRangeStruct.
+     */
+    public func posRangeToIndexRange(_ range: TextRangeStruct) throws -> (Int, Int) {
+        guard self.context != nil, let text else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        let textRange = try text.findIndexesFromRange((RGATreeSplitPos.fromStruct(range.0), RGATreeSplitPos.fromStruct(range.1)))
+        return (textRange.0, textRange.1)
     }
 
     /**
@@ -189,14 +245,30 @@ public class JSONText {
     }
 
     /**
-     * `createRange` returns pair of RGATreeSplitNodePos of the given integer offsets.
+     * `length` returns size of RGATreeList.
      */
-    func createRange(_ fromIdx: Int, _ toIdx: Int) -> RGATreeSplitNodeRange? {
+    public var length: Int {
+        self.text?.length ?? 0
+    }
+
+    /**
+     * `checkWeight` returns false when there is an incorrect weight node.
+     * for debugging purpose.
+     */
+    public func checkWeight() -> Bool {
+        self.text?.checkWeight() ?? false
+    }
+
+    /**
+     * `createRangeForTest` returns pair of RGATreeSplitNodePos of the given indexes
+     * for testing purpose.
+     */
+    func createRangeForTest(_ fromIdx: Int, _ toIdx: Int) -> RGATreeSplitPosRange? {
         guard self.context != nil, let text else {
             Logger.critical("it is not initialized yet")
             return nil
         }
 
-        return try? text.createRange(fromIdx, toIdx)
+        return try? text.indexRangeToPosRange(fromIdx, toIdx)
     }
 }

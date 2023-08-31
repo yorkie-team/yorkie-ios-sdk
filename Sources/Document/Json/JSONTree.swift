@@ -442,63 +442,54 @@ public class JSONTree {
     }
 
     /**
-     * `createRange` returns pair of CRDTTreePos of the given integer offsets.
+     * `pathRangeToPosRange` converts the path range into the position range.
      */
-    func createRange(_ fromIdx: Int, _ toIdx: Int) throws -> TreeRange? {
+    func pathRangeToPosRange(_ range: ([Int], [Int])) throws -> TreePosStructRange {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return try tree.createRange(fromIdx, toIdx)
+        let indexRange = try (tree.pathToIndex(range.0), tree.pathToIndex(range.1))
+        let posRange = try tree.indexRangeToPosRange(indexRange)
+
+        return (posRange.0.toStruct, posRange.1.toStruct)
     }
 
     /**
-     * `createRangeByPath` returns pair of CRDTTreePos of the given integer offsets.
+     * `indexRangeToPosRange` converts the index range into the position range.
      */
-    func createRangeByPath(_ fromPath: [Int], _ toPath: [Int]) throws -> TreeRange? {
+    func indexRangeToPosRange(_ range: (Int, Int)) throws -> TreePosStructRange {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        let fromIdx = try tree.pathToIndex(fromPath)
-        let toIdx = try tree.pathToIndex(toPath)
-
-        return try tree.createRange(fromIdx, toIdx)
+        return try tree.indexRangeToPosStructRange(range)
     }
 
     /**
-     * `toPosRange` converts the integer index range into the Tree position range structure.
+     * `posRangeToIndexRange` converts the position range into the index range.
      */
-    func toPosRange(_ range: (Int, Int)) throws -> TreeRangeStruct {
+    func posRangeToIndexRange(_ range: TreePosStructRange) throws -> (Int, Int) {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        let range = try tree.toPosRange(range)
+        let posRange = try (CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1))
 
-        return (range.0.toStructure, range.1.toStructure)
+        return try (tree.toIndex(posRange.0), tree.toIndex(posRange.1))
     }
 
     /**
-     * `toIndexRange` converts the Tree position range into the integer index range.
+     * `posRangeToPathRange` converts the position range into the path range.
      */
-    func toIndexRange(_ range: TreeRangeStruct) throws -> (Int, Int) {
+    func posRangeToPathRange(_ range: TreePosStructRange) throws -> ([Int], [Int]) {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return try tree.toIndexRange((CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1)))
-    }
+        let posRange = try (CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1))
 
-    /**
-     * `rangeToPath` returns the path of the given range.
-     */
-    func rangeToPath(_ range: TreeRange) throws -> ([Int], [Int]) {
-        guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
-        }
-
-        return try tree.rangeToPath(range)
+        return try tree.posRangeToPathRange(posRange)
     }
 }
 
@@ -537,15 +528,6 @@ struct TimeTicketStruct {
 }
 
 /**
- * `CRDTTreePosStruct` represents the structure of CRDTTreePos.
- * It is used to serialize and deserialize the CRDTTreePos.
- */
-struct CRDTTreePosStruct {
-    let createdAt: TimeTicketStruct
-    let offset: Int32
-}
-
-/**
  * `TreeRangeStruct` represents the structure of TreeRange.
  * It is used to serialize and deserialize the TreeRange.
  */
@@ -564,25 +546,9 @@ extension TimeTicket {
     }
 
     /**
-     * `toStructure` returns the structure of this Ticket.
+     * `toStruct` returns the structure of this Ticket.
      */
-    var toStructure: TimeTicketStruct {
+    var toStruct: TimeTicketStruct {
         TimeTicketStruct(lamport: String(self.lamport), delimiter: self.delimiter, actorID: self.actorID)
-    }
-}
-
-extension CRDTTreePos {
-    /**
-     * `fromStruct` creates a new instance of CRDTTreePos from the given struct.
-     */
-    static func fromStruct(_ value: CRDTTreePosStruct) throws -> CRDTTreePos {
-        try CRDTTreePos(createdAt: TimeTicket.fromStruct(value.createdAt), offset: value.offset)
-    }
-
-    /**
-     * `toStructure` returns the structure of this position.
-     */
-    var toStructure: CRDTTreePosStruct {
-        CRDTTreePosStruct(createdAt: self.createdAt.toStructure, offset: self.offset)
     }
 }

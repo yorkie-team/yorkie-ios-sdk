@@ -317,4 +317,12 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
         try await c3.deactivate()
     }
+
+    private func decodePresence<T: Decodable>(_ dictionary: [String: Any]) -> T? {
+        guard let data = try? JSONSerialization.data(withJSONObject: dictionary, options: []) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
 }

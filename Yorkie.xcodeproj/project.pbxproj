@@ -53,6 +53,7 @@
 		9AEA80DC296FE38D000672FC /* TextIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80DB296FE38D000672FC /* TextIntegrationTests.swift */; };
 		9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF55ED0290684BD006B7146 /* ConverterTests.swift */; };
 		9AFB4EBC2A93980A00494401 /* Dictionary+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A232B762A7D0C0F0041C826 /* Dictionary+Extension.swift */; };
+		9AFB4EBD2A94DA0600494401 /* ClientIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */; };
 		CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE370E5B28EEBFA6008FCABD /* RHTTests.swift */; };
 		CE3EC95228D195E4009471BC /* LLRBTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95028D195E0009471BC /* LLRBTreeTests.swift */; };
 		CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */; };
@@ -926,6 +927,7 @@
 				CE7B998628E520D600D56198 /* CRDTArrayTests.swift in Sources */,
 				9AB38FD42A9337DF006FA879 /* PresenceTests.swift in Sources */,
 				CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */,
+				9AFB4EBD2A94DA0600494401 /* ClientIntegrationTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,
 				CEBC84072909130900781AE9 /* JSONArrayTests.swift in Sources */,
 				CEC631DE28F4F36100915A85 /* StringEscapingTests.swift in Sources */,

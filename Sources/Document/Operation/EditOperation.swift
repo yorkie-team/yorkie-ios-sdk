@@ -23,11 +23,11 @@ struct EditOperation: Operation {
     /**
      * `fromPos` returns the start point of the editing range.
      */
-    private(set) var fromPos: RGATreeSplitNodePos
+    private(set) var fromPos: RGATreeSplitPos
     /**
      * `toPos` returns the end point of the editing range.
      */
-    private(set) var toPos: RGATreeSplitNodePos
+    private(set) var toPos: RGATreeSplitPos
 
     /**
      * `maxCreatedAtMapByActor` returns the map that stores the latest creation time
@@ -45,7 +45,7 @@ struct EditOperation: Operation {
      */
     private(set) var attributes: [String: String]?
 
-    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitNodePos, toPos: RGATreeSplitNodePos, maxCreatedAtMapByActor: [String: TimeTicket], content: String, attributes: [String: String]?, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitPos, toPos: RGATreeSplitPos, maxCreatedAtMapByActor: [String: TimeTicket], content: String, attributes: [String: String]?, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos

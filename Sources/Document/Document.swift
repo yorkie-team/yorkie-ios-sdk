@@ -43,6 +43,12 @@ public enum DocumentStatus: String {
 public typealias DocumentKey = String
 public typealias DocumentID = String
 
+public enum PresenceSubscriptionType: String {
+    case presence
+    case myPresence
+    case others
+}
+
 /**
  * A CRDT-based data type. We can representing the model
  * of the application. And we can edit it even while offline.
@@ -62,7 +68,7 @@ public actor Document {
 
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
-    private var peersSubscribeCallback: SubscribeCallback?
+    private var presenceSubscribeCallback: [String: SubscribeCallback]
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -82,6 +88,7 @@ public actor Document {
         self.checkpoint = Checkpoint.initial
         self.localChanges = []
         self.subscribeCallbacks = [:]
+        self.presenceSubscribeCallback = [:]
         self.onlineClients = Set<ActorID>()
         self.presences = [:]
     }
@@ -130,9 +137,7 @@ public actor Document {
             }
 
             if change.presenceChange != nil, let presence = self.presences[actorID] {
-                let peerChangedInfo = PeersChangedValue.presenceChanged(peer: (actorID, presence))
-                let peerChangedEvent = PeersChangedEvent(value: peerChangedInfo)
-                self.processDocEvent(peerChangedEvent)
+                self.processDocEvent(PresenceChangedEvent(value: (actorID, presence)))
             }
 
             Logger.trace("after update a local change: \(self.toJSON())")
@@ -152,11 +157,11 @@ public actor Document {
     }
 
     /**
-     * `subscribePeers` registers a callback to subscribe to events on the document.
+     * `subscribePresence` registers a callback to subscribe to events on the document.
      * The callback will be called when the targetPath or any of its nested values change.
      */
-    public func subscribePeers(_ callback: @escaping (DocEvent) -> Void) {
-        self.peersSubscribeCallback = callback
+    public func subscribePresence(_ type: PresenceSubscriptionType = .presence, _ callback: @escaping (DocEvent) -> Void) {
+        self.presenceSubscribeCallback[type.rawValue] = callback
     }
 
     /**
@@ -171,10 +176,10 @@ public actor Document {
     }
 
     /**
-     * `unsubscribePeers` unregisters a callback to subscribe to events on the document.
+     * `unsubscribePresence` unregisters a callback to subscribe to events on the document.
      */
-    public func unsubscribePeers() {
-        self.peersSubscribeCallback = nil
+    public func unsubscribePresence(_ type: PresenceSubscriptionType = .presence) {
+        self.presenceSubscribeCallback.removeValue(forKey: type.rawValue)
     }
 
     /**
@@ -364,10 +369,9 @@ public actor Document {
 
         for change in changes {
             try change.execute(root: clone.root, presences: &self.clone!.presences)
-        }
 
-        for change in changes {
-            var updates: (changeInfo: ChangeInfo?, peer: PeersChangedValue?)
+            var changeInfo: ChangeInfo?
+            var docEvent: DocEvent?
 
             guard let actorID = change.id.getActorID() else {
                 throw YorkieError.unexpected(message: "ActorID is null")
@@ -378,9 +382,9 @@ public actor Document {
                     let peer = (actorID, presence)
 
                     if self.presences[actorID] != nil {
-                        updates.peer = PeersChangedValue.presenceChanged(peer: peer)
+                        docEvent = PresenceChangedEvent(value: peer)
                     } else {
-                        updates.peer = PeersChangedValue.watched(peer: peer)
+                        docEvent = WatchedEvent(value: peer)
                     }
                 }
             }
@@ -388,22 +392,20 @@ public actor Document {
             let opInfos = try change.execute(root: self.root, presences: &self.presences)
 
             if change.hasOperations {
-                updates.changeInfo = ChangeInfo(message: change.message ?? "", operations: opInfos, actorID: actorID)
+                changeInfo = ChangeInfo(message: change.message ?? "", operations: opInfos, actorID: actorID)
             }
 
-            // NOTE: RemoteChange event should be emitted synchronously with
-            // applying changes. This is because 3rd party model should be synced
-            // with the Document after RemoteChange event is emitted. If the event
-            // is emitted asynchronously, the model can be changed and breaking
-            // consistency.
-            if let info = updates.changeInfo {
+            // DocEvent should be emitted synchronously with applying changes.
+            // This is because 3rd party model should be synced with the Document
+            // after RemoteChange event is emitted. If the event is emitted
+            // asynchronously, the model can be changed and breaking consistency.
+            if let info = changeInfo {
                 let remoteChangeEvent = RemoteChangeEvent(value: info)
                 self.processDocEvent(remoteChangeEvent)
             }
 
-            if let peer = updates.peer {
-                let peerChangedEvent = PeersChangedEvent(value: peer)
-                self.processDocEvent(peerChangedEvent)
+            if let docEvent = docEvent {
+                self.processDocEvent(docEvent)
             }
 
             self.changeID = self.changeID.syncLamport(with: change.id.getLamport())
@@ -470,17 +472,17 @@ public actor Document {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    func publish(_ eventType: PeersChangedEventType, _ peerActorID: ActorID?) {
+    func publish(_ eventType: DocEventType, _ peerActorID: ActorID?) {
         switch eventType {
         case .initialized:
-            self.processDocEvent(PeersChangedEvent(value: .initialized(peers: self.getPresences())))
+            self.processDocEvent(InitializedEvent(value: self.getPresences()))
         case .watched:
             if let peerActorID, let presence = self.getPresence(peerActorID) {
-                self.processDocEvent(PeersChangedEvent(value: .watched(peer: (peerActorID, presence))))
+                self.processDocEvent(WatchedEvent(value: (peerActorID, presence)))
             }
         case .unwatched:
             if let peerActorID {
-                self.processDocEvent(PeersChangedEvent(value: .unwatched(peer: (peerActorID, [:]))))
+                self.processDocEvent(UnwatchedEvent(value: peerActorID))
             }
         default:
             break
@@ -488,35 +490,64 @@ public actor Document {
     }
 
     private func processDocEvent(_ event: DocEvent) {
-        if event.type != .snapshot {
-            if let event = event as? ChangeEvent {
-                var operations = [String: [any OperationInfo]]()
+        let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
-                event.value.operations.forEach { operationInfo in
-                    self.subscribeCallbacks.keys.forEach { targetPath in
-                        if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
-                            if operations[targetPath] == nil {
-                                operations[targetPath] = [any OperationInfo]()
-                            }
-                            operations[targetPath]?.append(operationInfo)
-                        }
+        if presenceEvents.contains(event.type) {
+            self.presenceSubscribeCallback[PresenceSubscriptionType.presence.rawValue]?(event)
+
+            if let id = self.changeID.getActorID() {
+                var isMine = false
+                var isOthers = false
+
+                if event is InitializedEvent {
+                    isMine = true
+                } else if event is WatchedEvent {
+                    isOthers = true
+                } else if event is UnwatchedEvent {
+                    isOthers = true
+                } else if let event = event as? PresenceChangedEvent {
+                    if event.value.clientID == id {
+                        isMine = true
+                    } else {
+                        isOthers = true
                     }
                 }
 
-                operations.forEach { key, value in
-                    let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
+                if isMine {
+                    self.presenceSubscribeCallback[PresenceSubscriptionType.myPresence.rawValue]?(event)
+                }
 
-                    self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
+                if isOthers {
+                    self.presenceSubscribeCallback[PresenceSubscriptionType.others.rawValue]?(event)
                 }
             }
         } else {
-            self.subscribeCallbacks["$"]?(event)
-        }
+            if event.type != .snapshot {
+                if let event = event as? ChangeEvent {
+                    var operations = [String: [any OperationInfo]]()
 
-        self.defaultSubscribeCallback?(event)
+                    event.value.operations.forEach { operationInfo in
+                        self.subscribeCallbacks.keys.forEach { targetPath in
+                            if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
+                                if operations[targetPath] == nil {
+                                    operations[targetPath] = [any OperationInfo]()
+                                }
+                                operations[targetPath]?.append(operationInfo)
+                            }
+                        }
+                    }
 
-        if event.type == .peersChanged {
-            self.peersSubscribeCallback?(event)
+                    operations.forEach { key, value in
+                        let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
+
+                        self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
+                    }
+                }
+            } else {
+                self.subscribeCallbacks["$"]?(event)
+            }
+
+            self.defaultSubscribeCallback?(event)
         }
     }
 

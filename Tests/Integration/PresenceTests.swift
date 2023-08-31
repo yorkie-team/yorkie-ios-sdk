@@ -126,14 +126,14 @@ final class PresenceTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["key": "key1", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePeers { event in
+        await doc1.subscribePresence { event in
             print("@@@@ event 1 \(event)")
         }
 
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["key": "key2", "cursor": ["x": 0, "y": 0]])
 
-        await doc2.subscribePeers { event in
+        await doc2.subscribePresence { event in
             print("@@@@ event 2 \(event)")
         }
 
@@ -158,27 +158,28 @@ final class PresenceSubscribeTests: XCTestCase {
     let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
     struct EventResult: Equatable {
-        let type: PeersChangedEventType
+        var type: DocEventType
         var elements = [PeerElement]()
 
-        init(_ event: PeersChangedEvent) {
-            switch event.value {
-            case .initialized(peers: let elements):
+        init(_ event: DocEvent) {
+            if let event = event as? InitializedEvent {
                 self.type = .initialized
-                self.elements.append(contentsOf: elements)
-            case .presenceChanged(let element):
-                self.type = .presenceChanged
-                self.elements.append(element)
-            case .watched(let element):
+                self.elements = event.value
+            } else if let event = event as? WatchedEvent {
                 self.type = .watched
-                self.elements.append(element)
-            case .unwatched(let element):
+                self.elements = [event.value]
+            } else if let event = event as? UnwatchedEvent {
                 self.type = .unwatched
-                self.elements.append(element)
+                self.elements = [PeerElement(event.value, [:])]
+            } else if let event = event as? PresenceChangedEvent {
+                self.type = .presenceChanged
+                self.elements = [event.value]
+            } else {
+                self.type = .snapshot
             }
         }
 
-        init(_ type: PeersChangedEventType, _ elements: [PeerElement]) {
+        init(_ type: DocEventType, _ elements: [PeerElement]) {
             self.type = type
             self.elements = elements
         }
@@ -212,7 +213,7 @@ final class PresenceSubscribeTests: XCTestCase {
         }
 
         for leftElement in lhs {
-            if let rightElment = rhs.first { $0.clientID == leftElement.clientID }, leftElement.presence == rightElment.presence {
+            if let rightElment = rhs.first(where: { $0.clientID == leftElement.clientID }), leftElement.presence == rightElment.presence {
                 continue
             } else {
                 return false
@@ -243,34 +244,30 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a"])
 
-        await doc1.subscribePeers { event in
+        await doc1.subscribePresence { event in
             print("@@@@ event 1 \(event)")
 
-            if let event = event as? PeersChangedEvent {
-                eventCount1 += 1
+            eventCount1 += 1
 
-                eventReceived1.append(EventResult(event))
+            eventReceived1.append(EventResult(event))
 
-                if eventCount1 == 3 {
-                    expect1.fulfill()
-                }
+            if eventCount1 == 3 {
+                expect1.fulfill()
             }
         }
 
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b"])
 
-        await doc2.subscribePeers { event in
+        await doc2.subscribePresence { event in
             print("@@@@ event 2 \(event)")
 
-            if let event = event as? PeersChangedEvent {
-                eventCount2 += 1
+            eventCount2 += 1
 
-                eventReceived2.append(EventResult(event))
+            eventReceived2.append(EventResult(event))
 
-                if eventCount2 == 2 {
-                    expect2.fulfill()
-                }
+            if eventCount2 == 2 {
+                expect2.fulfill()
             }
         }
 
@@ -294,7 +291,7 @@ final class PresenceSubscribeTests: XCTestCase {
             EventResult(.presenceChanged, [PeerElement(c1ID, ["name": "A"])])
         ]
 
-        var presence = await doc2.getPresences()
+        let presence = await doc2.getPresences()
         XCTAssertEqual(presence.first { $0.clientID == c2ID }?.presence["name"] as? String, "B")
         XCTAssertEqual(presence.first { $0.clientID == c1ID }?.presence["name"] as? String, "A")
 
@@ -336,34 +333,30 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePeers { event in
+        await doc1.subscribePresence { event in
             print("@@@@ event 1 \(event)")
 
-            if let event = event as? PeersChangedEvent {
-                eventCount1 += 1
+            eventCount1 += 1
 
-                eventReceived1.append(EventResult(event))
+            eventReceived1.append(EventResult(event))
 
-                if eventCount1 == 2 {
-                    expect1.fulfill()
-                }
+            if eventCount1 == 2 {
+                expect1.fulfill()
             }
         }
 
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b", "cursor": ["x": 0, "y": 0]])
 
-        await doc2.subscribePeers { event in
+        await doc2.subscribePresence { event in
             print("@@@@ event 2 \(event)")
 
-            if let event = event as? PeersChangedEvent {
-                eventCount2 += 1
+            eventCount2 += 1
 
-                eventReceived2.append(EventResult(event))
+            eventReceived2.append(EventResult(event))
 
-                if eventCount2 == 1 {
-                    expect2.fulfill()
-                }
+            if eventCount2 == 1 {
+                expect2.fulfill()
             }
         }
 
@@ -414,21 +407,19 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a"])
 
-        await doc1.subscribePeers { event in
+        await doc1.subscribePresence { event in
             print("@@@@ event 1 \(event)")
 
-            if let event = event as? PeersChangedEvent {
-                eventCount1 += 1
+            eventCount1 += 1
 
-                eventReceived1.append(EventResult(event))
+            eventReceived1.append(EventResult(event))
 
-                if eventCount1 == 1 {
-                    expect1.fulfill()
-                }
+            if eventCount1 == 1 {
+                expect1.fulfill()
+            }
 
-                if eventCount1 == 2 {
-                    expect2.fulfill()
-                }
+            if eventCount1 == 2 {
+                expect2.fulfill()
             }
         }
 
