@@ -278,8 +278,7 @@ public actor Document {
     }
 
     /**
-     * `getClone` return clone object.
-     *
+     * `getCloneRoot` return clone object.
      */
     func getCloneRoot() -> CRDTObject? {
         return self.clone?.root.object
@@ -595,17 +594,6 @@ public actor Document {
      */
     public func hasPresence(_ clientID: ActorID) -> Bool {
         self.presences[clientID] != nil
-    }
-
-    /**
-     * `getMyPresence` returns the presence of the current client.
-     */
-    public func getMyPresence() -> PresenceData? {
-        guard self.status == .attached, let id = self.changeID.getActorID() else {
-            return nil
-        }
-
-        return self.presences[id]
     }
 
     /**
