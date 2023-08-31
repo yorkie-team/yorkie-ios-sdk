@@ -90,6 +90,8 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
     let ticket = context.issueTimeTicket
 
     if let node = treeNode as? JSONTreeTextNode {
+        try validateTextNode(node)
+
         let textNode = CRDTTreeNode(pos: CRDTTreePos(createdAt: ticket, offset: 0), type: DefaultTreeNodeType.text.rawValue, value: node.value)
 
         try parent.append(contentsOf: [textNode])
@@ -138,6 +140,36 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
     }
 
     return root
+}
+
+/**
+ * `validateTextNode` ensures that a text node has a non-empty string value.
+ */
+func validateTextNode(_ textNode: JSONTreeTextNode) throws {
+    if textNode.value.isEmpty {
+        throw YorkieError.unexpected(message: "text node cannot have empty value")
+    }
+}
+
+/**
+ * `validateTreeNodes` ensures that treeNodes consists of only one type.
+ */
+func validateTreeNodes(_ treeNodes: [any JSONTreeNode]) throws {
+    if treeNodes.isEmpty == false {
+        if treeNodes[0] is JSONTreeTextNode {
+            for node in treeNodes {
+                if let node = node as? JSONTreeTextNode {
+                    try validateTextNode(node)
+                } else {
+                    throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
+                }
+            }
+        } else {
+            if treeNodes.first(where: { !($0 is JSONTreeElementNode) }) != nil {
+                throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
+            }
+        }
+    }
 }
 
 /**
@@ -264,27 +296,35 @@ public class JSONTree {
         )
     }
 
-    /**
-     * `editByPath` edits this tree with the given node and path.
-     */
-    @discardableResult
-    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?) throws -> Bool {
+    private func editInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, contents: [any JSONTreeNode]?) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        if fromPath.count != toPath.count {
-            throw YorkieError.unexpected(message: "path length should be equal")
+        if let contents, contents.isEmpty == false {
+            try validateTreeNodes(contents)
+
+            if let contents = contents as? [JSONTreeElementNode] {
+                try contents.forEach {
+                    try validateTreeNodes($0.children)
+                }
+            }
         }
 
-        if fromPath.isEmpty || toPath.isEmpty {
-            throw YorkieError.unexpected(message: "path should not be empty")
-        }
-
-        let crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
-        let fromPos = try tree.pathToPos(fromPath)
-        let toPos = try tree.pathToPos(toPath)
         let ticket = context.lastTimeTicket
+        let crdtNodes: [CRDTTreeNode]?
+
+        if let contents = contents as? [JSONTreeTextNode] {
+            var compVal = ""
+            for content in contents {
+                compVal += content.value
+            }
+
+            crdtNodes = try [createCRDTTreeNode(context: context, content: JSONTreeTextNode(value: compVal))]
+        } else {
+            crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
+        }
+
         try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
@@ -302,11 +342,34 @@ public class JSONTree {
     }
 
     /**
+     * `editByPath` edits this tree with the given node and path.
+     */
+    @discardableResult
+    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?) throws -> Bool {
+        guard let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        if fromPath.count != toPath.count {
+            throw YorkieError.unexpected(message: "path length should be equal")
+        }
+
+        if fromPath.isEmpty || toPath.isEmpty {
+            throw YorkieError.unexpected(message: "path should not be empty")
+        }
+
+        let fromPos = try tree.pathToPos(fromPath)
+        let toPos = try tree.pathToPos(toPath)
+
+        return try self.editInternal(fromPos, toPos, contents: contents)
+    }
+
+    /**
      * `edit` edits this tree with the given node.
      */
     @discardableResult
     public func edit(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil) throws -> Bool {
-        guard let context, let tree else {
+        guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
@@ -314,24 +377,10 @@ public class JSONTree {
             throw YorkieError.unexpected(message: "from should be less than or equal to to")
         }
 
-        let crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
-        let ticket = context.lastTimeTicket
-        try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
-        context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
-                                                  fromPos: fromPos,
-                                                  toPos: toPos,
-                                                  contents: crdtNodes,
-                                                  executedAt: ticket)
-        )
-
-        if fromPos != toPos {
-            context.registerElementHasRemovedNodes(tree)
-        }
-
-        return true
+        return try self.editInternal(fromPos, toPos, contents: contents)
     }
 
     /**

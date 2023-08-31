@@ -212,7 +212,7 @@ final class PresenceSubscribeTests: XCTestCase {
         }
 
         for leftElement in lhs {
-            if let rightElment = rhs.first(where: { $0.clientID == leftElement.clientID }), leftElement.presence == rightElment.presence {
+            if let rightElment = rhs.first { $0.clientID == leftElement.clientID }, leftElement.presence == rightElment.presence {
                 continue
             } else {
                 return false
@@ -294,7 +294,7 @@ final class PresenceSubscribeTests: XCTestCase {
             EventResult(.presenceChanged, [PeerElement(c1ID, ["name": "A"])])
         ]
 
-        let presence = await doc2.getPresences()
+        var presence = await doc2.getPresences()
         XCTAssertEqual(presence.first { $0.clientID == c2ID }?.presence["name"] as? String, "B")
         XCTAssertEqual(presence.first { $0.clientID == c1ID }?.presence["name"] as? String, "A")
 

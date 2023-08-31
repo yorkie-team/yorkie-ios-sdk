@@ -581,7 +581,7 @@ class CRDTTree: CRDTGCElement {
                     let elementNode = toPos.node
                     let offset = try elementNode.findBranchOffset(node: removedElementNode!)
                     try removedElementNode?.children.reversed().forEach { node in
-                        try elementNode.insertAt(newNode: node, offset: offset)
+                        try elementNode.insertAt(node, offset)
                     }
                 }
             } else {
@@ -592,24 +592,29 @@ class CRDTTree: CRDTGCElement {
         }
 
         // 03. insert the given node at the given position.
-        if let content = contents?[safe: 0] {
+        if let contents, contents.isEmpty == false {
             // 03-1. insert the content nodes to the list.
             var previous = fromRight.prev
-            traverse(node: content) { node, _ in
-                self.insertAfter(previous!, node)
-                previous = node
-            }
+            let node = fromPos.node
+            var offset = Int(fromPos.offset)
 
-            // 03-2. insert the content nodes to the tree.
-            if fromPos.node.isText {
-                if fromPos.offset == 0 {
-                    try fromPos.node.parent!.insertBefore(newNode: content, referenceNode: fromPos.node)
-                } else {
-                    try fromPos.node.parent!.insertAfter(newNode: content, referenceNode: fromPos.node)
+            for content in contents {
+                traverse(node: content) { node, _ in
+                    self.insertAfter(previous!, node)
+                    previous = node
                 }
-            } else {
-                let target = fromPos.node
-                try target.insertAt(newNode: content, offset: Int(fromPos.offset))
+
+                // 03-2. insert the content nodes to the tree.
+                if node.isText {
+                    if fromPos.offset == 0 {
+                        try node.parent!.insertBefore(content, node)
+                    } else {
+                        try node.parent!.insertAfter(content, node)
+                    }
+                } else {
+                    try node.insertAt(content, offset)
+                    offset += 1
+                }
             }
         }
 
