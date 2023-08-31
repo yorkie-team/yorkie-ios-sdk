@@ -718,24 +718,24 @@ public actor Client {
             self.semaphoresForInitialzation[docKey]?.signal()
 
             await self.attachmentMap[docKey]?.doc.setOnlineClients(onlineClients)
-            await self.attachmentMap[docKey]?.doc.publish(.initialized)
+            await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized)
         case .event(let pbWatchEvent):
             let publisher = pbWatchEvent.publisher.toHexString
 
             switch pbWatchEvent.type {
-            case .documentsChanged:
+            case .documentChanged:
                 self.attachmentMap[docKey]?.remoteChangeEventReceived = true
 
-                let event = DocumentsChangedEvent(value: [docKey])
+                let event = DocumentChangedEvent(value: [docKey])
                 self.eventStream.send(event)
-            case .documentsWatched:
+            case .documentWatched:
                 await self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
                 // unless we also know their initial presence data at this point.
                 if let presence = await self.attachmentMap[docKey]?.doc.getPresence(publisher) {
-                    await self.attachmentMap[docKey]?.doc.publish(.watched, publisher, presence)
+                    await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.watched, publisher, presence)
                 }
-            case .documentsUnwatched:
+            case .documentUnwatched:
                 // NOTE(chacha912): There is no presence, when PresenceChange(clear) is applied before unwatching.
                 // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
                 let presence = await self.attachmentMap[docKey]?.doc.getPresence(publisher)
@@ -743,7 +743,7 @@ public actor Client {
                 await self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
                 
                 if let presence {
-                    await self.attachmentMap[docKey]?.doc.publish(.unwatched, publisher, presence)
+                    await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
                 }
             case .UNRECOGNIZED:
                 break

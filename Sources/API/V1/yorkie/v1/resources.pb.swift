@@ -125,29 +125,29 @@ extension Yorkie_V1_ValueType: CaseIterable {
 
 enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
   typealias RawValue = Int
-  case documentsChanged // = 0
-  case documentsWatched // = 1
-  case documentsUnwatched // = 2
+  case documentChanged // = 0
+  case documentWatched // = 1
+  case documentUnwatched // = 2
   case UNRECOGNIZED(Int)
 
   init() {
-    self = .documentsChanged
+    self = .documentChanged
   }
 
   init?(rawValue: Int) {
     switch rawValue {
-    case 0: self = .documentsChanged
-    case 1: self = .documentsWatched
-    case 2: self = .documentsUnwatched
+    case 0: self = .documentChanged
+    case 1: self = .documentWatched
+    case 2: self = .documentUnwatched
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
 
   var rawValue: Int {
     switch self {
-    case .documentsChanged: return 0
-    case .documentsWatched: return 1
-    case .documentsUnwatched: return 2
+    case .documentChanged: return 0
+    case .documentWatched: return 1
+    case .documentUnwatched: return 2
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -159,9 +159,9 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
 extension Yorkie_V1_DocEventType: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
   static var allCases: [Yorkie_V1_DocEventType] = [
-    .documentsChanged,
-    .documentsWatched,
-    .documentsUnwatched,
+    .documentChanged,
+    .documentWatched,
+    .documentUnwatched,
   ]
 }
 
@@ -1901,7 +1901,7 @@ struct Yorkie_V1_DocEvent {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var type: Yorkie_V1_DocEventType = .documentsChanged
+  var type: Yorkie_V1_DocEventType = .documentChanged
 
   var publisher: Data = Data()
 
@@ -1985,9 +1985,9 @@ extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
 
 extension Yorkie_V1_DocEventType: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    0: .same(proto: "DOC_EVENT_TYPE_DOCUMENTS_CHANGED"),
-    1: .same(proto: "DOC_EVENT_TYPE_DOCUMENTS_WATCHED"),
-    2: .same(proto: "DOC_EVENT_TYPE_DOCUMENTS_UNWATCHED"),
+    0: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_CHANGED"),
+    1: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_WATCHED"),
+    2: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_UNWATCHED"),
   ]
 }
 
@@ -4641,7 +4641,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.type != .documentsChanged {
+    if self.type != .documentChanged {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
     if !self.publisher.isEmpty {

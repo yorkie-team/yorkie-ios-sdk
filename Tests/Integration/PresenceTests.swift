@@ -221,7 +221,6 @@ final class PresenceTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
         let c1ID = await c1.id!
-        let c2ID = await c2.id!
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 

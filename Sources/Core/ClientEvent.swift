@@ -57,12 +57,12 @@ struct StatusChangedEvent: BaseClientEvent {
 }
 
 /**
- * `DocumentsChangedEvent` is an event that occurs when documents attached to
+ * `DocumentChangedEvent` is an event that occurs when documents attached to
  * the client changes.
  */
-struct DocumentsChangedEvent: BaseClientEvent {
+struct DocumentChangedEvent: BaseClientEvent {
     /**
-     * enum {@link ClientEventType}.DocumentsChangedEvent
+     * enum {@link ClientEventType}.DocumentChangedEvent
      */
     var type: ClientEventType = .documentsChanged
     /**
@@ -88,7 +88,7 @@ struct StreamConnectionStatusChangedEvent: BaseClientEvent {
 }
 
 /**
- * `DocumentSyncedEvent` is an event that occurs when documents
+ * `DocumentSyncedEvent` is an event that occurs when document
  * attached to the client are synced.
  */
 struct DocumentSyncedEvent: BaseClientEvent {
