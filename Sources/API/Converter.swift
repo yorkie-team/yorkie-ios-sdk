@@ -408,7 +408,7 @@ extension Converter {
             pbTreeEditOperation.parentCreatedAt = toTimeTicket(treeEditOperation.parentCreatedAt)
             pbTreeEditOperation.from = toTreePos(treeEditOperation.fromPos)
             pbTreeEditOperation.to = toTreePos(treeEditOperation.toPos)
-            pbTreeEditOperation.content = toTreeNodes(treeEditOperation.contents?[safe: 0])
+            pbTreeEditOperation.contents = toTreeNodesWhenEdit(treeEditOperation.contents)
             pbTreeEditOperation.executedAt = toTimeTicket(treeEditOperation.executedAt)
             pbOperation.treeEdit = pbTreeEditOperation
         } else if let treeStyleOperation = operation as? TreeStyleOperation {
@@ -486,16 +486,10 @@ extension Converter {
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
-                var contents = [CRDTTreeNode]()
-                
-                if let content = try fromTreeNodes(pbTreeEditOperation.content) {
-                    contents.append(content)
-                }
-                
                 return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
                                          toPos: fromTreePos(pbTreeEditOperation.to),
-                                         contents: contents,
+                                         contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
                                          executedAt: fromTimeTicket(pbTreeEditOperation.executedAt))
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
                 return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
@@ -843,11 +837,11 @@ extension Converter {
         
         return pbTreePos
     }
-/*
+
     /**
      * `toTreeNodesWhenEdit` converts the given model to Protobuf format.
      */
-    static func toTreeNodesWhenEdit(_ nodes: [CRDTTreeNode]?) -> [PbTreeNode] {
+    static func toTreeNodesWhenEdit(_ nodes: [CRDTTreeNode]?) -> [PbTreeNodes] {
         guard let nodes else {
             return []
         }
@@ -859,7 +853,7 @@ extension Converter {
             return pbTreeNodes
         }
     }
-*/
+
     /**
      * `toTreeNodes` converts the given model to Protobuf format.
      */
@@ -903,11 +897,11 @@ extension Converter {
     static func fromTreePos(_ pbTreePos: PbTreePos) -> CRDTTreePos {
         CRDTTreePos(createdAt: fromTimeTicket(pbTreePos.createdAt), offset: pbTreePos.offset)
     }
-/*
+
     /**
      * `fromTreeNodesWhenEdit` converts the given Protobuf format to model format.
      */
-    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNode]) -> [CRDTTreeNode]? {
+    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNodes]) -> [CRDTTreeNode]? {
         guard pbTreeNodes.isEmpty == false else {
             return nil
         }
@@ -915,7 +909,6 @@ extension Converter {
         return pbTreeNodes.compactMap { try? fromTreeNodes($0.content) }
     }
 
-    */
     /**
      * `fromTreeNodes` converts the given Protobuf format to model format.
      */

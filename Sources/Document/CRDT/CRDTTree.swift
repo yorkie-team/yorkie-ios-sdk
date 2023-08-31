@@ -535,8 +535,8 @@ class CRDTTree: CRDTGCElement {
 
         var value: TreeChangeValue?
 
-        if let node = contents?.compactMap({ $0.toJSON }) {
-            value = .nodes(node)
+        if let nodes = contents?.compactMap({ $0.toJSON }) {
+            value = .nodes(nodes)
         }
 
         try changes.append(TreeChange(actor: actorID,
