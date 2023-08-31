@@ -732,9 +732,9 @@ public actor Client {
                 // NOTE(chacha912): There is no presence, when PresenceChange(clear) is applied before unwatching.
                 // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
                 let presence = await self.attachmentMap[docKey]?.doc.getPresence(publisher)
-                
+
                 await self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
-                
+
                 if let presence {
                     await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
                 }

@@ -359,7 +359,9 @@ class ConverterTests: XCTestCase {
     func test_presence() {
         let samplePresence: PresenceData = ["a": "str", "b": 10, "c": 0.5, "d": false, "e": ["a", "b", "c"], "f": ""]
 
-        let converted = Converter.fromPresence(pbPresence: Converter.toPresence(presence: samplePresence))
+        let stringPresence = samplePresence.mapValues { $0.toJSONString ?? "" }
+
+        let converted = Converter.fromPresence(pbPresence: Converter.toPresence(presence: stringPresence))
 
         XCTAssert(!(samplePresence == converted))
     }

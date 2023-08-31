@@ -92,7 +92,7 @@ class CRDTObjectTests: XCTestCase {
         target.set(key: "K3", value: a3)
 
         try target.deleteByKey(key: targetKey,
-                          executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
+                               executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
 
         XCTAssertFalse(target.has(key: targetKey))
 

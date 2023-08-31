@@ -231,7 +231,7 @@ final class PresenceTests: XCTestCase {
         try await c2.attach(doc2, ["counter": 0], false)
 
         try await doc1.update { _, presence in
-            if let counter = presence.get("counter") as? Int {
+            if let counter: Int = presence.get("counter") {
                 presence.set(["counter": counter + 1])
             }
         }

@@ -64,7 +64,7 @@ public actor Document {
     private var localChanges: [Change]
 
     private var root: CRDTRoot
-    private var clone: (root: CRDTRoot, presences: [ActorID: PresenceData])?
+    private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
 
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
@@ -78,7 +78,7 @@ public actor Document {
     /**
      * `presences` is a map of client IDs to their presence information.
      */
-    private var presences: [ActorID: PresenceData]
+    private var presences: [ActorID: StringValueTypeDictionary]
 
     public init(key: String) {
         self.key = key
@@ -136,7 +136,7 @@ public actor Document {
                 self.publish(changeEvent)
             }
 
-            if change.presenceChange != nil, let presence = self.presences[actorID] {
+            if change.presenceChange != nil, let presence = self.getPresence(actorID) {
                 self.publish(PresenceChangedEvent(value: (actorID, presence)))
             }
 
@@ -384,9 +384,9 @@ public actor Document {
                     // their presence was initially absent, we can consider that we have
                     // received their initial presence, so trigger the 'watched' event
                     if self.onlineClients.contains(actorID) {
-                        let peer = (actorID, presence)
+                        let peer = (actorID, presence.toJSONObejct)
 
-                        if self.presences[actorID] != nil {
+                        if self.getPresence(actorID) != nil {
                             presenceEvent = PresenceChangedEvent(value: peer)
                         } else {
                             presenceEvent = WatchedEvent(value: peer)
@@ -487,7 +487,7 @@ public actor Document {
         "[\(self.key)]"
     }
 
-    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: PresenceData? = nil) {
+    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: [String: Any]? = nil) {
         switch eventType {
         case .initialized:
             self.publish(InitializedEvent(value: self.getPresences()))
@@ -618,30 +618,30 @@ public actor Document {
     /**
      * `getMyPresence` returns the presence of the current client.
      */
-    public func getMyPresence() -> PresenceData? {
+    public func getMyPresence() -> [String: Any]? {
         guard self.status == .attached, let id = self.changeID.getActorID() else {
             return nil
         }
-        
-        return self.presences[id]
+
+        return self.presences[id]?.mapValues { $0.toJSONObject }
     }
 
     /**
      * `getPresence` returns the presence of the given clientID.
      */
-    public func getPresence(_ clientID: ActorID) -> PresenceData? {
+    public func getPresence(_ clientID: ActorID) -> [String: Any]? {
         guard self.onlineClients.contains(clientID) else {
             return nil
         }
 
-        return self.presences[clientID]
+        return self.presences[clientID]?.mapValues { $0.toJSONObject }
     }
 
     /**
      * `getPresenceForTest` returns the presence of the given clientID.
      */
-    public func getPresenceForTest(_ clientID: ActorID) -> PresenceData? {
-        self.presences[clientID]
+    public func getPresenceForTest(_ clientID: ActorID) -> [String: Any]? {
+        self.presences[clientID]?.mapValues { $0.toJSONObject }
     }
 
     /**
@@ -651,7 +651,7 @@ public actor Document {
         var presences = [PeerElement]()
 
         for clientID in self.onlineClients {
-            if let presence = self.presences[clientID] {
+            if let presence = getPresence(clientID) {
                 presences.append((clientID, presence))
             }
         }

@@ -82,7 +82,7 @@ class ChangeTests: XCTestCase {
                        {"k-a1":"a1","k-a3":{"k-b1":"b1"}}
                        """)
 
-        var presences = [ActorID: PresenceData]()
+        var presences = [ActorID: StringValueTypeDictionary]()
 
         try target.execute(root: root, presences: &presences)
 

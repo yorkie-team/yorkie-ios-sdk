@@ -243,7 +243,7 @@ public class JSONTree {
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
      */
-    public func styleByPath(_ path: [Int], _ attributes: [String: Any]) throws {
+    public func styleByPath(_ path: [Int], _ attributes: [String: Codable]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -271,7 +271,7 @@ public class JSONTree {
     /**
      * `style` sets the attributes to the elements of the given range.
      */
-    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any]) throws {
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Codable]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -500,7 +500,7 @@ public class JSONTree {
  * `TimeTicketStruct` is a structure represents the meta data of the ticket.
  * It is used to serialize and deserialize the ticket.
  */
-struct TimeTicketStruct {
+struct TimeTicketStruct: Codable {
     let lamport: String
     let delimiter: UInt32
     let actorID: ActorID?

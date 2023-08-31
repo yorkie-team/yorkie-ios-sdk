@@ -67,16 +67,20 @@ class TreeStyleOperation: Operation {
         }
 
         return changes.compactMap { change in
-            guard case .attributes(let attributes) = change.value else {
-                return nil
-            }
+            let attributes: [String: Codable] = {
+                if case .attributes(let attributes) = change.value {
+                    return attributes
+                } else {
+                    return [:]
+                }
+            }()
 
             return TreeStyleOpInfo(
                 path: path,
                 from: change.from,
                 to: change.to,
                 fromPath: change.fromPath,
-                value: attributes.anyValueTypeDictionary
+                value: attributes
             )
         }
     }

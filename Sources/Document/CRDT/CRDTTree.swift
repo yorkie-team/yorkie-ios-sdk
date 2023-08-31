@@ -187,7 +187,7 @@ extension CRDTTreeNodeID {
 /**
  * `CRDTTreePosStruct` represents the structure of CRDTTreePos.
  */
-struct CRDTTreePosStruct {
+struct CRDTTreePosStruct: Codable {
     let parentID: CRDTTreeNodeIDStruct
     let leftSiblingID: CRDTTreeNodeIDStruct
 }
@@ -196,7 +196,7 @@ struct CRDTTreePosStruct {
  * `CRDTTreeNodeIDStruct` represents the structure of CRDTTreePos.
  * It is used to serialize and deserialize the CRDTTreePos.
  */
-struct CRDTTreeNodeIDStruct {
+struct CRDTTreeNodeIDStruct: Codable {
     let createdAt: TimeTicketStruct
     let offset: Int32
 }
@@ -323,17 +323,17 @@ final class CRDTTreeNode: IndexTreeNode {
      * `clone` clones this node with the given offset.
      */
     func clone(offset: Int32) -> CRDTTreeNode {
-        let clone = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset), type: self.type, attributes:  self.attrs)
+        let clone = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset), type: self.type, attributes: self.attrs)
         clone.removedAt = self.removedAt
         clone.value = self.value
         clone.size = self.size
         clone.innerChildren = self.innerChildren.compactMap {
             let childClone = $0.deepcopy()
             childClone?.parent = clone
-            
+
             return childClone
         }
-        
+
         return clone
     }
 
@@ -432,7 +432,7 @@ final class CRDTTreeNode: IndexTreeNode {
             }
 
             return JSONTreeElementNode(type: self.type,
-                                       attributes: attrs.anyValueTypeDictionary,
+                                       attributes: attrs.toJSONObejct,
                                        children: self.children.compactMap { $0.toJSONTreeNode })
         }
     }
@@ -460,7 +460,7 @@ class CRDTTree: CRDTGCElement {
             self.nodeMapByID.put(node.id, node)
         }
     }
-    
+
     /**
      * `findFloorNode` finds node of given id.
      */
@@ -518,7 +518,7 @@ class CRDTTree: CRDTGCElement {
         if index <= parentNode.innerChildren.count {
             for idx in index ..< parentNode.innerChildren.count {
                 let next = parentNode.innerChildren[idx]
-                
+
                 if next.id.createdAt.after(editedAt) {
                     leftSiblingNode = next
                 } else {
@@ -614,30 +614,22 @@ class CRDTTree: CRDTGCElement {
             if node.isText == false, contain != .all {
                 return
             }
-            
+
             guard let actorID = node.createdAt.actorID else {
                 throw YorkieError.unexpected(message: "Can't get actorID")
             }
-            
+
             let latestCreatedAt = latestCreatedAtMapByActor.isEmpty == false ? latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
-            
+
             if node.canDelete(editedAt, latestCreatedAt) {
                 let latestCreatedAt = latestCreatedAtMap[actorID]
                 let createdAt = node.createdAt
-                
+
                 if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
                     latestCreatedAtMap[actorID] = createdAt
                 }
-                
+
                 toBeRemoveds.append(node)
-            }
-        }
-
-        for node in toBeRemoveds {
-            node.remove(editedAt)
-
-            if node.isRemoved {
-                self.removedNodeMap[node.id.toIDString] = node
             }
         }
 
@@ -685,13 +677,14 @@ class CRDTTree: CRDTGCElement {
                                     _ fromLeft: CRDTTreeNode,
                                     _ toParent: CRDTTreeNode,
                                     _ toLeft: CRDTTreeNode,
-                                    callback: @escaping (CRDTTreeNode, TagContained) throws -> Void) throws {
-       let fromIdx = try self.toIndex(fromParent, fromLeft)
-       let toIdx = try self.toIndex(toParent, toLeft)
+                                    callback: @escaping (CRDTTreeNode, TagContained) throws -> Void) throws
+    {
+        let fromIdx = try self.toIndex(fromParent, fromLeft)
+        let toIdx = try self.toIndex(toParent, toLeft)
 
-       return try self.indexTree.nodesBetween(fromIdx, toIdx, callback)
-     }
-    
+        return try self.indexTree.nodesBetween(fromIdx, toIdx, callback)
+    }
+
     /**
      * `editByIndex` edits the given range with the given value.
      * This method uses indexes instead of a pair of TreePos for testing.

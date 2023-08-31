@@ -40,7 +40,7 @@ protocol RGATreeSplitValue {
  * `RGATreeSplitPosStruct` is a structure represents the meta data of the node pos.
  * It is used to serialize and deserialize the node pos.
  */
-public struct RGATreeSplitPosStruct {
+public struct RGATreeSplitPosStruct: Codable {
     let id: RGATreeSplitNodeIDStruct
     let relativeOffset: Int32
 }
@@ -49,7 +49,7 @@ public struct RGATreeSplitPosStruct {
  * `RGATreeSplitNodeIDStruct` is a structure represents the meta data of the node id.
  * It is used to serialize and deserialize the node id.
  */
-public struct RGATreeSplitNodeIDStruct {
+public struct RGATreeSplitNodeIDStruct: Codable {
     let createdAt: TimeTicketStruct
     let offset: Int32
 }

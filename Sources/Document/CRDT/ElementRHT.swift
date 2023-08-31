@@ -150,7 +150,7 @@ class ElementRHT {
      * `get` returns the value of the given key.
      */
     func get(key: String) -> CRDTElement? {
-        nodeMapByKey[key]?.value
+        self.nodeMapByKey[key]?.value
     }
 }
 
