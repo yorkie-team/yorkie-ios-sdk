@@ -47,7 +47,7 @@ class TextViewModel {
             // attach the document into the client.
             try! await self.client.attach(self.document)
 
-            try await self.document.update { root in
+            try await self.document.update { root, _ in
                 var text = root.content as? JSONText
                 if text == nil {
                     root.content = JSONText()
@@ -67,29 +67,25 @@ class TextViewModel {
                 }
             }
 
-            await self.document.subscribe("$.content") { [weak self] event in
-                guard let event = event as? RemoteChangeEvent else {
-                    return
-                }
+            await self.document.subscribePresence(.others) { [weak self] event in
+                if let event = event as? PresenceChangedEvent {
+                    if let fromPos: TextPosStruct = self?.decodePresence(event.value.presence["from"]),
+                       let toPos: TextPosStruct = self?.decodePresence(event.value.presence["to"])
+                    {
+                        Task { [weak self] in
+                            if let (fromIdx, toIdx) = try? await(self?.document.getRoot().content as? JSONText)?.posRangeToIndexRange((fromPos, toPos)) {
+                                let range: NSRange
 
-                var textChanges = [TextOperation]()
+                                if fromIdx <= toIdx {
+                                    range = NSRange(location: fromIdx, length: toIdx - fromIdx)
+                                } else {
+                                    range = NSRange(location: toIdx, length: fromIdx - toIdx)
+                                }
 
-                event.value.operations.forEach {
-                    if let op = $0 as? SelectOpInfo {
-                        let range: NSRange
-
-                        if op.from <= op.to {
-                            range = NSRange(location: op.from, length: op.to - op.from)
-                        } else {
-                            range = NSRange(location: op.to, length: op.from - op.to)
+                                self?.operationSubject?.send([.select(range: range, actorID: event.value.clientID)])
+                            }
                         }
-
-                        textChanges.append(.select(range: range, actorID: event.value.actorID ?? ""))
                     }
-                }
-
-                if textChanges.isEmpty == false {
-                    self?.operationSubject?.send(textChanges)
                 }
             }
 
@@ -114,7 +110,7 @@ class TextViewModel {
     }
 
     func edit(_ operaitions: [TextOperation]) async {
-        try? await self.document.update { root in
+        try? await self.document.update { root, presence in
             guard let content = root.content as? JSONText else {
                 return
             }
@@ -133,11 +129,13 @@ class TextViewModel {
                     let fromIdx = range.location
                     let toIdx = range.location + range.length
 
-                    guard content.plainText.count > fromIdx, content.plainText.count > toIdx else {
+                    guard ((root.content as? JSONText)?.length ?? 0) >= fromIdx else {
                         return
                     }
 
-                    content.select(fromIdx, toIdx)
+                    if let range = try? (root.content as? JSONText)?.indexRangeToPosRange((fromIdx, toIdx)) {
+                        presence.set(["from": range.0, "to": range.1])
+                    }
                 }
             }
         }
@@ -149,5 +147,15 @@ class TextViewModel {
 
     func resume() async {
         try? await self.client.resumeRemoteChanges(self.document)
+    }
+
+    private func decodePresence<T: Decodable>(_ dictionary: Any?) -> T? {
+        guard let dictionary = dictionary as? [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: dictionary, options: [])
+        else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(T.self, from: data)
     }
 }
