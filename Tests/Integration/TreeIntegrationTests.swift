@@ -18,26 +18,6 @@ import XCTest
 @testable import Yorkie
 
 /**
- * `listEqual` is a helper function that the given tree is equal to the
- * expected list of nodes.
- */
-func listEqual(_ tree: JSONTree?, _ expected: [any JSONTreeNode]) {
-    guard let tree else {
-        XCTAssertTrue(false)
-
-        return
-    }
-
-    for (index, node) in tree.enumerated() {
-        if let expected = expected[index] as? JSONTreeElementNode, let node = node as? JSONTreeElementNode {
-            XCTAssertEqual(expected.type, node.type)
-        } else if let expected = expected[index] as? JSONTreeTextNode, let node = node as? JSONTreeTextNode {
-            XCTAssertEqual(expected.value, node.value)
-        }
-    }
-}
-
-/**
  * `createChangePack` is a helper function that creates a change pack from the
  * given document. It is used to to emulate the behavior of the server.
  */
@@ -143,18 +123,6 @@ final class TreeIntegrationTests: XCTestCase {
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>ab</p><ng><note>cd</note><note>ef</note></ng><bp>gh</bp></doc>")
             XCTAssertEqual(try? (root.t as? JSONTree)?.getSize() ?? 0, 18)
-            listEqual(root.t as? JSONTree, [
-                JSONTreeTextNode(value: "ab"),
-                JSONTreeElementNode(type: "p"),
-                JSONTreeTextNode(value: "cd"),
-                JSONTreeElementNode(type: "note"),
-                JSONTreeTextNode(value: "ef"),
-                JSONTreeElementNode(type: "note"),
-                JSONTreeElementNode(type: "ng"),
-                JSONTreeTextNode(value: "gh"),
-                JSONTreeElementNode(type: "bp"),
-                JSONTreeElementNode(type: "doc")
-            ])
         }
     }
 
@@ -761,19 +729,19 @@ final class TreeIntegrationStyleTests: XCTestCase {
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(4, 5, ["c": "d"])
+            try (root.t as? JSONTree)?.style(1, 2, ["c": "d"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"d\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(4, 5, ["c": "q"])
+            try (root.t as? JSONTree)?.style(1, 2, ["c": "q"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(3, 4, ["z": "m"])
+            try (root.t as? JSONTree)?.style(2, 3, ["z": "m"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"m\"></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(3, 4, ["z": 100])
+            try (root.t as? JSONTree)?.style(2, 3, ["z": 100])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=100></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(3, 4, ["z": true])
+            try (root.t as? JSONTree)?.style(2, 3, ["z": true])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=true></tn></p></tc></doc>")
         }
     }
@@ -828,7 +796,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<doc><p italic=\"true\">hello</p></doc>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.style(6, 7, ["bold": "true"])
+                try (root.t as? JSONTree)?.style(0, 1, ["bold": "true"])
             }
 
             try await c1.sync()

@@ -59,3 +59,5 @@ typealias PbTreeNode = Yorkie_V1_TreeNode
 typealias PbTreePos = Yorkie_V1_TreePos
 typealias PbTreeNodes = Yorkie_V1_TreeNodes
 typealias PbSnapshot = Yorkie_V1_Snapshot
+typealias PbTreeNodeID = Yorkie_V1_TreeNodeID
+

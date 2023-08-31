@@ -93,8 +93,8 @@ class TreeStyleOperation: Operation {
      */
     public var toTestString: String {
         let parent = self.parentCreatedAt.toTestString
-        let fromPos = "\(self.fromPos.createdAt.toTestString):\(self.fromPos.offset)"
-        let toPos = "\(self.toPos.createdAt.toTestString):\(self.toPos.offset)"
+        let fromPos = "\(self.fromPos.leftSiblingID):\(self.fromPos.leftSiblingID.offset)"
+        let toPos = "\(self.toPos.leftSiblingID):\(self.toPos.leftSiblingID.offset)"
 
         let attrString = self.attributes.compactMap { key, value in
             "\(key):\"\(value)\""

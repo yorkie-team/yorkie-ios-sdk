@@ -72,11 +72,6 @@ public typealias TreeNodeType = String
 
 enum DefaultTreeNodeType: String {
     /**
-     * DummyHeadType is a type of dummy head. It is used to represent the head node
-     * of RGA.
-     */
-    case dummy
-    /**
      * `RootType` is the default type of the root node.
      * It is used when the type of the root node is not specified.
      */
@@ -96,6 +91,11 @@ func addSizeOfLeftSiblings<T: IndexTreeNode>(parent: T, offset: Int) -> Int {
 
     for index in 0 ..< offset {
         let leftSibling = parent.children[index]
+
+        if leftSibling.isRemoved {
+            continue
+        }
+
         acc += leftSibling.paddedSize
     }
 
@@ -120,7 +120,7 @@ protocol IndexTreeNode: AnyObject {
 
     func findOffset(node: Self) throws -> Int?
     @discardableResult
-    func split(_ soffset: Int32) throws -> Self?
+    func split(_ soffset: Int32, _ absOffset: Int32) throws -> Self?
 
     // For extension
     var isRemoved: Bool { get }
@@ -187,9 +187,9 @@ extension IndexTreeNode {
      * `split` splits the node at the given offset.
      */
     @discardableResult
-    func split(_ offset: Int32) throws -> Self? {
+    func split(_ offset: Int32, _ absOffset: Int32) throws -> Self? {
         if self.isText {
-            return try self.splitText(offset: offset)
+            return try self.splitText(offset: offset, absOffset: absOffset)
         }
 
         return try self.splitElement(offset: offset)
@@ -198,7 +198,7 @@ extension IndexTreeNode {
     /**
      * `splitText` splits the given node at the given offset.
      */
-    func splitText(offset: Int32) throws -> Self? {
+    func splitText(offset: Int32, absOffset: Int32) throws -> Self? {
         guard offset > 0, offset < self.size else {
             return nil
         }
@@ -206,10 +206,15 @@ extension IndexTreeNode {
         let leftValue = String(self.value.substring(from: 0, to: Int(offset) - 1))
         let rightValue = String(self.value.substring(from: Int(offset), to: self.value.count - 1))
 
+        if rightValue.isEmpty {
+            return nil
+        }
+
         self.value = leftValue
 
-        let rightNode = self.clone(offset: offset)
+        let rightNode = self.clone(offset: offset + absOffset)
         rightNode.value = rightValue
+
         try self.parent?.insertAfterInternal(newNode: rightNode, referenceNode: self)
 
         return rightNode
@@ -260,7 +265,10 @@ extension IndexTreeNode {
 
         newNode.forEach { node in
             node.parent = self
-            node.updateAncestorsSize()
+
+            if node.isRemoved == false {
+                node.updateAncestorsSize()
+            }
         }
     }
 
@@ -390,6 +398,18 @@ extension IndexTreeNode {
     func findOffset(node: Self) throws -> Int? {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
+        }
+
+        if node.isRemoved {
+            guard let index = self.innerChildren.firstIndex(where: { $0 === node }) else {
+                throw YorkieError.unexpected(message: "Can't find index")
+            }
+
+            // If nodes are removed, the offset of the removed node is the number of
+            // nodes before the node excluding the removed nodes.
+            let refined = self.innerChildren[0 ..< index].filter { $0.isRemoved == false }.count - 1
+
+            return refined < 0 ? 0 : refined
         }
 
         return self.children.firstIndex { $0 === node }
@@ -703,7 +723,7 @@ class IndexTree<T: IndexTreeNode> {
             guard node != nil, node !== self.root else {
                 break
             }
-            try node!.split(offset)
+            try node!.split(offset, 0)
 
             guard let nextOffset = try node!.parent?.findOffset(node: node!) else {
                 throw YorkieError.unexpected(message: "cant find offset")

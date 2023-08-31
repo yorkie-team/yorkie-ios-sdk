@@ -35,13 +35,15 @@ struct TreeEditOperation: Operation {
      * `content` returns the content of Edit.
      */
     let contents: [CRDTTreeNode]?
+    let maxCreatedAtMapByActor: [String: TimeTicket]
 
-    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, contents: [CRDTTreeNode]?, executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, contents: [CRDTTreeNode]?, executedAt: TimeTicket, maxCreatedAtMapByActor: [String: TimeTicket]) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
         self.contents = contents
         self.executedAt = executedAt
+        self.maxCreatedAtMapByActor = maxCreatedAtMapByActor
     }
 
     /**
@@ -59,7 +61,7 @@ struct TreeEditOperation: Operation {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
-        let changes = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.executedAt)
+        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.executedAt, self.maxCreatedAtMapByActor)
 
         if self.fromPos != self.toPos {
             root.registerElementHasRemovedNodes(tree)
@@ -97,8 +99,8 @@ struct TreeEditOperation: Operation {
      */
     public var toTestString: String {
         let parent = self.parentCreatedAt.toTestString
-        let fromPos = "\(self.fromPos.createdAt.toTestString):\(self.fromPos.offset)"
-        let toPos = "\(self.toPos.createdAt.toTestString):\(self.toPos.offset)"
+        let fromPos = "\(self.fromPos.leftSiblingID):\(self.fromPos.leftSiblingID.offset)"
+        let toPos = "\(self.toPos.leftSiblingID):\(self.toPos.leftSiblingID.offset)"
 
         return "\(parent).EDIT(\(fromPos),\(toPos),\(self.contents?.map { "\($0)" }.joined(separator: ",") ?? ""))"
     }
