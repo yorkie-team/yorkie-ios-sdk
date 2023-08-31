@@ -33,23 +33,23 @@ class CRDTRoot {
      * `elementPairMapByCreatedAt` is a hash table that maps the creation time of
      * an element to the element itself and its parent.
      */
-    private var elementPairMapByCreatedAt: [TimeTicket: CRDTElementPair] = [:]
+    private var elementPairMapByCreatedAt: [String: CRDTElementPair] = [:]
     /**
      * `removedElementSetByCreatedAt` is a hash set that contains the creation
      * time of the removed element. It is used to find the removed element when
      * executing garbage collection.
      */
-    private var removedElementSetByCreatedAt: Set<TimeTicket> = Set()
+    private var removedElementSetByCreatedAt: Set<String> = Set()
     /**
      * `elementHasRemovedNodesSetByCreatedAt` is a hash set that contains the
      * creation time of the element that has removed nodes. It is used to find
      * the element that has removed nodes when executing garbage collection.
      */
-    private var elementHasRemovedNodesSetByCreatedAt: Set<TimeTicket> = Set()
+    private var elementHasRemovedNodesSetByCreatedAt: Set<String> = Set()
 
     init(rootObject: CRDTObject = CRDTObject(createdAt: TimeTicket.initial)) {
         self.rootObject = rootObject
-        self.elementPairMapByCreatedAt[self.rootObject.createdAt] = (element: self.rootObject, parent: nil)
+        self.elementPairMapByCreatedAt[self.rootObject.createdAt.toIDString] = (element: self.rootObject, parent: nil)
 
         self.rootObject.getDescendants(callback: { element, parent in
             self.registerElement(element, parent: parent)
@@ -61,7 +61,7 @@ class CRDTRoot {
      * `find` returns the element of given creation time.
      */
     func find(createdAt: TimeTicket) -> CRDTElement? {
-        return self.elementPairMapByCreatedAt[createdAt]?.element
+        return self.elementPairMapByCreatedAt[createdAt.toIDString]?.element
     }
 
     private let subPathPrefix = "$"
@@ -71,7 +71,7 @@ class CRDTRoot {
      * `createSubPaths` creates an array of the sub paths for the given element.
      */
     func createSubPaths(createdAt: TimeTicket) throws -> [String] {
-        guard let pair = self.elementPairMapByCreatedAt[createdAt] else {
+        guard let pair = self.elementPairMapByCreatedAt[createdAt.toIDString] else {
             return []
         }
 
@@ -81,7 +81,7 @@ class CRDTRoot {
             let createdAt = pairForLoop.element.createdAt
             let subPath = try parent.subPath(createdAt: createdAt)
             result.append(subPath)
-            guard let parentPair = self.elementPairMapByCreatedAt[parent.createdAt] else {
+            guard let parentPair = self.elementPairMapByCreatedAt[parent.createdAt.toIDString] else {
                 break
             }
 
@@ -103,22 +103,22 @@ class CRDTRoot {
      * `registerElement` registers the given element to hash table.
      */
     func registerElement(_ element: CRDTElement, parent: CRDTContainer?) {
-        self.elementPairMapByCreatedAt[element.createdAt] = (element, parent)
+        self.elementPairMapByCreatedAt[element.createdAt.toIDString] = (element, parent)
     }
 
     /**
      * `deregisterElement` deregister the given element from hash table.
      */
     func deregisterElement(_ element: CRDTElement) {
-        self.elementPairMapByCreatedAt[element.createdAt] = nil
-        self.removedElementSetByCreatedAt.remove(element.createdAt)
+        self.elementPairMapByCreatedAt[element.createdAt.toIDString] = nil
+        self.removedElementSetByCreatedAt.remove(element.createdAt.toIDString)
     }
 
     /**
      * `registerRemovedElement` registers the given element to the hash set.
      */
     func registerRemovedElement(_ element: CRDTElement) {
-        self.removedElementSetByCreatedAt.insert(element.createdAt)
+        self.removedElementSetByCreatedAt.insert(element.createdAt.toIDString)
     }
 
     /**
@@ -126,7 +126,7 @@ class CRDTRoot {
      * hash set.
      */
     func registerElementHasRemovedNodes(_ element: CRDTElement) {
-        self.elementHasRemovedNodesSetByCreatedAt.insert(element.createdAt)
+        self.elementHasRemovedNodesSetByCreatedAt.insert(element.createdAt.toIDString)
     }
 
     /**
@@ -208,7 +208,7 @@ class CRDTRoot {
                 return
             }
 
-            try? pair.parent?.delete(element: pair.element)
+            try? pair.parent?.purge(element: pair.element)
             count += self.garbageCollectInternal(element: pair.element)
         }
 
@@ -224,7 +224,7 @@ class CRDTRoot {
                 return
             }
 
-            self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt)
+            self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt.toIDString)
             count += removedNodeCount
         }
 

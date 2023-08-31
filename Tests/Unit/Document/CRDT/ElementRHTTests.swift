@@ -28,8 +28,8 @@ class ElementRHTTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        let elementA1 = try target.get(key: "a1")
-        let elementA2 = try target.get(key: "a2")
+        let elementA1 = target.get(key: "a1")!
+        let elementA2 = target.get(key: "a2")!
 
         XCTAssertEqual(elementA1.toJSON(), "\"A1\"")
         XCTAssertEqual(elementA1.isRemoved, false)
@@ -46,10 +46,10 @@ class ElementRHTTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a1", value: a2)
 
-        let result = try target.get(key: "a1")
+        let result = target.get(key: "a1")
 
-        XCTAssertEqual(result.toJSON(), "\"A2\"")
-        XCTAssertEqual(result.isRemoved, false)
+        XCTAssertEqual(result!.toJSON(), "\"A2\"")
+        XCTAssertEqual(result!.isRemoved, false)
     }
 
     func test_remove_by_createdAt() throws {
@@ -62,11 +62,11 @@ class ElementRHTTests: XCTestCase {
         target.set(key: "a2", value: a2)
 
         let executedAt = TimeTicket(lamport: 3, delimiter: 0, actorID: actorId)
-        let removed = try target.remove(createdAt: a2.createdAt, executedAt: executedAt)
+        let removed = try target.delete(createdAt: a2.createdAt, executedAt: executedAt)
 
         XCTAssertEqual(removed.toJSON(), "\"A2\"")
-        XCTAssertEqual(try target.get(key: "a2").isRemoved, true)
-        XCTAssertEqual(try target.get(key: "a1").isRemoved, false)
+        XCTAssertEqual(target.get(key: "a2")!.isRemoved, true)
+        XCTAssertEqual(target.get(key: "a1")!.isRemoved, false)
     }
 
     func test_remove_by_key() throws {
@@ -79,11 +79,11 @@ class ElementRHTTests: XCTestCase {
         target.set(key: "a2", value: a2)
 
         let executedAt = TimeTicket(lamport: 3, delimiter: 0, actorID: actorId)
-        let removed = try target.remove(key: "a2", executedAt: executedAt)
+        let removed = try target.deleteByKey(key: "a2", executedAt: executedAt)
 
         XCTAssertEqual(removed.toJSON(), "\"A2\"")
-        XCTAssertEqual(try target.get(key: "a2").isRemoved, true)
-        XCTAssertEqual(try target.get(key: "a1").isRemoved, false)
+        XCTAssertEqual(target.get(key: "a2")!.isRemoved, true)
+        XCTAssertEqual(target.get(key: "a1")!.isRemoved, false)
     }
 
     func test_subPath() throws {
@@ -108,9 +108,9 @@ class ElementRHTTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        try target.delete(value: a2)
+        target.purge(element: a2)
 
-        let result = try? target.get(key: "a2")
+        let result = target.get(key: "a2")
         XCTAssertNil(result)
     }
 
@@ -123,7 +123,7 @@ class ElementRHTTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        try target.delete(value: a2)
+        target.purge(element: a2)
 
         XCTAssertTrue(target.has(key: "a1"))
         XCTAssertFalse(target.has(key: "a2"))

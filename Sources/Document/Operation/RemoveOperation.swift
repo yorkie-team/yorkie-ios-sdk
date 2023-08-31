@@ -49,7 +49,7 @@ struct RemoveOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        let element = try object.remove(createdAt: self.createdAt, executedAt: self.executedAt)
+        let element = try object.delete(createdAt: self.createdAt, executedAt: self.executedAt)
         root.registerRemovedElement(element)
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {

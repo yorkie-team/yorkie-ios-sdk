@@ -76,9 +76,9 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     }
 
     /**
-     * `delete` deletes prev and next node.
+     * `release` deletes prev and next node.
      */
-    fileprivate func delete() {
+    fileprivate func release() {
         if let previous = self.previous {
             previous.next = self.next
         }
@@ -150,12 +150,12 @@ class RGATreeList {
         return node
     }
 
-    private func delete(node: RGATreeListNode) {
+    private func release(node: RGATreeListNode) {
         if self.last === node, let previousNode = node.previous {
             self.last = previousNode
         }
 
-        node.delete()
+        node.release()
         self.nodeMapByIndex.delete(node)
         self.nodeMapByCreatedAt.removeValue(forKey: node.value.createdAt)
     }
@@ -208,7 +208,7 @@ class RGATreeList {
             return
         }
 
-        self.delete(node: movingNode)
+        self.release(node: movingNode)
         try self.insert(movingNode.value, afterCreatedAt: previsousNode.createdAt, executedAt: executedAt)
         movingNode.value.setMovedAt(executedAt)
     }
@@ -247,16 +247,16 @@ class RGATreeList {
     }
 
     /**
-     * `delete` physically purges element.
+     * `purge` physically purges element.
      */
-    func delete(_ value: CRDTElement) throws {
+    func purge(_ value: CRDTElement) throws {
         guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
             let log = "failed to find the given createdAt: \(value.createdAt)"
             Logger.critical(log)
             throw YorkieError.unexpected(message: log)
         }
 
-        self.delete(node: node)
+        self.release(node: node)
     }
 
     /**
@@ -316,9 +316,9 @@ class RGATreeList {
     }
 
     /**
-     * `remove` removes the node of the given creation time.
+     * `delete` deletes the node of the given creation time.
      */
-    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
+    func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
         guard let node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
             Logger.critical(log)
@@ -333,9 +333,9 @@ class RGATreeList {
     }
 
     /**
-     * `remove` removes the node of the given index.
+     * `deleteByIndex` deletes the node of the given index.
      */
-    func remove(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
+    func deleteByIndex(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
         let node = try self.getNode(index: index)
 
         if node.remove(executedAt) {

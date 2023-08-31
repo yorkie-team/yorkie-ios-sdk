@@ -31,14 +31,14 @@ class CRDTObjectTests: XCTestCase {
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         target.set(key: "K3", value: a3)
 
-        let resultK1 = try target.get(key: "K1")
-        XCTAssertEqual(resultK1.toJSON(), "\"A1\"")
+        let resultK1 = target.get(key: "K1")
+        XCTAssertEqual(resultK1?.toJSON(), "\"A1\"")
 
-        let resultK2 = try target.get(key: "K2")
-        XCTAssertEqual(resultK2.toJSON(), "\"A2\"")
+        let resultK2 = target.get(key: "K2")
+        XCTAssertEqual(resultK2?.toJSON(), "\"A2\"")
 
-        let resultK3 = try target.get(key: "K3")
-        XCTAssertEqual(resultK3.toJSON(), "\"A3\"")
+        let resultK3 = target.get(key: "K3")
+        XCTAssertEqual(resultK3?.toJSON(), "\"A3\"")
     }
 
     func test_can_get_subPath() throws {
@@ -72,7 +72,7 @@ class CRDTObjectTests: XCTestCase {
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         target.set(key: "K3", value: a3)
 
-        try target.delete(element: a2)
+        target.purge(element: a2)
 
         XCTAssertFalse(target.has(key: targetKey))
     }
@@ -91,12 +91,12 @@ class CRDTObjectTests: XCTestCase {
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         target.set(key: "K3", value: a3)
 
-        try target.remove(key: targetKey,
+        try target.deleteByKey(key: targetKey,
                           executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
 
         XCTAssertFalse(target.has(key: targetKey))
 
-        let result = try target.get(key: targetKey)
+        let result = target.get(key: targetKey)!
         XCTAssertTrue(result.isRemoved)
     }
 

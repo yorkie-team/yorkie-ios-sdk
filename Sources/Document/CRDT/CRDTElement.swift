@@ -104,9 +104,9 @@ protocol CRDTContainer: CRDTElement {
      */
     func subPath(createdAt: TimeTicket) throws -> String
 
-    func delete(element: CRDTElement) throws
+    func purge(element: CRDTElement) throws
 
-    func remove(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
+    func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
 
     func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool)
 }
