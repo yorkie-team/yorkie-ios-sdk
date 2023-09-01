@@ -32,6 +32,10 @@ extension AnyValueTypeDictionary {
                let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
+            } else if let value = value as? [String: Any],
+                      let jsonData = try? JSONSerialization.data(withJSONObject: value),
+                      let stringValue = String(data: jsonData, encoding: .utf8) {
+                convertedDictionary[key] = stringValue                
             } else {
                 print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
             }
@@ -92,29 +96,5 @@ extension StringValueTypeDictionary {
 
     var toJSONObejct: [String: Any] {
         self.compactMapValues { $0.toJSONObject }
-    }
-}
-
-typealias CodableValueTypeDictionary = [String: Codable]
-
-extension CodableValueTypeDictionary {
-    var stringValueTypeDictionary: [String: String] {
-        self.convertToDictionaryStringValues(self)
-    }
-
-    func convertToDictionaryStringValues(_ dictionary: [String: Codable]) -> [String: String] {
-        var convertedDictionary: [String: String] = [:]
-
-        for (key, value) in dictionary {
-            if let jsonData = try? JSONEncoder().encode(value),
-               let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else {
-                print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
-            }
-        }
-
-        return convertedDictionary
     }
 }
