@@ -35,7 +35,11 @@ extension AnyValueTypeDictionary {
             } else if let value = value as? [String: Any],
                       let jsonData = try? JSONSerialization.data(withJSONObject: value),
                       let stringValue = String(data: jsonData, encoding: .utf8) {
-                convertedDictionary[key] = stringValue                
+                convertedDictionary[key] = stringValue
+            } else if let value = value as? [[String: Any]],
+                      let jsonData = try? JSONSerialization.data(withJSONObject: value),
+                      let stringValue = String(data: jsonData, encoding: .utf8) {
+                convertedDictionary[key] = stringValue
             } else {
                 print("Warning: Skipping non-convertible value for key '\(key)': \(value)")
             }
