@@ -64,7 +64,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
         return true
     }
 
-    public init(type: TreeNodeType, attributes: [String: Any] = [:], children: [any JSONTreeNode] = []) {
+    public init(type: TreeNodeType, attributes: [String: Any?] = [:], children: [any JSONTreeNode] = []) {
         self.type = type
         self.attributes = attributes
         self.children = children
