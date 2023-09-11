@@ -201,19 +201,6 @@ final class JSONTextTest: XCTestCase {
         }
     }
 
-    func test_should_handle_select_operations() async throws {
-        let doc = Document(key: "test-doc")
-
-        try await doc.update { root, _ in
-            root.text = JSONText()
-            (root.text as? JSONText)?.edit(0, 0, "ABCD")
-        }
-
-        await doc.subscribe("$.text") { event in
-            XCTAssertEqual((event as! ChangeEvent).value.operations[0] as! SelectOpInfo, SelectOpInfo(path: "$.text", from: 2, to: 4))
-        }
-    }
-
     func test_should_handle_rich_text_edit_operations() async throws {
         let doc = Document(key: "test-doc")
 

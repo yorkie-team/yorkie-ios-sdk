@@ -84,11 +84,7 @@ struct EditOperation: Operation {
         }
 
         return changes.compactMap {
-            if $0.type == .content {
-                return EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)
-            } else {
-                return SelectOpInfo(path: path, from: $0.from, to: $0.to)
-            }
+            EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)
         }
     }
 
