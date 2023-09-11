@@ -187,7 +187,7 @@ extension CRDTTreeNodeID {
 /**
  * `CRDTTreePosStruct` represents the structure of CRDTTreePos.
  */
-struct CRDTTreePosStruct: Codable {
+public struct CRDTTreePosStruct: Codable {
     let parentID: CRDTTreeNodeIDStruct
     let leftSiblingID: CRDTTreeNodeIDStruct
 }
@@ -196,7 +196,7 @@ struct CRDTTreePosStruct: Codable {
  * `CRDTTreeNodeIDStruct` represents the structure of CRDTTreePos.
  * It is used to serialize and deserialize the CRDTTreePos.
  */
-struct CRDTTreeNodeIDStruct: Codable {
+public struct CRDTTreeNodeIDStruct: Codable {
     let createdAt: TimeTicketStruct
     let offset: Int32
 }
@@ -209,7 +209,7 @@ typealias TreePosRange = (CRDTTreePos, CRDTTreePos)
 /**
  * `TreePosStructRange` represents a pair of CRDTTreePosStruct.
  */
-typealias TreePosStructRange = (CRDTTreePosStruct, CRDTTreePosStruct)
+public typealias TreePosStructRange = (CRDTTreePosStruct, CRDTTreePosStruct)
 
 /**
  * `CRDTTreeNode` is a node of CRDTTree. It is includes the logical clock and
