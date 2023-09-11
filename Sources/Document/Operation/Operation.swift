@@ -127,13 +127,6 @@ public struct StyleOpInfo: OperationInfo {
     }
 }
 
-public struct SelectOpInfo: OperationInfo {
-    public let type: OperationInfoType = .select
-    public let path: String
-    public let from: Int
-    public let to: Int
-}
-
 public struct TreeEditOpInfo: OperationInfo {
     public let type: OperationInfoType = .treeEdit
     public let path: String
