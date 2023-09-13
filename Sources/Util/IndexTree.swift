@@ -89,8 +89,10 @@ enum DefaultTreeNodeType: String {
 func addSizeOfLeftSiblings<T: IndexTreeNode>(parent: T, offset: Int) -> Int {
     var acc = 0
 
+    let siblings = parent.children
+    
     for index in 0 ..< offset {
-        let leftSibling = parent.children[index]
+        let leftSibling = siblings[index]
 
         if leftSibling.isRemoved {
             continue

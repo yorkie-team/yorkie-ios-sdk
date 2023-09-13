@@ -39,6 +39,11 @@ let package = Package(
             name: "YorkieIntegrationTests",
             dependencies: ["Yorkie"],
             path: "Tests/Integration"
+        ),
+        .testTarget(
+            name: "YorkieBenchmarkTests",
+            dependencies: ["Yorkie"],
+            path: "Tests/Benchmark"
         )
     ]
 )
