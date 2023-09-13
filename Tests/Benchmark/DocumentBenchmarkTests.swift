@@ -18,18 +18,17 @@ import XCTest
 @testable import Yorkie
 
 final class DocumentBenchmarkTests: XCTestCase {
-
     func benchmarkTree(_ size: Int) async {
         let doc = Document(key: "test-doc")
-        
+
         do {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
-                                        JSONTreeElementNode(type: "doc", children: [
-                                            JSONTreeElementNode(type: "p")])
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p")])
                 )
-                
-                for index in 1..<size {
+
+                for index in 1 ..< size {
                     try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a")])
                 }
             }
@@ -40,25 +39,25 @@ final class DocumentBenchmarkTests: XCTestCase {
 
     func benchmarkTreeDeleteAll(_ size: Int) async {
         let doc = Document(key: "test-doc")
-        
+
         do {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
-                                        JSONTreeElementNode(type: "doc", children: [
-                                            JSONTreeElementNode(type: "p")])
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p")])
                 )
-                
-                for index in 1..<size {
+
+                for index in 1 ..< size {
                     try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a")])
                 }
             }
-            
+
             try await doc.update { root, _ in
                 try (root.tree as? JSONTree)?.edit(1, size + 1)
             }
 
-            let xml = await (doc.getRoot().tree as? JSONTree)?.toXML()
-            
+            let xml = await(doc.getRoot().tree as? JSONTree)?.toXML()
+
             XCTAssertEqual(xml, "<doc><p></p></doc>")
         } catch {
             XCTAssert(false, "\(error)")
@@ -67,21 +66,21 @@ final class DocumentBenchmarkTests: XCTestCase {
 
     func benchmarkTreeSplitGC(_ size: Int) async {
         let doc = Document(key: "test-doc")
-        
+
         do {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
-                                        JSONTreeElementNode(type: "doc", children: [
-                                            JSONTreeElementNode(type: "p")])
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p")])
                 )
-                
-                for index in 1...size {
+
+                for index in 1 ... size {
                     try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a".repeatString(size))])
                 }
             }
-            
+
             try await doc.update { root, _ in
-                for index in 1...size {
+                for index in 1 ... size {
                     try (root.tree as? JSONTree)?.edit(index, index + 1, [JSONTreeTextNode(value: "b")])
                 }
             }
@@ -100,21 +99,21 @@ final class DocumentBenchmarkTests: XCTestCase {
 
     func benchmarkTreeEditGC(_ size: Int) async {
         let doc = Document(key: "test-doc")
-        
+
         do {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
-                                        JSONTreeElementNode(type: "doc", children: [
-                                            JSONTreeElementNode(type: "p")])
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p")])
                 )
-                
-                for index in 1...size {
+
+                for index in 1 ... size {
                     try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a")])
                 }
             }
-            
+
             try await doc.update { root, _ in
-                for index in 1...size {
+                for index in 1 ... size {
                     try (root.tree as? JSONTree)?.edit(index, index + 1, [JSONTreeTextNode(value: "b")])
                 }
             }
@@ -137,10 +136,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTree(100)
+                await self.benchmarkTree(100)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 1)
         }
     }
@@ -151,10 +150,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTree(1000)
+                await self.benchmarkTree(1000)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 10)
         }
     }
@@ -165,10 +164,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTreeDeleteAll(1000)
+                await self.benchmarkTreeDeleteAll(1000)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 10)
         }
     }
@@ -179,10 +178,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTreeSplitGC(100)
+                await self.benchmarkTreeSplitGC(100)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 1)
         }
     }
@@ -193,10 +192,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTreeSplitGC(1000)
+                await self.benchmarkTreeSplitGC(1000)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 30)
         }
     }
@@ -207,10 +206,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTreeEditGC(100)
+                await self.benchmarkTreeEditGC(100)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 1)
         }
     }
@@ -221,24 +220,23 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await benchmarkTreeEditGC(1000)
+                await self.benchmarkTreeEditGC(1000)
                 exp.fulfill()
             }
-            
+
             wait(for: [exp], timeout: 20)
         }
     }
-
 }
 
 extension String {
     func repeatString(_ count: Int) -> String {
         var repeatedString = ""
-        
-        for _ in 0..<count {
+
+        for _ in 0 ..< count {
             repeatedString += self
         }
-        
+
         return repeatedString
     }
 }
