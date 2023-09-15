@@ -828,6 +828,8 @@ extension Converter {
             return fromText(element)
         } else if case let .counter(element) = pbElement.body {
             return try fromCounter(element)
+        } else if case let .tree(element) = pbElement.body {
+            return try fromTree(element)
         } else {
             throw YorkieError.unimplemented(message: "unimplemented element: \(pbElement)")
         }
