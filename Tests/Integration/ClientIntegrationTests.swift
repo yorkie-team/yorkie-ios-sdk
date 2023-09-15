@@ -317,7 +317,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
         try await c3.deactivate()
     }
-    
+
     func test_can_be_built_from_a_snapshot() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -338,7 +338,7 @@ final class ClientIntegrationTests: XCTestCase {
             root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abc")]))
             root.text = JSONText()
         }
-        
+
         for index in 0 ..< snapshotThreshold {
             try await doc1.update { root, _ in
                 try (root.tree as? JSONTree)?.edit(0, 0, [JSONTreeTextNode(value: "\(index),")])
@@ -348,11 +348,10 @@ final class ClientIntegrationTests: XCTestCase {
 
         try await c1.sync()
         try await c2.sync()
-        
+
         let result1 = await doc1.toSortedJSON()
         let result2 = await doc2.toSortedJSON()
 
         XCTAssertEqual(result1, result2)
     }
-
 }
