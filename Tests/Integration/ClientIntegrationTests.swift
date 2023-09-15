@@ -317,4 +317,41 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
         try await c3.deactivate()
     }
+
+    func test_can_be_built_from_a_snapshot() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+
+        try await c1.activate()
+        try await c2.activate()
+
+        let doc1 = Document(key: docKey)
+        try await c1.attach(doc1, [:], false)
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, [:], false)
+
+        let snapshotThreshold = 500
+
+        try await doc1.update { root, _ in
+            root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abc")]))
+            root.text = JSONText()
+        }
+
+        for index in 0 ..< snapshotThreshold {
+            try await doc1.update { root, _ in
+                try (root.tree as? JSONTree)?.edit(0, 0, [JSONTreeTextNode(value: "\(index),")])
+                (root.text as? JSONText)?.edit(0, 0, "\(index),")
+            }
+        }
+
+        try await c1.sync()
+        try await c2.sync()
+
+        let result1 = await doc1.toSortedJSON()
+        let result2 = await doc2.toSortedJSON()
+
+        XCTAssertEqual(result1, result2)
+    }
 }
