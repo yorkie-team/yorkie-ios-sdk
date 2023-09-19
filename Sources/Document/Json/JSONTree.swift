@@ -421,6 +421,17 @@ public class JSONTree {
     }
 
     /**
+     * `getRootTreeNode` returns TreeNode of this tree.
+     */
+    public func getRootTreeNode() throws -> TreeNode? {
+        guard self.context != nil, let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+        
+        return tree.rootTreeNode
+    }
+    
+    /**
      * `indexToPath` returns the path of the given index.
      */
     public func indexToPath(_ index: Int) throws -> [Int] {

@@ -359,15 +359,15 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
-     * toJSON converts the given CRDTNode to JSON.
+     * `toTreeNode` converts the given CRDTTreeNode to TreeNode.
      */
-    var toJSON: TreeNode {
+    var toTreeNode: TreeNode {
         if self.isText {
             return TreeNode(type: self.type, value: self.value)
         }
 
         let children = self.children.compactMap {
-            $0.toJSON
+            $0.toTreeNode
         }
 
         let attrs = self.attrs?.toObject().mapValues { $0.value }
@@ -592,7 +592,7 @@ class CRDTTree: CRDTGCElement {
 
         var value: TreeChangeValue?
 
-        if let nodes = contents?.compactMap({ $0.toJSON }) {
+        if let nodes = contents?.compactMap({ $0.toTreeNode }) {
             value = .nodes(nodes)
         }
 
@@ -849,9 +849,16 @@ class CRDTTree: CRDTGCElement {
      * `toJSON` returns the JSON encoding of this tree.
      */
     func toJSON() -> String {
-        self.indexTree.root.toJSON.toJSONString
+        self.rootTreeNode.toJSONString
     }
 
+    /**
+     * `rootTreeNode` returns the converted value of this tree to TreeNode.
+     */
+    var rootTreeNode: TreeNode {
+        self.indexTree.root.toTreeNode
+    }
+    
     /**
      * `toTestTreeNode` returns the JSON of this tree for debugging.
      */
