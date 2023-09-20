@@ -147,8 +147,9 @@ public class JSONText {
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
         let ticket = context.issueTimeTicket
+        let maxCreatedAtMapByActor: [String: TimeTicket]
         do {
-            try text.setStyle(range, attributes, ticket)
+            (maxCreatedAtMapByActor, _) = try text.setStyle(range, attributes, ticket)
         } catch {
             Logger.critical("can't set Style")
             return false
@@ -157,6 +158,7 @@ public class JSONText {
         context.push(operation: StyleOperation(parentCreatedAt: text.createdAt,
                                                fromPos: range.0,
                                                toPos: range.1,
+                                               maxCreatedAtMapByActor: maxCreatedAtMapByActor,
                                                attributes: stringifyAttributes(attributes),
                                                executedAt: ticket))
 

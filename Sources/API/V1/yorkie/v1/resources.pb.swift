@@ -103,7 +103,7 @@ enum Yorkie_V1_ValueType: SwiftProtobuf.Enum {
 
 extension Yorkie_V1_ValueType: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [Yorkie_V1_ValueType] = [
+  static let allCases: [Yorkie_V1_ValueType] = [
     .null,
     .boolean,
     .integer,
@@ -158,7 +158,7 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
 
 extension Yorkie_V1_DocEventType: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [Yorkie_V1_DocEventType] = [
+  static let allCases: [Yorkie_V1_DocEventType] = [
     .documentChanged,
     .documentWatched,
     .documentUnwatched,
@@ -787,6 +787,11 @@ struct Yorkie_V1_Operation {
     var hasExecutedAt: Bool {return _storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
+
+    var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
+      get {return _storage._createdAtMapByActor}
+      set {_uniqueStorage()._createdAtMapByActor = newValue}
+    }
 
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1878,7 +1883,7 @@ struct Yorkie_V1_PresenceChange {
 
 extension Yorkie_V1_PresenceChange.ChangeType: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [Yorkie_V1_PresenceChange.ChangeType] = [
+  static let allCases: [Yorkie_V1_PresenceChange.ChangeType] = [
     .unspecified,
     .put,
     .delete,
@@ -2941,6 +2946,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
     3: .same(proto: "to"),
     4: .same(proto: "attributes"),
     5: .standard(proto: "executed_at"),
+    6: .standard(proto: "created_at_map_by_actor"),
   ]
 
   fileprivate class _StorageClass {
@@ -2949,6 +2955,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
     var _to: Yorkie_V1_TextNodePos? = nil
     var _attributes: Dictionary<String,String> = [:]
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
 
     static let defaultInstance = _StorageClass()
 
@@ -2960,6 +2967,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
       _to = source._to
       _attributes = source._attributes
       _executedAt = source._executedAt
+      _createdAtMapByActor = source._createdAtMapByActor
     }
   }
 
@@ -2983,6 +2991,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._to) }()
         case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: &_storage._createdAtMapByActor) }()
         default: break
         }
       }
@@ -3010,6 +3019,9 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
       } }()
+      if !_storage._createdAtMapByActor.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: _storage._createdAtMapByActor, fieldNumber: 6)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3024,6 +3036,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
         if _storage._to != rhs_storage._to {return false}
         if _storage._attributes != rhs_storage._attributes {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._createdAtMapByActor != rhs_storage._createdAtMapByActor {return false}
         return true
       }
       if !storagesAreEqual {return false}

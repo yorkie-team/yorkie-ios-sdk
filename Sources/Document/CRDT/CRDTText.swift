@@ -222,15 +222,17 @@ final class CRDTText: CRDTGCElement {
      */
     public func setStyle(_ range: RGATreeSplitPosRange,
                          _ attributes: TextAttributes,
-                         _ editedAt: TimeTicket) throws
+                         _ editedAt: TimeTicket,
+                         _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [TextChange])
     {
-        try self.setStyle(range, stringifyAttributes(attributes), editedAt)
+        try self.setStyle(range, stringifyAttributes(attributes), editedAt, latestCreatedAtMapByActor)
     }
 
     @discardableResult
     func setStyle(_ range: RGATreeSplitPosRange,
                   _ attributes: [String: String],
-                  _ editedAt: TimeTicket) throws -> [TextChange]
+                  _ editedAt: TimeTicket,
+                  _ latestCreatedAtMapByActor: [String: TimeTicket]) throws -> ([String: TimeTicket], [TextChange])
     {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
@@ -239,7 +241,31 @@ final class CRDTText: CRDTGCElement {
         // 02. style nodes between from and to
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
+        var createdAtMapByActor = [String: TimeTicket]()
+        var toBeStyleds = [RGATreeSplitNode<TextValue>]()
         for node in nodes {
+            guard let actorID = node.createdAt.actorID else { continue }
+
+            let latestCreatedAt: TimeTicket
+
+            if latestCreatedAtMapByActor.isEmpty {
+                latestCreatedAt = TimeTicket.max
+            } else {
+                latestCreatedAt = latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial
+            }
+
+            if node.canStyle(editedAt, latestCreatedAt) {
+                let latestCreatedAt = createdAtMapByActor[actorID]
+                let createdAt = node.createdAt
+
+                if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
+                    createdAtMapByActor[actorID] = createdAt
+                }
+                toBeStyleds.append(node)
+            }
+        }
+
+        for node in toBeStyleds {
             if node.isRemoved {
                 continue
             }
@@ -257,7 +283,7 @@ final class CRDTText: CRDTGCElement {
             }
         }
 
-        return changes
+        return (createdAtMapByActor, changes)
     }
 
     /**

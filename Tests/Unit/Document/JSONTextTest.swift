@@ -222,48 +222,48 @@ final class JSONTextTest: XCTestCase {
         XCTAssertEqual("{\"k1\":[{\"attrs\":{\"b\":1},\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"attrs\":{\"b\":1},\"val\":\"D\"}]}",
                        docContent)
     }
-    
+
     func test_should_handle_text_delete_operations() async throws {
         let doc = Document(key: "test-doc")
-        
+
         let docContent = await doc.toSortedJSON()
         XCTAssertEqual("{}", docContent)
-        
+
         try await doc.update { root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "ABCD")
         }
-        
-        var string = await (doc.getRoot().k1 as? JSONText)?.toString
+
+        var string = await(doc.getRoot().k1 as? JSONText)?.toString
         XCTAssertEqual("ABCD", string)
-        
+
         try await doc.update { root, _ in
             (root.k1 as? JSONText)?.delete(1, 3)
         }
-        
-        string = await (doc.getRoot().k1 as? JSONText)?.toString
+
+        string = await(doc.getRoot().k1 as? JSONText)?.toString
         XCTAssertEqual("AD", string)
     }
 
     func test_should_handle_text_empty_operations() async throws {
         let doc = Document(key: "test-doc")
-        
+
         let docContent = await doc.toSortedJSON()
         XCTAssertEqual("{}", docContent)
-        
+
         try await doc.update { root, _ in
             root.k1 = JSONText()
             (root.k1 as? JSONText)?.edit(0, 0, "ABCD")
         }
-        
-        var string = await (doc.getRoot().k1 as? JSONText)?.toString
+
+        var string = await(doc.getRoot().k1 as? JSONText)?.toString
         XCTAssertEqual("ABCD", string)
-        
+
         try await doc.update { root, _ in
             (root.k1 as? JSONText)?.empty()
         }
-        
-        string = await (doc.getRoot().k1 as? JSONText)?.toString
+
+        string = await(doc.getRoot().k1 as? JSONText)?.toString
         XCTAssertEqual("", string)
     }
     // swiftlint: enable force_cast

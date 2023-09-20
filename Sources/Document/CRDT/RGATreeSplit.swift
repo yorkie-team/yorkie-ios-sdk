@@ -353,6 +353,13 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
+     * `canStyle` checks if node is able to set style.
+     */
+    public func canStyle(_ editedAt: TimeTicket, _ latestCreatedAt: TimeTicket) -> Bool {
+        !self.createdAt.after(latestCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    }
+
+    /**
      * `remove` removes node of given edited time.
      */
     public func remove(_ editedAt: TimeTicket?) {
