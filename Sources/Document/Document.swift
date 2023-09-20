@@ -18,6 +18,18 @@ import Combine
 import Foundation
 
 /**
+ * `DocumentOptions` are the options to create a new document.
+ *
+ * @public
+ */
+public struct DocumentOptions {
+    /**
+     * `disableGC` disables garbage collection if true.
+     */
+    var disableGC: Bool
+}
+
+/**
  * `DocumentStatus` represents the status of the document.
  */
 public enum DocumentStatus: String {
@@ -59,6 +71,7 @@ public actor Document {
 
     private let key: DocumentKey
     private(set) var status: DocumentStatus
+    private let opts: DocumentOptions
     private var changeID: ChangeID
     var checkpoint: Checkpoint
     private var localChanges: [Change]
@@ -81,8 +94,13 @@ public actor Document {
     private var presences: [ActorID: StringValueTypeDictionary]
 
     public init(key: String) {
+        self.init(key: key, opts: DocumentOptions(disableGC: false))
+    }
+
+    public init(key: String, opts: DocumentOptions) {
         self.key = key
         self.status = .detached
+        self.opts = opts
         self.root = CRDTRoot()
         self.changeID = ChangeID.initial
         self.checkpoint = Checkpoint.initial
@@ -300,6 +318,10 @@ public actor Document {
      */
     @discardableResult
     func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
+        if self.opts.disableGC {
+            return 0
+        }
+
         if let clone = self.clone {
             clone.root.garbageCollect(lessThanOrEqualTo: ticket)
         }
