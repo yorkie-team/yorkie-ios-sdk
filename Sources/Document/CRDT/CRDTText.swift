@@ -124,7 +124,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
         if attrs.isEmpty == false {
             var data = [String]()
 
-            attrs.forEach { key, value in
+            attrs.sorted(by: { $0.key < $1.key }).forEach { key, value in
                 if value.value.count > 2, value.value.first == "\"", value.value.last == "\"" {
                     data.append("\"\(key)\":\(value.value)")
                 } else {
@@ -327,7 +327,7 @@ final class CRDTText: CRDTGCElement {
         self.rgaTreeSplit.toTestString
     }
 
-    public var plainText: String {
+    public var toString: String {
         self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value.toString }.joined(separator: "")
     }
 

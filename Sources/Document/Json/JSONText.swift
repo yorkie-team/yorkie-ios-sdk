@@ -111,6 +111,7 @@ public class JSONText {
     /**
      * `delete` deletes the text in the given range.
      */
+    @discardableResult
     public func delete(_ fromIdx: Int, _ toIdx: Int) -> (Int, Int)? {
         self.edit(fromIdx, toIdx, "")
     }
@@ -118,6 +119,7 @@ public class JSONText {
     /**
      * `empty` makes the text empty.
      */
+    @discardableResult
     public func empty() -> (Int, Int)? {
         self.edit(0, self.length, "")
     }
@@ -198,8 +200,11 @@ public class JSONText {
         return text.toTestString
     }
 
-    public var plainText: String {
-        self.text?.plainText ?? ""
+    /**
+     * `toString` returns the string representation of this text.
+     */
+    public var toString: String {
+        self.text?.toString ?? ""
     }
 
     /**
