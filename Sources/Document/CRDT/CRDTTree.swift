@@ -858,7 +858,7 @@ class CRDTTree: CRDTGCElement {
     var rootTreeNode: TreeNode {
         self.indexTree.root.toTreeNode
     }
-    
+
     /**
      * `toTestTreeNode` returns the JSON of this tree for debugging.
      */

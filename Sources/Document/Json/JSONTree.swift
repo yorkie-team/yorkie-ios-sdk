@@ -427,10 +427,10 @@ public class JSONTree {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
-        
+
         return tree.rootTreeNode
     }
-    
+
     /**
      * `indexToPath` returns the path of the given index.
      */
