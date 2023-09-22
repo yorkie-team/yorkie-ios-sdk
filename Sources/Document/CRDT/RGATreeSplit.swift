@@ -216,24 +216,24 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `prev` returns a previous node of this node.
      */
-    private(set) var prev: RGATreeSplitNode<T>?
+    private(set) weak var prev: RGATreeSplitNode<T>?
 
     /**
      * `next`  returns a next node of this node.
      */
-    private(set) var next: RGATreeSplitNode<T>? {
+    private(set) weak var next: RGATreeSplitNode<T>? {
         didSet {}
     }
 
     /**
      * `insPrev` returns a previous node of this node insertion.
      */
-    private(set) var insPrev: RGATreeSplitNode<T>?
+    private(set) weak var insPrev: RGATreeSplitNode<T>?
 
     /**
      * `insNext` returns a next node of this node insertion.
      */
-    private(set) var insNext: RGATreeSplitNode<T>?
+    private(set) weak var insNext: RGATreeSplitNode<T>?
 
     init(_ id: RGATreeSplitNodeID, _ value: T? = nil, _ removedAt: TimeTicket? = nil) {
         self.id = id
