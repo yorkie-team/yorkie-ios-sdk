@@ -22,7 +22,7 @@ import Foundation
 class TrieNode<V: Hashable> {
     fileprivate var value: V
     fileprivate var children: [V: TrieNode<V>]
-    fileprivate var parent: TrieNode<V>?
+    fileprivate weak var parent: TrieNode<V>?
     fileprivate var isTerminal: Bool
 
     init(value: V, parent: TrieNode<V>? = nil) {

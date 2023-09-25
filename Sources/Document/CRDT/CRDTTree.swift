@@ -217,7 +217,7 @@ typealias TreePosStructRange = (CRDTTreePosStruct, CRDTTreePosStruct)
  */
 final class CRDTTreeNode: IndexTreeNode {
     var size: Int
-    var parent: CRDTTreeNode?
+    weak var parent: CRDTTreeNode?
     var type: TreeNodeType
     var value: String {
         get {

@@ -35,7 +35,7 @@ class LLRBTree<K: Comparable, V> {
     class Node<K, V>: CustomDebugStringConvertible {
         var key: K
         var value: V
-        var parent: Node<K, V>?
+        weak var parent: Node<K, V>?
         var left: Node<K, V>?
         var right: Node<K, V>?
         var isRed: Bool

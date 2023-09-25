@@ -24,7 +24,7 @@ class SplayNode<V>: CustomDebugStringConvertible {
 
     fileprivate var left: SplayNode<V>?
     fileprivate var right: SplayNode<V>?
-    fileprivate var parent: SplayNode<V>?
+    fileprivate weak var parent: SplayNode<V>?
     fileprivate(set) var weight: Int = 0
 
     init(_ value: V) {
