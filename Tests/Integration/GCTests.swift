@@ -66,6 +66,33 @@ class GCTests: XCTestCase {
         XCTAssertEqual(0, len)
     }
 
+    func test_disable_GC_test() async throws {
+        let doc = Document(key: "test-doc", opts: DocumentOptions(disableGC: true))
+
+        try await doc.update({ root, _ in
+            root["1"] = Int64(1)
+            root["2"] = [Int64(1), Int64(2), Int64(3)]
+            root["3"] = Int64(3)
+        }, "set 1, 2, 3")
+
+        var result = await doc.toSortedJSON()
+        XCTAssertEqual("{\"1\":1,\"2\":[1,2,3],\"3\":3}", result)
+
+        try await doc.update({ root, _ in
+            root.remove(key: "2")
+        }, "deletes 2")
+
+        result = await doc.toSortedJSON()
+        XCTAssertEqual("{\"1\":1,\"3\":3}", result)
+
+        var len = await doc.getGarbageLength()
+        XCTAssertEqual(4, len)
+        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        XCTAssertEqual(0, len)
+        len = await doc.getGarbageLength()
+        XCTAssertEqual(4, len)
+    }
+
     func test_garbage_collection_test2() async throws {
         let size = 10000
         let doc = Document(key: "test-doc")
