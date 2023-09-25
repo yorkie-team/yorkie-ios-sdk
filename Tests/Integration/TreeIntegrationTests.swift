@@ -830,6 +830,12 @@ final class TreeIntegrationStyleTests: XCTestCase {
 
             try (root.t as? JSONTree)?.style(2, 3, ["z": "m"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"m\"></tn></p></tc></doc>")
+
+            try (root.t as? JSONTree)?.style(2, 3, ["z": 3])
+            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"3\"></tn></p></tc></doc>")
+
+            try (root.t as? JSONTree)?.style(2, 3, ["z": nil])
+            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"null\"></tn></p></tc></doc>")
         }
     }
 

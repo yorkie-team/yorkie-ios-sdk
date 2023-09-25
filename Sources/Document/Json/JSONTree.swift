@@ -35,7 +35,7 @@ struct TreeChangeWithPath {
  */
 public struct JSONTreeElementNode: JSONTreeNode {
     public let type: TreeNodeType
-    public let attributes: [String: Any]
+    public let attributes: [String: Any?]
     public let children: [any JSONTreeNode]
 
     public static func == (lhs: JSONTreeElementNode, rhs: JSONTreeElementNode) -> Bool {
@@ -64,7 +64,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
         return true
     }
 
-    public init(type: TreeNodeType, attributes: [String: Any] = [:], children: [any JSONTreeNode] = []) {
+    public init(type: TreeNodeType, attributes: [String: Any?] = [:], children: [any JSONTreeNode] = []) {
         self.type = type
         self.attributes = attributes
         self.children = children
@@ -243,7 +243,7 @@ public class JSONTree {
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
      */
-    public func styleByPath(_ path: [Int], _ attributes: [String: Codable]) throws {
+    public func styleByPath(_ path: [Int], _ attributes: [String: Any?]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -271,7 +271,7 @@ public class JSONTree {
     /**
      * `style` sets the attributes to the elements of the given range.
      */
-    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Codable]) throws {
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any?]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -456,7 +456,7 @@ public class JSONTree {
     /**
      * `pathRangeToPosRange` converts the path range into the position range.
      */
-    func pathRangeToPosRange(_ range: ([Int], [Int])) throws -> TreePosStructRange {
+    public func pathRangeToPosRange(_ range: ([Int], [Int])) throws -> TreePosStructRange {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -470,7 +470,7 @@ public class JSONTree {
     /**
      * `indexRangeToPosRange` converts the index range into the position range.
      */
-    func indexRangeToPosRange(_ range: (Int, Int)) throws -> TreePosStructRange {
+    public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TreePosStructRange {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -481,7 +481,7 @@ public class JSONTree {
     /**
      * `posRangeToIndexRange` converts the position range into the index range.
      */
-    func posRangeToIndexRange(_ range: TreePosStructRange) throws -> (Int, Int) {
+    public func posRangeToIndexRange(_ range: TreePosStructRange) throws -> (Int, Int) {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -494,7 +494,7 @@ public class JSONTree {
     /**
      * `posRangeToPathRange` converts the position range into the path range.
      */
-    func posRangeToPathRange(_ range: TreePosStructRange) throws -> ([Int], [Int]) {
+    public func posRangeToPathRange(_ range: TreePosStructRange) throws -> ([Int], [Int]) {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
