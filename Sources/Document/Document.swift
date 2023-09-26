@@ -489,18 +489,6 @@ public actor Document {
         return rootObject.get(keyPath: subPath)
     }
 
-    private func createPaths(change: Change) -> [String] {
-        let pathTrie = Trie<String>(value: "$")
-        for op in change.operations {
-            let createdAt = op.effectedCreatedAt
-            if var subPaths = try? self.root.createSubPaths(createdAt: createdAt), subPaths.isEmpty == false {
-                subPaths.removeFirst()
-                pathTrie.insert(values: subPaths)
-            }
-        }
-        return pathTrie.findPrefixes().map { $0.joined(separator: ".") }
-    }
-
     public func setStatus(_ status: DocumentStatus) {
         self.status = status
     }
