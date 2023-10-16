@@ -111,6 +111,7 @@ public class JSONText {
     /**
      * `delete` deletes the text in the given range.
      */
+    @discardableResult
     public func delete(_ fromIdx: Int, _ toIdx: Int) -> (Int, Int)? {
         self.edit(fromIdx, toIdx, "")
     }
@@ -118,6 +119,7 @@ public class JSONText {
     /**
      * `empty` makes the text empty.
      */
+    @discardableResult
     public func empty() -> (Int, Int)? {
         self.edit(0, self.length, "")
     }
@@ -145,8 +147,9 @@ public class JSONText {
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
         let ticket = context.issueTimeTicket
+        let maxCreatedAtMapByActor: [String: TimeTicket]
         do {
-            try text.setStyle(range, attributes, ticket)
+            (maxCreatedAtMapByActor, _) = try text.setStyle(range, attributes, ticket)
         } catch {
             Logger.critical("can't set Style")
             return false
@@ -155,6 +158,7 @@ public class JSONText {
         context.push(operation: StyleOperation(parentCreatedAt: text.createdAt,
                                                fromPos: range.0,
                                                toPos: range.1,
+                                               maxCreatedAtMapByActor: maxCreatedAtMapByActor,
                                                attributes: stringifyAttributes(attributes),
                                                executedAt: ticket))
 
@@ -198,8 +202,11 @@ public class JSONText {
         return text.toTestString
     }
 
-    public var plainText: String {
-        self.text?.plainText ?? ""
+    /**
+     * `toString` returns the string representation of this text.
+     */
+    public var toString: String {
+        self.text?.toString ?? ""
     }
 
     /**

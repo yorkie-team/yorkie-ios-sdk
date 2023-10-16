@@ -396,6 +396,9 @@ extension Converter {
             pbStyleOperation.parentCreatedAt = toTimeTicket(styleOperation.parentCreatedAt)
             pbStyleOperation.from = toTextNodePos(pos: styleOperation.fromPos)
             pbStyleOperation.to = toTextNodePos(pos: styleOperation.toPos)
+            styleOperation.maxCreatedAtMapByActor.forEach {
+                pbStyleOperation.createdAtMapByActor[$0.key] = toTimeTicket($0.value)
+            }
             styleOperation.attributes.forEach {
                 pbStyleOperation.attributes[$0.key] = $0.value
             }
@@ -481,6 +484,7 @@ extension Converter {
                 return StyleOperation(parentCreatedAt: fromTimeTicket(pbStyleOperation.parentCreatedAt),
                                       fromPos: fromTextNodePos(pbStyleOperation.from),
                                       toPos: fromTextNodePos(pbStyleOperation.to),
+                                      maxCreatedAtMapByActor: pbStyleOperation.createdAtMapByActor.mapValues({ fromTimeTicket($0) }),
                                       attributes: pbStyleOperation.attributes,
                                       executedAt: fromTimeTicket(pbStyleOperation.executedAt))
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {

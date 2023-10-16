@@ -905,7 +905,7 @@ class DocumentTests: XCTestCase {
 
         let text = try await target.getValueByPath("$.text") as? JSONText
 
-        XCTAssertEqual(text?.plainText, "hello world")
+        XCTAssertEqual(text?.toString, "hello world")
     }
 
     func test_change_paths_test_for_text_with_attributes() async throws {
