@@ -423,7 +423,7 @@ public class JSONTree {
     /**
      * `getRootTreeNode` returns TreeNode of this tree.
      */
-    public func getRootTreeNode() throws -> TreeNode? {
+    public func getRootTreeNode() throws -> (any JSONTreeNode)? {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }

@@ -134,7 +134,48 @@ public struct TreeEditOpInfo: OperationInfo {
     public let to: Int
     public let fromPath: [Int]
     public let toPath: [Int]
-    public let value: [TreeNode]
+    public let value: [any JSONTreeNode]
+    
+    public static func == (lhs: TreeEditOpInfo, rhs: TreeEditOpInfo) -> Bool {
+        if lhs.type != rhs.type {
+            return false
+        }
+        if lhs.path != rhs.path {
+            return false
+        }
+        if lhs.from != rhs.from {
+            return false
+        }
+        if lhs.to != rhs.to {
+            return false
+        }
+        if lhs.fromPath != rhs.fromPath {
+            return false
+        }
+        if lhs.toPath != rhs.toPath {
+            return false
+        }
+        
+        if lhs.value.count != rhs.value.count {
+            return false
+        }
+        
+        for (index, lhs) in lhs.value.enumerated() {
+            if let lhs = lhs as? JSONTreeTextNode, let rhs = rhs.value[index] as? JSONTreeTextNode {
+                if lhs != rhs {
+                    return false
+                }
+            } else if let lhs = lhs as? JSONTreeElementNode, let rhs = rhs.value[index] as? JSONTreeElementNode {
+                if lhs != rhs {
+                    return false
+                }
+            } else {
+                return false
+            }
+        }
+        
+        return true
+    }
 }
 
 public struct TreeStyleOpInfo: OperationInfo {
@@ -146,19 +187,19 @@ public struct TreeStyleOpInfo: OperationInfo {
     public let value: [String: Codable]
 
     public static func == (lhs: TreeStyleOpInfo, rhs: TreeStyleOpInfo) -> Bool {
-        if lhs.type != lhs.type {
+        if lhs.type != rhs.type {
             return false
         }
-        if lhs.path != lhs.path {
+        if lhs.path != rhs.path {
             return false
         }
-        if lhs.from != lhs.from {
+        if lhs.from != rhs.from {
             return false
         }
-        if lhs.to != lhs.to {
+        if lhs.to != rhs.to {
             return false
         }
-        if lhs.fromPath != lhs.fromPath {
+        if lhs.fromPath != rhs.fromPath {
             return false
         }
 
