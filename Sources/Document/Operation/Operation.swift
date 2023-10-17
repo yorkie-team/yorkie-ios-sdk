@@ -135,7 +135,7 @@ public struct TreeEditOpInfo: OperationInfo {
     public let fromPath: [Int]
     public let toPath: [Int]
     public let value: [any JSONTreeNode]
-    
+
     public static func == (lhs: TreeEditOpInfo, rhs: TreeEditOpInfo) -> Bool {
         if lhs.type != rhs.type {
             return false
@@ -155,11 +155,11 @@ public struct TreeEditOpInfo: OperationInfo {
         if lhs.toPath != rhs.toPath {
             return false
         }
-        
+
         if lhs.value.count != rhs.value.count {
             return false
         }
-        
+
         for (index, lhs) in lhs.value.enumerated() {
             if let lhs = lhs as? JSONTreeTextNode, let rhs = rhs.value[index] as? JSONTreeTextNode {
                 if lhs != rhs {
@@ -173,7 +173,7 @@ public struct TreeEditOpInfo: OperationInfo {
                 return false
             }
         }
-        
+
         return true
     }
 }

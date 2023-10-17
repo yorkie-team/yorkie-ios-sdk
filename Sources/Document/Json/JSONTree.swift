@@ -30,6 +30,23 @@ struct TreeChangeWithPath {
     let value: TreeChangeValue?
 }
 
+extension CRDTTreeNode {
+    var toJSONTreeNode: any JSONTreeNode {
+        if self.isText {
+            return JSONTreeTextNode(value: self.value)
+        } else {
+            var attrs = [String: String]()
+            self.attrs?.forEach {
+                attrs[$0.key] = $0.value
+            }
+
+            return JSONTreeElementNode(type: self.type,
+                                       attributes: attrs.toJSONObejct,
+                                       children: self.children.compactMap { $0.toJSONTreeNode })
+        }
+    }
+}
+
 /**
  * `ElementNode` is a node that has children.
  */
@@ -421,14 +438,14 @@ public class JSONTree {
     }
 
     /**
-     * `getRootTreeNode` returns TreeNode of this tree.
+     * `getRootTreeNode` returns JSONTreeNode of this tree.
      */
     public func getRootTreeNode() throws -> (any JSONTreeNode)? {
         guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
-        return tree.rootTreeNode
+        return tree.root.toJSONTreeNode
     }
 
     /**

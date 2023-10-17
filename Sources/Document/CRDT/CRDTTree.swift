@@ -361,21 +361,6 @@ final class CRDTTreeNode: IndexTreeNode {
         }
     }
 
-    var toJSONTreeNode: any JSONTreeNode {
-        if self.isText {
-            return JSONTreeTextNode(value: self.value)
-        } else {
-            var attrs = [String: String]()
-            self.attrs?.forEach {
-                attrs[$0.key] = $0.value
-            }
-
-            return JSONTreeElementNode(type: self.type,
-                                       attributes: attrs.toJSONObejct,
-                                       children: self.children.compactMap { $0.toJSONTreeNode })
-        }
-    }
-    
     var toJSONString: String {
         if self.type == DefaultTreeNodeType.text.rawValue {
             return "{\"type\":\"\(self.type)\",\"value\":\"\(self.value)\"}"
@@ -820,13 +805,6 @@ class CRDTTree: CRDTGCElement {
      */
     func toJSON() -> String {
         self.indexTree.root.toJSONString
-    }
-
-    /**
-     * `rootTreeNode` returns the converted value of this tree to TreeNode.
-     */
-    var rootTreeNode: any JSONTreeNode {
-        self.indexTree.root.toJSONTreeNode
     }
 
     /**
