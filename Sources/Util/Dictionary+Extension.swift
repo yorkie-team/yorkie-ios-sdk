@@ -43,7 +43,11 @@ extension AnyValueTypeDictionary {
             {
                 convertedDictionary[key] = stringValue
             } else if let value {
-                convertedDictionary[key] = String("\(value)")
+                if value is String {
+                    convertedDictionary[key] = String("\"\(value)\"")
+                } else {
+                    convertedDictionary[key] = String("\(value)")
+                }
                 print("Warning: non-encodable value for key '\(key)': \(value)")
             } else {
                 convertedDictionary[key] = "null"
