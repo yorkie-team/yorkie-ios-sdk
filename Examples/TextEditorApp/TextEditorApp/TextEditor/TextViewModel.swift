@@ -94,7 +94,7 @@ class TextViewModel {
     }
 
     func syncText() async {
-        let context = (await self.document.getRoot().content as? JSONText)?.plainText ?? ""
+        let context = (await self.document.getRoot().content as? JSONText)?.toString ?? ""
 
         self.operationSubject?.send([.edit(range: nil, content: context)])
     }
