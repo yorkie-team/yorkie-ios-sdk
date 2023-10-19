@@ -27,17 +27,17 @@ import Foundation
  * Invariant 3: Only the left child can be red (left leaning)
  */
 class LLRBTree<K: Comparable, V> {
-    typealias Entry<K, V> = (key: K, value: V)
+    typealias Entry = (key: K, value: V)
 
     /**
      * `LLRBNode` is node of LLRBTree.
      */
-    class Node<K, V>: CustomDebugStringConvertible {
+    class Node: CustomDebugStringConvertible {
         var key: K
         var value: V
-        weak var parent: Node<K, V>?
-        var left: Node<K, V>?
-        var right: Node<K, V>?
+        weak var parent: Node?
+        var left: Node?
+        var right: Node?
         var isRed: Bool
 
         init(_ key: K, _ value: V, _ isRed: Bool) {
@@ -54,12 +54,12 @@ class LLRBTree<K: Comparable, V> {
             self.left == nil && self.right == nil
         }
 
-        var entry: Entry<K, V> {
-            (self.key, self.value)
+        var entry: Entry {
+            (key: self.key, value: self.value)
         }
     }
 
-    private var root: Node<K, V>?
+    private var root: Node?
     private var counter: Int = 0
 
     /**
@@ -105,7 +105,7 @@ class LLRBTree<K: Comparable, V> {
         return result
     }
 
-    private func traverseInorder(_ node: Node<K, V>?, _ result: inout [V]) {
+    private func traverseInorder(_ node: Node?, _ result: inout [V]) {
         guard let node else {
             return
         }
@@ -119,7 +119,7 @@ class LLRBTree<K: Comparable, V> {
      * `floorEntry` returns the entry for the greatest key less than or equal to the
      *  given key. If there is no such key, returns `undefined`.
      */
-    func floorEntry(_ key: K) -> Entry<K, V>? {
+    func floorEntry(_ key: K) -> Entry? {
         var node = self.root
 
         while node != nil {
@@ -154,7 +154,7 @@ class LLRBTree<K: Comparable, V> {
     /**
      * `lastEntry` returns last entry of LLRBTree.
      */
-    func lastEntry() -> Entry<K, V>? {
+    func lastEntry() -> Entry? {
         if self.root == nil {
             return nil
         }
@@ -196,7 +196,7 @@ class LLRBTree<K: Comparable, V> {
         return self.max(root).value
     }
 
-    private func getInternal(_ key: K, _ node: Node<K, V>?) -> Node<K, V>? {
+    private func getInternal(_ key: K, _ node: Node?) -> Node? {
         var node = node
 
         while node != nil {
@@ -212,7 +212,7 @@ class LLRBTree<K: Comparable, V> {
         return nil
     }
 
-    private func putInternal(_ key: K, _ value: V, _ node: Node<K, V>?) -> Node<K, V> {
+    private func putInternal(_ key: K, _ value: V, _ node: Node?) -> Node {
         var node = node
 
         if node == nil {
@@ -243,7 +243,7 @@ class LLRBTree<K: Comparable, V> {
         return node!
     }
 
-    private func removeInternal(_ node: Node<K, V>, _ key: K) -> Node<K, V>? {
+    private func removeInternal(_ node: Node, _ key: K) -> Node? {
         var node = node
 
         if key < node.key {
@@ -279,7 +279,7 @@ class LLRBTree<K: Comparable, V> {
         return self.fixUp(node)
     }
 
-    private func min(_ node: Node<K, V>) -> Node<K, V> {
+    private func min(_ node: Node) -> Node {
         if node.left == nil {
             return node
         } else {
@@ -287,7 +287,7 @@ class LLRBTree<K: Comparable, V> {
         }
     }
 
-    private func max(_ node: Node<K, V>) -> Node<K, V> {
+    private func max(_ node: Node) -> Node {
         if node.right == nil {
             return node
         } else {
@@ -295,7 +295,7 @@ class LLRBTree<K: Comparable, V> {
         }
     }
 
-    private func removeMin(_ node: Node<K, V>) -> Node<K, V>? {
+    private func removeMin(_ node: Node) -> Node? {
         var node = node
 
         if node.left == nil {
@@ -311,7 +311,7 @@ class LLRBTree<K: Comparable, V> {
         return self.fixUp(node)
     }
 
-    private func fixUp(_ node: Node<K, V>) -> Node<K, V> {
+    private func fixUp(_ node: Node) -> Node {
         var node = node
 
         if self.isRed(node.right) {
@@ -329,7 +329,7 @@ class LLRBTree<K: Comparable, V> {
         return node
     }
 
-    private func moveRedLeft(_ node: Node<K, V>) -> Node<K, V> {
+    private func moveRedLeft(_ node: Node) -> Node {
         var node = node
 
         self.flipColors(&node)
@@ -341,7 +341,7 @@ class LLRBTree<K: Comparable, V> {
         return node
     }
 
-    private func moveRedRight(_ node: Node<K, V>) -> Node<K, V> {
+    private func moveRedRight(_ node: Node) -> Node {
         var node = node
 
         self.flipColors(&node)
@@ -352,11 +352,11 @@ class LLRBTree<K: Comparable, V> {
         return node
     }
 
-    private func isRed(_ node: Node<K, V>?) -> Bool {
+    private func isRed(_ node: Node?) -> Bool {
         node?.isRed ?? false
     }
 
-    private func rotateLeft(_ node: Node<K, V>) -> Node<K, V> {
+    private func rotateLeft(_ node: Node) -> Node {
         let nodeX = node.right!
         node.right = nodeX.left
         nodeX.left = node
@@ -365,7 +365,7 @@ class LLRBTree<K: Comparable, V> {
         return nodeX
     }
 
-    private func rotateRight(_ node: Node<K, V>) -> Node<K, V> {
+    private func rotateRight(_ node: Node) -> Node {
         let nodeX = node.left!
         node.left = nodeX.right
         nodeX.right = node
@@ -374,7 +374,7 @@ class LLRBTree<K: Comparable, V> {
         return nodeX
     }
 
-    private func flipColors(_ node: inout Node<K, V>) {
+    private func flipColors(_ node: inout Node) {
         node.isRed = !node.isRed
         node.left!.isRed = !node.left!.isRed
         node.right!.isRed = !node.right!.isRed
@@ -386,7 +386,7 @@ class LLRBTree<K: Comparable, V> {
         print("<<<<<<<<<<<<<<<<<<")
     }
 
-    func print2DUtil(_ node: Node<K, V>?, _ space: Int, _ dir: String) {
+    func print2DUtil(_ node: Node?, _ space: Int, _ dir: String) {
         if node == nil {
             return
         }
