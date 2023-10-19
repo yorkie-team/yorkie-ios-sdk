@@ -42,10 +42,15 @@ extension AnyValueTypeDictionary {
                       let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
-            } else if value == nil {
-                convertedDictionary[key] = "null"
+            } else if let value {
+                if value is String {
+                    convertedDictionary[key] = String("\"\(value)\"")
+                } else {
+                    convertedDictionary[key] = String("\(value)")
+                }
+                print("Warning: non-encodable value for key '\(key)': \(value)")
             } else {
-                print("Warning: Skipping non-convertible value for key '\(key)': \(String(describing: value))")
+                convertedDictionary[key] = "null"
             }
         }
 
