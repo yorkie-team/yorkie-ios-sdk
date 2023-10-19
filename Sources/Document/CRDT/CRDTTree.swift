@@ -17,50 +17,6 @@
 import Foundation
 
 /**
- * `TreeNode` represents the JSON representation of a node in the tree.
- * It is used to serialize and deserialize the tree.
- */
-public struct TreeNode: Equatable {
-    let type: TreeNodeType
-    var children: [TreeNode]?
-    var value: String?
-    var attributes: [String: String]?
-
-    var toJSONString: String {
-        if self.type == DefaultTreeNodeType.text.rawValue {
-            let valueString = self.value ?? ""
-
-            return "{\"type\":\"\(self.type)\",\"value\":\"\(valueString)\"}"
-        } else {
-            var childrenString = ""
-            if let children, children.isEmpty == false {
-                childrenString = children.compactMap { $0.toJSONString }.joined(separator: ",")
-            }
-
-            var resultString = "{\"type\":\"\(self.type)\",\"children\":[\(childrenString)]"
-
-            if let attributes, attributes.isEmpty == false {
-                let sortedKeys = attributes.keys.sorted()
-
-                let attrsString = sortedKeys.compactMap { key in
-                    if let value = attributes[key] {
-                        return "\"\(key)\":\(value)"
-                    } else {
-                        return nil
-                    }
-                }.joined(separator: ",")
-
-                resultString += ",\"attributes\":{\(attrsString)}"
-            }
-
-            resultString += "}"
-
-            return resultString
-        }
-    }
-}
-
-/**
  * `TreeNodeForTest` represents the JSON representation of a node in the tree.
  * It is used for testing.
  */
@@ -82,7 +38,7 @@ enum TreeChangeType {
 }
 
 enum TreeChangeValue {
-    case nodes([TreeNode])
+    case nodes([CRDTTreeNode])
     case attributes([String: String])
 }
 
@@ -359,23 +315,6 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
-     * `toTreeNode` converts the given CRDTTreeNode to TreeNode.
-     */
-    var toTreeNode: TreeNode {
-        if self.isText {
-            return TreeNode(type: self.type, value: self.value)
-        }
-
-        let children = self.children.compactMap {
-            $0.toTreeNode
-        }
-
-        let attrs = self.attrs?.toObject().mapValues { $0.value }
-
-        return TreeNode(type: self.type, children: children, attributes: attrs)
-    }
-
-    /**
      * toXML converts the given CRDTNode to XML string.
      */
     static func toXML(node: CRDTTreeNode) -> String {
@@ -422,18 +361,34 @@ final class CRDTTreeNode: IndexTreeNode {
         }
     }
 
-    var toJSONTreeNode: any JSONTreeNode {
-        if self.isText {
-            return JSONTreeTextNode(value: self.value)
+    var toJSONString: String {
+        if self.type == DefaultTreeNodeType.text.rawValue {
+            return "{\"type\":\"\(self.type)\",\"value\":\"\(self.value)\"}"
         } else {
-            var attrs = [String: String]()
-            self.attrs?.forEach {
-                attrs[$0.key] = $0.value
+            var childrenString = ""
+            if children.isEmpty == false {
+                childrenString = children.compactMap { $0.toJSONString }.joined(separator: ",")
             }
 
-            return JSONTreeElementNode(type: self.type,
-                                       attributes: attrs.toJSONObejct,
-                                       children: self.children.compactMap { $0.toJSONTreeNode })
+            var resultString = "{\"type\":\"\(self.type)\",\"children\":[\(childrenString)]"
+
+            if let attributes = self.attrs?.toObject().mapValues({ $0.value }), attributes.isEmpty == false {
+                let sortedKeys = attributes.keys.sorted()
+
+                let attrsString = sortedKeys.compactMap { key in
+                    if let value = attributes[key] {
+                        return "\"\(key)\":\(value)"
+                    } else {
+                        return nil
+                    }
+                }.joined(separator: ",")
+
+                resultString += ",\"attributes\":{\(attrsString)}"
+            }
+
+            resultString += "}"
+
+            return resultString
         }
     }
 }
@@ -592,7 +547,7 @@ class CRDTTree: CRDTGCElement {
 
         var value: TreeChangeValue?
 
-        if let nodes = contents?.compactMap({ $0.toTreeNode }) {
+        if let nodes = contents?.compactMap({ $0 }) {
             value = .nodes(nodes)
         }
 
@@ -849,14 +804,7 @@ class CRDTTree: CRDTGCElement {
      * `toJSON` returns the JSON encoding of this tree.
      */
     func toJSON() -> String {
-        self.rootTreeNode.toJSONString
-    }
-
-    /**
-     * `rootTreeNode` returns the converted value of this tree to TreeNode.
-     */
-    var rootTreeNode: TreeNode {
-        self.indexTree.root.toTreeNode
+        self.indexTree.root.toJSONString
     }
 
     /**

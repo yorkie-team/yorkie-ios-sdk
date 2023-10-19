@@ -72,7 +72,7 @@ struct TreeEditOperation: Operation {
         }
 
         return changes.compactMap { change in
-            let value: [TreeNode] = {
+            let value: [CRDTTreeNode] = {
                 if case .nodes(let nodes) = change.value {
                     return nodes
                 } else {
@@ -86,7 +86,7 @@ struct TreeEditOperation: Operation {
                 to: change.to,
                 fromPath: change.fromPath,
                 toPath: change.toPath,
-                value: value
+                value: value.compactMap { $0.toJSONTreeNode }
             )
         }
     }

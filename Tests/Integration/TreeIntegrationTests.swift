@@ -216,7 +216,7 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(treeOperations[0].type, .treeEdit)
         XCTAssertEqual(treeOperations[0].from, 1)
         XCTAssertEqual(treeOperations[0].to, 1)
-        XCTAssertEqual(treeOperations[0].value, [TreeNode(type: DefaultTreeNodeType.text.rawValue, value: "X")])
+        XCTAssertEqual(treeOperations[0].value as? [JSONTreeTextNode], [JSONTreeTextNode(value: "X")])
     }
 
     func test_can_be_subscribed_by_handler_path() async throws {
@@ -260,7 +260,7 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(treeOperations[0].type, .treeEdit)
         XCTAssertEqual(treeOperations[0].fromPath, [0, 0, 0, 1])
         XCTAssertEqual(treeOperations[0].toPath, [0, 0, 0, 1])
-        XCTAssertEqual(treeOperations[0].value, [TreeNode(type: DefaultTreeNodeType.text.rawValue, value: "X")])
+        XCTAssertEqual(treeOperations[0].value as? [JSONTreeTextNode], [JSONTreeTextNode(value: "X")])
     }
 
     func test_can_edit_its_content_with_path() async throws {
