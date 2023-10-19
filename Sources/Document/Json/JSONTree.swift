@@ -18,6 +18,7 @@ import Foundation
 
 public protocol JSONTreeNode: Equatable {
     var type: TreeNodeType { get }
+    var toJSONString: String { get }
 }
 
 struct TreeChangeWithPath {
@@ -86,6 +87,39 @@ public struct JSONTreeElementNode: JSONTreeNode {
         self.attributes = attributes
         self.children = children
     }
+
+    public var toJSONString: String {
+        var childrenString = ""
+        if self.children.isEmpty == false {
+            childrenString = self.children.compactMap { $0.toJSONString }.joined(separator: ",")
+        }
+
+        var resultString = "{\"type\":\"\(self.type)\",\"children\":[\(childrenString)]"
+
+        if self.attributes.isEmpty == false {
+            let sortedKeys = self.attributes.keys.sorted()
+
+            let attrsString = sortedKeys.compactMap { key in
+                if let value = attributes[key] as? Int {
+                    return "\"\(key)\":\(value)"
+                } else if let value = attributes[key] as? Double {
+                    return "\"\(key)\":\(value)"
+                } else if let value = attributes[key] as? Bool {
+                    return "\"\(key)\":\(value)"
+                } else if let value = attributes[key] as? String {
+                    return "\"\(key)\":\"\(value)\""
+                } else {
+                    return "\"\(key)\":null"
+                }
+            }.joined(separator: ",")
+
+            resultString += ",\"attributes\":{\(attrsString)}"
+        }
+
+        resultString += "}"
+
+        return resultString
+    }
 }
 
 /**
@@ -97,6 +131,10 @@ public struct JSONTreeTextNode: JSONTreeNode {
 
     public init(value: String) {
         self.value = value
+    }
+
+    public var toJSONString: String {
+        return "{\"type\":\"\(self.type)\",\"value\":\"\(self.value)\"}"
     }
 }
 
