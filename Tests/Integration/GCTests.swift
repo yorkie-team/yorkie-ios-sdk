@@ -739,4 +739,34 @@ class GCTests: XCTestCase {
         try await client1.deactivate()
         try await client2.deactivate()
     }
+
+    func test_can_collect_removed_elements_from_both_root_and_clone() async throws {
+        let options = ClientOptions()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc = Document(key: docKey)
+
+        let client = Client(rpcAddress: rpcAddress, options: options)
+
+        try await client.activate()
+
+        try await client.attach(doc, [:], false)
+
+        try await doc.update { root, _ in
+            root.point = ["x": Int64(0), "y": Int64(0)]
+        }
+
+        try await doc.update { root, _ in
+            root.point = ["x": Int64(1), "y": Int64(1)]
+        }
+
+        try await doc.update { root, _ in
+            root.point = ["x": Int64(2), "y": Int64(2)]
+        }
+
+        var len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 6)
+        len = await doc.getGarbageLengthFromClone()
+        XCTAssertEqual(len, 6)
+    }
 }

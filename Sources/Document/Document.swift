@@ -345,6 +345,13 @@ public actor Document {
     }
 
     /**
+     * `getGarbageLengthFromClone` returns the length of elements should be purged from clone.
+     */
+    func getGarbageLengthFromClone() -> Int {
+        return self.clone?.root.garbageLength ?? 0
+    }
+
+    /**
      * `toJSON` returns the JSON encoding of this array.
      */
     public func toJSON() -> String {

@@ -55,8 +55,11 @@ struct SetOperation: Operation {
         }
 
         let value = self.value.deepcopy()
-        parent.set(key: self.key, value: value)
+        let removed = parent.set(key: self.key, value: value)
         root.registerElement(value, parent: parent)
+        if let removed {
+            root.registerRemovedElement(removed)
+        }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError.unexpected(message: "fail to get path")
