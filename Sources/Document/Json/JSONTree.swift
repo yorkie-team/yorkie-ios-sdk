@@ -100,7 +100,9 @@ public struct JSONTreeElementNode: JSONTreeNode {
             let sortedKeys = self.attributes.keys.sorted()
 
             let attrsString = sortedKeys.compactMap { key in
-                if let value = attributes[key] as? Int {
+                if let attrs = attributes[key] as? Encodable, let value = attrs.toJSONString {
+                    return "\"\(key)\":\(value)"
+                } else if let value = attributes[key] as? Int {
                     return "\"\(key)\":\(value)"
                 } else if let value = attributes[key] as? Double {
                     return "\"\(key)\":\(value)"
