@@ -33,12 +33,12 @@ extension AnyValueTypeDictionary {
             {
                 convertedDictionary[key] = stringValue
             } else if let value = value as? [String: Any],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value),
+                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
                       let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
             } else if let value = value as? [[String: Any]],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value),
+                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
                       let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
