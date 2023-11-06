@@ -70,7 +70,7 @@ final class CRDTTreeNodeTests: XCTestCase {
         XCTAssertEqual(right?.id, CRDTTreeNodeID(createdAt: TimeTicket.initial, offset: 5))
     }
 
-    func test_can_be_escaped_newline_() {
+    func test_can_be_escaped_newline() {
         let node = CRDTTreeNode(id: DTP, type: DefaultTreeNodeType.text.rawValue, value: "\n")
 
         XCTAssertEqual(node.id, DTP)
