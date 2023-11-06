@@ -45,13 +45,14 @@ extension String {
 
         return self
     }
-    
+
     var toJSONString: String {
         if let jsonData = try? JSONSerialization.data(withJSONObject: self, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
-           let escapedValue = String(bytes: jsonData, encoding: .utf8) {
+           let escapedValue = String(bytes: jsonData, encoding: .utf8)
+        {
             return escapedValue
         }
-        
+
         return ""
     }
 }
