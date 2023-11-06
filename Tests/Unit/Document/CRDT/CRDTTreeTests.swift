@@ -69,6 +69,19 @@ final class CRDTTreeNodeTests: XCTestCase {
         XCTAssertEqual(left.id, CRDTTreeNodeID(createdAt: TimeTicket.initial, offset: 0))
         XCTAssertEqual(right?.id, CRDTTreeNodeID(createdAt: TimeTicket.initial, offset: 5))
     }
+
+    func test_can_be_escaped_newline_() {
+        let node = CRDTTreeNode(id: DTP, type: DefaultTreeNodeType.text.rawValue, value: "\n")
+
+        XCTAssertEqual(node.id, DTP)
+        XCTAssertEqual(node.type, DefaultTreeNodeType.text.rawValue)
+        XCTAssertEqual(node.value, "\n")
+        XCTAssertEqual(node.size, 1)
+        XCTAssertEqual(node.isText, true)
+        XCTAssertEqual(node.isRemoved, false)
+
+        XCTAssertEqual(node.toJSONString, "{\"type\":\"text\",\"value\":\"\\n\"}")
+    }
 }
 
 final class CRDTTreeTests: XCTestCase {
