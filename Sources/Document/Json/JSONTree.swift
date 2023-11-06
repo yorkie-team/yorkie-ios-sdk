@@ -109,7 +109,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
                 } else if let value = attributes[key] as? Bool {
                     return "\"\(key)\":\(value)"
                 } else if let value = attributes[key] as? String {
-                    return "\"\(key)\":\"\(value)\""
+                    return "\"\(key)\":\(value.toJSONString)"
                 } else {
                     return "\"\(key)\":null"
                 }
@@ -136,7 +136,7 @@ public struct JSONTreeTextNode: JSONTreeNode {
     }
 
     public var toJSONString: String {
-        return "{\"type\":\"\(self.type)\",\"value\":\"\(self.value)\"}"
+        return "{\"type\":\(self.type.toJSONString),\"value\":\(value.toJSONString)}"
     }
 }
 

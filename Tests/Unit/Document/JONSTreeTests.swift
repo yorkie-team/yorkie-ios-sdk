@@ -38,4 +38,10 @@ final class JONSTreeTests: XCTestCase {
 
         XCTAssertEqual(elementNode.toJSONString, "{\"type\":\"doc\",\"children\":[{\"type\":\"p\",\"children\":[]},{\"type\":\"text\",\"value\":\"Y\"}],\"attributes\":{\"boolean\":true,\"doubleValue\":10.5,\"intValue\":100,\"point\":{\"x\":100,\"y\":200},\"string\":\"testString\"}}")
     }
+    
+    func test_json_newline_string() throws {
+        let textNode = JSONTreeTextNode(value: "\n")
+
+        XCTAssertEqual(textNode.toJSONString, "{\"type\":\"text\",\"value\":\"\\n\"}")
+    }
 }
