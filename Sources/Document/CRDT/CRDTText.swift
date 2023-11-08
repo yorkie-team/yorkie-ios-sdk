@@ -30,7 +30,7 @@ func stringifyAttributes(_ attributes: TextAttributes) -> [String: String] {
     }
 
     return jsonObject.mapValues {
-        if let result = try? JSONSerialization.data(withJSONObject: $0, options: .fragmentsAllowed) {
+        if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes]) {
             return String(data: result, encoding: .utf8) ?? ""
         } else {
             return ""

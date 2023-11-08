@@ -653,7 +653,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
             var d1JSON = await d1.toSortedJSON()
             var d2JSON = await d2.toSortedJSON()
 
-            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"The \"},{\"attrs\":{\"link\":\"https:\\/\\/www.google.com\\/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\".\"}]}")
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"The \"},{\"attrs\":{\"link\":\"https://www.google.com/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\".\"}]}")
             XCTAssertEqual(d1JSON, d2JSON)
 
             try await d1.update { root, _ in
@@ -661,14 +661,14 @@ final class TextIntegrationConcurrentTests: XCTestCase {
             }
 
             d1JSON = await d1.toSortedJSON()
-            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"The \"},{\"val\":\"quick \"},{\"attrs\":{\"link\":\"https:\\/\\/www.google.com\\/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\".\"}]}")
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"The \"},{\"val\":\"quick \"},{\"attrs\":{\"link\":\"https://www.google.com/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\".\"}]}")
 
             try await d2.update { root, _ in
                 (root.k1 as? JSONText)?.edit(14, 14, " over the dog")
             }
 
             d2JSON = await d2.toSortedJSON()
-            XCTAssertEqual(d2JSON, "{\"k1\":[{\"val\":\"The \"},{\"attrs\":{\"link\":\"https:\\/\\/www.google.com\\/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\" over the dog\"},{\"val\":\".\"}]}")
+            XCTAssertEqual(d2JSON, "{\"k1\":[{\"val\":\"The \"},{\"attrs\":{\"link\":\"https://www.google.com/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\" over the dog\"},{\"val\":\".\"}]}")
 
             try await c1.sync()
             try await c2.sync()
@@ -676,7 +676,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
 
             d1JSON = await d1.toSortedJSON()
             d2JSON = await d2.toSortedJSON()
-            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"The \"},{\"val\":\"quick \"},{\"attrs\":{\"link\":\"https:\\/\\/www.google.com\\/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\" over the dog\"},{\"val\":\".\"}]}")
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"The \"},{\"val\":\"quick \"},{\"attrs\":{\"link\":\"https://www.google.com/search?q=jumping+fox\"},\"val\":\"fox jumped\"},{\"val\":\" over the dog\"},{\"val\":\".\"}]}")
             XCTAssertEqual(d1JSON, d2JSON)
         }
     }
