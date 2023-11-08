@@ -363,21 +363,21 @@ final class CRDTTreeNode: IndexTreeNode {
 
     var toJSONString: String {
         if self.type == DefaultTreeNodeType.text.rawValue {
-            return "{\"type\":\"\(self.type)\",\"value\":\"\(self.value)\"}"
+            return "{\"type\":\(self.type.toJSONString),\"value\":\(self.value.toJSONString)}"
         } else {
             var childrenString = ""
             if children.isEmpty == false {
                 childrenString = children.compactMap { $0.toJSONString }.joined(separator: ",")
             }
 
-            var resultString = "{\"type\":\"\(self.type)\",\"children\":[\(childrenString)]"
+            var resultString = "{\"type\":\(self.type.toJSONString),\"children\":[\(childrenString)]"
 
             if let attributes = self.attrs?.toObject().mapValues({ $0.value }), attributes.isEmpty == false {
                 let sortedKeys = attributes.keys.sorted()
 
                 let attrsString = sortedKeys.compactMap { key in
                     if let value = attributes[key] {
-                        return "\"\(key)\":\(value)"
+                        return "\(key.toJSONString):\(value)"
                     } else {
                         return nil
                     }

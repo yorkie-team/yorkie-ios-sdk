@@ -94,24 +94,24 @@ public struct JSONTreeElementNode: JSONTreeNode {
             childrenString = self.children.compactMap { $0.toJSONString }.joined(separator: ",")
         }
 
-        var resultString = "{\"type\":\"\(self.type)\",\"children\":[\(childrenString)]"
+        var resultString = "{\"type\":\(self.type.toJSONString),\"children\":[\(childrenString)]"
 
         if self.attributes.isEmpty == false {
             let sortedKeys = self.attributes.keys.sorted()
 
             let attrsString = sortedKeys.compactMap { key in
                 if let attrs = attributes[key] as? Encodable, let value = attrs.toJSONString {
-                    return "\"\(key)\":\(value)"
+                    return "\(key.toJSONString):\(value)"
                 } else if let value = attributes[key] as? Int {
-                    return "\"\(key)\":\(value)"
+                    return "\(key.toJSONString):\(value)"
                 } else if let value = attributes[key] as? Double {
-                    return "\"\(key)\":\(value)"
+                    return "\(key.toJSONString):\(value)"
                 } else if let value = attributes[key] as? Bool {
-                    return "\"\(key)\":\(value)"
+                    return "\(key.toJSONString):\(value)"
                 } else if let value = attributes[key] as? String {
-                    return "\"\(key)\":\"\(value)\""
+                    return "\(key.toJSONString):\(value.toJSONString)"
                 } else {
-                    return "\"\(key)\":null"
+                    return "\(key.toJSONString):null"
                 }
             }.joined(separator: ",")
 
@@ -136,7 +136,7 @@ public struct JSONTreeTextNode: JSONTreeNode {
     }
 
     public var toJSONString: String {
-        return "{\"type\":\"\(self.type)\",\"value\":\"\(self.value)\"}"
+        return "{\"type\":\(self.type.toJSONString),\"value\":\(self.value.toJSONString)}"
     }
 }
 
