@@ -17,7 +17,6 @@
 import Combine
 import UIKit
 
-@MainActor
 class KanbanViewController: UIViewController {
     private var cancellables = Set<AnyCancellable>()
     private let itemHeight: CGFloat = KanbanLayoutProperty.labelHeight

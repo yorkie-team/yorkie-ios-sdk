@@ -17,7 +17,6 @@
 import Combine
 import UIKit
 
-@MainActor
 class TextEditorViewController: UIViewController {
     private let defaultFont = UIFont.preferredFont(forTextStyle: .body)
     private let textView: UITextView = {
@@ -102,9 +101,7 @@ class TextEditorViewController: UIViewController {
 
         subject.sink { [weak self] elements in
             Task {
-                await MainActor.run { [weak self] in
-                    self?.updateTextStorage(elements)
-                }
+				self?.updateTextStorage(elements)
             }
         }.store(in: &self.cancellables)
 
