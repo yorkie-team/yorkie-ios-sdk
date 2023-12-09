@@ -101,7 +101,7 @@ class TextEditorViewController: UIViewController {
 
         subject.sink { [weak self] elements in
             Task {
-				self?.updateTextStorage(elements)
+                self?.updateTextStorage(elements)
             }
         }.store(in: &self.cancellables)
 
