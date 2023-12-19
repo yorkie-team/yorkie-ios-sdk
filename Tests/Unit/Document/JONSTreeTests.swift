@@ -44,4 +44,15 @@ final class JONSTreeTests: XCTestCase {
 
         XCTAssertEqual(textNode.toJSONString, "{\"type\":\"text\",\"value\":\"\\n\"}")
     }
+
+    func test_json_jsonSerialiaztion() throws {
+        let attr = RHT()
+
+        attr.set(key: "list", value: "{\"@ctype\":\"paragraphListStyle\",\"level\":0,\"type\":\"bullet\"}", executedAt: TimeTicket.initial)
+
+        let crdtTreeNode = CRDTTreeNode(id: .initial, type: "listNode", children: nil, attributes: attr)
+        let jsonTreeNode = crdtTreeNode.toJSONTreeNode
+
+        XCTAssertEqual(crdtTreeNode.toJSONString, jsonTreeNode.toJSONString)
+    }
 }
