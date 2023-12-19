@@ -102,6 +102,10 @@ public struct JSONTreeElementNode: JSONTreeNode {
             let attrsString = sortedKeys.compactMap { key in
                 if let attrs = attributes[key] as? Encodable, let value = attrs.toJSONString {
                     return "\(key.toJSONString):\(value)"
+                } else if let value = attributes[key] as? Any, JSONSerialization.isValidJSONObject(value),
+                          let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
+                {
+                    return "\(key.toJSONString):\(String(data: data, encoding: .utf8) ?? "null")"
                 } else if let value = attributes[key] as? Int {
                     return "\(key.toJSONString):\(value)"
                 } else if let value = attributes[key] as? Double {
