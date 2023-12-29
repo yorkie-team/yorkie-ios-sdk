@@ -73,7 +73,7 @@ public class Presence {
     /**
      * `clear` clears the presence.
      */
-    func clear() {
+    public func clear() {
         self.presence = [:]
 
         let presenceChange = PresenceChange.clear
