@@ -475,6 +475,13 @@ public actor Client {
         self.attachmentMap[docKey]?.isRealtimeSync = isRealtimeSync
 
         if isRealtimeSync {
+            // NOTE(chacha912): When re-establishing real-time sync, there might have been
+            // changes while the connection was off. Therefore, syncing needs to be performed
+            // once. Currently, if syncing is called here, it overlaps with `syncInternal`,
+            // causing the issue of the response being applied twice. (Ref: issues#603)
+            // Therefore, we set `remoteChangeEventReceived` to true, allowing syncing to
+            // occur in `syncInternal`.
+            self.attachmentMap[docKey]?.remoteChangeEventReceived = true
             try self.runWatchLoop(docKey)
         } else {
             try self.stopWatchLoop(docKey)
