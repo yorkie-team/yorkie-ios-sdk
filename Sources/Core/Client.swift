@@ -478,7 +478,8 @@ public actor Client {
             // NOTE(hackerwins): In manual mode, the client does not receive change events
             // from the server. Therefore, we need to set `remoteChangeEventReceived` to true
             // to sync the local and remote changes. This has limitations in that unnecessary
-            // syncs occur if the client and server do not have any changes.            self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+            // syncs occur if the client and server do not have any changes.
+            self.attachmentMap[docKey]?.remoteChangeEventReceived = true
             try self.runWatchLoop(docKey)
         } else {
             try self.stopWatchLoop(docKey)
