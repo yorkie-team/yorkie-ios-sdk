@@ -563,13 +563,11 @@ public actor Document {
                     var operations = [String: [any OperationInfo]]()
 
                     for operationInfo in event.value.operations {
-                        for targetPath in self.subscribeCallbacks.keys {
-                            if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
-                                if operations[targetPath] == nil {
-                                    operations[targetPath] = [any OperationInfo]()
-                                }
-                                operations[targetPath]?.append(operationInfo)
+                        for targetPath in self.subscribeCallbacks.keys where self.isSameElementOrChildOf(operationInfo.path, targetPath) {
+                            if operations[targetPath] == nil {
+                                operations[targetPath] = [any OperationInfo]()
                             }
+                            operations[targetPath]?.append(operationInfo)
                         }
                     }
 

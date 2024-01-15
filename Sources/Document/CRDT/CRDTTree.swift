@@ -522,8 +522,8 @@ class CRDTTree: CRDTGCElement {
         let allChildren = parent.innerChildren
         let index = parent === leftNode ? 0 : allChildren.firstIndex(where: { $0 === leftNode })! + 1
 
-        for i in index ..< parent.innerChildren.count {
-            let next = allChildren[i]
+        for index in index ..< parent.innerChildren.count {
+            let next = allChildren[index]
             if !next.id.createdAt.after(editedAt) {
                 break
             }

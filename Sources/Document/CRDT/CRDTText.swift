@@ -326,12 +326,10 @@ final class CRDTText: CRDTGCElement {
     public func toJSON() -> String {
         var json = [String]()
 
-        for item in self.rgaTreeSplit {
-            if !item.isRemoved {
-                let nodeValue = item.value.toJSON
-                if nodeValue.isEmpty == false {
-                    json.append(nodeValue)
-                }
+        for item in self.rgaTreeSplit where !item.isRemoved {
+            let nodeValue = item.value.toJSON
+            if nodeValue.isEmpty == false {
+                json.append(nodeValue)
             }
         }
 
