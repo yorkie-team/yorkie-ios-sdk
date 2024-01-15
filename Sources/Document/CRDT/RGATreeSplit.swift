@@ -537,9 +537,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     public var toJSON: String {
         var result = [String]()
 
-        self.forEach {
-            if !$0.isRemoved {
-                result.append("\($0.value)")
+        for item in self {
+            if !item.isRemoved {
+                result.append("\(item.value)")
             }
         }
 
@@ -576,11 +576,11 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     public var toTestString: String {
         var result = [String]()
 
-        self.forEach {
-            if !$0.isRemoved {
-                result.append("[\($0.toTestString)]")
+        for item in self {
+            if !item.isRemoved {
+                result.append("[\(item.toTestString)]")
             } else {
-                result.append("{\($0.toTestString)}")
+                result.append("{\(item.toTestString)}")
             }
         }
 

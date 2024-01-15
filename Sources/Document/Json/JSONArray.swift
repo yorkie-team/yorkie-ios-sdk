@@ -157,7 +157,7 @@ public class JSONArray {
     }
 
     func push(values: [Any]) {
-        values.forEach { value in
+        for value in values {
             self.push(value)
         }
     }
@@ -181,8 +181,8 @@ public class JSONArray {
             let length = self.push(JSONArray())
             let appendedIndex = length - 1
             let jsonArray = self[appendedIndex] as? JSONArray
-            value.toJsonArray.forEach {
-                jsonArray?.push($0)
+            for item in value.toJsonArray {
+                jsonArray?.push(item)
             }
 
             return length
@@ -645,7 +645,7 @@ public class JSONArrayIterator: IteratorProtocol {
     init(_ crdtArray: CRDTArray, _ context: ChangeContext) {
         self.context = context
         self.values = []
-        crdtArray.forEach { element in
+        for element in crdtArray {
             self.values.append(element)
         }
     }

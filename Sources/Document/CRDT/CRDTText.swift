@@ -124,7 +124,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
         if attrs.isEmpty == false {
             var data = [String]()
 
-            attrs.sorted(by: { $0.key < $1.key }).forEach { key, value in
+            for (key, value) in attrs.sorted(by: { $0.key < $1.key }) {
                 if value.value.count > 2, value.value.first == "\"", value.value.last == "\"" {
                     data.append("\"\(key)\":\(value.value)")
                 } else {
@@ -188,7 +188,7 @@ final class CRDTText: CRDTGCElement {
     {
         let value = !content.isEmpty ? TextValue(content) : nil
         if !content.isEmpty, let attributes {
-            attributes.forEach { key, jsonValue in
+            for (key, jsonValue) in attributes {
                 value?.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
             }
         }
@@ -278,7 +278,7 @@ final class CRDTText: CRDTGCElement {
                                       content: nil,
                                       attributes: attributes))
 
-            attributes.forEach { key, jsonValue in
+            for (key, jsonValue) in attributes {
                 node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
             }
         }
@@ -326,9 +326,9 @@ final class CRDTText: CRDTGCElement {
     public func toJSON() -> String {
         var json = [String]()
 
-        self.rgaTreeSplit.forEach {
-            if !$0.isRemoved {
-                let nodeValue = $0.value.toJSON
+        for item in self.rgaTreeSplit {
+            if !item.isRemoved {
+                let nodeValue = item.value.toJSON
                 if nodeValue.isEmpty == false {
                     json.append(nodeValue)
                 }

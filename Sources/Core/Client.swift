@@ -256,8 +256,8 @@ public actor Client {
             return
         }
 
-        try self.attachmentMap.forEach {
-            try self.stopWatchLoop($0.key)
+        for item in self.attachmentMap {
+            try self.stopWatchLoop(item.key)
         }
 
         var deactivateRequest = DeactivateClientRequest()
@@ -704,7 +704,7 @@ public actor Client {
         switch body {
         case .initialization(let initialization):
             var onlineClients = Set<ActorID>()
-            initialization.clientIds.forEach { pbClientID in
+            for pbClientID in initialization.clientIds {
                 onlineClients.insert(pbClientID)
             }
 

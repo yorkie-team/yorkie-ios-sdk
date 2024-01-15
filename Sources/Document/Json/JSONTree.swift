@@ -159,7 +159,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
     } else if let node = treeNode as? JSONTreeElementNode {
         let attrs = RHT()
 
-        node.attributes.stringValueTypeDictionary.forEach { key, value in
+        for (key, value) in node.attributes.stringValueTypeDictionary {
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
@@ -167,7 +167,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
 
         try parent.append(contentsOf: [elementNode])
 
-        try node.children.forEach { child in
+        for child in node.children {
             try buildDescendants(treeNode: child, parent: elementNode, context: context)
         }
     } else {
@@ -187,13 +187,13 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
     } else if let node = content as? JSONTreeElementNode {
         let attrs = RHT()
 
-        node.attributes.stringValueTypeDictionary.forEach { key, value in
+        for (key, value) in node.attributes.stringValueTypeDictionary {
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
         root = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: ticket, offset: 0), type: node.type, attributes: attrs.size == 0 ? nil : attrs)
 
-        try node.children.forEach { child in
+        for child in node.children {
             try buildDescendants(treeNode: child, parent: root, context: context)
         }
     } else {
@@ -216,19 +216,21 @@ func validateTextNode(_ textNode: JSONTreeTextNode) throws {
  * `validateTreeNodes` ensures that treeNodes consists of only one type.
  */
 func validateTreeNodes(_ treeNodes: [any JSONTreeNode]) throws {
-    if treeNodes.isEmpty == false {
-        if treeNodes[0] is JSONTreeTextNode {
-            for node in treeNodes {
-                if let node = node as? JSONTreeTextNode {
-                    try validateTextNode(node)
-                } else {
-                    throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
-                }
-            }
-        } else {
-            if treeNodes.first(where: { !($0 is JSONTreeElementNode) }) != nil {
+    if treeNodes.isEmpty {
+        return
+    }
+
+    if treeNodes[0] is JSONTreeTextNode {
+        for node in treeNodes {
+            if let node = node as? JSONTreeTextNode {
+                try validateTextNode(node)
+            } else {
                 throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
             }
+        }
+    } else {
+        if treeNodes.first(where: { !($0 is JSONTreeElementNode) }) != nil {
+            throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
         }
     }
 }
@@ -366,8 +368,8 @@ public class JSONTree {
             try validateTreeNodes(contents)
 
             if let contents = contents as? [JSONTreeElementNode] {
-                try contents.forEach {
-                    try validateTreeNodes($0.children)
+                for content in contents {
+                    try validateTreeNodes(content.children)
                 }
             }
         }
@@ -386,6 +388,7 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
+        // TODO(hackerwins): Implement splitLevels.
         let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
@@ -443,18 +446,6 @@ public class JSONTree {
         let toPos = try tree.findPos(toIdx)
 
         return try self.editInternal(fromPos, toPos, contents: contents)
-    }
-
-    /**
-     * `split` splits this tree at the given index.
-     */
-    public func split(_ index: Int, _ depth: Int) throws -> Bool {
-        guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
-        }
-
-        try tree.split(index, depth)
-        return true
     }
 
     /**

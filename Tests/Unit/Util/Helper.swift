@@ -27,7 +27,7 @@ class TextView {
     public func applyChanges(operations: [any OperationInfo], enableLog: Bool = false) {
         let oldValue = self.value
         var changeLogs = [String]()
-        operations.forEach { operation in
+        for operation in operations {
             if let operation = operation as? EditOpInfo {
                 self.value = [
                     self.value.substring(from: 0, to: operation.from - 1),

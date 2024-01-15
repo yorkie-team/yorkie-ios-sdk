@@ -28,7 +28,7 @@ func getNodeLength(_ root: CRDTTreeNode?) -> Int {
     size += root.innerChildren.count
 
     if root.innerChildren.isEmpty == false {
-        root.innerChildren.forEach { child in
+        for child in root.innerChildren {
             size += getNodeLength(child)
         }
     }

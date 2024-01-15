@@ -61,6 +61,7 @@ struct TreeEditOperation: Operation {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
+        // TODO(hackerwins): Implement splitLevels.
         let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.executedAt, self.maxCreatedAtMapByActor)
 
         if self.fromPos != self.toPos {
