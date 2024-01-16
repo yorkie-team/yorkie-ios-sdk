@@ -82,6 +82,9 @@ extension CRDTElement {
         }
 
         if let currentRemovedAt = self.removedAt, removedAt.after(currentRemovedAt) {
+            // NOTE(chacha912): If it's a CRDTContainer, removedAt is marked only on
+            // the top-level element, without marking all descendant elements. This
+            // enhances the speed of deletion.
             self.removedAt = removedAt
             return true
         }

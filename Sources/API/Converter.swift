@@ -239,10 +239,22 @@ extension Converter {
     static func toElementSimple(_ element: CRDTElement) -> PbJSONElementSimple {
         var pbElementSimple = PbJSONElementSimple()
 
-        if element is CRDTObject {
+        if let element = element as? CRDTObject {
             pbElementSimple.type = .jsonObject
-        } else if element is CRDTArray {
+            
+            do {
+                pbElementSimple.value = try objectToBytes(obj: element)
+            } catch {
+                fatalError("Can't convert CRDTObject to bytes")
+            }
+        } else if let element = element as? CRDTArray {
             pbElementSimple.type = .jsonArray
+            
+            do {
+                pbElementSimple.value = try arrayToBytes(array: element)
+            } catch {
+                fatalError("Can't convert CRDTArray to bytes")
+            }
         } else if element is CRDTText {
             pbElementSimple.type = .text
         } else if let element = element as? Primitive {
@@ -275,9 +287,17 @@ extension Converter {
     static func fromElementSimple(pbElementSimple: PbJSONElementSimple) throws -> CRDTElement {
         switch pbElementSimple.type {
         case .jsonObject:
-            return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            if !pbElementSimple.value.isEmpty {
+                return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            } else {
+                return try bytesToObject(bytes: pbElementSimple.value)
+            }
         case .jsonArray:
-            return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            if !pbElementSimple.value.isEmpty {
+                return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            } else {
+                return try bytesToArray(bytes: pbElementSimple.value)
+            }
         case .text:
             return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
@@ -1154,7 +1174,7 @@ extension Converter {
      */
     static func bytesToObject(bytes: Data) throws -> CRDTObject {
         guard bytes.isEmpty == false else {
-            return CRDTObject(createdAt: TimeTicket.initial)
+            throw YorkieError.unexpected(message: "byte is empty")
         }
 
         let pbElement = try PbJSONElement(serializedData: bytes)
@@ -1166,6 +1186,25 @@ extension Converter {
      */
     static func objectToBytes(obj: CRDTObject) throws -> Data {
         try toElement(obj).serializedData()
+    }
+    
+    /**
+     * `bytesToArray` creates an CRDTArray from the given bytes.
+     */
+    static func bytesToArray(bytes: Data) throws -> CRDTArray {
+        guard bytes.isEmpty == false else {
+            throw YorkieError.unexpected(message: "byte is empty")
+        }
+        
+        let pbElement = try PbJSONElement(serializedData: bytes)
+        return try fromArray(pbElement.jsonArray)
+    }
+    
+    /**
+     * `arrayToBytes` converts the given CRDTArray to bytes.
+     */
+    static func arrayToBytes(array: CRDTArray) throws -> Data {
+        try toArray(array).serializedData()
     }
 }
 
