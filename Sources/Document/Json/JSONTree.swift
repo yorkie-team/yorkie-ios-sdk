@@ -388,7 +388,7 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket)
+        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, context.issueTimeTicket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,

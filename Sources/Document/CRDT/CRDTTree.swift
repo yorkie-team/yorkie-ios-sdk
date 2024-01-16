@@ -272,12 +272,13 @@ final class CRDTTreeNode: IndexTreeNode {
      */
     var insNextID: CRDTTreeNodeID?
 
-    init(id: CRDTTreeNodeID, type: TreeNodeType, value: String? = nil, children: [CRDTTreeNode]? = nil, attributes: RHT? = nil) {
+    init(id: CRDTTreeNodeID, type: TreeNodeType, value: String? = nil, children: [CRDTTreeNode]? = nil, attributes: RHT? = nil, removedAt: TimeTicket? = nil) {
         self.size = 0
         self.innerValue = ""
         self.parent = nil
 
         self.id = id
+        self.removedAt = removedAt
         self.type = type
         self.innerChildren = children ?? []
         self.attrs = attributes
@@ -336,9 +337,9 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
-     * `clone` clones this node with the given offset.
+     * `cloneText` clones this text node with the given offset.
      */
-    func clone(offset: Int32) -> CRDTTreeNode {
+    func cloneText(offset: Int32) -> CRDTTreeNode {
         let clone = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset), type: self.type, attributes: self.attrs)
         clone.removedAt = self.removedAt
         if self.isText {
@@ -357,11 +358,24 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
+     * `cloneElement` clones this element node with the given issueTimeTicket function.
+     */
+    func cloneElement(issueTimeTicket: TimeTicket) -> CRDTTreeNode {
+        CRDTTreeNode(id: CRDTTreeNodeID(createdAt: issueTimeTicket, offset: 0),
+                     type: self.type,
+                     removedAt: self.removedAt)
+    }
+
+    /**
      * `split` splits the given offset of this node.
      */
     @discardableResult
-    func split(_ tree: CRDTTree, _ offset: Int32) throws -> CRDTTreeNode? {
-        let split = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, self.id.offset)
+    func split(_ tree: CRDTTree, _ offset: Int32, _ issueTimeTicket: TimeTicket? = nil) throws -> CRDTTreeNode? {
+        if self.isText == false, issueTimeTicket == nil {
+            throw YorkieError.unexpected(message: "The issueTimeTicket for Text Node have to nil!")
+        }
+
+        let split = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!)
 
         if split != nil {
             split?.insPrevID = self.id
@@ -533,7 +547,7 @@ class CRDTTree: CRDTGCElement {
 
         // 02. Split text node if the left node is a text node.
         if leftNode.isText {
-            try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset)
+            try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset, nil)
         }
 
         // 03. Find the appropriate left node. If some nodes are inserted at the
@@ -602,7 +616,7 @@ class CRDTTree: CRDTGCElement {
      * If the content is undefined, the range will be removed.
      */
     @discardableResult
-    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([TreeChange], [String: TimeTicket]) {
+    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ issueTimeTicket: TimeTicket?, _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([TreeChange], [String: TimeTicket]) {
         // 01. find nodes from the given range and split nodes.
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -698,7 +712,7 @@ class CRDTTree: CRDTGCElement {
             var parent = fromParent
             var left = fromLeft
             while splitCount < splitLevel {
-                try parent.split(self, Int32(parent.findOffset(node: left)! + 1))
+                try parent.split(self, Int32(parent.findOffset(node: left)! + 1), issueTimeTicket)
                 left = parent
                 parent = parent.parent!
                 splitCount += 1
@@ -710,12 +724,12 @@ class CRDTTree: CRDTGCElement {
             var leftInChildren = fromLeft // tree
 
             for content in contents {
-                // 03-1. insert the content nodes to the tree.
+                // 05-1. insert the content nodes to the tree.
                 if leftInChildren === fromParent {
-                    // 03-1-1. when there's no leftSibling, then insert content into very fromt of parent's children List
+                    // 05-1-1. when there's no leftSibling, then insert content into very fromt of parent's children List
                     try fromParent.insertAt(content, 0)
                 } else {
-                    // 03-1-2. insert after leftSibling
+                    // 05-1-2. insert after leftSibling
                     try fromParent.insertAfter(content, leftInChildren)
                 }
 
@@ -741,10 +755,10 @@ class CRDTTree: CRDTGCElement {
      * `editT` edits the given range with the given value.
      * This method uses indexes instead of a pair of TreePos for testing.
      */
-    func editT(_ range: (Int, Int), _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket) throws {
+    func editT(_ range: (Int, Int), _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ issueTimeTicket: TimeTicket) throws {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
-        try self.edit((fromPos, toPos), contents, splitLevel, editedAt)
+        try self.edit((fromPos, toPos), contents, splitLevel, editedAt, issueTimeTicket)
     }
 
     /**

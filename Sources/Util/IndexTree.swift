@@ -128,7 +128,8 @@ protocol IndexTreeNode: AnyObject {
     var value: String { get set }
     var innerChildren: [Self] { get set }
 
-    func clone(offset: Int32) -> Self
+    func cloneText(offset: Int32) -> Self
+    func cloneElement(issueTimeTicket: TimeTicket) -> Self
 }
 
 extension IndexTreeNode {
@@ -200,7 +201,7 @@ extension IndexTreeNode {
 
         self.value = leftValue
 
-        let rightNode = self.clone(offset: offset + absOffset)
+        let rightNode = self.cloneText(offset: offset + absOffset)
         rightNode.value = rightValue
 
         try self.parent?.insertAfterInternal(newNode: rightNode, referenceNode: self)
@@ -323,7 +324,7 @@ extension IndexTreeNode {
     /**
      * `splitElement` splits the given element at the given offset.
      */
-    func splitElement(_ offset: Int32, _ absOffset: Int32) throws -> Self? {
+    func splitElement(_ offset: Int32, _ issuedTimeTicket: TimeTicket) throws -> Self? {
         /**
          * TODO(hackerwins): Define ID of split node for concurrent editing.
          * Text has fixed content and its split nodes could have limited offset
@@ -332,7 +333,7 @@ extension IndexTreeNode {
          * and its order could be broken when concurrent editing happens.
          * Currently, we use the similar ID of split element with the split text.
          */
-        let clone = self.clone(offset: offset + absOffset)
+        let clone = self.cloneElement(issueTimeTicket: issuedTimeTicket)
         try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
         clone.updateAncestorsSize()
 
