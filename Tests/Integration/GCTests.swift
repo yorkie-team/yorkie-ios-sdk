@@ -298,7 +298,7 @@ class GCTests: XCTestCase {
 
         try await doc.update { root, _ in
             do {
-                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], [JSONTreeTextNode(value: "gh")])
+                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "gh"))
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -322,7 +322,7 @@ class GCTests: XCTestCase {
 
         try await doc.update { root, _ in
             do {
-                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], [JSONTreeTextNode(value: "cv")])
+                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "cv"))
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -347,11 +347,11 @@ class GCTests: XCTestCase {
         try await doc.update { root, _ in
             do {
                 try (root.t as? JSONTree)?.editByPath([0], [1],
-                                                      [JSONTreeElementNode(type: "p",
-                                                                           children: [
-                                                                               JSONTreeElementNode(type: "tn",
-                                                                                                   children: [JSONTreeTextNode(value: "ab")])
-                                                                           ])])
+                                                      JSONTreeElementNode(type: "p",
+                                                                          children: [
+                                                                              JSONTreeElementNode(type: "tn",
+                                                                                                  children: [JSONTreeTextNode(value: "ab")])
+                                                                          ]))
             } catch {
                 assertionFailure("Can't editByPath")
             }
@@ -423,7 +423,7 @@ class GCTests: XCTestCase {
 
         try await doc2.update({ root, _ in
             do {
-                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], [JSONTreeTextNode(value: "gh")])
+                try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "gh"))
             } catch {
                 assertionFailure("Can't editByPath")
             }

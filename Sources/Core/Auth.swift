@@ -102,4 +102,8 @@ final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtoco
     func makePushPullChangesInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>] {
         [AuthClientInterceptor<PushPullChangeRequest, PushPullChangeResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
     }
+
+    func makeBroadcastInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse>] {
+        [AuthClientInterceptor<BroadcastRequest, BroadcastResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
+    }
 }

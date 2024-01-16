@@ -359,7 +359,7 @@ public class JSONTree {
         )
     }
 
-    private func editInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, contents: [any JSONTreeNode]?) throws -> Bool {
+    private func editInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ contents: [any JSONTreeNode]?, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -388,13 +388,13 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        // TODO(hackerwins): Implement splitLevels.
-        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, ticket)
+        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket)
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,
                                                   toPos: toPos,
                                                   contents: crdtNodes,
+                                                  splitLevel: splitLevel,
                                                   executedAt: ticket,
                                                   maxCreatedAtMapByActor: maxCreatedAtMapByActor)
         )
@@ -410,7 +410,15 @@ public class JSONTree {
      * `editByPath` edits this tree with the given node and path.
      */
     @discardableResult
-    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?) throws -> Bool {
+    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)?, _ splitLevel: Int32 = 0) throws -> Bool {
+        try self.editBulkByPath(fromPath, toPath, content != nil ? [content!] : nil, splitLevel)
+    }
+
+    /**
+     * `editBulkByPath` edits this tree with the given node and path.
+     */
+    @discardableResult
+    public func editBulkByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -426,14 +434,22 @@ public class JSONTree {
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
 
-        return try self.editInternal(fromPos, toPos, contents: contents)
+        return try self.editInternal(fromPos, toPos, contents, splitLevel)
     }
 
     /**
      * `edit` edits this tree with the given node.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil) throws -> Bool {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: (any JSONTreeNode)? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
+        try self.editBulk(fromIdx, toIdx, content != nil ? [content!] : nil, splitLevel)
+    }
+
+    /**
+     * `editBulk` edits this tree with the given node.
+     */
+    @discardableResult
+    public func editBulk(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -445,7 +461,7 @@ public class JSONTree {
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
 
-        return try self.editInternal(fromPos, toPos, contents: contents)
+        return try self.editInternal(fromPos, toPos, contents != nil ? contents! : nil, splitLevel)
     }
 
     /**

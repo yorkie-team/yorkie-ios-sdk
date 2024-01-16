@@ -83,22 +83,22 @@ final class TreeIntegrationTests: XCTestCase {
         try await doc.update { root, _ in
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree()
-            try (root.t as? JSONTree)?.edit(0, 0, [JSONTreeElementNode(type: "p")])
+            try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p></p></root>")
             XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[]}]}}")
 
             // 02. Create a text into the paragraph.
-            try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "AB")])
+            try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "AB"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>AB</p></root>")
             XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"text\",\"value\":\"AB\"}]}]}}")
 
             // 03. Insert a text into the paragraph.
-            try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "CD")])
+            try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "CD"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>ABCD</p></root>")
             XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"text\",\"value\":\"AB\"},{\"type\":\"text\",\"value\":\"CD\"}]}]}}")
 
             // 04. Replace ABCD with Yorkie
-            try (root.t as? JSONTree)?.edit(1, 5, [JSONTreeTextNode(value: "Yorkie")])
+            try (root.t as? JSONTree)?.edit(1, 5, JSONTreeTextNode(value: "Yorkie"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>Yorkie</p></root>")
             XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"text\",\"value\":\"Yorkie\"}]}]}}")
         }
@@ -155,13 +155,13 @@ final class TreeIntegrationTests: XCTestCase {
                                                                                               children: [JSONTreeTextNode(value: "ab")])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>ab</p></doc>")
 
-            try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "X")])
+            try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "X"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>Xab</p></doc>")
 
             try (root.t as? JSONTree)?.edit(1, 2)
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>ab</p></doc>")
 
-            try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "X")])
+            try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "X"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>aXb</p></doc>")
 
             try (root.t as? JSONTree)?.edit(2, 3)
@@ -177,7 +177,7 @@ final class TreeIntegrationTests: XCTestCase {
                                                                                               children: [JSONTreeTextNode(value: "ab")])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>ab</p></doc>")
 
-            try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "X")])
+            try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "X"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>abX</p></doc>")
 
             try (root.t as? JSONTree)?.edit(3, 4)
@@ -209,7 +209,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
 
         try await doc.update { root, _ in
-            try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "X")])
+            try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "X"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p>Xab</p></doc>")
         }
 
@@ -252,7 +252,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
 
         try await doc.update { root, _ in
-            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 1], [0, 0, 0, 1], [JSONTreeTextNode(value: "X")])
+            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 1], [0, 0, 0, 1], JSONTreeTextNode(value: "X"))
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb</tn></p></tc></doc>")
         }
@@ -286,28 +286,28 @@ final class TreeIntegrationTests: XCTestCase {
             )
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>ab</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 1], [0, 0, 0, 1], [JSONTreeTextNode(value: "X")])
+            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 1], [0, 0, 0, 1], JSONTreeTextNode(value: "X"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 3], [0, 0, 0, 3], [JSONTreeTextNode(value: "!")])
+            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 3], [0, 0, 0, 3], JSONTreeTextNode(value: "!"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb!</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 0, 1], [JSONTreeElementNode(type: "tn", children: [JSONTreeTextNode(value: "cd")])])
+            try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 0, 1], JSONTreeElementNode(type: "tn", children: [JSONTreeTextNode(value: "cd")]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb!</tn><tn>cd</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 1], [0, 1], [JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [JSONTreeTextNode(value: "q")])])])
+            try (root.t as? JSONTree)?.editByPath([0, 1], [0, 1], JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [JSONTreeTextNode(value: "q")])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb!</tn><tn>cd</tn></p><p><tn>q</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 1, 0, 0], [0, 1, 0, 0], [JSONTreeTextNode(value: "a")])
+            try (root.t as? JSONTree)?.editByPath([0, 1, 0, 0], [0, 1, 0, 0], JSONTreeTextNode(value: "a"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb!</tn><tn>cd</tn></p><p><tn>aq</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 1, 0, 2], [0, 1, 0, 2], [JSONTreeTextNode(value: "B")])
+            try (root.t as? JSONTree)?.editByPath([0, 1, 0, 2], [0, 1, 0, 2], JSONTreeTextNode(value: "B"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb!</tn><tn>cd</tn></p><p><tn>aqB</tn></p></tc></doc>")
 
             var failed = false
 
             do {
-                _ = try (root.t as? JSONTree)?.editByPath([0, 0, 4], [0, 0, 4], [JSONTreeElementNode(type: "tn")])
+                _ = try (root.t as? JSONTree)?.editByPath([0, 0, 4], [0, 0, 4], JSONTreeElementNode(type: "tn"))
             } catch {
                 failed = true
             }
@@ -339,28 +339,28 @@ final class TreeIntegrationTests: XCTestCase {
             )
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 0], [0, 0, 0, 0], [JSONTreeTextNode(value: "a")])
+            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 0], [0, 0, 0, 0], JSONTreeTextNode(value: "a"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), "<doc><tc><p><tn>a</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 1], [0, 1], [JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])])])
+            try (root.t as? JSONTree)?.editByPath([0, 1], [0, 1], JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 1, 0, 0], [0, 1, 0, 0], [JSONTreeTextNode(value: "b")])
+            try (root.t as? JSONTree)?.editByPath([0, 1, 0, 0], [0, 1, 0, 0], JSONTreeTextNode(value: "b"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn>b</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 2], [0, 2], [JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])])])
+            try (root.t as? JSONTree)?.editByPath([0, 2], [0, 2], JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn>b</tn></p><p><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 2, 0, 0], [0, 2, 0, 0], [JSONTreeTextNode(value: "c")])
+            try (root.t as? JSONTree)?.editByPath([0, 2, 0, 0], [0, 2, 0, 0], JSONTreeTextNode(value: "c"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn>b</tn></p><p><tn>c</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 3], [0, 3], [JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])])])
+            try (root.t as? JSONTree)?.editByPath([0, 3], [0, 3], JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn>b</tn></p><p><tn>c</tn></p><p><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 3, 0, 0], [0, 3, 0, 0], [JSONTreeTextNode(value: "d")])
+            try (root.t as? JSONTree)?.editByPath([0, 3, 0, 0], [0, 3, 0, 0], JSONTreeTextNode(value: "d"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn>b</tn></p><p><tn>c</tn></p><p><tn>d</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 3], [0, 3], [JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])])])
+            try (root.t as? JSONTree)?.editByPath([0, 3], [0, 3], JSONTreeElementNode(type: "p", children: [JSONTreeElementNode(type: "tn", children: [])]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>a</tn></p><p><tn>b</tn></p><p><tn>c</tn></p><p><tn></tn></p><p><tn>d</tn></p></tc></doc>")
         }
     }
@@ -381,7 +381,7 @@ final class TreeIntegrationTests: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<doc><p>hello</p></doc>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(7, 7, [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "yorkie")])])
+                try (root.t as? JSONTree)?.edit(7, 7, JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "yorkie")]))
             }
 
             try await c1.sync()
@@ -499,7 +499,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            try (root.t as? JSONTree)?.edit(3, 3, [
+            try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeTextNode(value: "c"),
                 JSONTreeTextNode(value: "d")
             ])
@@ -526,7 +526,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            try (root.t as? JSONTree)?.edit(4, 4, [
+            try (root.t as? JSONTree)?.editBulk(4, 4, [
                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")]),
                 JSONTreeElementNode(type: "i", children: [JSONTreeTextNode(value: "fg")])
             ])
@@ -560,7 +560,7 @@ final class TreeIntegrationEditTests: XCTestCase {
             var docXML = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(docXML, /* html */ "<doc><tc><p><tn>ab</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 0, 0, 1], [0, 0, 0, 1], [
+            try (root.t as? JSONTree)?.editBulkByPath([0, 0, 0, 1], [0, 0, 0, 1], [
                 JSONTreeTextNode(value: "X"),
                 JSONTreeTextNode(value: "X")
             ])
@@ -568,7 +568,7 @@ final class TreeIntegrationEditTests: XCTestCase {
             docXML = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(docXML, /* html */ "<doc><tc><p><tn>aXXb</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 1], [0, 1], [
+            try (root.t as? JSONTree)?.editBulkByPath([0, 1], [0, 1], [
                 JSONTreeElementNode(type: "p", children: [
                     JSONTreeElementNode(type: "tn", children: [
                         JSONTreeTextNode(value: "te"),
@@ -586,7 +586,7 @@ final class TreeIntegrationEditTests: XCTestCase {
             docXML = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(docXML, /* html */ "<doc><tc><p><tn>aXXb</tn></p><p><tn>test</tn></p><p><tn>text</tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.editByPath([0, 3], [0, 3], [
+            try (root.t as? JSONTree)?.editBulkByPath([0, 3], [0, 3], [
                 JSONTreeElementNode(type: "p", children: [
                     JSONTreeElementNode(type: "tn", children: [
                         JSONTreeTextNode(value: "te"),
@@ -622,7 +622,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            XCTAssertThrowsError(try (root.t as? JSONTree)?.edit(3, 3, [
+            XCTAssertThrowsError(try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeTextNode(value: "C"),
                 JSONTreeTextNode(value: "")
             ]))
@@ -647,7 +647,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            XCTAssertThrowsError(try (root.t as? JSONTree)?.edit(3, 3, [
+            XCTAssertThrowsError(try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeElementNode(type: "p", children: []),
                 JSONTreeTextNode(value: "d")
             ]))
@@ -672,7 +672,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            XCTAssertThrowsError(try (root.t as? JSONTree)?.edit(3, 3, [
+            XCTAssertThrowsError(try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeElementNode(type: "p", children: [
                     JSONTreeTextNode(value: "c"),
                     JSONTreeTextNode(value: "")]),
@@ -699,7 +699,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            XCTAssertThrowsError(try (root.t as? JSONTree)?.edit(3, 3, [
+            XCTAssertThrowsError(try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeElementNode(type: "p", children: [
                     JSONTreeTextNode(value: "c")
                 ]),
@@ -728,7 +728,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p></doc>")
 
         try await doc.update { root, _ in
-            XCTAssertThrowsError(try (root.t as? JSONTree)?.edit(3, 3, [
+            XCTAssertThrowsError(try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeTextNode(value: "d"),
                 JSONTreeElementNode(type: "p", children: [
                     JSONTreeTextNode(value: "c")
@@ -779,10 +779,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
 
         docXML = await(doc.getRoot().t as? JSONTree)?.toXML()
-        XCTAssertEqual(docXML, /* html */ "<doc><p>a</p><p>f</p></doc>")
-
-        // TODO(sejongk): Use the below assertion after implementing Tree.Move.
-        // assert.equal(doc.getRoot().t.toXML(), /*html*/ `<doc><p>af</p></doc>`);
+        XCTAssertEqual(docXML, /* html */ "<doc><p>af</p></doc>")
     }
 }
 
@@ -1070,7 +1067,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>1234</p><p>abcd</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(6, 6, [JSONTreeElementNode(type: "p")])
+                try (root.t as? JSONTree)?.edit(6, 6, JSONTreeElementNode(type: "p"))
             }
 
             try await d2.update { root, _ in
@@ -1121,19 +1118,19 @@ final class TreeIntegrationContainedRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>1234</p><p>abcd</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(6, 6, [JSONTreeElementNode(type: "p")])
+                try (root.t as? JSONTree)?.edit(6, 6, JSONTreeElementNode(type: "p"))
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(8, 8, [JSONTreeElementNode(type: "p")])
+                try (root.t as? JSONTree)?.edit(8, 8, JSONTreeElementNode(type: "p"))
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(10, 10, [JSONTreeElementNode(type: "p")])
+                try (root.t as? JSONTree)?.edit(10, 10, JSONTreeElementNode(type: "p"))
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(12, 12, [JSONTreeElementNode(type: "p")])
+                try (root.t as? JSONTree)?.edit(12, 12, JSONTreeElementNode(type: "p"))
             }
 
             try await d2.update { root, _ in
@@ -1181,7 +1178,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p><i></i></p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeElementNode(type: "i")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeElementNode(type: "i"))
             }
 
             try await d2.update { root, _ in
@@ -1283,7 +1280,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "a")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "a"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1379,7 +1376,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "a")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "a"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1471,11 +1468,11 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p></p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(0, 0, [JSONTreeElementNode(type: "b")])
+                try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "b"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(0, 0, [JSONTreeElementNode(type: "i")])
+                try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "i"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1517,11 +1514,11 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p></p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeElementNode(type: "b")])
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeElementNode(type: "b"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeElementNode(type: "i")])
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeElementNode(type: "i"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1563,11 +1560,11 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p></p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeElementNode(type: "b")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeElementNode(type: "b"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeElementNode(type: "i")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeElementNode(type: "i"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1615,7 +1612,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeElementNode(type: "i")])
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeElementNode(type: "i"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1663,7 +1660,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeElementNode(type: "i")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeElementNode(type: "i"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1756,11 +1753,11 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>12</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "A")])
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "A"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "B")])
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "B"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1804,11 +1801,11 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>12</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "A")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "A"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "B")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "B"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1852,11 +1849,11 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>12</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "A")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "A"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "B")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "B"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -1900,7 +1897,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>1234</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "a")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "a"))
             }
 
             try await d2.update { root, _ in
@@ -1948,7 +1945,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>1234</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "a")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "a"))
             }
 
             try await d2.update { root, _ in
@@ -2338,7 +2335,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "B")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "B"))
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -2386,7 +2383,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "a"), JSONTreeTextNode(value: "bc")])
+                try (root.t as? JSONTree)?.editBulk(3, 3, [JSONTreeTextNode(value: "a"), JSONTreeTextNode(value: "bc")])
             }
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -2437,7 +2434,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(6, 6, [
+                try (root.t as? JSONTree)?.editBulk(6, 6, [
                     JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")]),
                     JSONTreeElementNode(type: "i", children: [JSONTreeTextNode(value: "fg")])
                 ])
@@ -2488,7 +2485,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(0, 0, [
+                try (root.t as? JSONTree)?.editBulk(0, 0, [
                     JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")]),
                     JSONTreeElementNode(type: "i", children: [JSONTreeTextNode(value: "fg")])
                 ])
@@ -2539,7 +2536,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(7, 7, [
+                try (root.t as? JSONTree)?.editBulk(7, 7, [
                     JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")]),
                     JSONTreeElementNode(type: "i", children: [JSONTreeTextNode(value: "fg")])
                 ])
@@ -2586,7 +2583,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>12</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "A")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "A"))
             }
 
             try await d2.update { root, _ in
@@ -2634,7 +2631,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>12</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "A")])
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "A"))
             }
 
             try await d2.update { root, _ in
@@ -2682,7 +2679,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<r><p>12</p></r>")
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "A")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "A"))
             }
 
             try await d2.update { root, _ in
@@ -2716,10 +2713,10 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         try await doc.update { root, _ in
             root.t = JSONTree()
 
-            try (root.t as? JSONTree)?.edit(0, 0, [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcdefghi")])])
+            try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcdefghi")]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>abcdefghi</p></root>")
 
-            try (root.t as? JSONTree)?.edit(1, 1, [JSONTreeTextNode(value: "12345")])
+            try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "12345"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>12345abcdefghi</p></root>")
 
             try (root.t as? JSONTree)?.edit(2, 5)
@@ -2753,13 +2750,13 @@ final class TreeIntegrationEdgeCases: XCTestCase {
             // 01. Create a tree and insert a paragraph.
             root.t = JSONTree()
 
-            try (root.t as? JSONTree)?.edit(0, 0, [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcde")])])
+            try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcde")]))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>abcde</p></root>")
 
-            try (root.t as? JSONTree)?.edit(6, 6, [JSONTreeTextNode(value: "f")])
+            try (root.t as? JSONTree)?.edit(6, 6, JSONTreeTextNode(value: "f"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>abcdef</p></root>")
 
-            try (root.t as? JSONTree)?.edit(7, 7, [JSONTreeTextNode(value: "g")])
+            try (root.t as? JSONTree)?.edit(7, 7, JSONTreeTextNode(value: "g"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>abcdefg</p></root>")
 
             try (root.t as? JSONTree)?.edit(7, 8)
@@ -2793,7 +2790,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "1")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "1"))
             }
 
             try await c1.sync()
@@ -2806,18 +2803,18 @@ final class TreeIntegrationEdgeCases: XCTestCase {
             XCTAssertEqual(d2XML, /* html */ "<doc><p>a1b</p></doc>")
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(3, 3, [JSONTreeTextNode(value: "1")])
+                try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "1"))
             }
 
             d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
             XCTAssertEqual(d2XML, /* html */ "<doc><p>a11b</p></doc>")
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 3, [JSONTreeTextNode(value: "12")])
+                try (root.t as? JSONTree)?.edit(2, 3, JSONTreeTextNode(value: "12"))
             }
 
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(4, 5, [JSONTreeTextNode(value: "21")])
+                try (root.t as? JSONTree)?.edit(4, 5, JSONTreeTextNode(value: "21"))
             }
 
             d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
@@ -2825,7 +2822,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
 
             // if split link is not transmitted, then left sibling in from index below, is "b" not "a"
             try await d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 4, [JSONTreeTextNode(value: "123")])
+                try (root.t as? JSONTree)?.edit(2, 4, JSONTreeTextNode(value: "123"))
             }
 
             d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
@@ -2847,19 +2844,19 @@ final class TreeIntegrationEdgeCases: XCTestCase {
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "123")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "123"))
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "456")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "456"))
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "789")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "789"))
             }
 
             try await d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(2, 2, [JSONTreeTextNode(value: "0123")])
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "0123"))
             }
 
             let d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
@@ -2872,6 +2869,47 @@ final class TreeIntegrationEdgeCases: XCTestCase {
             let sized2 = try await(d2.getRoot().t as? JSONTree)?.getIndexTree().root.size
 
             XCTAssertEqual(sized1, sized2)
+        }
+    }
+
+    func test_can_split_and_merge_with_empty_paragraph() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, _ in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeTextNode(value: "a"),
+                                                JSONTreeTextNode(value: "b")
+                                            ])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(3, 3, nil, 1)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p><p></p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(3, 5)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, d2XML)
         }
     }
 }

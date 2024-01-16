@@ -53,6 +53,11 @@ internal protocol Yorkie_V1_YorkieServiceClientProtocol: GRPCClient {
     callOptions: CallOptions?,
     handler: @escaping (Yorkie_V1_WatchDocumentResponse) -> Void
   ) -> ServerStreamingCall<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
+
+  func broadcast(
+    _ request: Yorkie_V1_BroadcastRequest,
+    callOptions: CallOptions?
+  ) -> UnaryCall<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse>
 }
 
 extension Yorkie_V1_YorkieServiceClientProtocol {
@@ -188,6 +193,24 @@ extension Yorkie_V1_YorkieServiceClientProtocol {
       handler: handler
     )
   }
+
+  /// Unary call to Broadcast
+  ///
+  /// - Parameters:
+  ///   - request: Request to send to Broadcast.
+  ///   - callOptions: Call options.
+  /// - Returns: A `UnaryCall` with futures for the metadata, status and response.
+  internal func broadcast(
+    _ request: Yorkie_V1_BroadcastRequest,
+    callOptions: CallOptions? = nil
+  ) -> UnaryCall<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse> {
+    return self.makeUnaryCall(
+      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.broadcast.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeBroadcastInterceptors() ?? []
+    )
+  }
 }
 
 @available(*, deprecated)
@@ -287,6 +310,11 @@ internal protocol Yorkie_V1_YorkieServiceAsyncClientProtocol: GRPCClient {
     _ request: Yorkie_V1_WatchDocumentRequest,
     callOptions: CallOptions?
   ) -> GRPCAsyncServerStreamingCall<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
+
+  func makeBroadcastCall(
+    _ request: Yorkie_V1_BroadcastRequest,
+    callOptions: CallOptions?
+  ) -> GRPCAsyncUnaryCall<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse>
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -382,6 +410,18 @@ extension Yorkie_V1_YorkieServiceAsyncClientProtocol {
       interceptors: self.interceptors?.makeWatchDocumentInterceptors() ?? []
     )
   }
+
+  internal func makeBroadcastCall(
+    _ request: Yorkie_V1_BroadcastRequest,
+    callOptions: CallOptions? = nil
+  ) -> GRPCAsyncUnaryCall<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse> {
+    return self.makeAsyncUnaryCall(
+      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.broadcast.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeBroadcastInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -469,6 +509,18 @@ extension Yorkie_V1_YorkieServiceAsyncClientProtocol {
       interceptors: self.interceptors?.makeWatchDocumentInterceptors() ?? []
     )
   }
+
+  internal func broadcast(
+    _ request: Yorkie_V1_BroadcastRequest,
+    callOptions: CallOptions? = nil
+  ) async throws -> Yorkie_V1_BroadcastResponse {
+    return try await self.performAsyncUnaryCall(
+      path: Yorkie_V1_YorkieServiceClientMetadata.Methods.broadcast.path,
+      request: request,
+      callOptions: callOptions ?? self.defaultCallOptions,
+      interceptors: self.interceptors?.makeBroadcastInterceptors() ?? []
+    )
+  }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
@@ -510,6 +562,9 @@ internal protocol Yorkie_V1_YorkieServiceClientInterceptorFactoryProtocol: Senda
 
   /// - Returns: Interceptors to use when invoking 'watchDocument'.
   func makeWatchDocumentInterceptors() -> [ClientInterceptor<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>]
+
+  /// - Returns: Interceptors to use when invoking 'broadcast'.
+  func makeBroadcastInterceptors() -> [ClientInterceptor<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse>]
 }
 
 internal enum Yorkie_V1_YorkieServiceClientMetadata {
@@ -524,6 +579,7 @@ internal enum Yorkie_V1_YorkieServiceClientMetadata {
       Yorkie_V1_YorkieServiceClientMetadata.Methods.removeDocument,
       Yorkie_V1_YorkieServiceClientMetadata.Methods.pushPullChanges,
       Yorkie_V1_YorkieServiceClientMetadata.Methods.watchDocument,
+      Yorkie_V1_YorkieServiceClientMetadata.Methods.broadcast,
     ]
   )
 
@@ -568,6 +624,12 @@ internal enum Yorkie_V1_YorkieServiceClientMetadata {
       name: "WatchDocument",
       path: "/yorkie.v1.YorkieService/WatchDocument",
       type: GRPCCallType.serverStreaming
+    )
+
+    internal static let broadcast = GRPCMethodDescriptor(
+      name: "Broadcast",
+      path: "/yorkie.v1.YorkieService/Broadcast",
+      type: GRPCCallType.unary
     )
   }
 }

@@ -121,8 +121,6 @@ protocol IndexTreeNode: AnyObject {
     var nextSibling: Self? { get }
 
     func findOffset(node: Self) throws -> Int?
-    @discardableResult
-    func split(_ soffset: Int32, _ absOffset: Int32) throws -> Self?
 
     // For extension
     var isRemoved: Bool { get }
@@ -186,21 +184,9 @@ extension IndexTreeNode {
     }
 
     /**
-     * `split` splits the node at the given offset.
-     */
-    @discardableResult
-    func split(_ offset: Int32, _ absOffset: Int32) throws -> Self? {
-        if self.isText {
-            return try self.splitText(offset: offset, absOffset: absOffset)
-        }
-
-        return try self.splitElement(offset: offset)
-    }
-
-    /**
      * `splitText` splits the given node at the given offset.
      */
-    func splitText(offset: Int32, absOffset: Int32) throws -> Self? {
+    func splitText(_ offset: Int32, _ absOffset: Int32) throws -> Self? {
         guard offset > 0, offset < self.size else {
             return nil
         }
@@ -337,8 +323,16 @@ extension IndexTreeNode {
     /**
      * `splitElement` splits the given element at the given offset.
      */
-    func splitElement(offset: Int32) throws -> Self? {
-        let clone = self.clone(offset: offset)
+    func splitElement(_ offset: Int32, _ absOffset: Int32) throws -> Self? {
+        /**
+         * TODO(hackerwins): Define ID of split node for concurrent editing.
+         * Text has fixed content and its split nodes could have limited offset
+         * range. But element node could have arbitrary children and its split
+         * nodes could have arbitrary offset range. So, id could be duplicated
+         * and its order could be broken when concurrent editing happens.
+         * Currently, we use the similar ID of split element with the split text.
+         */
+        let clone = self.clone(offset: offset + absOffset)
         try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
         clone.updateAncestorsSize()
 
@@ -731,30 +725,6 @@ class IndexTree<T: IndexTreeNode> {
      */
     func traverseAll(callback: @escaping (T, Int32) -> Void) {
         Yorkie.traverseAll(node: self.root, depth: 0, callback: callback)
-    }
-
-    /**
-     * `split` splits the node at the given index.
-     */
-    public func split(_ index: Int, _ depth: Int = 1) throws -> TreePos<T> {
-        let treePos = try Yorkie.findTreePos(node: self.root, index: index, preferText: true)
-
-        var node: T? = treePos.node
-        var offset = treePos.offset
-        for _ in 0 ..< depth {
-            guard node != nil, node !== self.root else {
-                break
-            }
-            try node!.split(offset, 0)
-
-            guard let nextOffset = try node!.parent?.findOffset(node: node!) else {
-                throw YorkieError.unexpected(message: "cant find offset")
-            }
-            offset = Int32(offset == 0 ? nextOffset : nextOffset + 1)
-            node = node?.parent
-        }
-
-        return treePos
     }
 
     /**

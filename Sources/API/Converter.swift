@@ -419,6 +419,7 @@ extension Converter {
             pbTreeEditOperation.from = toTreePos(treeEditOperation.fromPos)
             pbTreeEditOperation.to = toTreePos(treeEditOperation.toPos)
             pbTreeEditOperation.contents = toTreeNodesWhenEdit(treeEditOperation.contents)
+            pbTreeEditOperation.splitLevel = treeEditOperation.splitLevel
             pbTreeEditOperation.executedAt = toTimeTicket(treeEditOperation.executedAt)
             pbOperation.treeEdit = pbTreeEditOperation
         } else if let treeStyleOperation = operation as? TreeStyleOperation {
@@ -502,6 +503,7 @@ extension Converter {
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
                                          toPos: fromTreePos(pbTreeEditOperation.to),
                                          contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
+                                         splitLevel: pbTreeEditOperation.splitLevel,
                                          executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
                                          maxCreatedAtMapByActor: createdAtMapByActor)
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
