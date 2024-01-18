@@ -179,13 +179,13 @@ class GCTests: XCTestCase {
         }
 
         len = await doc2.getGarbageLength()
-        XCTAssertEqual(len, 1)  // x
+        XCTAssertEqual(len, 1) // x
 
         try await client1.sync()
         try await client2.sync()
         try await client1.sync()
 
-        let gcNodeLen = 3   // point x, y
+        let gcNodeLen = 3 // point x, y
         var doc1Len = await doc1.getGarbageLength()
         var doc2Len = await doc2.getGarbageLength()
         XCTAssertEqual(doc1Len, gcNodeLen)
