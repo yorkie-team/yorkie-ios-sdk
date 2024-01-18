@@ -143,11 +143,6 @@ class GCTests: XCTestCase {
     }
     
     func test_getGarbageLength_should_return_the_actual_number_of_elements_garbage_collected() async throws {
-        struct Point {
-            var x: Int?
-            var y: Int?
-        }
-        
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
