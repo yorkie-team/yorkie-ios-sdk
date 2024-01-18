@@ -97,8 +97,6 @@
 		CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED32028F646EA009A5419 /* AddOperation.swift */; };
 		CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8ED32628F6470D009A5419 /* MoveOperation.swift */; };
 		CE9557C02902025600DF4DFA /* JSONObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557BE2902024700DF4DFA /* JSONObjectTests.swift */; };
-		CE9557C8290666CE00DF4DFA /* Trie.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557C7290666CE00DF4DFA /* Trie.swift */; };
-		CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557C929066D8700DF4DFA /* TrieTests.swift */; };
 		CE9557CD2907523A00DF4DFA /* JSONArray.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557CC2907523A00DF4DFA /* JSONArray.swift */; };
 		CE9557CF2908B6BA00DF4DFA /* JSONDatable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9557CE2908B6BA00DF4DFA /* JSONDatable.swift */; };
 		CE9F6FAE2910FBBA002F776D /* DocumentConcurrentAccessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9F6FAD2910FBBA002F776D /* DocumentConcurrentAccessTests.swift */; };
@@ -228,8 +226,6 @@
 		CE8ED32028F646EA009A5419 /* AddOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddOperation.swift; sourceTree = "<group>"; };
 		CE8ED32628F6470D009A5419 /* MoveOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveOperation.swift; sourceTree = "<group>"; };
 		CE9557BE2902024700DF4DFA /* JSONObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONObjectTests.swift; sourceTree = "<group>"; };
-		CE9557C7290666CE00DF4DFA /* Trie.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trie.swift; sourceTree = "<group>"; };
-		CE9557C929066D8700DF4DFA /* TrieTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrieTests.swift; sourceTree = "<group>"; };
 		CE9557CC2907523A00DF4DFA /* JSONArray.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = JSONArray.swift; sourceTree = "<group>"; };
 		CE9557CE2908B6BA00DF4DFA /* JSONDatable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONDatable.swift; sourceTree = "<group>"; };
 		CE9F6FAD2910FBBA002F776D /* DocumentConcurrentAccessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentConcurrentAccessTests.swift; sourceTree = "<group>"; };
@@ -400,7 +396,6 @@
 				CE3EC95028D195E0009471BC /* LLRBTreeTests.swift */,
 				CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */,
 				CEA2DA4B28F693F500431B61 /* StringExtensionsTests.swift */,
-				CE9557C929066D8700DF4DFA /* TrieTests.swift */,
 				9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */,
 			);
 			path = Util;
@@ -515,7 +510,6 @@
 				CE7B996D28E142A300D56198 /* Errors.swift */,
 				CE72E85128EE531C00D1331C /* Collection+Extensions.swift */,
 				CEA2DA4928F6938700431B61 /* String+Extensions.swift */,
-				CE9557C7290666CE00DF4DFA /* Trie.swift */,
 				CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */,
 				9A7E88BF2A4962A700AF8997 /* IndexTree.swift */,
 				9A232B762A7D0C0F0041C826 /* Dictionary+Extension.swift */,
@@ -850,7 +844,6 @@
 				9A66B1A02955833E00D10B94 /* LLRBTree.swift in Sources */,
 				CEFF0015290120000020561A /* JSONObject.swift in Sources */,
 				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,
-				CE9557C8290666CE00DF4DFA /* Trie.swift in Sources */,
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				9ADAEE5829657696007E9F9F /* JSONText.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
@@ -900,7 +893,6 @@
 				9AFB4EBC2A93980A00494401 /* Dictionary+Extension.swift in Sources */,
 				9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */,
 				9A30D40429514F150036F732 /* ClientTests.swift in Sources */,
-				CE9557CB29066D8C00DF4DFA /* TrieTests.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
 				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,
 				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
