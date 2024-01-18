@@ -2872,8 +2872,49 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
-    func test_can_split_and_merge_with_empty_paragraph() async throws {
-        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, _ in
+    func test_can_split_and_merge_with_empty_paragraph_left() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeTextNode(value: "a"),
+                                                JSONTreeTextNode(value: "b")
+                                            ])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(1, 1, nil, 1)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p></p><p>ab</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(1, 3)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func test_can_split_and_merge_with_empty_paragraph_right() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
                 root.t = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc",
@@ -2907,7 +2948,199 @@ final class TreeIntegrationEdgeCases: XCTestCase {
             try await c2.sync()
 
             d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
-            let d2XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func test_can_split_and_merge_with_empty_paragraph_and_multiple_split_level_left() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeElementNode(type: "p", children: [
+                                                    JSONTreeTextNode(value: "a"),
+                                                    JSONTreeTextNode(value: "b")
+                                                ])
+                                            ])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p><p>ab</p></p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, nil, 2)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p><p></p></p><p><p>ab</p></p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 6)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p><p>ab</p></p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func test_split_at_the_same_offset_multiple_times() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeTextNode(value: "a"),
+                                                JSONTreeTextNode(value: "b")
+                                            ])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, nil, 1)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>a</p><p>b</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "c"))
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ac</p><p>b</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, nil, 1)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>a</p><p>c</p><p>b</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 7)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func test_can_concurrently_split_and_insert_into_original_node() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeTextNode(value: "a"),
+                                                JSONTreeTextNode(value: "b"),
+                                                JSONTreeTextNode(value: "c"),
+                                                JSONTreeTextNode(value: "d")
+                                            ])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>abcd</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(3, 3, nil, 1)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p><p>cd</p></doc>")
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "e"))
+            }
+
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>aebcd</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func test_can_concurrently_split_and_insert_into_split_node() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeTextNode(value: "a"),
+                                                JSONTreeTextNode(value: "b"),
+                                                JSONTreeTextNode(value: "c"),
+                                                JSONTreeTextNode(value: "d")
+                                            ])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>abcd</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(3, 3, nil, 1)
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ab</p><p>cd</p></doc>")
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "e"))
+            }
+
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>aebcd</p></doc>")
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
 
             XCTAssertEqual(d1XML, d2XML)
         }

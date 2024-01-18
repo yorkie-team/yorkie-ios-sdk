@@ -120,7 +120,7 @@ protocol IndexTreeNode: AnyObject {
     var hasTextChild: Bool { get }
     var nextSibling: Self? { get }
 
-    func findOffset(node: Self) throws -> Int?
+    func findOffset(node: Self) throws -> Int
 
     // For extension
     var isRemoved: Bool { get }
@@ -359,11 +359,7 @@ extension IndexTreeNode {
      * `insertAfterInternal` inserts the given node after the given child.
      * This method does not update the size of the ancestors.
      */
-    func insertAfterInternal(newNode: Self?, referenceNode: Self) throws {
-        guard newNode != nil else {
-            return
-        }
-
+    func insertAfterInternal(newNode: Self, referenceNode: Self) throws {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
@@ -372,7 +368,7 @@ extension IndexTreeNode {
             throw YorkieError.unexpected(message: "child not found")
         }
 
-        try self.insertAtInternal(newNode: newNode!, offset: offset + 1)
+        try self.insertAtInternal(newNode: newNode, offset: offset + 1)
     }
 
     /**
@@ -392,24 +388,23 @@ extension IndexTreeNode {
      * findOffset returns the offset of the given node in the children.
      * It excludes the removed nodes.
      */
-    func findOffset(node: Self) throws -> Int? {
+    func findOffset(node: Self) throws -> Int {
         guard self.isText == false else {
             throw YorkieError.unexpected(message: "Text node cannot have children")
         }
 
         if node.isRemoved {
-            guard let index = self.innerChildren.firstIndex(where: { $0 === node }) else {
-                throw YorkieError.unexpected(message: "Can't find index")
-            }
+            let index = self.innerChildren.firstIndex(where: { $0 === node }) ?? -1
 
             // If nodes are removed, the offset of the removed node is the number of
             // nodes before the node excluding the removed nodes.
-            let refined = self.innerChildren[0 ..< index].filter { $0.isRemoved == false }.count
+            var allChildren = self.innerChildren
+            let refined = allChildren.splice(0, index, with: []).filter { !$0.isRemoved }.count
 
             return refined
         }
 
-        return self.children.firstIndex { $0 === node }
+        return self.children.firstIndex(where: { $0 === node }) ?? -1
     }
 
     /**
@@ -435,12 +430,20 @@ extension IndexTreeNode {
 }
 
 extension Array {
-    mutating func splice<C>(_ start: Int, _ deleteCount: Int, with newElements: C) where C: Collection, Self.Element == C.Element {
+    @discardableResult
+    mutating func splice<C>(_ start: Int, _ deleteCount: Int, with newElements: C) -> [Self.Element] where C: Collection, Self.Element == C.Element {
         let actualStart = Swift.max(Swift.min(start, self.count), 0)
         let actualDeleteCount = Swift.max(Swift.min(deleteCount, self.count - actualStart), 0)
 
-        self.removeSubrange(actualStart ..< actualStart + actualDeleteCount)
+        var result = [Self.Element]()
+
+        if actualDeleteCount > 0 {
+            result = Array(self[actualStart ..< actualStart + actualDeleteCount])
+            self.removeSubrange(actualStart ..< actualStart + actualDeleteCount)
+        }
         self.insert(contentsOf: newElements, at: actualStart)
+
+        return result
     }
 }
 
@@ -743,7 +746,8 @@ class IndexTree<T: IndexTreeNode> {
         var node = treePos.node
 
         if node.isText {
-            guard let offset = try node.parent!.findOffset(node: node) else {
+            let offset = try node.parent!.findOffset(node: node)
+            if offset == -1 {
                 throw YorkieError.unexpected(message: "invalid treePos")
             }
 
@@ -755,7 +759,8 @@ class IndexTree<T: IndexTreeNode> {
         }
 
         while node.parent != nil {
-            guard let offset = try node.parent?.findOffset(node: node) else {
+            let offset = try node.parent!.findOffset(node: node)
+            if offset == -1 {
                 throw YorkieError.unexpected(message: "invalid treePos")
             }
 
@@ -852,7 +857,8 @@ class IndexTree<T: IndexTreeNode> {
             size += offset
 
             let parent = node.parent!
-            guard let offsetOfNode = try parent.findOffset(node: node) else {
+            let offsetOfNode = try parent.findOffset(node: node)
+            if offsetOfNode == -1 {
                 throw YorkieError.unexpected(message: "invalid pos")
             }
 
@@ -865,7 +871,8 @@ class IndexTree<T: IndexTreeNode> {
 
         while node.parent != nil {
             let parent = node.parent!
-            guard let offsetOfNode = try parent.findOffset(node: node) else {
+            let offsetOfNode = try parent.findOffset(node: node)
+            if offsetOfNode == -1 {
                 throw YorkieError.unexpected(message: "invalid pos")
             }
 

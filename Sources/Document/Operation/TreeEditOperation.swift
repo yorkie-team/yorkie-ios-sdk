@@ -59,7 +59,7 @@ struct TreeEditOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        let editedAt = self.executedAt
+        var editedAt = self.executedAt
         guard let tree = parentObject as? CRDTTree else {
             fatalError("fail to execute, only Tree can execute edit")
         }
@@ -71,17 +71,17 @@ struct TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let issueTimeTicket = {
+        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, self.maxCreatedAtMapByActor) {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
             }
 
             delimiter += 1
-            return TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
-        }()
+            editedAt = TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
 
-        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, self.executedAt, issueTimeTicket, self.maxCreatedAtMapByActor)
+            return editedAt
+        }
 
         if self.fromPos != self.toPos {
             root.registerElementHasRemovedNodes(tree)
