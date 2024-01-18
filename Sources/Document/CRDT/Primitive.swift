@@ -167,6 +167,7 @@ extension Primitive {
     func deepcopy() -> CRDTElement {
         let primitive = Primitive(value: self.value, createdAt: self.createdAt)
         primitive.setMovedAt(self.movedAt)
+        primitive.removedAt = self.removedAt
         return primitive
     }
 }
