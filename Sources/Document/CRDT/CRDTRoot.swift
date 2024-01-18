@@ -155,20 +155,22 @@ class CRDTRoot {
      */
     var garbageLength: Int {
         var count = 0
+        var seen = Set<String>()
 
         for item in self.removedElementSetByCreatedAt {
-            count += 1
+            seen.insert(item)
             guard let pair = self.elementPairMapByCreatedAt[item],
                   let element = pair.element as? CRDTContainer
             else {
                 continue
             }
-
-            element.getDescendants { _, _ in
-                count += 1
+            element.getDescendants { element, _ in
+                seen.insert(element.createdAt.toIDString)
                 return false
             }
         }
+
+        count += seen.count
 
         for item in self.elementHasRemovedNodesSetByCreatedAt {
             guard let pair = self.elementPairMapByCreatedAt[item],
