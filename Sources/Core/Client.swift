@@ -743,7 +743,7 @@ public actor Client {
                 if let presence {
                     await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
                 }
-            case .UNRECOGNIZED:
+            default:
                 break
             }
         }

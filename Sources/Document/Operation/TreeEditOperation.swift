@@ -35,13 +35,15 @@ struct TreeEditOperation: Operation {
      * `content` returns the content of Edit.
      */
     let contents: [CRDTTreeNode]?
+    let splitLevel: Int32
     let maxCreatedAtMapByActor: [String: TimeTicket]
 
-    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, contents: [CRDTTreeNode]?, executedAt: TimeTicket, maxCreatedAtMapByActor: [String: TimeTicket]) {
+    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, contents: [CRDTTreeNode]?, splitLevel: Int32, executedAt: TimeTicket, maxCreatedAtMapByActor: [String: TimeTicket]) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
         self.contents = contents
+        self.splitLevel = splitLevel
         self.executedAt = executedAt
         self.maxCreatedAtMapByActor = maxCreatedAtMapByActor
     }
@@ -61,8 +63,7 @@ struct TreeEditOperation: Operation {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
-        // TODO(hackerwins): Implement splitLevels.
-        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.executedAt, self.maxCreatedAtMapByActor)
+        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, self.executedAt, self.maxCreatedAtMapByActor)
 
         if self.fromPos != self.toPos {
             root.registerElementHasRemovedNodes(tree)
@@ -85,9 +86,10 @@ struct TreeEditOperation: Operation {
                 path: path,
                 from: change.from,
                 to: change.to,
+                value: value.compactMap { $0.toJSONTreeNode },
+                splitLevel: change.splitLevel,
                 fromPath: change.fromPath,
-                toPath: change.toPath,
-                value: value.compactMap { $0.toJSONTreeNode }
+                toPath: change.toPath
             )
         }
     }

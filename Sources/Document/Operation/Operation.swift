@@ -132,9 +132,10 @@ public struct TreeEditOpInfo: OperationInfo {
     public let path: String
     public let from: Int
     public let to: Int
+    public let value: [any JSONTreeNode]
+    public let splitLevel: Int32
     public let fromPath: [Int]
     public let toPath: [Int]
-    public let value: [any JSONTreeNode]
 
     public static func == (lhs: TreeEditOpInfo, rhs: TreeEditOpInfo) -> Bool {
         if lhs.type != rhs.type {
@@ -172,6 +173,10 @@ public struct TreeEditOpInfo: OperationInfo {
             } else {
                 return false
             }
+        }
+
+        if lhs.splitLevel != rhs.splitLevel {
+            return false
         }
 
         return true

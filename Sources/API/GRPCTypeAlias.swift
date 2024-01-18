@@ -37,6 +37,8 @@ typealias WatchDocumentRequest = Yorkie_V1_WatchDocumentRequest
 typealias WatchDocumentResponse = Yorkie_V1_WatchDocumentResponse
 typealias RemoveDocumentRequest = Yorkie_V1_RemoveDocumentRequest
 typealias RemoveDocumentResponse = Yorkie_V1_RemoveDocumentResponse
+typealias BroadcastRequest = Yorkie_V1_BroadcastRequest
+typealias BroadcastResponse = Yorkie_V1_BroadcastResponse
 
 typealias PbChange = Yorkie_V1_Change
 typealias PbChangeID = Yorkie_V1_ChangeID

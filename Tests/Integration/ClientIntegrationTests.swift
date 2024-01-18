@@ -416,7 +416,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         for index in 0 ..< snapshotThreshold {
             try await doc1.update { root, _ in
-                try (root.tree as? JSONTree)?.edit(0, 0, [JSONTreeTextNode(value: "\(index),")])
+                try (root.tree as? JSONTree)?.edit(0, 0, JSONTreeTextNode(value: "\(index),"))
                 (root.text as? JSONText)?.edit(0, 0, "\(index),")
             }
         }

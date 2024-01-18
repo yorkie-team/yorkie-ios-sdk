@@ -29,7 +29,7 @@ final class DocumentBenchmarkTests: XCTestCase {
                 )
 
                 for index in 1 ..< size {
-                    try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a")])
+                    try (root.tree as? JSONTree)?.edit(index, index, JSONTreeTextNode(value: "a"))
                 }
             }
         } catch {
@@ -48,7 +48,7 @@ final class DocumentBenchmarkTests: XCTestCase {
                 )
 
                 for index in 1 ..< size {
-                    try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a")])
+                    try (root.tree as? JSONTree)?.edit(index, index, JSONTreeTextNode(value: "a"))
                 }
             }
 
@@ -75,13 +75,13 @@ final class DocumentBenchmarkTests: XCTestCase {
                 )
 
                 for index in 1 ... size {
-                    try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a".repeatString(size))])
+                    try (root.tree as? JSONTree)?.edit(index, index, JSONTreeTextNode(value: "a".repeatString(size)))
                 }
             }
 
             try await doc.update { root, _ in
                 for index in 1 ... size {
-                    try (root.tree as? JSONTree)?.edit(index, index + 1, [JSONTreeTextNode(value: "b")])
+                    try (root.tree as? JSONTree)?.edit(index, index + 1, JSONTreeTextNode(value: "b"))
                 }
             }
 
@@ -108,13 +108,13 @@ final class DocumentBenchmarkTests: XCTestCase {
                 )
 
                 for index in 1 ... size {
-                    try (root.tree as? JSONTree)?.edit(index, index, [JSONTreeTextNode(value: "a")])
+                    try (root.tree as? JSONTree)?.edit(index, index, JSONTreeTextNode(value: "a"))
                 }
             }
 
             try await doc.update { root, _ in
                 for index in 1 ... size {
-                    try (root.tree as? JSONTree)?.edit(index, index + 1, [JSONTreeTextNode(value: "b")])
+                    try (root.tree as? JSONTree)?.edit(index, index + 1, JSONTreeTextNode(value: "b"))
                 }
             }
 

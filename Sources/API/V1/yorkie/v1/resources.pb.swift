@@ -128,6 +128,7 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
   case documentChanged // = 0
   case documentWatched // = 1
   case documentUnwatched // = 2
+  case documentBroadcast // = 3
   case UNRECOGNIZED(Int)
 
   init() {
@@ -139,6 +140,7 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
     case 0: self = .documentChanged
     case 1: self = .documentWatched
     case 2: self = .documentUnwatched
+    case 3: self = .documentBroadcast
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -148,6 +150,7 @@ enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum {
     case .documentChanged: return 0
     case .documentWatched: return 1
     case .documentUnwatched: return 2
+    case .documentBroadcast: return 3
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -162,6 +165,7 @@ extension Yorkie_V1_DocEventType: CaseIterable {
     .documentChanged,
     .documentWatched,
     .documentUnwatched,
+    .documentBroadcast,
   ]
 }
 
@@ -879,6 +883,11 @@ struct Yorkie_V1_Operation {
     var contents: [Yorkie_V1_TreeNodes] {
       get {return _storage._contents}
       set {_uniqueStorage()._contents = newValue}
+    }
+
+    var splitLevel: Int32 {
+      get {return _storage._splitLevel}
+      set {_uniqueStorage()._splitLevel = newValue}
     }
 
     var executedAt: Yorkie_V1_TimeTicket {
@@ -1960,6 +1969,20 @@ struct Yorkie_V1_TimeTicket {
   init() {}
 }
 
+struct Yorkie_V1_DocEventBody {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var topic: String = String()
+
+  var payload: Data = Data()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct Yorkie_V1_DocEvent {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1969,9 +1992,20 @@ struct Yorkie_V1_DocEvent {
 
   var publisher: String = String()
 
+  var body: Yorkie_V1_DocEventBody {
+    get {return _body ?? Yorkie_V1_DocEventBody()}
+    set {_body = newValue}
+  }
+  /// Returns true if `body` has been explicitly set.
+  var hasBody: Bool {return self._body != nil}
+  /// Clears the value of `body`. Subsequent reads from it will return its default value.
+  mutating func clearBody() {self._body = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
+
+  fileprivate var _body: Yorkie_V1_DocEventBody? = nil
 }
 
 #if swift(>=5.5) && canImport(_Concurrency)
@@ -2022,6 +2056,7 @@ extension Yorkie_V1_Presence: @unchecked Sendable {}
 extension Yorkie_V1_Checkpoint: @unchecked Sendable {}
 extension Yorkie_V1_TextNodePos: @unchecked Sendable {}
 extension Yorkie_V1_TimeTicket: @unchecked Sendable {}
+extension Yorkie_V1_DocEventBody: @unchecked Sendable {}
 extension Yorkie_V1_DocEvent: @unchecked Sendable {}
 #endif  // swift(>=5.5) && canImport(_Concurrency)
 
@@ -2053,6 +2088,7 @@ extension Yorkie_V1_DocEventType: SwiftProtobuf._ProtoNameProviding {
     0: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_CHANGED"),
     1: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_WATCHED"),
     2: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_UNWATCHED"),
+    3: .same(proto: "DOC_EVENT_TYPE_DOCUMENT_BROADCAST"),
   ]
 }
 
@@ -3138,6 +3174,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     3: .same(proto: "to"),
     4: .standard(proto: "created_at_map_by_actor"),
     5: .same(proto: "contents"),
+    7: .standard(proto: "split_level"),
     6: .standard(proto: "executed_at"),
   ]
 
@@ -3147,6 +3184,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _to: Yorkie_V1_TreePos? = nil
     var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
     var _contents: [Yorkie_V1_TreeNodes] = []
+    var _splitLevel: Int32 = 0
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
     static let defaultInstance = _StorageClass()
@@ -3159,6 +3197,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       _to = source._to
       _createdAtMapByActor = source._createdAtMapByActor
       _contents = source._contents
+      _splitLevel = source._splitLevel
       _executedAt = source._executedAt
     }
   }
@@ -3184,6 +3223,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: &_storage._createdAtMapByActor) }()
         case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._contents) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._splitLevel) }()
         default: break
         }
       }
@@ -3214,6 +3254,9 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
       } }()
+      if _storage._splitLevel != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._splitLevel, fieldNumber: 7)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3228,6 +3271,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._to != rhs_storage._to {return false}
         if _storage._createdAtMapByActor != rhs_storage._createdAtMapByActor {return false}
         if _storage._contents != rhs_storage._contents {return false}
+        if _storage._splitLevel != rhs_storage._splitLevel {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
         return true
       }
@@ -4875,11 +4919,50 @@ extension Yorkie_V1_TimeTicket: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
+extension Yorkie_V1_DocEventBody: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = _protobuf_package + ".DocEventBody"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "topic"),
+    2: .same(proto: "payload"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.topic) }()
+      case 2: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.topic.isEmpty {
+      try visitor.visitSingularStringField(value: self.topic, fieldNumber: 1)
+    }
+    if !self.payload.isEmpty {
+      try visitor.visitSingularBytesField(value: self.payload, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: Yorkie_V1_DocEventBody, rhs: Yorkie_V1_DocEventBody) -> Bool {
+    if lhs.topic != rhs.topic {return false}
+    if lhs.payload != rhs.payload {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DocEvent"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "type"),
     2: .same(proto: "publisher"),
+    3: .same(proto: "body"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4890,24 +4973,33 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.publisher) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._body) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if self.type != .documentChanged {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
     if !self.publisher.isEmpty {
       try visitor.visitSingularStringField(value: self.publisher, fieldNumber: 2)
     }
+    try { if let v = self._body {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_DocEvent, rhs: Yorkie_V1_DocEvent) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs.publisher != rhs.publisher {return false}
+    if lhs._body != rhs._body {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

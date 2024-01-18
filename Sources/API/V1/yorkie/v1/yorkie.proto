@@ -19,7 +19,7 @@ package yorkie.v1;
 
 import "yorkie/v1/resources.proto";
 
-option go_package = ".;v1";
+option go_package = "github.com/yorkie-team/yorkie/api/yorkie/v1;v1";
 
 option java_multiple_files = true;
 option java_package = "dev.yorkie.api.v1";
@@ -35,6 +35,8 @@ service YorkieService {
   rpc PushPullChanges (PushPullChangesRequest) returns (PushPullChangesResponse) {}
 
   rpc WatchDocument (WatchDocumentRequest) returns (stream WatchDocumentResponse) {}
+
+  rpc Broadcast (BroadcastRequest) returns (BroadcastResponse) {}
 }
 
 message ActivateClientRequest {
@@ -66,6 +68,7 @@ message DetachDocumentRequest {
   string client_id = 1;
   string document_id = 2;
   ChangePack change_pack = 3;
+  bool remove_if_not_attached = 4;
 }
 
 message DetachDocumentResponse {
@@ -107,4 +110,14 @@ message PushPullChangesRequest {
 
 message PushPullChangesResponse {
   ChangePack change_pack = 1;
+}
+
+message BroadcastRequest {
+  string client_id = 1;
+  string document_id = 2;
+  string topic = 3;
+  bytes payload = 4;
+}
+
+message BroadcastResponse {
 }
