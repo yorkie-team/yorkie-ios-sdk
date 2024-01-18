@@ -195,6 +195,9 @@ class GCTests: XCTestCase {
         doc1Len = await doc1.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
         doc2Len = await doc2.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
 
+        XCTAssertEqual(doc1Len, gcNodeLen)
+        XCTAssertEqual(doc2Len, gcNodeLen)
+
         try await client1.deactivate()
         try await client2.deactivate()
     }
