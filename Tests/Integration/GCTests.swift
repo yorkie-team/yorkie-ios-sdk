@@ -191,7 +191,7 @@ class GCTests: XCTestCase {
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)
 
-        // Actual garbage-collected node
+        // Actual garbage-collected nodes
         doc1Len = await doc1.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
         doc2Len = await doc2.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
 
