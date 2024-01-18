@@ -44,7 +44,7 @@ class PeerSelectionDisplayLayoutManager: NSLayoutManager {
         enumerateEnclosingRects(forGlyphRange: tokenGlypeRange, withinSelectedGlyphRange: withinRange, in: textContainer) { rect, _ in
             let tokenRect = rect.offsetBy(dx: origin.x, dy: origin.y)
 
-            colors.forEach { color in
+            for color in colors {
                 color.setFill()
                 UIBezierPath(rect: tokenRect).fill()
             }

@@ -562,18 +562,16 @@ public actor Document {
                 if let event = event as? ChangeEvent {
                     var operations = [String: [any OperationInfo]]()
 
-                    event.value.operations.forEach { operationInfo in
-                        self.subscribeCallbacks.keys.forEach { targetPath in
-                            if self.isSameElementOrChildOf(operationInfo.path, targetPath) {
-                                if operations[targetPath] == nil {
-                                    operations[targetPath] = [any OperationInfo]()
-                                }
-                                operations[targetPath]?.append(operationInfo)
+                    for operationInfo in event.value.operations {
+                        for targetPath in self.subscribeCallbacks.keys where self.isSameElementOrChildOf(operationInfo.path, targetPath) {
+                            if operations[targetPath] == nil {
+                                operations[targetPath] = [any OperationInfo]()
                             }
+                            operations[targetPath]?.append(operationInfo)
                         }
                     }
 
-                    operations.forEach { key, value in
+                    for (key, value) in operations {
                         let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
 
                         self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))

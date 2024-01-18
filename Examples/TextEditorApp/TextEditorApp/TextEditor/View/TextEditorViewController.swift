@@ -129,7 +129,7 @@ class TextEditorViewController: UIViewController {
 
         storage.beginEditing()
 
-        elements.forEach { element in
+        for element in elements {
             switch element {
             case .edit(range: let range, content: let content):
                 let range = range ?? NSRange(location: 0, length: storage.length)
@@ -160,7 +160,7 @@ class TextEditorViewController: UIViewController {
                 }
 
                 // Correct peer selection position.
-                self.peerSelection.forEach { selection in
+                for selection in self.peerSelection {
                     var prevSelectRange = selection.value.0
                     let newDocEnd = storage.length
 
@@ -208,7 +208,7 @@ class TextEditorViewController: UIViewController {
     func redrawPeerSelections() {
         let storage = self.textView.textStorage
 
-        self.peerSelection.forEach { key, value in
+        for (key, value) in self.peerSelection {
             let key = PeerSelectionDisplayLayoutManager.createKey(key)
             let allRange = NSRange(location: 0, length: storage.length)
 

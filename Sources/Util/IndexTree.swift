@@ -249,7 +249,7 @@ extension IndexTreeNode {
 
         self.innerChildren.append(contentsOf: newNode)
 
-        newNode.forEach { node in
+        for node in newNode {
             node.parent = self
             node.updateAncestorsSize()
         }
@@ -265,7 +265,7 @@ extension IndexTreeNode {
 
         self.innerChildren.insert(contentsOf: newNode, at: 0)
 
-        newNode.forEach { node in
+        for node in newNode {
             node.parent = self
 
             if node.isRemoved == false {
@@ -353,8 +353,8 @@ extension IndexTreeNode {
         clone.size = clone.innerChildren.reduce(0) { acc, child in
             acc + child.paddedSize
         }
-        clone.innerChildren.forEach {
-            $0.parent = clone
+        for innerChild in clone.innerChildren {
+            innerChild.parent = clone
         }
 
         return clone
@@ -517,7 +517,7 @@ func nodesBetween<T: IndexTreeNode>(root: T,
     }
 
     var pos = 0
-    try root.children.forEach { child in
+    for child in root.children {
         // If the child is an element node, the size of the child.
         if from - child.paddedSize < pos, pos < to {
             // If the child is an element node, the range of the child
@@ -558,7 +558,7 @@ func traverse<T: IndexTreeNode>(node: T,
                                 callback: @escaping (T, Int32) -> Void,
                                 depth: Int32 = 0)
 {
-    node.children.forEach { child in
+    for child in node.children {
         traverse(node: child, callback: callback, depth: depth + 1)
     }
     callback(node, depth)
@@ -568,7 +568,7 @@ func traverse<T: IndexTreeNode>(node: T,
  * `traverseAll` traverses the whole tree (include tombstones) with postorder traversal.
  */
 func traverseAll<T: IndexTreeNode>(node: T, depth: Int32 = 0, callback: @escaping (T, Int32) -> Void) {
-    node.innerChildren.forEach { child in
+    for child in node.innerChildren {
         traverseAll(node: child, depth: depth + 1, callback: callback)
     }
 

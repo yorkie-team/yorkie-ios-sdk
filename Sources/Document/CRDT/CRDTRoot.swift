@@ -157,13 +157,12 @@ class CRDTRoot {
         var count = 0
         var seen = Set<String>()
 
-        self.removedElementSetByCreatedAt.forEach {
-            seen.insert($0)
-
-            guard let pair = self.elementPairMapByCreatedAt[$0],
+        for item in self.removedElementSetByCreatedAt {
+            seen.insert(item)
+            guard let pair = self.elementPairMapByCreatedAt[item],
                   let element = pair.element as? CRDTContainer
             else {
-                return
+                continue
             }
             element.getDescendants { element, _ in
                 seen.insert(element.createdAt.toIDString)
@@ -173,11 +172,11 @@ class CRDTRoot {
 
         count += seen.count
 
-        self.elementHasRemovedNodesSetByCreatedAt.forEach {
-            guard let pair = self.elementPairMapByCreatedAt[$0],
+        for item in self.elementHasRemovedNodesSetByCreatedAt {
+            guard let pair = self.elementPairMapByCreatedAt[item],
                   let element = pair.element as? CRDTGCElement
             else {
-                return
+                continue
             }
 
             count += element.removedNodesLength
@@ -204,27 +203,27 @@ class CRDTRoot {
     func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
         var count = 0
 
-        self.removedElementSetByCreatedAt.forEach {
-            guard let pair = self.elementPairMapByCreatedAt[$0],
+        for item in self.removedElementSetByCreatedAt {
+            guard let pair = self.elementPairMapByCreatedAt[item],
                   let removedAt = pair.element.removedAt, removedAt <= ticket
             else {
-                return
+                continue
             }
 
             try? pair.parent?.purge(element: pair.element)
             count += self.garbageCollectInternal(element: pair.element)
         }
 
-        self.elementHasRemovedNodesSetByCreatedAt.forEach {
-            guard let pair = self.elementPairMapByCreatedAt[$0],
+        for item in self.elementHasRemovedNodesSetByCreatedAt {
+            guard let pair = self.elementPairMapByCreatedAt[item],
                   let element = pair.element as? CRDTGCElement
             else {
-                return
+                continue
             }
 
             let removedNodeCount = element.purgeRemovedNodesBefore(ticket: ticket)
             guard removedNodeCount > 0 else {
-                return
+                continue
             }
 
             self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt.toIDString)

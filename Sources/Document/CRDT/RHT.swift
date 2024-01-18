@@ -82,7 +82,7 @@ class RHT {
      */
     func toJSON() -> String {
         var result = [String]()
-        self.nodeMapByKey.forEach { (key: String, node: RHTNode) in
+        for (key, node) in self.nodeMapByKey {
             result.append("\"\(key)\":\"\(node.value.escaped())\"")
         }
 
@@ -122,7 +122,7 @@ class RHT {
      */
     func toObject() -> [String: (value: String, updatedAt: TimeTicket)] {
         var result = [String: (String, TimeTicket)]()
-        self.nodeMapByKey.forEach { (key: String, node: RHTNode) in
+        for (key, node) in self.nodeMapByKey {
             result[key] = (node.value, node.updatedAt)
         }
 

@@ -111,8 +111,8 @@ extension CRDTObject {
      */
     func deepcopy() -> CRDTElement {
         let clone = CRDTObject(createdAt: self.createdAt)
-        self.memberNodes.forEach {
-            clone.memberNodes.set(key: $0.key, value: $0.value.deepcopy())
+        for memberNode in self.memberNodes {
+            clone.memberNodes.set(key: memberNode.key, value: memberNode.value.deepcopy())
         }
 
         clone.remove(self.removedAt)

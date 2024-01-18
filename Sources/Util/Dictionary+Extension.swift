@@ -88,19 +88,19 @@ extension StringValueTypeDictionary {
     var anyValueTypeDictionary: AnyValueTypeDictionary {
         var result = AnyValueTypeDictionary()
 
-        self.forEach {
-            if let value = Int($0.value) {
-                result[$0.key] = value
-            } else if let value = Double($0.value) {
-                result[$0.key] = value
-            } else if let value = Bool($0.value) {
-                result[$0.key] = value
-            } else if let data = $0.value.data(using: .utf8),
+        for item in self {
+            if let value = Int(item.value) {
+                result[item.key] = value
+            } else if let value = Double(item.value) {
+                result[item.key] = value
+            } else if let value = Bool(item.value) {
+                result[item.key] = value
+            } else if let data = item.value.data(using: .utf8),
                       let object = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
             {
-                result[$0.key] = object
+                result[item.key] = object
             } else {
-                result[$0.key] = $0.value
+                result[item.key] = item.value
             }
         }
 

@@ -68,6 +68,65 @@ struct CRDTTreePos: Equatable {
 
 extension CRDTTreePos {
     /**
+     * `fromTreePos` creates a new instance of CRDTTreePos from the given TreePos.
+     */
+    static func fromTreePos(pos: TreePos<CRDTTreeNode>) -> CRDTTreePos {
+        let offset = Int(pos.offset)
+        var node = pos.node
+        var leftNode: CRDTTreeNode!
+
+        if node.isText {
+            if node.parent?.children[0] === node, offset == 0 {
+                leftNode = node.parent
+            } else {
+                leftNode = node
+            }
+
+            node = node.parent!
+        } else {
+            if offset == 0 {
+                leftNode = node
+            } else {
+                leftNode = node.children[offset - 1]
+            }
+        }
+
+        return CRDTTreePos(parentID: node.id, leftSiblingID: CRDTTreeNodeID(createdAt: leftNode.createdAt, offset: leftNode.offset + Int32(offset)))
+    }
+
+    /**
+     * `toTreeNodes` converts the pos to parent and left sibling nodes.
+     * If the position points to the middle of a node, then the left sibling node
+     * is the node that contains the position. Otherwise, the left sibling node is
+     * the node that is located at the left of the position.
+     */
+    func toTreeNodes(tree: CRDTTree) throws -> (CRDTTreeNode, CRDTTreeNode) {
+        let parentID = self.parentID
+        let leftSiblingID = self.leftSiblingID
+        let parentNode = tree.findFloorNode(parentID)
+        let leftNode = tree.findFloorNode(leftSiblingID)
+        guard let parentNode, var leftNode else {
+            throw YorkieError.unexpected(message: "cannot find node at \(self)")
+        }
+
+        /**
+         * NOTE(hackerwins): If the left node and the parent node are the same,
+         * it means that the position is the left-most of the parent node.
+         * We need to skip finding the left of the position.
+         */
+        if leftSiblingID != parentID,
+           leftSiblingID.offset > 0,
+           leftSiblingID.offset == leftNode.id.offset,
+           let insPrevID = leftNode.insPrevID,
+           let newLeftNode = tree.findFloorNode(insPrevID)
+        {
+            leftNode = newLeftNode
+        }
+
+        return (parentNode, leftNode)
+    }
+
+    /**
      * `fromStruct` creates a new instance of CRDTTreePos from the given struct.
      */
     static func fromStruct(_ value: CRDTTreePosStruct) throws -> CRDTTreePos {
@@ -324,12 +383,12 @@ final class CRDTTreeNode: IndexTreeNode {
 
         var xml = "<\(node.type)"
         if let attrs = node.attrs?.toObject() {
-            attrs.keys.sorted().forEach {
-                if let value = attrs[$0]?.value {
+            for key in attrs.keys.sorted() {
+                if let value = attrs[key]?.value {
                     if value.first == "\"", value.last == "\"" {
-                        xml += " \($0)=\(value)"
+                        xml += " \(key)=\(value)"
                     } else {
-                        xml += " \($0)=\"\(value)\""
+                        xml += " \(key)=\"\(value)\""
                     }
                 }
             }
@@ -419,7 +478,7 @@ class CRDTTree: CRDTGCElement {
     /**
      * `findFloorNode` finds node of given id.
      */
-    private func findFloorNode(_ id: CRDTTreeNodeID) -> CRDTTreeNode? {
+    func findFloorNode(_ id: CRDTTreeNodeID) -> CRDTTreeNode? {
         guard let entry = self.nodeMapByID.floorEntry(id), entry.key.createdAt == id.createdAt else {
             return nil
         }
@@ -428,61 +487,51 @@ class CRDTTree: CRDTGCElement {
     }
 
     /**
-     * `findNodesAndSplitText` finds `TreePos` of the given `CRDTTreeNodeID` and
-     * splits the text node if necessary.
+     * `findNodesAndSplit` finds `TreePos` of the given `CRDTTreeNodeID` and
+     * splits nodes for the given split level.
      *
-     * `CRDTTreeNodeID` is a position in the CRDT perspective. This is
-     * different from `TreePos` which is a position of the tree in the local
-     * perspective.
+     * The ids of the given `pos` are the ids of the node in the CRDT perspective.
+     * This is different from `TreePos` which is a position of the tree in the
+     * physical perspective.
      */
-    func findNodesAndSplitText(_ pos: CRDTTreePos, _ editedAt: TimeTicket) throws -> (CRDTTreeNode, CRDTTreeNode) {
-        guard let treeNodes = self.toTreeNodes(pos) else {
-            throw YorkieError.unexpected(message: "cannot find node at \(pos)")
-        }
+    func findNodesAndSplit(_ pos: CRDTTreePos, _ editedAt: TimeTicket) throws -> (CRDTTreeNode, CRDTTreeNode) {
+        // 01. Find the parent and left sibling node of the given position.
+        let (parent, leftSibling) = try pos.toTreeNodes(tree: self)
+        var leftNode = leftSibling
 
-        let parentNode = treeNodes.0
-        var leftSiblingNode = treeNodes.1
+        // 02. Split nodes for the given split level.
+        if leftNode.isText {
+            let absOffset = leftNode.id.offset
+            let split = try leftNode.split(pos.leftSiblingID.offset - absOffset, absOffset)
 
-        // Find the appropriate position. This logic is similar to the logical to
-        // handle the same position insertion of RGA.
-
-        if leftSiblingNode.isText {
-            let absOffset = leftSiblingNode.id.offset
-            if let split = try leftSiblingNode.split(pos.leftSiblingID.offset - absOffset, absOffset) {
-                split.insPrevID = leftSiblingNode.id
-                self.nodeMapByID.put(split.id, split)
-
-                if let id = leftSiblingNode.insNextID {
-                    let insNext = self.findFloorNode(id)
-
-                    insNext?.insPrevID = split.id
-                    split.insNextID = id
+            if split != nil {
+                split!.insPrevID = leftNode.id
+                if leftNode.insNextID != nil {
+                    self.findFloorNode(leftNode.insNextID!)?.insPrevID = split!.id
+                    split!.insNextID = leftNode.insNextID
                 }
-                leftSiblingNode.insNextID = split.id
+                leftNode.insNextID = split!.id
+
+                self.nodeMapByID.put(split!.id, split!)
             }
         }
 
-        var index = 0
+        // 03. Find the appropriate left node. If some nodes are inserted at the
+        // same position concurrently, then we need to find the appropriate left
+        // node. This is similar to RGA.
+        let allChildren = parent.innerChildren
+        let index = parent === leftNode ? 0 : allChildren.firstIndex(where: { $0 === leftNode })! + 1
 
-        if parentNode !== leftSiblingNode {
-            let firstIndex = parentNode.innerChildren.firstIndex(where: { $0 === leftSiblingNode }) ?? -1
-
-            index = firstIndex + 1
-        }
-
-        if index <= parentNode.innerChildren.count {
-            for idx in index ..< parentNode.innerChildren.count {
-                let next = parentNode.innerChildren[idx]
-
-                if next.id.createdAt.after(editedAt) {
-                    leftSiblingNode = next
-                } else {
-                    break
-                }
+        for index in index ..< parent.innerChildren.count {
+            let next = allChildren[index]
+            if !next.id.createdAt.after(editedAt) {
+                break
             }
+
+            leftNode = next
         }
 
-        return (parentNode, leftSiblingNode)
+        return (parent, leftNode)
     }
 
     /**
@@ -490,8 +539,8 @@ class CRDTTree: CRDTGCElement {
      */
     @discardableResult
     func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
+        let (fromParent, fromLeft) = try self.findNodesAndSplit(range.0, editedAt)
+        let (toParent, toLeft) = try self.findNodesAndSplit(range.1, editedAt)
         var changes: [TreeChange] = []
 
         guard let actorID = editedAt.actorID else {
@@ -534,8 +583,8 @@ class CRDTTree: CRDTGCElement {
     @discardableResult
     func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket, _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([TreeChange], [String: TimeTicket]) {
         // 01. split text nodes at the given range if needed.
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
+        let (fromParent, fromLeft) = try self.findNodesAndSplit(range.0, editedAt)
+        let (toParent, toLeft) = try self.findNodesAndSplit(range.1, editedAt)
 
         // TODO(hackerwins): If concurrent deletion happens, we need to seperate the
         // range(from, to) into multiple ranges.
@@ -628,23 +677,11 @@ class CRDTTree: CRDTGCElement {
         return (changes, latestCreatedAtMap)
     }
 
-    private func traverseInPosRange(_ fromParent: CRDTTreeNode,
-                                    _ fromLeft: CRDTTreeNode,
-                                    _ toParent: CRDTTreeNode,
-                                    _ toLeft: CRDTTreeNode,
-                                    callback: @escaping (CRDTTreeNode, TagContained) throws -> Void) throws
-    {
-        let fromIdx = try self.toIndex(fromParent, fromLeft)
-        let toIdx = try self.toIndex(toParent, toLeft)
-
-        return try self.indexTree.nodesBetween(fromIdx, toIdx, callback)
-    }
-
     /**
-     * `editByIndex` edits the given range with the given value.
+     * `editT` edits the given range with the given value.
      * This method uses indexes instead of a pair of TreePos for testing.
      */
-    func editByIndex(_ range: (Int, Int), _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket) throws {
+    func editT(_ range: (Int, Int), _ contents: [CRDTTreeNode]?, _ editedAt: TimeTicket) throws {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         try self.edit((fromPos, toPos), contents, editedAt)
@@ -682,14 +719,14 @@ class CRDTTree: CRDTGCElement {
         var nodesToBeRemoved = [CRDTTreeNode]()
         var count = 0
 
-        self.removedNodeMap.forEach { _, node in
+        for (_, node) in self.removedNodeMap {
             if node.removedAt != nil, ticket >= node.removedAt! {
                 nodesToBeRemoved.append(node)
                 count += 1
             }
         }
 
-        nodesToBeRemoved.forEach { node in
+        for node in nodesToBeRemoved {
             do {
                 try node.parent?.removeChild(child: node)
             } catch {
@@ -724,27 +761,7 @@ class CRDTTree: CRDTGCElement {
     func findPos(_ index: Int, _ preferText: Bool = true) throws -> CRDTTreePos {
         let treePos = try self.indexTree.findTreePos(index, preferText)
 
-        let offset = treePos.offset
-        var node = treePos.node
-        var leftSibing: CRDTTreeNode
-
-        if node.isText {
-            if node.parent?.children[0] === node, offset == 0 {
-                leftSibing = node.parent!
-            } else {
-                leftSibing = node
-            }
-
-            node = node.parent!
-        } else {
-            if offset == 0 {
-                leftSibing = node
-            } else {
-                leftSibing = node.children[Int(offset) - 1]
-            }
-        }
-
-        return CRDTTreePos(parentID: node.id, leftSiblingID: CRDTTreeNodeID(createdAt: leftSibing.createdAt, offset: leftSibing.offset + offset))
+        return CRDTTreePos.fromTreePos(pos: treePos)
     }
 
     /**
@@ -761,13 +778,6 @@ class CRDTTree: CRDTGCElement {
         let fromIdx = try self.pathToIndex(path)
 
         return try (self.findPos(fromIdx), self.findPos(fromIdx + 1))
-    }
-
-    /**
-     * `pathToTreePos` finds the tree position path.
-     */
-    func pathToTreePos(_ path: [Int]) throws -> TreePos<CRDTTreeNode> {
-        try self.indexTree.pathToTreePos(path)
     }
 
     /**
@@ -852,68 +862,6 @@ class CRDTTree: CRDTGCElement {
         return try self.indexTree.indexOf(treePos)
     }
 
-    private func toTreeNodes(_ pos: CRDTTreePos) -> (CRDTTreeNode, CRDTTreeNode)? {
-        let parentID = pos.parentID
-        let leftSiblingID = pos.leftSiblingID
-        guard let parentNode = self.findFloorNode(parentID),
-              var leftSiblingNode = self.findFloorNode(leftSiblingID)
-        else {
-            return nil
-        }
-
-        if leftSiblingID.offset > 0,
-           leftSiblingID.offset == leftSiblingNode.id.offset,
-           leftSiblingNode.insPrevID != nil
-        {
-            leftSiblingNode = self.findFloorNode(leftSiblingNode.insPrevID!) ?? leftSiblingNode
-        }
-
-        return (parentNode, leftSiblingNode)
-    }
-
-    /**
-     * `toTreePos` converts the given CRDTTreePos to local TreePos<CRDTTreeNode>.
-     */
-    private func toTreePos(_ parentNode: CRDTTreeNode, _ leftSiblingNode: CRDTTreeNode) throws -> TreePos<CRDTTreeNode>? {
-        var treePos: TreePos<CRDTTreeNode>
-
-        var parentNode = parentNode
-
-        if parentNode.isRemoved {
-            var childNode = parentNode
-            while parentNode.isRemoved {
-                childNode = parentNode
-                parentNode = childNode.parent!
-            }
-
-            guard let childOffset = try parentNode.findOffset(node: childNode) else {
-                throw YorkieError.unexpected(message: "Can't find Offset")
-            }
-
-            treePos = TreePos(node: parentNode, offset: Int32(childOffset))
-        } else {
-            if parentNode === leftSiblingNode {
-                treePos = TreePos(node: parentNode, offset: 0)
-            } else {
-                guard var offset = try parentNode.findOffset(node: leftSiblingNode) else {
-                    throw YorkieError.unexpected(message: "Can't find Offset")
-                }
-
-                if leftSiblingNode.isRemoved == false {
-                    if leftSiblingNode.isText {
-                        return TreePos(node: leftSiblingNode, offset: Int32(leftSiblingNode.paddedSize))
-                    } else {
-                        offset += 1
-                    }
-                }
-
-                treePos = TreePos(node: parentNode, offset: Int32(offset))
-            }
-        }
-
-        return treePos
-    }
-
     /**
      * `indexToPath` converts the given tree index to path.
      */
@@ -957,8 +905,8 @@ class CRDTTree: CRDTGCElement {
      * `posRangeToPathRange` converts the given position range to the path range.
      */
     func posRangeToPathRange(_ range: TreePosRange, _ timeTicket: TimeTicket) throws -> ([Int], [Int]) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, timeTicket)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, timeTicket)
+        let (fromParent, fromLeft) = try self.findNodesAndSplit(range.0, timeTicket)
+        let (toParent, toLeft) = try self.findNodesAndSplit(range.1, timeTicket)
 
         return try (self.toPath(fromParent, fromLeft), self.toPath(toParent, toLeft))
     }
@@ -967,8 +915,8 @@ class CRDTTree: CRDTGCElement {
      * `posRangeToIndexRange` converts the given position range to the path range.
      */
     func posRangeToIndexRange(_ range: TreePosRange, _ timeTicket: TimeTicket) throws -> (Int, Int) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, timeTicket)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, timeTicket)
+        let (fromParent, fromLeft) = try self.findNodesAndSplit(range.0, timeTicket)
+        let (toParent, toLeft) = try self.findNodesAndSplit(range.1, timeTicket)
 
         return try (self.toIndex(fromParent, fromLeft), self.toIndex(toParent, toLeft))
     }
@@ -979,31 +927,58 @@ class CRDTTree: CRDTGCElement {
     func toBytes() -> Data {
         return Data()
     }
+
+    /**
+     * `traverseInPosRange` traverses the tree in the given position range.
+     */
+    private func traverseInPosRange(_ fromParent: CRDTTreeNode,
+                                    _ fromLeft: CRDTTreeNode,
+                                    _ toParent: CRDTTreeNode,
+                                    _ toLeft: CRDTTreeNode,
+                                    callback: @escaping (CRDTTreeNode, TagContained) throws -> Void) throws
+    {
+        let fromIdx = try self.toIndex(fromParent, fromLeft)
+        let toIdx = try self.toIndex(toParent, toLeft)
+
+        return try self.indexTree.nodesBetween(fromIdx, toIdx, callback)
+    }
+
+    /**
+     * `toTreePos` converts the given CRDTTreePos to local TreePos<CRDTTreeNode>.
+     */
+    private func toTreePos(_ parentNode: CRDTTreeNode, _ leftSiblingNode: CRDTTreeNode) throws -> TreePos<CRDTTreeNode>? {
+        var parentNode = parentNode
+
+        if parentNode.isRemoved {
+            var childNode = parentNode
+            while parentNode.isRemoved {
+                childNode = parentNode
+                parentNode = childNode.parent!
+            }
+
+            guard let childOffset = try parentNode.findOffset(node: childNode) else {
+                throw YorkieError.unexpected(message: "Can't find Offset")
+            }
+
+            return TreePos(node: parentNode, offset: Int32(childOffset))
+        }
+
+        if parentNode === leftSiblingNode {
+            return TreePos(node: parentNode, offset: 0)
+        }
+
+        guard var offset = try parentNode.findOffset(node: leftSiblingNode) else {
+            throw YorkieError.unexpected(message: "Can't find Offset")
+        }
+
+        if leftSiblingNode.isRemoved == false {
+            if leftSiblingNode.isText {
+                return TreePos(node: leftSiblingNode, offset: Int32(leftSiblingNode.paddedSize))
+            } else {
+                offset += 1
+            }
+        }
+
+        return TreePos(node: parentNode, offset: Int32(offset))
+    }
 }
-
-/*
- extension CRDTTree: Sequence {
-     func makeIterator() -> CRDTTreeListIterator {
-         return CRDTTreeListIterator(self.dummyHead.next)
-     }
- }
-
- class CRDTTreeListIterator: IteratorProtocol {
-     private weak var iteratorNext: CRDTTreeNode?
-
-     init(_ firstNode: CRDTTreeNode?) {
-         self.iteratorNext = firstNode
-     }
-
-     func next() -> CRDTTreeNode? {
-         while let result = self.iteratorNext {
-             self.iteratorNext = result.next
-             if result.isRemoved == false {
-                 return result
-             }
-         }
-
-         return nil
-     }
- }
- */
