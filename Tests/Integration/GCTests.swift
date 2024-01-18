@@ -142,6 +142,66 @@ class GCTests: XCTestCase {
         XCTAssertEqual(root, clone)
     }
 
+    func test_getGarbageLength_should_return_the_actual_number_of_elements_garbage_collected() async throws {
+        let options = ClientOptions()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress: rpcAddress, options: options)
+        let client2 = Client(rpcAddress: rpcAddress, options: options)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        // 1. initial state
+        try await client1.attach(doc1, [:], false)
+
+        try await doc1.update { root, _ in
+            root.point = ["x": Int64(0), "y": Int64(0)]
+        }
+
+        try await client1.sync()
+        try await client2.attach(doc2, [:], false)
+
+        // 2. client1 updates doc
+        try await doc1.update { root, _ in
+            root.remove(key: "point")
+        }
+
+        var len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 3)
+
+        // 3. client2 updates doc
+        try await doc2.update { root, _ in
+            (root.point as? JSONObject)?.remove(key: "x")
+        }
+
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 1) // x
+
+        try await client1.sync()
+        try await client2.sync()
+        try await client1.sync()
+
+        let gcNodeLen = 3 // point x, y
+        var doc1Len = await doc1.getGarbageLength()
+        var doc2Len = await doc2.getGarbageLength()
+        XCTAssertEqual(doc1Len, gcNodeLen)
+        XCTAssertEqual(doc2Len, gcNodeLen)
+
+        // Actual garbage-collected nodes
+        doc1Len = await doc1.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        doc2Len = await doc2.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+
+        XCTAssertEqual(doc1Len, gcNodeLen)
+        XCTAssertEqual(doc2Len, gcNodeLen)
+
+        try await client1.deactivate()
+        try await client2.deactivate()
+    }
+
     func test_text_garbage_collection_test() async throws {
         let doc = Document(key: "test-doc")
 
@@ -768,5 +828,76 @@ class GCTests: XCTestCase {
         XCTAssertEqual(len, 6)
         len = await doc.getGarbageLengthFromClone()
         XCTAssertEqual(len, 6)
+    }
+
+    func test_can_purges_removed_elements_after_peers_can_not_access_them() async throws {
+        let options = ClientOptions()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress: rpcAddress, options: options)
+        let client2 = Client(rpcAddress: rpcAddress, options: options)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], false)
+
+        try await doc1.update { root, _ in
+            root.point = ["x": Int64(0), "y": Int64(0)]
+        }
+
+        try await doc1.update { root, _ in
+            (root.point as? JSONObject)?.x = Int64(1)
+        }
+
+        var len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 1)
+
+        try await client1.sync()
+
+        try await client2.attach(doc2, [:], false)
+
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 1)
+
+        try await doc2.update { root, _ in
+            (root.point as? JSONObject)?.x = Int64(2)
+        }
+
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 2)
+
+        try await doc1.update { root, _ in
+            root.point = ["x": Int64(3), "y": Int64(3)]
+        }
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 4)
+        try await client1.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 4)
+
+        try await client1.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 4)
+
+        try await client2.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 4)
+        try await client1.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 5)
+        try await client2.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 5)
+        try await client1.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.deactivate()
+        try await client2.deactivate()
     }
 }

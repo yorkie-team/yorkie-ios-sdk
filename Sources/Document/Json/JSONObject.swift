@@ -128,7 +128,7 @@ public class JSONObject {
         self.setToCRDTObject(key: key, value: primitive)
 
         let operation = SetOperation(key: key,
-                                     value: primitive,
+                                     value: primitive.deepcopy(),
                                      parentCreatedAt: self.target.createdAt,
                                      executedAt: ticket)
         self.context.push(operation: operation)

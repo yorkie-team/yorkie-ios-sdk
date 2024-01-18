@@ -240,6 +240,81 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
     }
 
+    func test_should_apply_previous_changes_when_resuming_document() async throws {
+        let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        let exps = [self.expectation(description: "Exp 1"), self.expectation(description: "Exp 2"), self.expectation(description: "Exp 3")]
+        var expCount = 0
+
+        c2.eventStream.sink { event in
+            if event.type == .documentSynced {
+                exps[safe: expCount]?.fulfill()
+                expCount += 1
+            }
+        }.store(in: &self.cancellables)
+
+        // 01. c2 attach the doc with realtime sync mode at first.
+        try await c1.attach(d1, [:], false)
+        try await c2.attach(d2)
+        try await d1.update { root, _ in
+            root.version = "v1"
+        }
+        try await c1.sync()
+        await fulfillment(of: [exps[0]], timeout: 1.5)
+
+        var d1Doc = await d1.toSortedJSON()
+        var d2Doc = await d2.toSortedJSON()
+
+        XCTAssertEqual(d1Doc, "{\"version\":\"v1\"}")
+        XCTAssertEqual(d2Doc, "{\"version\":\"v1\"}")
+
+        // 02. c2 pauses realtime sync mode. So, c2 doesn't get the changes of c1
+        try await c2.pause(d2)
+        try await d1.update { root, _ in
+            root.version = "v2"
+        }
+        try await c1.sync()
+
+        d1Doc = await d1.toSortedJSON()
+        d2Doc = await d2.toSortedJSON()
+
+        XCTAssertEqual(d1Doc, "{\"version\":\"v2\"}")
+        XCTAssertEqual(d2Doc, "{\"version\":\"v1\"}")
+
+        // 03. c2 resumes realtime sync mode.
+        // c2 should be able to apply changes made to the document while c2 is not in realtime sync.
+        try await c2.resume(d2)
+        await fulfillment(of: [exps[1]], timeout: 1.5)
+
+        d2Doc = await d2.toSortedJSON()
+        XCTAssertEqual(d2Doc, "{\"version\":\"v2\"}")
+
+        // 04. c2 should automatically synchronize changes.
+        try await d1.update { root, _ in
+            root.version = "v3"
+        }
+        try await c1.sync()
+        await fulfillment(of: [exps[2]], timeout: 1.5)
+
+        d1Doc = await d1.toSortedJSON()
+        d2Doc = await d2.toSortedJSON()
+
+        XCTAssertEqual(d1Doc, "{\"version\":\"v3\"}")
+        XCTAssertEqual(d2Doc, "{\"version\":\"v3\"}")
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
+
     func test_can_change_sync_mode_in_realtime_sync() async throws {
         let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
         let c2 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
