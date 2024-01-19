@@ -681,11 +681,7 @@ class CRDTTree: CRDTGCElement {
         }
 
         // 03. Merge: move the nodes that are marked as moved.
-        for node in toBeMovedToFromParents {
-            if node.removedAt == nil {
-                try fromParent.append(contentsOf: [node])
-            }
-        }
+        try fromParent.append(contentsOf: toBeMovedToFromParents.filter { $0.removedAt == nil })
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {

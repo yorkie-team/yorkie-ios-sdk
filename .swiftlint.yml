@@ -19,6 +19,7 @@ disabled_rules:
   - opening_brace
   - large_tuple
   - todo
+  - function_body_length
 opt_in_rules:
   - empty_count
 # Rewrited rules
