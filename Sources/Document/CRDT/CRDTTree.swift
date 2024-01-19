@@ -533,16 +533,21 @@ class CRDTTree: CRDTGCElement {
         let (parent, leftSibling) = try pos.toTreeNodes(tree: self)
         var leftNode = leftSibling
 
-        // 02. Split text node if the left node is a text node.
+        // 02. Determine whether the position is left-most and the exact parent
+        // in the current tree.
+        let isLeftMost = parent === leftNode
+        let realParent = leftNode.parent != nil && !isLeftMost ? leftNode.parent! : parent
+
+        // 03. Split text node if the left node is a text node.
         if leftNode.isText {
             try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset, nil)
         }
 
-        // 03. Find the appropriate left node. If some nodes are inserted at the
+        // 04. Find the appropriate left node. If some nodes are inserted at the
         // same position concurrently, then we need to find the appropriate left
         // node. This is similar to RGA.
-        let allChildren = parent.innerChildren
-        let index = parent === leftNode ? 0 : (allChildren.firstIndex(where: { $0 === leftNode }) ?? -1) + 1
+        let allChildren = realParent.innerChildren
+        let index = isLeftMost ? 0 : (allChildren.firstIndex(where: { $0 === leftNode }) ?? -1) + 1
 
         for index in index ..< parent.innerChildren.count {
             let next = allChildren[index]
@@ -553,7 +558,7 @@ class CRDTTree: CRDTGCElement {
             leftNode = next
         }
 
-        return (parent, leftNode)
+        return (realParent, leftNode)
     }
 
     /**
