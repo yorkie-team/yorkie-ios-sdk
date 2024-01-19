@@ -13,14 +13,15 @@ final class IndexTreeTests: XCTestCase {
      * `betweenEqual` is a helper function that checks the nodes between the given
      * indexes.
      */
-    func nodesBetweenEqual(_ tree: IndexTree<CRDTTreeNode>,
-                           _ from: Int,
-                           _ to: Int,
-                           _ expected: [String]) throws
+    func tokensBetweenEqual(_ tree: IndexTree<CRDTTreeNode>,
+                            _ from: Int,
+                            _ to: Int,
+                            _ expected: [String]) throws
     {
         var actual = [String]()
-        try tree.nodesBetween(from, to) { node, contain in
-            actual.append("\(self.toDiagnostic(node)):\(contain.rawValue)")
+        try tree.tokensBetween(from, to) { token, _ in
+            let (node, tokenType) = token
+            actual.append("\(self.toDiagnostic(node)):\(tokenType.rawValue)")
         }
 
         for (index, actualValue) in actual.enumerated() {
@@ -38,7 +39,7 @@ final class IndexTreeTests: XCTestCase {
         }
 
         if node.isText {
-            return "\(node.type).\(node.value)"
+            return "\(node.value)"
         }
         return node.type
     }
@@ -58,10 +59,10 @@ final class IndexTreeTests: XCTestCase {
         XCTAssertEqual(self.toDiagnostic(pos?.node), "r")
         XCTAssertEqual(pos?.offset, 0)
         pos = try tree?.findTreePos(1)
-        XCTAssertEqual(self.toDiagnostic(pos?.node), "text.hello")
+        XCTAssertEqual(self.toDiagnostic(pos?.node), "hello")
         XCTAssertEqual(pos?.offset, 0)
         pos = try tree?.findTreePos(6)
-        XCTAssertEqual(self.toDiagnostic(pos?.node), "text.hello")
+        XCTAssertEqual(self.toDiagnostic(pos?.node), "hello")
         XCTAssertEqual(pos?.offset, 5)
         pos = try tree?.findTreePos(6, false)
         XCTAssertEqual(self.toDiagnostic(pos?.node), "p")
@@ -70,10 +71,10 @@ final class IndexTreeTests: XCTestCase {
         XCTAssertEqual(self.toDiagnostic(pos?.node), "r")
         XCTAssertEqual(pos?.offset, 1)
         pos = try tree?.findTreePos(8)
-        XCTAssertEqual(self.toDiagnostic(pos?.node), "text.world")
+        XCTAssertEqual(self.toDiagnostic(pos?.node), "world")
         XCTAssertEqual(pos?.offset, 0)
         pos = try tree?.findTreePos(13)
-        XCTAssertEqual(self.toDiagnostic(pos?.node), "text.world")
+        XCTAssertEqual(self.toDiagnostic(pos?.node), "world")
         XCTAssertEqual(pos?.offset, 5)
         pos = try tree?.findTreePos(14)
         XCTAssertEqual(self.toDiagnostic(pos?.node), "r")
@@ -122,12 +123,12 @@ final class IndexTreeTests: XCTestCase {
         let nodeAB = try tree.findTreePos(3, true).node
         let nodeCD = try tree.findTreePos(7, true).node
 
-        XCTAssertEqual(self.toDiagnostic(nodeAB), "text.ab")
-        XCTAssertEqual(self.toDiagnostic(nodeCD), "text.cd")
+        XCTAssertEqual(self.toDiagnostic(nodeAB), "ab")
+        XCTAssertEqual(self.toDiagnostic(nodeCD), "cd")
         XCTAssertEqual(findCommonAncestor(nodeA: nodeAB, nodeB: nodeCD)?.type, "p")
     }
 
-    func test_can_traverse_nodes_between_two_given_positions() async throws {
+    func test_can_traverse_tokens_between_two_given_positions() async throws {
         //       0   1 2 3    4   5 6 7 8    9   10 11 12   13
         // <root> <p> a b </p> <p> c d e </p> <p>  f  g  </p>  </root>
         guard let tree = try await buildIndexTree(
@@ -146,23 +147,19 @@ final class IndexTreeTests: XCTestCase {
             return
         }
 
-        try self.nodesBetweenEqual(tree, 2, 11, [
-            "text.b:All",
-            "p:Closing",
-            "text.cde:All",
-            "p:All",
-            "text.fg:All",
-            "p:Opening"
+        try self.tokensBetweenEqual(tree, 2, 11, [
+            "b:Text",
+            "p:End",
+            "p:Start",
+            "cde:Text",
+            "p:End",
+            "p:Start",
+            "fg:Text"
         ])
-        try self.nodesBetweenEqual(tree, 2, 6, [
-            "text.b:All",
-            "p:Closing",
-            "text.cde:All",
-            "p:Opening"
-        ])
-        try self.nodesBetweenEqual(tree, 0, 1, ["p:Opening"])
-        try self.nodesBetweenEqual(tree, 3, 4, ["p:Closing"])
-        try self.nodesBetweenEqual(tree, 3, 5, ["p:Closing", "p:Opening"])
+        try self.tokensBetweenEqual(tree, 2, 6, ["b:Text", "p:End", "p:Start", "cde:Text"])
+        try self.tokensBetweenEqual(tree, 0, 1, ["p:Start"])
+        try self.tokensBetweenEqual(tree, 3, 4, ["p:End"])
+        try self.tokensBetweenEqual(tree, 3, 5, ["p:End", "p:Start"])
     }
 
     func test_can_convert_index_to_pos() async throws {
@@ -230,15 +227,15 @@ final class IndexTreeTests: XCTestCase {
         XCTAssertEqual(pos.offset, 0)
 
         pos = try tree.pathToTreePos([0, 0])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.a")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "a")
         XCTAssertEqual(pos.offset, 0)
 
         pos = try tree.pathToTreePos([0, 1])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.a")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "a")
         XCTAssertEqual(pos.offset, 1)
 
         pos = try tree.pathToTreePos([0, 2])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.b")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "b")
         XCTAssertEqual(pos.offset, 1)
 
         pos = try tree.pathToTreePos([1])
@@ -246,19 +243,19 @@ final class IndexTreeTests: XCTestCase {
         XCTAssertEqual(pos.offset, 1)
 
         pos = try tree.pathToTreePos([1, 0])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.cde")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "cde")
         XCTAssertEqual(pos.offset, 0)
 
         pos = try tree.pathToTreePos([1, 1])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.cde")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "cde")
         XCTAssertEqual(pos.offset, 1)
 
         pos = try tree.pathToTreePos([1, 2])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.cde")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "cde")
         XCTAssertEqual(pos.offset, 2)
 
         pos = try tree.pathToTreePos([1, 3])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.cde")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "cde")
         XCTAssertEqual(pos.offset, 3)
 
         pos = try tree.pathToTreePos([2])
@@ -266,15 +263,15 @@ final class IndexTreeTests: XCTestCase {
         XCTAssertEqual(pos.offset, 2)
 
         pos = try tree.pathToTreePos([2, 0])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.fg")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "fg")
         XCTAssertEqual(pos.offset, 0)
 
         pos = try tree.pathToTreePos([2, 1])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.fg")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "fg")
         XCTAssertEqual(pos.offset, 1)
 
         pos = try tree.pathToTreePos([2, 2])
-        XCTAssertEqual(self.toDiagnostic(pos.node), "text.fg")
+        XCTAssertEqual(self.toDiagnostic(pos.node), "fg")
         XCTAssertEqual(pos.offset, 2)
 
         pos = try tree.pathToTreePos([3])

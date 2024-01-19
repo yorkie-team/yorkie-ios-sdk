@@ -49,10 +49,10 @@ struct TreeChange {
     let actor: ActorID
     let type: TreeChangeType
     let from: Int
-    let to: Int
+    var to: Int
     let fromPath: [Int]
-    let toPath: [Int]
-    let value: TreeChangeValue?
+    var toPath: [Int]
+    var value: TreeChangeValue?
     let splitLevel: Int32
 }
 
@@ -332,7 +332,11 @@ final class CRDTTreeNode: IndexTreeNode {
         }
 
         if alived {
-            self.updateAncestorsSize()
+            if self.parent?.removedAt == nil {
+                self.updateAncestorsSize()
+            } else {
+                self.parent?.size -= self.paddedSize
+            }
         }
     }
 
@@ -549,7 +553,7 @@ class CRDTTree: CRDTGCElement {
         let allChildren = realParent.innerChildren
         let index = isLeftMost ? 0 : (allChildren.firstIndex(where: { $0 === leftNode }) ?? -1) + 1
 
-        for index in index ..< parent.innerChildren.count {
+        for index in index ..< allChildren.count {
             let next = allChildren[index]
             if !next.id.createdAt.after(editedAt) {
                 break
@@ -590,7 +594,8 @@ class CRDTTree: CRDTGCElement {
                                       splitLevel: 0) // dummy value.
         )
 
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { node, _ in
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
+            let (node, _) = token
             if node.isRemoved == false, node.isText == false, let attributes {
                 if node.attrs == nil {
                     node.attrs = RHT()
@@ -614,19 +619,18 @@ class CRDTTree: CRDTGCElement {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
 
-        var toBeRemoveds = [CRDTTreeNode]()
+        let fromIdx = try self.toIndex(fromParent, fromLeft)
+        let fromPath = try self.toPath(fromParent, fromLeft)
+
+        var nodesToBeRemoved = [CRDTTreeNode]()
+        var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var latestCreatedAtMap = [String: TimeTicket]()
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { node, contain in
-            // NOTE(hackerwins): If the node overlaps as a closing tag with the
-            // range then we need to keep the node.
-            if node.isText == false, contain == .closing {
-                return
-            }
-
-            // NOTE(hackerwins): If the node overlaps as an opening tag with the
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { treeToken, ended in
+            // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
-            if node.isText == false, contain == .opening {
+            let (node, tokenType) = treeToken
+            if tokenType == .start, !ended {
                 // TODO(hackerwins): Define more clearly merge-able rules
                 // between two parents. For now, we only merge two parents are
                 // both element nodes having text children.
@@ -635,13 +639,7 @@ class CRDTTree: CRDTGCElement {
                 //   return;
                 // }
 
-                for child in node.children {
-                    if toBeRemoveds.contains(where: { $0 === child }) {
-                        continue
-                    }
-
-                    toBeMovedToFromParents.append(child)
-                }
+                toBeMovedToFromParents.append(contentsOf: node.children)
             }
 
             guard let actorID = node.createdAt.actorID else {
@@ -650,7 +648,9 @@ class CRDTTree: CRDTGCElement {
 
             let latestCreatedAt = latestCreatedAtMapByActor.isEmpty == false ? latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
 
-            if node.canDelete(editedAt, latestCreatedAt) {
+            // NOTE(sejongk): If the node is removable or its parent is going to
+            // be removed, then this node should be removed.
+            if node.canDelete(editedAt, latestCreatedAt) || nodesToBeRemoved.contains(where: { $0 === node.parent }) {
                 let latestCreatedAt = latestCreatedAtMap[actorID]
                 let createdAt = node.createdAt
 
@@ -658,36 +658,21 @@ class CRDTTree: CRDTGCElement {
                     latestCreatedAtMap[actorID] = createdAt
                 }
 
-                toBeRemoveds.append(node)
+                // NOTE(hackerwins): If the node overlaps as an end token with the
+                // range then we need to keep the node.
+                if tokenType == .text || tokenType == .start {
+                    nodesToBeRemoved.append(node)
+                }
+                tokensToBeRemoved.append((node, tokenType))
             }
         }
 
-        // TODO(hackerwins): If concurrent deletion happens, we need to seperate the
+        // NOTE(hackerwins): If concurrent deletion happens, we need to seperate the
         // range(from, to) into multiple ranges.
-        var changes = [TreeChange]()
-
-        guard let actorID = editedAt.actorID else {
-            throw YorkieError.unexpected(message: "No actor ID.")
-        }
-
-        var value: TreeChangeValue?
-
-        if let nodes = contents?.compactMap({ $0 }) {
-            value = .nodes(nodes)
-        }
-
-        try changes.append(TreeChange(actor: actorID,
-                                      type: .content,
-                                      from: self.toIndex(fromParent, fromLeft),
-                                      to: self.toIndex(toParent, toLeft),
-                                      fromPath: self.toPath(fromParent, fromLeft),
-                                      toPath: self.toPath(toParent, toLeft),
-                                      value: value,
-                                      splitLevel: splitLevel)
-        )
+        var changes = try self.makeDeletionChanges(tokensToBeRemoved, editedAt)
 
         // 02. Delete: delete the nodes that are marked as removed.
-        for node in toBeRemoveds {
+        for node in nodesToBeRemoved {
             node.remove(editedAt)
 
             if node.isRemoved {
@@ -696,7 +681,7 @@ class CRDTTree: CRDTGCElement {
         }
 
         // 03. Merge: move the nodes that are marked as moved.
-        try fromParent.append(contentsOf: toBeMovedToFromParents)
+        try fromParent.append(contentsOf: toBeMovedToFromParents.filter { $0.removedAt == nil })
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
@@ -709,10 +694,24 @@ class CRDTTree: CRDTGCElement {
                 parent = parent.parent!
                 splitCount += 1
             }
+
+            guard let actorID = editedAt.actorID else {
+                throw YorkieError.unexpected(message: "Can't get actorID")
+            }
+
+            changes.append(TreeChange(actor: actorID,
+                                      type: .content,
+                                      from: fromIdx,
+                                      to: fromIdx,
+                                      fromPath: fromPath,
+                                      toPath: fromPath,
+                                      value: nil,
+                                      splitLevel: 0))
         }
 
         // 05. Insert: insert the given nodes at the given position.
         if let contents, contents.isEmpty == false {
+            var aliveContents = [CRDTTreeNode]()
             var leftInChildren = fromLeft // tree
 
             for content in contents {
@@ -736,6 +735,36 @@ class CRDTTree: CRDTGCElement {
                     }
 
                     self.nodeMapByID.put(node.id, node)
+                }
+
+                if !content.isRemoved {
+                    aliveContents.append(content)
+                }
+            }
+
+            if aliveContents.isEmpty == false {
+                let value = TreeChangeValue.nodes(aliveContents)
+
+                if changes.isEmpty == false, changes.last!.from == fromIdx {
+                    var last = changes.last!
+
+                    last.value = value
+
+                    changes.removeLast()
+                    changes.append(last)
+                } else {
+                    guard let actorID = editedAt.actorID else {
+                        throw YorkieError.unexpected(message: "Can't find actorID")
+                    }
+
+                    changes.append(TreeChange(actor: actorID,
+                                              type: .content,
+                                              from: fromIdx,
+                                              to: fromIdx,
+                                              fromPath: fromPath,
+                                              toPath: fromPath,
+                                              value: value,
+                                              splitLevel: 0))
                 }
             }
         }
@@ -986,12 +1015,12 @@ class CRDTTree: CRDTGCElement {
                                     _ fromLeft: CRDTTreeNode,
                                     _ toParent: CRDTTreeNode,
                                     _ toLeft: CRDTTreeNode,
-                                    callback: @escaping (CRDTTreeNode, TagContained) throws -> Void) throws
+                                    callback: @escaping (TreeToken<CRDTTreeNode>, Bool) throws -> Void) throws
     {
         let fromIdx = try self.toIndex(fromParent, fromLeft)
         let toIdx = try self.toIndex(toParent, toLeft)
 
-        return try self.indexTree.nodesBetween(fromIdx, toIdx, callback)
+        return try self.indexTree.tokensBetween(fromIdx, toIdx, callback)
     }
 
     /**
@@ -1027,5 +1056,133 @@ class CRDTTree: CRDTGCElement {
         }
 
         return TreePos(node: parentNode, offset: Int32(offset))
+    }
+
+    /**
+     * `makeDeletionChanges` converts nodes to be deleted to deletion changes.
+     */
+    func makeDeletionChanges(_ candidates: [TreeToken<CRDTTreeNode>], _ editedAt: TimeTicket) throws -> [TreeChange] {
+        var changes = [TreeChange]()
+        var ranges = [(TreeToken<CRDTTreeNode>, TreeToken<CRDTTreeNode>)]()
+
+        // Generate ranges by accumulating consecutive nodes.
+        var start: TreeToken<CRDTTreeNode>?
+        var end: TreeToken<CRDTTreeNode>?
+        for index in 0 ..< candidates.count {
+            let cur = candidates[index]
+            let next = candidates[safe: index + 1]
+            if start == nil {
+                start = cur
+            }
+            end = cur
+
+            let rightToken = try self.findRightToken(cur)
+            if next == nil ||
+                rightToken.0 !== next!.0 ||
+                rightToken.1 != next!.1
+            {
+                ranges.append((start!, end!))
+                start = nil
+                end = nil
+            }
+        }
+
+        // Convert each range to a deletion change.
+        for range in ranges {
+            let (start, end) = range
+            let (fromLeft, fromLeftTokenType) = try self.findLeftToken(start)
+            let (toLeft, toLeftTokenType) = end
+            let fromParent = fromLeftTokenType == .start ? fromLeft : fromLeft.parent!
+            let toParent = toLeftTokenType == .start ? toLeft : toLeft.parent!
+
+            let fromIdx = try self.toIndex(fromParent, fromLeft)
+            let toIdx = try self.toIndex(toParent, toLeft)
+            if fromIdx < toIdx {
+                // When the range is overlapped with the previous one, compact them.
+                if changes.isEmpty == false, fromIdx == changes.last!.to {
+                    var last = changes.last!
+
+                    last.to = toIdx
+                    last.toPath = try self.toPath(toParent, toLeft)
+
+                    changes.removeLast()
+                    changes.append(last)
+                } else {
+                    guard let actorID = editedAt.actorID else {
+                        throw YorkieError.unexpected(message: "Can't get actorID")
+                    }
+
+                    try changes.append(TreeChange(actor: actorID,
+                                                  type: .content,
+                                                  from: fromIdx,
+                                                  to: toIdx,
+                                                  fromPath: self.toPath(fromParent, fromLeft),
+                                                  toPath: self.toPath(toParent, toLeft),
+                                                  value: nil,
+                                                  splitLevel: 0))
+                }
+            }
+        }
+        return changes
+    }
+
+    /**
+     * `findRightToken` returns the token to the right of the given token in the tree.
+     */
+    func findRightToken(_ token: TreeToken<CRDTTreeNode>) throws -> TreeToken<CRDTTreeNode> {
+        let (node, tokenType) = token
+        if tokenType == .start {
+            let children = node.innerChildren
+            if children.isEmpty == false {
+                let firstChild = children.first!
+                return (firstChild, firstChild.isText ? .text : .end)
+            }
+
+            return (node, .end)
+        }
+
+        let parent = node.parent
+        let siblings = parent!.innerChildren
+
+        guard let offset = siblings.firstIndex(where: { $0 === node }) else {
+            throw YorkieError.unexpected(message: "Can't find index of node \(node)")
+        }
+
+        if parent != nil, offset == siblings.count - 1 {
+            return (parent!, .end)
+        }
+
+        let next = siblings[offset + 1]
+        return (next, next.isText ? .text : .end)
+    }
+
+    /**
+     * `findLeftToken` returns the token to the left of the given token in the tree.
+     */
+    func findLeftToken(_ token: TreeToken<CRDTTreeNode>) throws -> TreeToken<CRDTTreeNode> {
+        let (node, tokenType) = token
+        if tokenType == .end {
+            let children = node.innerChildren
+            if children.isEmpty == false {
+                let lastChild = children.last!
+                return (lastChild, lastChild.isText ? .text : .end)
+            }
+
+            return (node, .start)
+        }
+
+        let parent = node.parent
+        let siblings = parent!.innerChildren
+
+        guard let offset = siblings.firstIndex(where: { $0 === node }) else {
+            throw YorkieError.unexpected(message: "Can't find index of node \(node)")
+        }
+
+        if parent != nil, offset == 0 {
+            return (parent!, .start)
+        }
+
+        let prev = siblings[offset - 1]
+        return (prev, prev.isText ? .text : .end)
     }
 }
