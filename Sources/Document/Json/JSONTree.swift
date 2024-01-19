@@ -367,9 +367,11 @@ public class JSONTree {
         if let contents, contents.isEmpty == false {
             try validateTreeNodes(contents)
 
-            if let contents = contents as? [JSONTreeElementNode] {
+            if contents[0] is JSONTreeElementNode {
                 for content in contents {
-                    try validateTreeNodes(content.children)
+                    if let content = content as? JSONTreeElementNode {
+                        try validateTreeNodes(content.children)
+                    }
                 }
             }
         }
@@ -388,7 +390,9 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket)
+        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket) {
+            context.issueTimeTicket
+        }
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
                                                   fromPos: fromPos,

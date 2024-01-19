@@ -59,11 +59,29 @@ struct TreeEditOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
+        var editedAt = self.executedAt
         guard let tree = parentObject as? CRDTTree else {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
-        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, self.executedAt, self.maxCreatedAtMapByActor)
+        /**
+         * TODO(sejongk): When splitting element nodes, a new nodeID is assigned with a different timeTicket.
+         * In the same change context, the timeTickets share the same lamport and actorID but have different delimiters,
+         * incremented by one for each.
+         * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
+         * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
+         */
+        let (changes, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, self.maxCreatedAtMapByActor) {
+            var delimiter = editedAt.delimiter
+            if let contents {
+                delimiter += UInt32(contents.count)
+            }
+
+            delimiter += 1
+            editedAt = TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
+
+            return editedAt
+        }
 
         if self.fromPos != self.toPos {
             root.registerElementHasRemovedNodes(tree)

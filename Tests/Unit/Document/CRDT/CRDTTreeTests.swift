@@ -37,7 +37,7 @@ func posT(_ offset: Int32 = 0) -> CRDTTreeNodeID {
 /**
  * `timeT` is a helper function that issues a new TimeTicket.
  */
-var timeT: TimeTicket {
+func timeT() -> TimeTicket {
     dummyContext.issueTimeTicket
 }
 
@@ -87,23 +87,23 @@ final class CRDTTreeNodeTests: XCTestCase {
     }
 }
 
-final class CRDTTreeTests: XCTestCase {
+final class CRDTTreeEditTests: XCTestCase {
     func test_can_inserts_nodes_with_edit() throws {
         //       0
         // <root> </root>
-        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: "r"), createdAt: timeT)
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: "r"), createdAt: timeT())
         XCTAssertEqual(tree.root.size, 0)
         XCTAssertEqual(tree.toXML(), "<r></r>")
 
         //           1
         // <root> <p> </p> </root>
-        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT)
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), "<r><p></p></r>")
         XCTAssertEqual(tree.root.size, 2)
 
         //           1
         // <root> <p> h e l l o </p> </root>
-        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "hello")], 0, timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "hello")], 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), "<r><p>hello</p></r>")
         XCTAssertEqual(tree.root.size, 7)
 
@@ -111,13 +111,13 @@ final class CRDTTreeTests: XCTestCase {
         // <root> <p> h e l l o </p> <p> w  o  r  l  d  </p>  </root>
         let para = CRDTTreeNode(id: posT(), type: "p")
         try para.insertAt(CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "world"), 0)
-        try tree.editT((7, 7), [para], 0, timeT)
+        try tree.editT((7, 7), [para], 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), "<r><p>hello</p><p>world</p></r>")
         XCTAssertEqual(tree.root.size, 14)
 
         //       0   1 2 3 4 5 6 7    8   9 10 11 12 13 14    15
         // <root> <p> h e l l o ! </p> <p> w  o  r  l  d  </p>  </root>
-        try tree.editT((6, 6), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "!")], 0, timeT)
+        try tree.editT((6, 6), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "!")], 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), "<r><p>hello!</p><p>world</p></r>")
 
         XCTAssertEqual(tree.toTestTreeNode().createdDictionary as NSDictionary,
@@ -165,7 +165,7 @@ final class CRDTTreeTests: XCTestCase {
 
         //       0   1 2 3 4 5 6 7 8    9   10 11 12 13 14 15    16
         // <root> <p> h e l l o ~ ! </p> <p>  w  o  r  l  d  </p>  </root>
-        try tree.editT((6, 6), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "~")], 0, timeT)
+        try tree.editT((6, 6), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "~")], 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<r><p>hello~!</p><p>world</p></r>")
     }
 
@@ -173,15 +173,15 @@ final class CRDTTreeTests: XCTestCase {
         // 01. Create a tree with 2 paragraphs.
         //       0   1 2 3    4   5 6 7    8
         // <root> <p> a b </p> <p> c d </p> </root>
-        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT)
-        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT)
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
         try tree.editT((1, 1),
                        [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
-                       timeT)
-        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT)
+                       timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
         try tree.editT((5, 5),
                        [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0,
-                       timeT)
+                       timeT(), timeT)
         XCTAssertEqual(tree.toXML(), "<root><p>ab</p><p>cd</p></root>")
 
         var treeNode = tree.toTestTreeNode()
@@ -192,7 +192,7 @@ final class CRDTTreeTests: XCTestCase {
         // 02. delete b from first paragraph
         //       0   1 2    3   4 5 6    7
         // <root> <p> a </p> <p> c d </p> </root>
-        try tree.editT((2, 3), nil, 0, timeT)
+        try tree.editT((2, 3), nil, 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p>a</p><p>cd</p></root>")
 
         treeNode = tree.toTestTreeNode()
@@ -202,75 +202,255 @@ final class CRDTTreeTests: XCTestCase {
     }
 
     func test_can_find_the_closest_TreePos_when_parentNode_or_leftSiblingNode_does_not_exist() async throws {
-        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT)
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
 
         let pNode = CRDTTreeNode(id: posT(), type: "p")
         let textNode = CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")
 
         //       0   1 2 3    4
         // <root> <p> a b </p> </root>
-        try tree.editT((0, 0), [pNode], 0, timeT)
-        try tree.editT((1, 1), [textNode], 0, timeT)
+        try tree.editT((0, 0), [pNode], 0, timeT(), timeT)
+        try tree.editT((1, 1), [textNode], 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p></root>")
 
         // Find the closest index.TreePos when leftSiblingNode in crdt.TreePos is removed.
         //       0   1    2
         // <root> <p> </p> </root>
-        try tree.editT((1, 3), nil, 0, timeT)
+        try tree.editT((1, 3), nil, 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p></p></root>")
 
-        var (parent, left) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT)
+        var (parent, left) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT())
         XCTAssertEqual(try tree.toIndex(parent, left), 1)
 
         // Find the closest index.TreePos when parentNode in crdt.TreePos is removed.
         //       0
         // <root> </root>
-        try tree.editT((0, 2), nil, 0, timeT)
+        try tree.editT((0, 2), nil, 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root></root>")
 
-        (parent, left) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT)
+        (parent, left) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT())
         XCTAssertEqual(try tree.toIndex(parent, left), 0)
     }
 }
 
-final class CRDTTreeMoveTests: XCTestCase {
+final class CRDTTreeSplitTests: XCTestCase {
+    func test_can_split_text_nodes() async throws {
+        // 00. Create a tree with 2 paragraphs.
+        //       0   1     6     11
+        // <root> <p> hello world  </p> </root>
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "helloworld")], 0,
+                       timeT(), timeT)
+
+        var expectedIntial = """
+        {
+            "size" : 12,
+            "isRemoved" : false,
+            "type" : "root",
+            "children" : [
+              {
+                "size" : 10,
+                "isRemoved" : false,
+                "type" : "p",
+                "children" : [
+                  {
+                    "size" : 10,
+                    "value" : "helloworld",
+                    "isRemoved" : false,
+                    "type" : "text"
+                  }
+                ]
+              }
+            ]
+          }
+        """.createdDictionary as NSDictionary
+
+        XCTAssertEqual(tree.toTestTreeNode().createdDictionary as NSDictionary, expectedIntial)
+
+        // 01. Split left side of 'helloworld'.
+        try tree.editT((1, 1), nil, 0, timeT(), timeT)
+        XCTAssertEqual(tree.toTestTreeNode().createdDictionary as NSDictionary, expectedIntial)
+
+        // 02. Split right side of 'helloworld'.
+        try tree.editT((11, 11), nil, 0, timeT(), timeT)
+        XCTAssertEqual(tree.toTestTreeNode().createdDictionary as NSDictionary, expectedIntial)
+
+        // 03. Split 'helloworld' into 'hello' and 'world'.
+        try tree.editT((6, 6), nil, 0, timeT(), timeT)
+
+        expectedIntial = """
+        {
+            "size" : 12,
+            "isRemoved" : false,
+            "type" : "root",
+            "children" : [
+              {
+                "size" : 10,
+                "isRemoved" : false,
+                "type" : "p",
+                "children" : [
+                  {
+                    "size" : 5,
+                    "value" : "hello",
+                    "isRemoved" : false,
+                    "type" : "text"
+                  },
+                  {
+                    "size" : 5,
+                    "value" : "world",
+                    "isRemoved" : false,
+                    "type" : "text"
+                  }
+                ]
+              }
+            ]
+          }
+        """.createdDictionary as NSDictionary
+        XCTAssertEqual(tree.toTestTreeNode().createdDictionary as NSDictionary, expectedIntial)
+    }
+
+    func test_can_split_element_nodes_level_1() async throws {
+        //       0   1 2 3    4
+        // <root> <p> a b </p> </root>
+
+        // 01. Split position 1.
+        var tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p></root>")
+        try tree.editT((1, 1), nil, 1, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p></p><p>ab</p></root>")
+        XCTAssertEqual(tree.size, 6)
+
+        // 02. Split position 2.
+        tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p></root>")
+        try tree.editT((2, 2), nil, 1, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>a</p><p>b</p></root>")
+        XCTAssertEqual(tree.size, 6)
+
+        // 03. Split position 3.
+        tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p></root>")
+        try tree.editT((3, 3), nil, 1, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p><p></p></root>")
+        XCTAssertEqual(tree.size, 6)
+    }
+
+    func test_can_split_element_nodes_multi_level() async throws {
+        //       0   1   2 3 4    5    6
+        // <root> <p> <b> a b </b> </p> </root>
+
+        // 01. Split nodes level 1.
+        var tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: "b")], 0, timeT(), timeT)
+        try tree.editT((2, 2),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p><b>ab</b></p></root>")
+        try tree.editT((3, 3), nil, 1, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p><b>a</b><b>b</b></p></root>")
+
+        // 02. Split nodes level 2.
+        tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: "b")], 0, timeT(), timeT)
+        try tree.editT((2, 2),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p><b>ab</b></p></root>")
+        try tree.editT((3, 3), nil, 2, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p><b>a</b></p><p><b>b</b></p></root>")
+    }
+
+    func test_can_split_and_merge_element_nodes_by_edit() async throws {
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "abcd")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>abcd</p></root>")
+        XCTAssertEqual(tree.size, 6)
+
+        //       0   1 2 3    4   5 6 7    8
+        // <root> <p> a b </p> <p> c d </p> </root>
+        try tree.editT((3, 3), nil, 1, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p><p>cd</p></root>")
+        XCTAssertEqual(tree.size, 8)
+
+        try tree.editT((3, 5), nil, 0, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>abcd</p></root>")
+        XCTAssertEqual(tree.size, 6)
+    }
+}
+
+final class CRDTTreeMergeTests: XCTestCase {
     func test_can_delete_nodes_between_element_nodes_with_edit() async throws {
         // 01. Create a tree with 2 paragraphs.
         //       0   1 2 3    4   5 6 7    8
         // <root> <p> a b </p> <p> c d </p> </root>
-        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT)
-        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT)
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
         try tree.editT((1, 1),
                        [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
-                       timeT)
-        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT)
+                       timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
         try tree.editT((5, 5),
                        [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0,
-                       timeT)
+                       timeT(), timeT)
 
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ab</p><p>cd</p></root>")
 
         // 02. delete b, c and first paragraph.
         //       0   1 2 3    4
         // <root> <p> a d </p> </root>
-        try tree.editT((2, 6), nil, 0, timeT)
+        try tree.editT((2, 6), nil, 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p>ad</p></root>")
 
-        // TODO(sejongk): Use the below assertion after implementing Tree.Move.
-        // assert.deepEqual(tree.toXML(), /*html*/ `<root><p>ad</p></root>`);
+        let node = tree.toTestTreeNode()
+        XCTAssertEqual(node.size, 4)
+        XCTAssertEqual(node.children![0].size, 2)
+        XCTAssertEqual(node.children![0].children![0].size, 1)
+        XCTAssertEqual(node.children![0].children![1].size, 1)
 
-        // const treeNode = tree.toTestTreeNode();
-        // assert.equal(treeNode.size, 4); // root
-        // assert.equal(treeNode.children![0].size, 2); // p
-        // assert.equal(treeNode.children![0].children![0].size, 1); // a
-        // assert.equal(treeNode.children![0].children![1].size, 1); // d
+        // 03. insert a new text node at the start of the first paragraph.
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "@")], 0, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p>@ad</p></root>")
+    }
 
-        // // 03. insert a new text node at the start of the first paragraph.
-        // tree.editByIndex(
-        //   [1, 1],
-        //   [new CRDTTreeNode(issuePos(), 'text', '@')],
-        //   issueTime(),
-        // );
-        // assert.deepEqual(tree.toXML(), /*html*/ `<root><p>@ad</p></root>`);
+    func test_can_delete_nodes_between_element_in_different_level_with_edit() async throws {
+        // 01. Create a tree with 2 paragraphs.
+        //       0   1   2 3 4    5    6   7 8 9    10
+        // <root> <p> <b> a b </b> </p> <p> c d </p>  </root>
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: "b")], 0, timeT(), timeT)
+        try tree.editT((2, 2),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        try tree.editT((6, 6), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((7, 7),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p><b>ab</b></p><p>cd</p></root>")
+
+        // 02. delete b, c and second paragraph.
+        //       0   1   2 3 4    5
+        // <root> <p> <b> a d </b> </root>
+        try tree.editT((3, 8), nil, 0, timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), /* html */ "<root><p><b>ad</b></p></root>")
     }
 }
