@@ -59,7 +59,6 @@ public enum DocEventType: String {
 
 /**
  * An event that occurs in ``Document``. It can be delivered
- * using ``Document/eventStream``.
  */
 public protocol DocEvent {
     var type: DocEventType { get }
@@ -71,9 +70,6 @@ public protocol DocEvent {
  *
  */
 public struct SnapshotEvent: DocEvent {
-    /**
-     * ``DocEventType.snapshot``
-     */
     public let type: DocEventType = .snapshot
     /**
      * SnapshotEvent type
