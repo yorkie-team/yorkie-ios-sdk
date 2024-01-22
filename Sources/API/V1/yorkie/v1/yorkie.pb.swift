@@ -64,6 +64,8 @@ struct Yorkie_V1_DeactivateClientRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var clientKey: String = String()
+
   var clientID: String = String()
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -85,6 +87,8 @@ struct Yorkie_V1_AttachDocumentRequest {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  var clientKey: String = String()
 
   var clientID: String = String()
 
@@ -131,6 +135,8 @@ struct Yorkie_V1_DetachDocumentRequest {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  var clientKey: String = String()
 
   var clientID: String = String()
 
@@ -180,7 +186,11 @@ struct Yorkie_V1_WatchDocumentRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var clientKey: String = String()
+
   var clientID: String = String()
+
+  var documentKey: String = String()
 
   var documentID: String = String()
 
@@ -258,6 +268,8 @@ struct Yorkie_V1_RemoveDocumentRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var clientKey: String = String()
+
   var clientID: String = String()
 
   var documentID: String = String()
@@ -303,6 +315,8 @@ struct Yorkie_V1_PushPullChangesRequest {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  var clientKey: String = String()
 
   var clientID: String = String()
 
@@ -352,7 +366,11 @@ struct Yorkie_V1_BroadcastRequest {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var clientKey: String = String()
+
   var clientID: String = String()
+
+  var documentKey: String = String()
 
   var documentID: String = String()
 
@@ -467,6 +485,7 @@ extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf
 extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DeactivateClientRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    2: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
   ]
 
@@ -477,6 +496,7 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -486,10 +506,14 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_DeactivateClientRequest, rhs: Yorkie_V1_DeactivateClientRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -518,6 +542,7 @@ extension Yorkie_V1_DeactivateClientResponse: SwiftProtobuf.Message, SwiftProtob
 extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".AttachDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    3: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
     2: .standard(proto: "change_pack"),
   ]
@@ -530,6 +555,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -546,10 +572,14 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_AttachDocumentRequest, rhs: Yorkie_V1_AttachDocumentRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -602,6 +632,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".DetachDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    5: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
     2: .standard(proto: "document_id"),
     3: .standard(proto: "change_pack"),
@@ -618,6 +649,7 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.removeIfNotAttached) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -640,10 +672,14 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if self.removeIfNotAttached != false {
       try visitor.visitSingularBoolField(value: self.removeIfNotAttached, fieldNumber: 4)
     }
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_DetachDocumentRequest, rhs: Yorkie_V1_DetachDocumentRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
@@ -692,7 +728,9 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".WatchDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    4: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
+    3: .standard(proto: "document_key"),
     2: .standard(proto: "document_id"),
   ]
 
@@ -704,6 +742,8 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.documentKey) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -716,11 +756,19 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
     }
+    if !self.documentKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentKey, fieldNumber: 3)
+    }
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_WatchDocumentRequest, rhs: Yorkie_V1_WatchDocumentRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentKey != rhs.documentKey {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -832,6 +880,7 @@ extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message,
 extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".RemoveDocumentRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    4: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
     2: .standard(proto: "document_id"),
     3: .standard(proto: "change_pack"),
@@ -846,6 +895,7 @@ extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -865,10 +915,14 @@ extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_RemoveDocumentRequest, rhs: Yorkie_V1_RemoveDocumentRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
@@ -916,6 +970,7 @@ extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".PushPullChangesRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    5: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
     2: .standard(proto: "document_id"),
     3: .standard(proto: "change_pack"),
@@ -932,6 +987,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.pushOnly) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -954,10 +1010,14 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     if self.pushOnly != false {
       try visitor.visitSingularBoolField(value: self.pushOnly, fieldNumber: 4)
     }
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_PushPullChangesRequest, rhs: Yorkie_V1_PushPullChangesRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
@@ -1006,7 +1066,9 @@ extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobu
 extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = _protobuf_package + ".BroadcastRequest"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    6: .standard(proto: "client_key"),
     1: .standard(proto: "client_id"),
+    5: .standard(proto: "document_key"),
     2: .standard(proto: "document_id"),
     3: .same(proto: "topic"),
     4: .same(proto: "payload"),
@@ -1022,6 +1084,8 @@ extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.topic) }()
       case 4: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.documentKey) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
       default: break
       }
     }
@@ -1040,11 +1104,19 @@ extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if !self.payload.isEmpty {
       try visitor.visitSingularBytesField(value: self.payload, fieldNumber: 4)
     }
+    if !self.documentKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentKey, fieldNumber: 5)
+    }
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: Yorkie_V1_BroadcastRequest, rhs: Yorkie_V1_BroadcastRequest) -> Bool {
+    if lhs.clientKey != rhs.clientKey {return false}
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentKey != rhs.documentKey {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs.topic != rhs.topic {return false}
     if lhs.payload != rhs.payload {return false}

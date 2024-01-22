@@ -262,6 +262,7 @@ public actor Client {
 
         var deactivateRequest = DeactivateClientRequest()
 
+        deactivateRequest.clientKey = key
         deactivateRequest.clientID = clientID
 
         do {
@@ -304,6 +305,7 @@ public actor Client {
         }
 
         var attachDocumentRequest = AttachDocumentRequest()
+        attachDocumentRequest.clientKey = key
         attachDocumentRequest.clientID = clientID
         attachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
@@ -370,6 +372,7 @@ public actor Client {
         }
 
         var detachDocumentRequest = DetachDocumentRequest()
+        detachDocumentRequest.clientKey = key
         detachDocumentRequest.clientID = clientID
         detachDocumentRequest.documentID = attachment.docID
         detachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
@@ -438,6 +441,7 @@ public actor Client {
         }
 
         var removeDocumentRequest = RemoveDocumentRequest()
+        removeDocumentRequest.clientKey = key
         removeDocumentRequest.clientID = clientID
         removeDocumentRequest.documentID = attachment.docID
         removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
@@ -646,6 +650,7 @@ public actor Client {
 
         var request = WatchDocumentRequest()
 
+        request.clientKey = key
         request.clientID = id
         request.documentID = docID
 
@@ -791,6 +796,7 @@ public actor Client {
         }
 
         var pushPullRequest = PushPullChangeRequest()
+        pushPullRequest.clientKey = key
         pushPullRequest.clientID = clientID
 
         let doc = attachment.doc
