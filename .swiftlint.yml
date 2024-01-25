@@ -19,13 +19,13 @@ disabled_rules:
   - opening_brace
   - large_tuple
   - todo
-  - function_body_length
 opt_in_rules:
   - empty_count
 # Rewrited rules
 cyclomatic_complexity: 
   warning: 25
-function_body_length: 100
+  error: 30
+function_body_length: 110
 type_body_length: 1000
 identifier_name:
   min_length: 2
