@@ -584,16 +584,6 @@ class CRDTTree: CRDTGCElement {
             value = .attributes(attributes)
         }
 
-        try changes.append(TreeChange(actor: actorID,
-                                      type: .style,
-                                      from: self.toIndex(fromParent, fromLeft),
-                                      to: self.toIndex(toParent, toLeft),
-                                      fromPath: self.toPath(fromParent, fromLeft),
-                                      toPath: self.toPath(toParent, toLeft),
-                                      value: value,
-                                      splitLevel: 0) // dummy value.
-        )
-
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             if node.isRemoved == false, node.isText == false, let attributes {
@@ -603,6 +593,16 @@ class CRDTTree: CRDTGCElement {
                 for (key, value) in attributes {
                     node.attrs?.set(key: key, value: value, executedAt: editedAt)
                 }
+
+                try changes.append(TreeChange(actor: actorID,
+                                              type: .style,
+                                              from: self.toIndex(fromParent, fromLeft),
+                                              to: self.toIndex(toParent, toLeft),
+                                              fromPath: self.toPath(fromParent, fromLeft),
+                                              toPath: self.toPath(toParent, toLeft),
+                                              value: value,
+                                              splitLevel: 0) // dummy value.
+                )
             }
         }
 

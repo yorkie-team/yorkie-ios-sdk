@@ -414,7 +414,7 @@ public class JSONTree {
      * `editByPath` edits this tree with the given node and path.
      */
     @discardableResult
-    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)?, _ splitLevel: Int32 = 0) throws -> Bool {
+    public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
         try self.editBulkByPath(fromPath, toPath, content != nil ? [content!] : nil, splitLevel)
     }
 
@@ -422,7 +422,7 @@ public class JSONTree {
      * `editBulkByPath` edits this tree with the given node and path.
      */
     @discardableResult
-    public func editBulkByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]?, _ splitLevel: Int32 = 0) throws -> Bool {
+    public func editBulkByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }

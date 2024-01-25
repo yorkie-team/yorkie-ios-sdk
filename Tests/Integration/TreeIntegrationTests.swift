@@ -3347,42 +3347,96 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
-    func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [TreeEditOpInfo], _ d2Expected: [TreeEditOpInfo]) async {
-        var d1Operations = [TreeEditOpInfo]()
+    func test_concurrent_delete_and_style() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
+                                        children: [
+                                            JSONTreeElementNode(type: "t", attributes: ["id": "1", "value": "init"], children: []),
+                                            JSONTreeElementNode(type: "t", attributes: ["id": "2", "value": "init"], children: [])
+                                        ])
+                )
+            }
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<root><t id=\"1\" value=\"init\"></t><t id=\"2\" value=\"init\"></t></root>")
+
+            try await c1.sync()
+            try await c2.sync()
+
+            await self.subscribeDocs(d1,
+                                     d2,
+                                     [TreeStyleOpInfo(path: "", from: 0, to: 1, fromPath: [], value: ["value": "\"changed\""]),
+                                      TreeEditOpInfo(path: "", from: 0, to: 2, value: [], splitLevel: 0, fromPath: [], toPath: [])],
+                                     [TreeEditOpInfo(path: "", from: 0, to: 2, value: [], splitLevel: 0, fromPath: [], toPath: [])])
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.styleByPath([0], ["value": "changed"])
+            }
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([0], [1])
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<root><t id=\"2\" value=\"init\"></t></root>")
+
+            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationInfo], _ d2Expected: [any OperationInfo]) async {
+        var d1Operations: [any OperationInfo] = []
         var d1Index = 0
 
         await d1.subscribe("$.t") { event in
             if let event = event as? LocalChangeEvent {
-                d1Operations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
+                d1Operations.append(contentsOf: event.value.operations)
             } else if let event = event as? RemoteChangeEvent {
-                d1Operations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
+                d1Operations.append(contentsOf: event.value.operations)
             }
 
             while d1Index <= d1Operations.count - 1 {
-                let expected = d1Expected[d1Index]
-                let operation = d1Operations[d1Index]
+                if let expected = d1Expected[d1Index] as? TreeEditOpInfo, let operation = d1Operations[d1Index] as? TreeEditOpInfo {
+                    XCTAssertEqual(expected.from, operation.from)
+                    XCTAssertEqual(expected.to, operation.to)
+                    XCTAssertEqual(expected.value.count, operation.value.count)
 
-                XCTAssertEqual(expected.from, operation.from)
-                XCTAssertEqual(expected.to, operation.to)
-                XCTAssertEqual(expected.value.count, operation.value.count)
-
-                if operation.value.count - 1 >= 0 {
-                    for idx in 0 ... operation.value.count - 1 {
-                        if let exp = expected.value[idx] as? JSONTreeTextNode, let oper = operation.value[idx] as? JSONTreeTextNode {
-                            XCTAssertEqual(exp, oper)
-                        } else if let exp = expected.value[idx] as? JSONTreeElementNode, let oper = operation.value[idx] as? JSONTreeElementNode {
-                            XCTAssertEqual(exp, oper)
-                        } else {
-                            XCTAssertFalse(true)
+                    if operation.value.count - 1 >= 0 {
+                        for idx in 0 ... operation.value.count - 1 {
+                            if let exp = expected.value[idx] as? JSONTreeTextNode, let oper = operation.value[idx] as? JSONTreeTextNode {
+                                XCTAssertEqual(exp, oper)
+                            } else if let exp = expected.value[idx] as? JSONTreeElementNode, let oper = operation.value[idx] as? JSONTreeElementNode {
+                                XCTAssertEqual(exp, oper)
+                            } else {
+                                XCTAssertFalse(true)
+                            }
                         }
                     }
+                } else if let expected = d1Expected[d1Index] as? TreeStyleOpInfo, let operation = d1Operations[d1Index] as? TreeStyleOpInfo {
+                    XCTAssertEqual(expected.from, operation.from)
+                    XCTAssertEqual(expected.to, operation.to)
+                    XCTAssertEqual(expected.value.count, operation.value.count)
+
+                    if operation.value.count - 1 >= 0 {
+                        for key in operation.value.keys {
+                            XCTAssertEqual(expected.value[key]?.toJSONString, operation.value[key]?.toJSONString)
+                        }
+                    }
+                } else {
+                    XCTAssertFalse(true)
                 }
 
                 d1Index += 1
             }
         }
 
-        var d2Operations = [TreeEditOpInfo]()
+        var d2Operations: [any OperationInfo] = []
         var d2Index = 0
 
         await d2.subscribe("$.t") { event in
@@ -3393,23 +3447,34 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
             }
 
             while d2Index <= d2Operations.count - 1 {
-                let expected = d2Expected[d2Index]
-                let operation = d2Operations[d2Index]
+                if let expected = d2Expected[d2Index] as? TreeEditOpInfo, let operation = d2Operations[d2Index] as? TreeEditOpInfo {
+                    XCTAssertEqual(expected.from, operation.from)
+                    XCTAssertEqual(expected.to, operation.to)
+                    XCTAssertEqual(expected.value.count, operation.value.count)
 
-                XCTAssertEqual(expected.from, operation.from)
-                XCTAssertEqual(expected.to, operation.to)
-                XCTAssertEqual(expected.value.count, operation.value.count)
-
-                if operation.value.count - 1 >= 0 {
-                    for idx in 0 ..< operation.value.count - 1 {
-                        if let exp = expected.value[idx] as? JSONTreeTextNode, let oper = operation.value[idx] as? JSONTreeTextNode {
-                            XCTAssertEqual(exp, oper)
-                        } else if let exp = expected.value[idx] as? JSONTreeElementNode, let oper = operation.value[idx] as? JSONTreeElementNode {
-                            XCTAssertEqual(exp, oper)
-                        } else {
-                            XCTAssertFalse(true)
+                    if operation.value.count - 1 >= 0 {
+                        for idx in 0 ... operation.value.count - 1 {
+                            if let exp = expected.value[idx] as? JSONTreeTextNode, let oper = operation.value[idx] as? JSONTreeTextNode {
+                                XCTAssertEqual(exp, oper)
+                            } else if let exp = expected.value[idx] as? JSONTreeElementNode, let oper = operation.value[idx] as? JSONTreeElementNode {
+                                XCTAssertEqual(exp, oper)
+                            } else {
+                                XCTAssertFalse(true)
+                            }
                         }
                     }
+                } else if let expected = d2Expected[d1Index] as? TreeStyleOpInfo, let operation = d2Operations[d1Index] as? TreeStyleOpInfo {
+                    XCTAssertEqual(expected.from, operation.from)
+                    XCTAssertEqual(expected.to, operation.to)
+                    XCTAssertEqual(expected.value.count, operation.value.count)
+
+                    if operation.value.count - 1 >= 0 {
+                        for key in operation.value.keys {
+                            XCTAssertEqual(expected.value[key]?.toJSONString, operation.value[key]?.toJSONString)
+                        }
+                    }
+                } else {
+                    XCTAssertFalse(true)
                 }
 
                 d2Index += 1
