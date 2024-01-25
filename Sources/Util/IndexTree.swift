@@ -435,7 +435,7 @@ extension Array {
         let actualStart = Swift.max(Swift.min(start, self.count), 0)
         let actualDeleteCount = Swift.max(Swift.min(deleteCount, self.count - actualStart), 0)
 
-        var result = [Self.Element]()
+        var result: [Self.Element] = []
 
         if actualDeleteCount > 0 {
             result = Array(self[actualStart ..< actualStart + actualDeleteCount])
