@@ -88,7 +88,7 @@ class LLRBTree<K: Comparable, V> {
             return
         }
 
-        if self.isRed(root.left), !self.isRed(root.right) {
+        if !self.isRed(root.left), !self.isRed(root.right) {
             self.root?.isRed = true
         }
 
@@ -203,7 +203,7 @@ class LLRBTree<K: Comparable, V> {
             if key == node!.key {
                 return node
             } else if key < node!.key {
-                node = node?.left
+                node = node!.left
             } else if key > node!.key {
                 node = node?.right
             }
