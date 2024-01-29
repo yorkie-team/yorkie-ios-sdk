@@ -67,7 +67,7 @@ class LLRBTree<K: Comparable, V> {
      */
     @discardableResult
     func put(_ key: K, _ value: V) -> V {
-        self.root = self.putInternal(key, value, self.root)
+        self.root = self.putInternal(key, value, &self.root)
         self.root?.isRed = false
 
         return value
@@ -77,7 +77,7 @@ class LLRBTree<K: Comparable, V> {
      * `get` gets a value of the given key.
      */
     func get(_ key: K) -> V? {
-        self.getInternal(key, self.root)?.value
+        self.getInternal(key, &self.root)?.value
     }
 
     /**
@@ -92,7 +92,7 @@ class LLRBTree<K: Comparable, V> {
             self.root?.isRed = true
         }
 
-        self.root = self.removeInternal(root, key)
+        self.root = self.removeInternal(&self.root!, key)
 
         self.root?.isRed = false
     }
@@ -196,9 +196,7 @@ class LLRBTree<K: Comparable, V> {
         return self.max(root).value
     }
 
-    private func getInternal(_ key: K, _ node: Node?) -> Node? {
-        var node = node
-
+    private func getInternal(_ key: K, _ node: inout Node?) -> Node? {
         while node != nil {
             if key == node!.key {
                 return node
@@ -212,18 +210,16 @@ class LLRBTree<K: Comparable, V> {
         return nil
     }
 
-    private func putInternal(_ key: K, _ value: V, _ node: Node?) -> Node {
-        var node = node
-
+    private func putInternal(_ key: K, _ value: V, _ node: inout Node?) -> Node {
         if node == nil {
             self.counter += 1
             return Node(key, value, true)
         }
 
         if key < node!.key {
-            node?.left = self.putInternal(key, value, node!.left)
+            node?.left = self.putInternal(key, value, &node!.left)
         } else if key > node!.key {
-            node?.right = self.putInternal(key, value, node!.right)
+            node?.right = self.putInternal(key, value, &node!.right)
         } else {
             node?.value = value
         }
@@ -243,14 +239,12 @@ class LLRBTree<K: Comparable, V> {
         return node!
     }
 
-    private func removeInternal(_ node: Node, _ key: K) -> Node? {
-        var node = node
-
+    private func removeInternal(_ node: inout Node, _ key: K) -> Node? {
         if key < node.key {
             if !self.isRed(node.left), !self.isRed(node.left?.left) {
-                node = self.moveRedLeft(node)
+                node = self.moveRedLeft(&node)
             }
-            node.left = self.removeInternal(node.left!, key)
+            node.left = self.removeInternal(&node.left!, key)
         } else {
             if self.isRed(node.left) {
                 node = self.rotateRight(node)
@@ -262,7 +256,7 @@ class LLRBTree<K: Comparable, V> {
             }
 
             if !self.isRed(node.right), !self.isRed(node.right?.left) {
-                node = self.moveRedRight(node)
+                node = self.moveRedRight(&node)
             }
 
             if key == node.key {
@@ -270,13 +264,13 @@ class LLRBTree<K: Comparable, V> {
                 let smallest = self.min(node.right!)
                 node.value = smallest.value
                 node.key = smallest.key
-                node.right = self.removeMin(node.right!)
+                node.right = self.removeMin(&node.right!)
             } else {
-                node.right = self.removeInternal(node.right!, key)
+                node.right = self.removeInternal(&node.right!, key)
             }
         }
 
-        return self.fixUp(node)
+        return self.fixUp(&node)
     }
 
     private func min(_ node: Node) -> Node {
@@ -295,25 +289,21 @@ class LLRBTree<K: Comparable, V> {
         }
     }
 
-    private func removeMin(_ node: Node) -> Node? {
-        var node = node
-
+    private func removeMin(_ node: inout Node) -> Node? {
         if node.left == nil {
             return nil
         }
 
         if !self.isRed(node.left), !self.isRed(node.left?.left) {
-            node = self.moveRedLeft(node)
+            node = self.moveRedLeft(&node)
         }
 
-        node.left = self.removeMin(node.left!)
+        node.left = self.removeMin(&node.left!)
 
-        return self.fixUp(node)
+        return self.fixUp(&node)
     }
 
-    private func fixUp(_ node: Node) -> Node {
-        var node = node
-
+    private func fixUp(_ node: inout Node) -> Node {
         if self.isRed(node.right) {
             node = self.rotateLeft(node)
         }
@@ -329,9 +319,7 @@ class LLRBTree<K: Comparable, V> {
         return node
     }
 
-    private func moveRedLeft(_ node: Node) -> Node {
-        var node = node
-
+    private func moveRedLeft(_ node: inout Node) -> Node {
         self.flipColors(&node)
         if self.isRed(node.right?.left) {
             node.right = self.rotateRight(node.right!)
@@ -341,9 +329,7 @@ class LLRBTree<K: Comparable, V> {
         return node
     }
 
-    private func moveRedRight(_ node: Node) -> Node {
-        var node = node
-
+    private func moveRedRight(_ node: inout Node) -> Node {
         self.flipColors(&node)
         if self.isRed(node.left?.left) {
             node = self.rotateRight(node)
