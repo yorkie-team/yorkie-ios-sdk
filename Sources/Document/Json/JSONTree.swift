@@ -554,7 +554,7 @@ public class JSONTree {
      * `posRangeToIndexRange` converts the position range into the index range.
      */
     public func posRangeToIndexRange(_ range: TreePosStructRange) throws -> (Int, Int) {
-        guard context != nil, let tree else {
+        guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
@@ -567,7 +567,7 @@ public class JSONTree {
      * `posRangeToPathRange` converts the position range into the path range.
      */
     public func posRangeToPathRange(_ range: TreePosStructRange) throws -> ([Int], [Int]) {
-        guard context != nil, let tree else {
+        guard self.context != nil, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 

@@ -563,7 +563,7 @@ class CRDTTree: CRDTGCElement {
                 leftNode = next
             }
         }
-        
+
         return (realParent, leftNode)
     }
 
