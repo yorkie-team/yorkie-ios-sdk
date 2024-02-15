@@ -509,9 +509,9 @@ final class TreeIntegrationTests: XCTestCase {
             XCTAssertEqual(d1XML, /* html */ "<doc><p>ahello</p></doc>")
             XCTAssertEqual(d2XML, /* html */ "<doc><p>ahello</p></doc>")
 
-            let selection = await d1.getMyPresence()!["selection"] as! [Any]
-            let from: CRDTTreePosStruct = self.decodeDictionary(selection[0])!
-            let to: CRDTTreePosStruct = self.decodeDictionary(selection[1])!
+            let selection = await d1.getMyPresence()!["selection"] as? [Any]
+            let from: CRDTTreePosStruct = self.decodeDictionary(selection?[0])!
+            let to: CRDTTreePosStruct = self.decodeDictionary(selection?[1])!
             let indexRange = try await(d1.getRoot().t as? JSONTree)?.posRangeToIndexRange((from, to))
             XCTAssertEqual(indexRange?.0, 2)
             XCTAssertEqual(indexRange?.1, 2)
