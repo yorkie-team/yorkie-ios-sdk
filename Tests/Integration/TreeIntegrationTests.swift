@@ -478,6 +478,68 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(resultRange?.0, [0])
         XCTAssertEqual(resultRange?.1, [1])
     }
+    
+    func test_should_return_correct_range_from_index_within_doc_subscribe() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "hello")])]))
+            }
+            
+            try await c1.sync()
+            try await c2.sync()
+            
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>hello</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>hello</p></doc>")
+            
+            try await d1.update { root, presence in
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "a"))
+                let posSelection = try (root.t as? JSONTree)?.indexRangeToPosRange((2, 2))
+                presence.set(["selection": [posSelection!.0, posSelection!.1]])
+            }
+            
+            try await c1.sync()
+            try await c2.sync()
+            
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>ahello</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>ahello</p></doc>")
+            
+            let selection = await d1.getMyPresence()!["selection"] as! [Any]
+            let from: CRDTTreePosStruct = decodeDictionary(selection[0])!
+            let to: CRDTTreePosStruct = decodeDictionary(selection[1])!
+            let indexRange = try await (d1.getRoot().t as? JSONTree)?.posRangeToIndexRange((from, to))
+            XCTAssertEqual(indexRange?.0, 2)
+            XCTAssertEqual(indexRange?.1, 2)
+                        
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
+            }
+            
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>abhello</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>abhello</p></doc>")
+        }
+    }
+    
+    private func decodeDictionary<T: Decodable>(_ dictionary: Any?) -> T? {
+        guard let dictionary = dictionary as? [String: Any],
+              let data = try? JSONSerialization.data(withJSONObject: dictionary, options: [])
+        else {
+            return nil
+        }
+        
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
 }
 
 final class TreeIntegrationEditTests: XCTestCase {

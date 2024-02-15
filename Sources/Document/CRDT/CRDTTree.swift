@@ -532,7 +532,7 @@ class CRDTTree: CRDTGCElement {
      * This is different from `TreePos` which is a position of the tree in the
      * physical perspective.
      */
-    func findNodesAndSplitText(_ pos: CRDTTreePos, _ editedAt: TimeTicket) throws -> (CRDTTreeNode, CRDTTreeNode) {
+    func findNodesAndSplitText(_ pos: CRDTTreePos, _ editedAt: TimeTicket? = nil) throws -> (CRDTTreeNode, CRDTTreeNode) {
         // 01. Find the parent and left sibling node of the given position.
         let (parent, leftSibling) = try pos.toTreeNodes(tree: self)
         var leftNode = leftSibling
@@ -550,18 +550,20 @@ class CRDTTree: CRDTGCElement {
         // 04. Find the appropriate left node. If some nodes are inserted at the
         // same position concurrently, then we need to find the appropriate left
         // node. This is similar to RGA.
-        let allChildren = realParent.innerChildren
-        let index = isLeftMost ? 0 : (allChildren.firstIndex(where: { $0 === leftNode }) ?? -1) + 1
+        if let editedAt {
+            let allChildren = realParent.innerChildren
+            let index = isLeftMost ? 0 : (allChildren.firstIndex(where: { $0 === leftNode }) ?? -1) + 1
 
-        for index in index ..< allChildren.count {
-            let next = allChildren[index]
-            if !next.id.createdAt.after(editedAt) {
-                break
+            for index in index ..< allChildren.count {
+                let next = allChildren[index]
+                if !next.id.createdAt.after(editedAt) {
+                    break
+                }
+
+                leftNode = next
             }
-
-            leftNode = next
         }
-
+        
         return (realParent, leftNode)
     }
 
@@ -991,9 +993,9 @@ class CRDTTree: CRDTGCElement {
     /**
      * `posRangeToPathRange` converts the given position range to the path range.
      */
-    func posRangeToPathRange(_ range: TreePosRange, _ timeTicket: TimeTicket) throws -> ([Int], [Int]) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, timeTicket)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, timeTicket)
+    func posRangeToPathRange(_ range: TreePosRange) throws -> ([Int], [Int]) {
+        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0)
+        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1)
 
         return try (self.toPath(fromParent, fromLeft), self.toPath(toParent, toLeft))
     }
@@ -1001,9 +1003,9 @@ class CRDTTree: CRDTGCElement {
     /**
      * `posRangeToIndexRange` converts the given position range to the path range.
      */
-    func posRangeToIndexRange(_ range: TreePosRange, _ timeTicket: TimeTicket) throws -> (Int, Int) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, timeTicket)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, timeTicket)
+    func posRangeToIndexRange(_ range: TreePosRange) throws -> (Int, Int) {
+        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0)
+        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1)
 
         return try (self.toIndex(fromParent, fromLeft), self.toIndex(toParent, toLeft))
     }
