@@ -586,7 +586,7 @@ public class JSONTree {
 struct TimeTicketStruct: Codable {
     let lamport: String
     let delimiter: UInt32
-    let actorID: ActorID?
+    let actorID: ActorID
 }
 
 /**

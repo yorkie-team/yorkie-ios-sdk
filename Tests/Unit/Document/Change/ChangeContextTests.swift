@@ -34,7 +34,7 @@ class ChangeContextTests: XCTestCase {
 
         let root = CRDTRoot(rootObject: rootObject)
 
-        let changeID = ChangeID(clientSeq: 1, lamport: 2)
+        let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: actorId)
         let target = ChangeContext(id: changeID, root: root, message: "test message.")
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
@@ -66,10 +66,10 @@ class ChangeContextTests: XCTestCase {
 
         let root = CRDTRoot(rootObject: rootObject)
 
-        let changeID = ChangeID(clientSeq: 1, lamport: 2)
+        let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: "actorID")
         let target = ChangeContext(id: changeID, root: root, message: "test message.")
 
         let result = target.issueTimeTicket
-        XCTAssertEqual(result.toTestString, "2:nil:1")
+        XCTAssertEqual(result.toTestString, "2:actorID:1")
     }
 }

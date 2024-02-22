@@ -459,7 +459,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             if !changes.isEmpty, changes[changes.count - 1].from == idx {
                 changes[changes.count - 1].content = value
             } else {
-                changes.append(ContentChange<T>(actor: editedAt.actorID!, from: idx, to: idx, content: value))
+                changes.append(ContentChange<T>(actor: editedAt.actorID, from: idx, to: idx, content: value))
             }
 
             caretPos = RGATreeSplitPos(inserted.id, Int32(inserted.contentLength))
@@ -712,13 +712,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         for node in nodesToDelete {
             // Then make nodes be tombstones and map that.
-            if let actorID = node.createdAt.actorID {
-                if createdAtMapByActor[actorID] == nil ||
-                    node.id.createdAt.after(createdAtMapByActor[actorID]!)
-                {
-                    createdAtMapByActor[actorID] = node.id.createdAt
-                }
+            let actorID = node.createdAt.actorID
+            if createdAtMapByActor[actorID] == nil ||
+                node.id.createdAt.after(createdAtMapByActor[actorID]!)
+            {
+                createdAtMapByActor[actorID] = node.id.createdAt
             }
+
             removedNodeMap[node.id.toIDString] = node
             node.remove(editedAt)
         }
@@ -743,7 +743,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             let latestCreatedAt: TimeTicket
 
             if isRemote {
-                if let actorID = node.createdAt.actorID, let latest = latestCreatedAtMapByActor?[actorID] {
+                if let latest = latestCreatedAtMapByActor?[node.createdAt.actorID] {
                     latestCreatedAt = latest
                 } else {
                     latestCreatedAt = TimeTicket.initial
@@ -807,7 +807,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             }
 
             if fromIdx < toIdx {
-                changes.append(ContentChange<T>(actor: editedAt.actorID!, from: fromIdx, to: toIdx, content: nil))
+                changes.append(ContentChange<T>(actor: editedAt.actorID, from: fromIdx, to: toIdx, content: nil))
             }
         }
 

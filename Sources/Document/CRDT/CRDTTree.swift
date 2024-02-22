@@ -576,10 +576,6 @@ class CRDTTree: CRDTGCElement {
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
         var changes: [TreeChange] = []
 
-        guard let actorID = editedAt.actorID else {
-            throw YorkieError.unexpected(message: "No actor ID.")
-        }
-
         var value: TreeChangeValue?
 
         if let attributes {
@@ -596,7 +592,7 @@ class CRDTTree: CRDTGCElement {
                     node.attrs?.set(key: key, value: value, executedAt: editedAt)
                 }
 
-                try changes.append(TreeChange(actor: actorID,
+                try changes.append(TreeChange(actor: editedAt.actorID,
                                               type: .style,
                                               from: self.toIndex(fromParent, fromLeft),
                                               to: self.toIndex(toParent, toLeft),
@@ -644,9 +640,7 @@ class CRDTTree: CRDTGCElement {
                 toBeMovedToFromParents.append(contentsOf: node.children)
             }
 
-            guard let actorID = node.createdAt.actorID else {
-                throw YorkieError.unexpected(message: "Can't get actorID")
-            }
+            let actorID = node.createdAt.actorID
 
             let latestCreatedAt = latestCreatedAtMapByActor.isEmpty == false ? latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
 
@@ -697,11 +691,7 @@ class CRDTTree: CRDTGCElement {
                 splitCount += 1
             }
 
-            guard let actorID = editedAt.actorID else {
-                throw YorkieError.unexpected(message: "Can't get actorID")
-            }
-
-            changes.append(TreeChange(actor: actorID,
+            changes.append(TreeChange(actor: editedAt.actorID,
                                       type: .content,
                                       from: fromIdx,
                                       to: fromIdx,
@@ -755,11 +745,7 @@ class CRDTTree: CRDTGCElement {
                     changes.removeLast()
                     changes.append(last)
                 } else {
-                    guard let actorID = editedAt.actorID else {
-                        throw YorkieError.unexpected(message: "Can't find actorID")
-                    }
-
-                    changes.append(TreeChange(actor: actorID,
+                    changes.append(TreeChange(actor: editedAt.actorID,
                                               type: .content,
                                               from: fromIdx,
                                               to: fromIdx,
@@ -1110,11 +1096,7 @@ class CRDTTree: CRDTGCElement {
                     changes.removeLast()
                     changes.append(last)
                 } else {
-                    guard let actorID = editedAt.actorID else {
-                        throw YorkieError.unexpected(message: "Can't get actorID")
-                    }
-
-                    try changes.append(TreeChange(actor: actorID,
+                    try changes.append(TreeChange(actor: editedAt.actorID,
                                                   type: .content,
                                                   from: fromIdx,
                                                   to: toIdx,

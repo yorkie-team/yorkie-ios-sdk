@@ -203,7 +203,7 @@ extension Converter {
         var pbTimeTicket = PbTimeTicket()
         pbTimeTicket.lamport = ticket.lamport
         pbTimeTicket.delimiter = ticket.delimiter
-        pbTimeTicket.actorID = ticket.actorID?.toData ?? Data()
+        pbTimeTicket.actorID = ticket.actorID.toData ?? Data()
         return pbTimeTicket
     }
 
@@ -213,7 +213,7 @@ extension Converter {
     static func fromTimeTicket(_ pbTimeTicket: PbTimeTicket) -> TimeTicket {
         TimeTicket(lamport: pbTimeTicket.lamport,
                    delimiter: pbTimeTicket.delimiter,
-                   actorID: pbTimeTicket.actorID.isEmpty ? nil : pbTimeTicket.actorID.toHexString)
+                   actorID: pbTimeTicket.actorID.toHexString)
     }
 }
 

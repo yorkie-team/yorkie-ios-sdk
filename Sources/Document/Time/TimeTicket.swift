@@ -43,9 +43,9 @@ public struct TimeTicket: Comparable {
     /**
      * `actorID` returns actorID.
      */
-    private(set) var actorID: ActorID?
+    private(set) var actorID: ActorID
 
-    init(lamport: Int64, delimiter: UInt32, actorID: ActorID?) {
+    init(lamport: Int64, delimiter: UInt32, actorID: ActorID) {
         self.lamport = lamport
         self.delimiter = delimiter
         self.actorID = actorID
@@ -55,10 +55,7 @@ public struct TimeTicket: Comparable {
      * `toIDString` returns the lamport string for this Ticket.
      */
     var toIDString: String {
-        guard let actorID = self.actorID else {
-            return "\(self.lamport):nil:\(self.delimiter)"
-        }
-        return "\(self.lamport):\(actorID):\(self.delimiter)"
+        "\(self.lamport):\(self.actorID):\(self.delimiter)"
     }
 
     /**
@@ -66,17 +63,13 @@ public struct TimeTicket: Comparable {
      * for debugging purpose.
      */
     var toTestString: String {
-        guard let actorID = self.actorID else {
-            return "\(self.lamport):nil:\(self.delimiter)"
-        }
-
         // If aactorID is digit display last two charactors.
         let formatedActorID: String
 
-        if actorID.count >= 2, CharacterSet(charactersIn: actorID).isSubset(of: CharacterSet(charactersIn: "0123456789abcdef")) {
-            formatedActorID = actorID.substring(from: actorID.count - 2, to: actorID.count - 1)
+        if self.actorID.count >= 2, CharacterSet(charactersIn: self.actorID).isSubset(of: CharacterSet(charactersIn: "0123456789abcdef")) {
+            formatedActorID = self.actorID.substring(from: self.actorID.count - 2, to: self.actorID.count - 1)
         } else {
-            formatedActorID = actorID
+            formatedActorID = self.actorID
         }
 
         return "\(self.lamport):\(formatedActorID):\(self.delimiter)"
@@ -108,8 +101,8 @@ public struct TimeTicket: Comparable {
             return lhs.lamport < rhs.lamport
         }
 
-        if let lhsActorID = lhs.actorID, let rhsActorID = rhs.actorID, lhsActorID.localizedCompare(rhsActorID) != .orderedSame {
-            return lhsActorID.localizedCompare(rhsActorID) == .orderedAscending
+        if lhs.actorID.localizedCompare(rhs.actorID) != .orderedSame {
+            return lhs.actorID.localizedCompare(rhs.actorID) == .orderedAscending
         }
 
         return lhs.delimiter < rhs.delimiter

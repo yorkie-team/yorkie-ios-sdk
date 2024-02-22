@@ -31,9 +31,9 @@ struct ChangeID {
 
     private let clientSeq: UInt32
     private var lamport: Int64
-    private var actor: ActorID?
+    private var actor: ActorID
 
-    init(clientSeq: UInt32, lamport: Int64, actor: ActorID? = nil) {
+    init(clientSeq: UInt32, lamport: Int64, actor: ActorID) {
         self.clientSeq = clientSeq
         self.lamport = lamport
         self.actor = actor
@@ -105,12 +105,6 @@ struct ChangeID {
      * `toTestString` returns a string containing the meta data of this ID.
      */
     var toTestString: String {
-        var actor: String
-        if let value = self.actor {
-            actor = String(value.suffix(2))
-        } else {
-            actor = "nil"
-        }
-        return "\(self.lamport):\(actor):\(self.clientSeq)"
+        "\(self.lamport):\(String(self.actor.suffix(2))):\(self.clientSeq)"
     }
 }

@@ -244,7 +244,7 @@ final class CRDTText: CRDTGCElement {
         var createdAtMapByActor = [String: TimeTicket]()
         var toBeStyleds = [RGATreeSplitNode<TextValue>]()
         for node in nodes {
-            guard let actorID = node.createdAt.actorID else { continue }
+            let actorID = node.createdAt.actorID
 
             let latestCreatedAt: TimeTicket
 
@@ -272,7 +272,7 @@ final class CRDTText: CRDTGCElement {
 
             let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
             changes.append(TextChange(type: .style,
-                                      actor: editedAt.actorID!,
+                                      actor: editedAt.actorID,
                                       from: fromIdx,
                                       to: toIdx,
                                       content: nil,
