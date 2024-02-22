@@ -336,6 +336,7 @@ public class JSONTree {
                                                    fromPos: fromPos,
                                                    toPos: toPos,
                                                    attributes: stringAttrs,
+                                                   attributesToRemove: [],
                                                    executedAt: ticket)
         )
     }
@@ -370,6 +371,34 @@ public class JSONTree {
                                                    fromPos: fromPos,
                                                    toPos: toPos,
                                                    attributes: stringAttrs,
+                                                   attributesToRemove: [],
+                                                   executedAt: ticket)
+        )
+    }
+
+    /**
+     * `removeStyle` removes the attributes to the elements of the given range.
+     */
+    public func removeStyle(_ fromIdx: Int, _ toIdx: Int, _ attributesToRemove: [String]) throws {
+        guard let context, let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        if fromIdx > toIdx {
+            throw YorkieError.unexpected(message: "from should be less than or equal to to")
+        }
+
+        let fromPos = try tree.findPos(fromIdx)
+        let toPos = try tree.findPos(toIdx)
+        let ticket = context.issueTimeTicket
+
+        try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+
+        context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
+                                                   fromPos: fromPos,
+                                                   toPos: toPos,
+                                                   attributes: [:],
+                                                   attributesToRemove: attributesToRemove,
                                                    executedAt: ticket)
         )
     }

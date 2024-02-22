@@ -23,6 +23,7 @@ struct RHTNode {
     var key: String
     var value: String
     var updatedAt: TimeTicket
+    var isRemoved: Bool
 }
 
 /**
@@ -31,26 +32,62 @@ struct RHTNode {
  */
 class RHT {
     private var nodeMapByKey = [String: RHTNode]()
+    private var numberOfRemovedElement: Int = 0
 
     /**
      * `set` sets the value of the given key.
      */
     func set(key: String, value: String, executedAt: TimeTicket) {
-        let previous = self.nodeMapByKey[key]
+        if let prev = nodeMapByKey[key] {
+            if executedAt.after(prev.updatedAt) {
+                if !prev.isRemoved {
+                    self.numberOfRemovedElement -= 1
+                }
+                let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
+                self.nodeMapByKey[key] = node
+            }
+        } else {
+            let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
+            self.nodeMapByKey[key] = node
+        }
+    }
 
-        if let previous, executedAt.after(previous.updatedAt) == false {
-            return
+    /**
+     * `remove` removes the Element of the given key.
+     */
+    @discardableResult
+    func remove(key: String, executedAt: TimeTicket) -> String {
+        guard let prev = self.nodeMapByKey[key] else {
+            self.numberOfRemovedElement += 1
+            let node = RHTNode(key: key, value: "", updatedAt: executedAt, isRemoved: true)
+            self.nodeMapByKey[key] = node
+
+            return ""
         }
 
-        let node = RHTNode(key: key, value: value, updatedAt: executedAt)
-        self.nodeMapByKey[key] = node
+        if executedAt.after(prev.updatedAt) {
+            let alreadyRemoved = prev.isRemoved
+            if !alreadyRemoved {
+                self.numberOfRemovedElement += 1
+            }
+            let node = RHTNode(key: key, value: prev.value, updatedAt: executedAt, isRemoved: true)
+            self.nodeMapByKey[key] = node
+
+            if alreadyRemoved {
+                return ""
+            }
+
+            return prev.value
+        }
+
+        return ""
     }
 
     /**
      * `has` returns whether the element exists of the given key or not.
      */
     func has(key: String) -> Bool {
-        return self.nodeMapByKey[key] != nil
+        !(self.nodeMapByKey[key]?.isRemoved ?? true)
     }
 
     /**
@@ -86,7 +123,7 @@ class RHT {
             result.append("\"\(key)\":\"\(node.value.escaped())\"")
         }
 
-        return result.isEmpty ? "" : "{\(result.joined(separator: ","))}"
+        return result.isEmpty ? "{}" : "{\(result.joined(separator: ","))}"
     }
 
     /**
@@ -100,7 +137,7 @@ class RHT {
         let sortedKeys = self.nodeMapByKey.keys.sorted()
 
         let xmlAttributes = sortedKeys.compactMap { key in
-            if let value = self.nodeMapByKey[key] {
+            if let value = self.nodeMapByKey[key], value.isRemoved == false {
                 return "\(key)=\"\(value.value)\""
             } else {
                 return nil
@@ -114,7 +151,7 @@ class RHT {
      * `size` returns the size of RHT
      */
     public var size: Int {
-        self.nodeMapByKey.count
+        self.nodeMapByKey.count - self.numberOfRemovedElement
     }
 
     /**
@@ -122,7 +159,7 @@ class RHT {
      */
     func toObject() -> [String: (value: String, updatedAt: TimeTicket)] {
         var result = [String: (String, TimeTicket)]()
-        for (key, node) in self.nodeMapByKey {
+        for (key, node) in self.nodeMapByKey.filter({ _, node in !node.isRemoved }) {
             result[key] = (node.value, node.updatedAt)
         }
 

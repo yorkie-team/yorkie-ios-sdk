@@ -1012,6 +1012,41 @@ final class TreeIntegrationStyleTests: XCTestCase {
         }
     }
 
+    func test_can_sync_its_content_with_remove_style() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [JSONTreeElementNode(type: "p",
+                                                                       children: [JSONTreeTextNode(value: "hello")],
+                                                                       attributes: ["italic": "true"])])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, /* html */ "<doc><p italic=\"true\">hello</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p italic=\"true\">hello</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.removeStyle(0, 1, ["italic"])
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>hello</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>hello</p></doc>")
+        }
+    }
+
     func test_should_return_correct_range_path_within_doc_subscribe() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in

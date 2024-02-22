@@ -28,7 +28,8 @@ public struct TimeTicket: Comparable {
     }
 
     public static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
-    static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
+    public static let next = TimeTicket(lamport: 1, delimiter: Values.initialDelimiter + 1, actorID: ActorIDs.initial)
+    public static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
 
     /**
      * `lamport` returns the lamport int64.

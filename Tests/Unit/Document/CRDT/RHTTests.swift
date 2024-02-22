@@ -25,7 +25,7 @@ class RHTTests: XCTestCase {
 
         let rht = RHT()
 
-        XCTAssertEqual(rht.toJSON(), "")
+        XCTAssertEqual(rht.toJSON(), "{}")
 
         rht.set(key: testKey, value: testValue, executedAt: TimeTicket.initial)
 
@@ -36,6 +36,24 @@ class RHTTests: XCTestCase {
         XCTAssertEqual(notExistsValue, nil)
     }
 
+    func test_should_handle_remove() throws {
+        let testKey = "test-key"
+        let testValue = "test-value"
+
+        let rht = RHT()
+
+        XCTAssertEqual(rht.toJSON(), "{}")
+        rht.set(key: testKey, value: testValue, executedAt: TimeTicket.initial)
+
+        let actualValue = try rht.get(key: testKey)
+        XCTAssertEqual(actualValue, testValue)
+        XCTAssertEqual(rht.size, 1)
+
+        rht.remove(key: testKey, executedAt: TimeTicket.next)
+        XCTAssertEqual(rht.has(key: testKey), false)
+        XCTAssertEqual(rht.size, 0)
+    }
+
     func test_should_not_set_when_same_key_exsits_and_updatedAt_is_bigger() {
         let actorId = "actorId-1"
         let testKey = "test-key"
@@ -43,7 +61,7 @@ class RHTTests: XCTestCase {
 
         let rht = RHT()
 
-        XCTAssertEqual(rht.toJSON(), "")
+        XCTAssertEqual(rht.toJSON(), "{}")
 
         rht.set(key: testKey,
                 value: testValue,
@@ -66,7 +84,7 @@ class RHTTests: XCTestCase {
         let rht = RHT()
 
         // Check if a rht object is constructed well.
-        XCTAssertEqual(rht.toJSON(), "")
+        XCTAssertEqual(rht.toJSON(), "{}")
 
         let notExistsValue = try? rht.get(key: notExistsKey)
         XCTAssertEqual(notExistsValue, nil)
@@ -79,7 +97,7 @@ class RHTTests: XCTestCase {
         let rht = RHT()
 
         // Check if a rht object is constructed well.
-        XCTAssertEqual(rht.toJSON(), "")
+        XCTAssertEqual(rht.toJSON(), "{}")
 
         rht.set(key: testKey, value: testValue, executedAt: TimeTicket.initial)
 

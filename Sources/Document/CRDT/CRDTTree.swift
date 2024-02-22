@@ -35,11 +35,13 @@ struct TreeNodeForTest: Codable {
 enum TreeChangeType {
     case content
     case style
+    case removeStyle
 }
 
 enum TreeChangeValue {
     case nodes([CRDTTreeNode])
     case attributes([String: String])
+    case attributesToRemove([String])
 }
 
 /**
@@ -593,6 +595,42 @@ class CRDTTree: CRDTGCElement {
 
                 try changes.append(TreeChange(actor: editedAt.actorID,
                                               type: .style,
+                                              from: self.toIndex(fromParent, fromLeft),
+                                              to: self.toIndex(toParent, toLeft),
+                                              fromPath: self.toPath(fromParent, fromLeft),
+                                              toPath: self.toPath(toParent, toLeft),
+                                              value: value,
+                                              splitLevel: 0) // dummy value.
+                )
+            }
+        }
+
+        return changes
+    }
+
+    /**
+     * `removeStyle` removes the given attributes of the given range.
+     */
+    @discardableResult
+    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket) throws -> [TreeChange] {
+        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
+        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
+        var changes: [TreeChange] = []
+        let actorID = editedAt.actorID
+        let value: TreeChangeValue = .attributesToRemove(attributesToRemove)
+
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
+            let (node, _) = token
+            if node.isRemoved == false, node.isText == false {
+                if node.attrs == nil {
+                    node.attrs = RHT()
+                }
+                for key in attributesToRemove {
+                    node.attrs?.remove(key: key, executedAt: editedAt)
+                }
+
+                try changes.append(TreeChange(actor: actorID,
+                                              type: .removeStyle,
                                               from: self.toIndex(fromParent, fromLeft),
                                               to: self.toIndex(toParent, toLeft),
                                               fromPath: self.toPath(fromParent, fromLeft),
