@@ -220,10 +220,10 @@ extension IndexTreeNode {
     }
 
     /**
-     * `hasTextChild` returns true if the node has an text child.
+     * `hasTextChild` returns true if the node's children consist of only text children.
      */
     var hasTextChild: Bool {
-        self.children.first { $0.isText } != nil
+        !self.children.isEmpty && !self.children.contains { !$0.isText }
     }
 
     /**
@@ -778,8 +778,13 @@ class IndexTree<T: IndexTreeNode> {
             }
 
             let sizeOfLeftSiblings = addSizeOfLeftSiblings(parent: node.parent!, offset: offset)
-            node = node.parent!
             path.append(sizeOfLeftSiblings + Int(treePos.offset))
+            node = node.parent!
+        } else if node.hasTextChild {
+            // TODO(hackerwins): The function does not consider the situation
+            // where Element and Text nodes are mixed in the Element's Children.
+            let sizeOfLeftSiblings = addSizeOfLeftSiblings(parent: node, offset: Int(treePos.offset))
+            path.append(sizeOfLeftSiblings)
         } else {
             path.append(Int(treePos.offset))
         }
