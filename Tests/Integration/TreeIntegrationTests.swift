@@ -1004,6 +1004,101 @@ final class TreeIntegrationStyleTests: XCTestCase {
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p color=\"red\" size=\"small\" style=\"italic\" weight=\"bold\">ab</p><p style=\"italic\">cd</p></doc>")
         }
     }
+
+    func test_should_return_correct_range_path_within_doc_subscribe() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "r",
+                                        children: [JSONTreeElementNode(type: "c",
+                                                                       children: [JSONTreeElementNode(type: "u",
+                                                                                                      children: [JSONTreeElementNode(type: "p",
+                                                                                                                                     children: [JSONTreeElementNode(type: "n",
+                                                                                                                                                                    children: [])])])]),
+                                                   JSONTreeElementNode(type: "c",
+                                                                       children: [JSONTreeElementNode(type: "p",
+                                                                                                      children: [JSONTreeElementNode(type: "n",
+                                                                                                                                     children: [])])])])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n></n></p></c></r>")
+            XCTAssertEqual(d2XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n></n></p></c></r>")
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 0], [1, 0, 0, 0], JSONTreeTextNode(value: "1"))
+            }
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 1], [1, 0, 0, 1], JSONTreeTextNode(value: "2"))
+            }
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 2], [1, 0, 0, 2], JSONTreeTextNode(value: "3"))
+            }
+
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>123</n></p></c></r>")
+            XCTAssertEqual(d2XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>123</n></p></c></r>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 1], [1, 0, 0, 1], JSONTreeTextNode(value: "abcdefgh"))
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>1abcdefgh23</n></p></c></r>")
+            XCTAssertEqual(d2XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>1abcdefgh23</n></p></c></r>")
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 5], [1, 0, 0, 5], JSONTreeTextNode(value: "4"))
+            }
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 6], [1, 0, 0, 7])
+            }
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 6], [1, 0, 0, 6], JSONTreeTextNode(value: "5"))
+            }
+
+            try await c2.sync()
+            try await c1.sync()
+
+            await subscribeDocs(d1,
+                                d2,
+                                nil,
+                                [TreeEditOpInfoForDebug(from: nil, to: nil, value: nil, fromPath: [1, 0, 0, 7], toPath: [1, 0, 0, 8])])
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([1, 0, 0, 7], [1, 0, 0, 8])
+            }
+
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+            XCTAssertEqual(d1XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>1abcd45gh23</n></p></c></r>")
+            XCTAssertEqual(d2XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>1abcd45gh23</n></p></c></r>")
+        }
+    }
 }
 
 final class TreeIntegrationOverlappingRange: XCTestCase {
@@ -3229,11 +3324,11 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            await self.subscribeDocs(d1,
-                                     d2,
-                                     [TreeEditOpInfo(path: "", from: 0, to: 4, value: [], splitLevel: 0, fromPath: [], toPath: [])],
-                                     [TreeEditOpInfo(path: "", from: 1, to: 2, value: [], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 0, to: 3, value: [], splitLevel: 0, fromPath: [], toPath: [])])
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeEditOpInfoForDebug(from: 0, to: 4, value: nil, fromPath: nil, toPath: nil)],
+                                [TreeEditOpInfoForDebug(from: 1, to: 2, value: nil, fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 0, to: 3, value: nil, fromPath: nil, toPath: nil)])
 
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.edit(0, 4)
@@ -3278,14 +3373,13 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            await self.subscribeDocs(d1,
-                                     d2,
-                                     [TreeEditOpInfo(path: "", from: 1, to: 3, value: [], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 1, to: 1, value: [JSONTreeTextNode(value: "c")], splitLevel: 0, fromPath: [], toPath: [])],
-                                     [TreeEditOpInfo(path: "", from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 1, to: 2, value: [], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 3, to: 4, value: [], splitLevel: 0, fromPath: [], toPath: [])])
-
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeEditOpInfoForDebug(from: 1, to: 3, value: nil, fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 1, to: 1, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil)],
+                                [TreeEditOpInfoForDebug(from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 1, to: 2, value: [], fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 3, to: 4, value: [], fromPath: nil, toPath: nil)])
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.edit(1, 3)
             }
@@ -3329,11 +3423,11 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            await self.subscribeDocs(d1,
-                                     d2,
-                                     [TreeEditOpInfo(path: "", from: 0, to: 4, value: [], splitLevel: 0, fromPath: [], toPath: [])],
-                                     [TreeEditOpInfo(path: "", from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 0, to: 5, value: [], splitLevel: 0, fromPath: [], toPath: [])])
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeEditOpInfoForDebug(from: 0, to: 4, value: nil, fromPath: nil, toPath: nil)],
+                                [TreeEditOpInfoForDebug(from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 0, to: 5, value: [], fromPath: nil, toPath: nil)])
 
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.edit(0, 4)
@@ -3378,12 +3472,12 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            await self.subscribeDocs(d1,
-                                     d2,
-                                     [TreeEditOpInfo(path: "", from: 1, to: 2, value: [JSONTreeTextNode(value: "b")], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], splitLevel: 0, fromPath: [], toPath: [])],
-                                     [TreeEditOpInfo(path: "", from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], splitLevel: 0, fromPath: [], toPath: []),
-                                      TreeEditOpInfo(path: "", from: 1, to: 2, value: [JSONTreeTextNode(value: "b")], splitLevel: 0, fromPath: [], toPath: [])])
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeEditOpInfoForDebug(from: 1, to: 2, value: [JSONTreeTextNode(value: "b")], fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil)],
+                                [TreeEditOpInfoForDebug(from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 1, to: 2, value: [JSONTreeTextNode(value: "b")], fromPath: nil, toPath: nil)])
 
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.edit(1, 2, JSONTreeTextNode(value: "b"))
@@ -3427,11 +3521,11 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            await self.subscribeDocs(d1,
-                                     d2,
-                                     [TreeStyleOpInfo(path: "", from: 0, to: 1, fromPath: [], value: ["value": "\"changed\""]),
-                                      TreeEditOpInfo(path: "", from: 0, to: 2, value: [], splitLevel: 0, fromPath: [], toPath: [])],
-                                     [TreeEditOpInfo(path: "", from: 0, to: 2, value: [], splitLevel: 0, fromPath: [], toPath: [])])
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["value": "\"changed\""], fromPath: nil),
+                                 TreeEditOpInfoForDebug(from: 0, to: 2, value: nil, fromPath: nil, toPath: nil)],
+                                [TreeEditOpInfoForDebug(from: 0, to: 2, value: nil, fromPath: nil, toPath: nil)])
 
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.styleByPath([0], ["value": "changed"])
@@ -3449,98 +3543,6 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
 
             let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
             XCTAssertEqual(d1XML, d2XML)
-        }
-    }
-
-    func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationInfo], _ d2Expected: [any OperationInfo]) async {
-        var d1Operations: [any OperationInfo] = []
-        var d1Index = 0
-
-        await d1.subscribe("$.t") { event in
-            if let event = event as? LocalChangeEvent {
-                d1Operations.append(contentsOf: event.value.operations)
-            } else if let event = event as? RemoteChangeEvent {
-                d1Operations.append(contentsOf: event.value.operations)
-            }
-
-            while d1Index <= d1Operations.count - 1 {
-                if let expected = d1Expected[d1Index] as? TreeEditOpInfo, let operation = d1Operations[d1Index] as? TreeEditOpInfo {
-                    XCTAssertEqual(expected.from, operation.from)
-                    XCTAssertEqual(expected.to, operation.to)
-                    XCTAssertEqual(expected.value.count, operation.value.count)
-
-                    if operation.value.count - 1 >= 0 {
-                        for idx in 0 ... operation.value.count - 1 {
-                            if let exp = expected.value[idx] as? JSONTreeTextNode, let oper = operation.value[idx] as? JSONTreeTextNode {
-                                XCTAssertEqual(exp, oper)
-                            } else if let exp = expected.value[idx] as? JSONTreeElementNode, let oper = operation.value[idx] as? JSONTreeElementNode {
-                                XCTAssertEqual(exp, oper)
-                            } else {
-                                XCTAssertFalse(true)
-                            }
-                        }
-                    }
-                } else if let expected = d1Expected[d1Index] as? TreeStyleOpInfo, let operation = d1Operations[d1Index] as? TreeStyleOpInfo {
-                    XCTAssertEqual(expected.from, operation.from)
-                    XCTAssertEqual(expected.to, operation.to)
-                    XCTAssertEqual(expected.value.count, operation.value.count)
-
-                    if operation.value.count - 1 >= 0 {
-                        for key in operation.value.keys {
-                            XCTAssertEqual(expected.value[key]?.toJSONString, operation.value[key]?.toJSONString)
-                        }
-                    }
-                } else {
-                    XCTAssertFalse(true)
-                }
-
-                d1Index += 1
-            }
-        }
-
-        var d2Operations: [any OperationInfo] = []
-        var d2Index = 0
-
-        await d2.subscribe("$.t") { event in
-            if let event = event as? LocalChangeEvent {
-                d2Operations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
-            } else if let event = event as? RemoteChangeEvent {
-                d2Operations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
-            }
-
-            while d2Index <= d2Operations.count - 1 {
-                if let expected = d2Expected[d2Index] as? TreeEditOpInfo, let operation = d2Operations[d2Index] as? TreeEditOpInfo {
-                    XCTAssertEqual(expected.from, operation.from)
-                    XCTAssertEqual(expected.to, operation.to)
-                    XCTAssertEqual(expected.value.count, operation.value.count)
-
-                    if operation.value.count - 1 >= 0 {
-                        for idx in 0 ... operation.value.count - 1 {
-                            if let exp = expected.value[idx] as? JSONTreeTextNode, let oper = operation.value[idx] as? JSONTreeTextNode {
-                                XCTAssertEqual(exp, oper)
-                            } else if let exp = expected.value[idx] as? JSONTreeElementNode, let oper = operation.value[idx] as? JSONTreeElementNode {
-                                XCTAssertEqual(exp, oper)
-                            } else {
-                                XCTAssertFalse(true)
-                            }
-                        }
-                    }
-                } else if let expected = d2Expected[d1Index] as? TreeStyleOpInfo, let operation = d2Operations[d1Index] as? TreeStyleOpInfo {
-                    XCTAssertEqual(expected.from, operation.from)
-                    XCTAssertEqual(expected.to, operation.to)
-                    XCTAssertEqual(expected.value.count, operation.value.count)
-
-                    if operation.value.count - 1 >= 0 {
-                        for key in operation.value.keys {
-                            XCTAssertEqual(expected.value[key]?.toJSONString, operation.value[key]?.toJSONString)
-                        }
-                    }
-                } else {
-                    XCTAssertFalse(true)
-                }
-
-                d2Index += 1
-            }
         }
     }
 }
