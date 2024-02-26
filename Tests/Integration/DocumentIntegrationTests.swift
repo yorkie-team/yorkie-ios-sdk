@@ -386,15 +386,15 @@ final class DocumentIntegrationTests: XCTestCase {
         var d2Events = [any OperationInfo]()
         var d3Events = [any OperationInfo]()
 
-        await self.d1.subscribe { event in
+        await self.d1.subscribe { event, _ in
             d1Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        await self.d1.subscribe("$.todos") { event in
+        await self.d1.subscribe("$.todos") { event, _ in
             d2Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        await self.d1.subscribe("$.counter") { event in
+        await self.d1.subscribe("$.counter") { event, _ in
             d3Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 

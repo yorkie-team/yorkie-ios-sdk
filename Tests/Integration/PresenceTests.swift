@@ -166,7 +166,7 @@ final class PresenceTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a1", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePresence { _ in
+        await doc1.subscribePresence { _, _ in
             eventCount1 += 1
 
             if eventCount1 == 1 {
@@ -337,7 +337,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a"])
 
-        await doc1.subscribePresence { event in
+        await doc1.subscribePresence { event, _ in
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
@@ -350,7 +350,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b"])
 
-        await doc2.subscribePresence { event in
+        await doc2.subscribePresence { event, _ in
             eventCount2 += 1
 
             eventReceived2.append(EventResult(event))
@@ -422,7 +422,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePresence { event in
+        await doc1.subscribePresence { event, _ in
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
@@ -435,7 +435,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b", "cursor": ["x": 0, "y": 0]])
 
-        await doc2.subscribePresence { event in
+        await doc2.subscribePresence { event, _ in
             eventCount2 += 1
 
             eventReceived2.append(EventResult(event))
@@ -492,7 +492,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a"])
 
-        await doc1.subscribePresence { event in
+        await doc1.subscribePresence { event, _ in
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
@@ -560,7 +560,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a1", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePresence { event in
+        await doc1.subscribePresence { event, _ in
             eventCount1 += 1
 
             eventReceived1.append(EventResult(event))
