@@ -302,10 +302,18 @@ public class JSONTree {
         return tree.indexTree
     }
 
+    public func styleByPath(_ path: [Int], _ attributes: Attributes) throws {
+        try self.styleByPathInternal(path, stringifyAttributes(attributes))
+    }
+
+    public func styleByPath(_ path: [Int], _ attributes: [String: Any]) throws {
+        try self.styleByPathInternal(path, attributes.stringValueTypeDictionary)
+    }
+
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
      */
-    public func styleByPath(_ path: [Int], _ attributes: Attributes) throws {
+    public func styleByPathInternal(_ path: [Int], _ stringAttrs: [String: String]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -316,8 +324,6 @@ public class JSONTree {
 
         let (fromPos, toPos) = try tree.pathToPosRange(path)
         let ticket = context.issueTimeTicket
-
-        let stringAttrs = stringifyAttributes(attributes)
 
         try tree.style((fromPos, toPos), stringAttrs, ticket)
 
