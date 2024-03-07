@@ -189,7 +189,7 @@ public struct TreeStyleOpInfo: OperationInfo {
     public let from: Int
     public let to: Int
     public let fromPath: [Int]
-    public let value: [String: Codable]
+    public let value: [String: Any]
 
     public static func == (lhs: TreeStyleOpInfo, rhs: TreeStyleOpInfo) -> Bool {
         if lhs.type != rhs.type {

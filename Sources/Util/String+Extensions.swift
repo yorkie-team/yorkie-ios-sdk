@@ -47,12 +47,15 @@ extension String {
     }
 
     var toJSONString: String {
-        if let jsonData = try? JSONSerialization.data(withJSONObject: self, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
-           let escapedValue = String(bytes: jsonData, encoding: .utf8)
-        {
-            return escapedValue
-        }
-
-        return ""
+        convertJSONString(self)
     }
+}
+
+func convertJSONString(_ data: Any) -> String {
+    if let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
+       let escapedValue = String(bytes: jsonData, encoding: .utf8)
+    {
+        return escapedValue
+    }
+    return ""
 }

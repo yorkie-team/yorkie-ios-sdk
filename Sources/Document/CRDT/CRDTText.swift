@@ -17,20 +17,23 @@
 import Combine
 import Foundation
 
-public typealias TextAttributes = Codable
+public typealias Attributes = Codable
 
 /**
  * `stringifyAttributes` makes values of attributes to JSON parsable string.
  */
-func stringifyAttributes(_ attributes: TextAttributes) -> [String: String] {
-    guard let jsonData = try? JSONEncoder().encode(attributes),
+func stringifyAttributes(_ attributes: Attributes) -> [String: String] {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+
+    guard let jsonData = try? encoder.encode(attributes),
           let jsonObject = try? JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) as? [String: Any]
     else {
         return [:]
     }
 
     return jsonObject.mapValues {
-        if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes]) {
+        if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]) {
             return String(data: result, encoding: .utf8) ?? ""
         } else {
             return ""
@@ -52,9 +55,9 @@ class TextChange {
     public let from: Int
     public let to: Int
     public var content: String?
-    public var attributes: TextAttributes?
+    public var attributes: Attributes?
 
-    init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String? = nil, attributes: TextAttributes? = nil) {
+    init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String? = nil, attributes: Attributes? = nil) {
         self.type = type
         self.actor = actor
         self.from = from
@@ -157,7 +160,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
 }
 
 final class CRDTText: CRDTGCElement {
-    public typealias TextVal = (attributes: TextAttributes, content: String)
+    public typealias TextVal = (attributes: Attributes, content: String)
 
     var createdAt: TimeTicket
     var movedAt: TimeTicket?
@@ -220,19 +223,11 @@ final class CRDTText: CRDTGCElement {
      * @param attributes - style attributes
      * @param editedAt - edited time
      */
-    public func setStyle(_ range: RGATreeSplitPosRange,
-                         _ attributes: TextAttributes,
-                         _ editedAt: TimeTicket,
-                         _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [TextChange])
-    {
-        try self.setStyle(range, stringifyAttributes(attributes), editedAt, latestCreatedAtMapByActor)
-    }
-
     @discardableResult
     func setStyle(_ range: RGATreeSplitPosRange,
                   _ attributes: [String: String],
                   _ editedAt: TimeTicket,
-                  _ latestCreatedAtMapByActor: [String: TimeTicket]) throws -> ([String: TimeTicket], [TextChange])
+                  _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [TextChange])
     {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1

@@ -135,12 +135,11 @@ final class TreeIntegrationTests: XCTestCase {
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "p",
                                                                    children: [
-                                                                       JSONTreeElementNode(type: "span", attributes: ["bold": true],
-                                                                                           children: [JSONTreeTextNode(value: "hello")])
+                                                                       JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "hello")], attributes: ["bold": true])
                                                                    ])])
             )
 
-            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p><span bold=\"true\">hello</span></p></doc>")
+            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><p><span bold=true>hello</span></p></doc>")
         }
     }
 
@@ -855,14 +854,13 @@ final class TreeIntegrationStyleTests: XCTestCase {
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "p",
                                                                    children: [JSONTreeElementNode(type: "span",
-                                                                                                  attributes: ["bold": "true"],
-                                                                                                  children: [JSONTreeTextNode(value: "hello")])])])
+                                                                                                  children: [JSONTreeTextNode(value: "hello")], attributes: ["bold": true])])])
             )
         }
 
         let docXML = await(doc.getRoot().t as? JSONTree)?.toXML()
 
-        XCTAssertEqual(docXML, /* html */ "<doc><p><span bold=\"true\">hello</span></p></doc>")
+        XCTAssertEqual(docXML, /* html */ "<doc><p><span bold=true>hello</span></p></doc>")
     }
 
     func test_can_be_edited_with_index() async throws {
@@ -874,9 +872,8 @@ final class TreeIntegrationStyleTests: XCTestCase {
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "tc",
                                                                    children: [JSONTreeElementNode(type: "p",
-                                                                                                  attributes: ["a": "b"],
                                                                                                   children: [JSONTreeElementNode(type: "tn",
-                                                                                                                                 children: [])])])])
+                                                                                                                                 children: [])], attributes: ["a": "b"])])])
             )
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\"><tn></tn></p></tc></doc>")
@@ -887,14 +884,17 @@ final class TreeIntegrationStyleTests: XCTestCase {
             try (root.t as? JSONTree)?.style(1, 2, ["c": "q"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(2, 3, ["z": "m"])
-            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"m\"></tn></p></tc></doc>")
+            try (root.t as? JSONTree)?.style(2, 3, ["c": "d", "z": 3, "b": false])
+            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn b=false c=\"d\" z=3></tn></p></tc></doc>")
 
-            try (root.t as? JSONTree)?.style(2, 3, ["z": 3])
-            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"3\"></tn></p></tc></doc>")
+            struct styles: Codable {
+                let c: String
+                let z: Int
+                let b: Bool
+            }
 
-            try (root.t as? JSONTree)?.style(2, 3, ["z": nil])
-            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"null\"></tn></p></tc></doc>")
+            try (root.t as? JSONTree)?.style(2, 3, styles(c: "d", z: 3, b: false))
+            XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn b=false c=\"d\" z=3></tn></p></tc></doc>")
         }
     }
 
@@ -907,9 +907,8 @@ final class TreeIntegrationStyleTests: XCTestCase {
                 JSONTreeElementNode(type: "doc",
                                     children: [JSONTreeElementNode(type: "tc",
                                                                    children: [JSONTreeElementNode(type: "p",
-                                                                                                  attributes: ["a": "b"],
                                                                                                   children: [JSONTreeElementNode(type: "tn",
-                                                                                                                                 children: [])])])])
+                                                                                                                                 children: [])], attributes: ["a": "b"])])])
             )
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\"><tn></tn></p></tc></doc>")
@@ -933,8 +932,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
                 root.t = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc",
                                         children: [JSONTreeElementNode(type: "p",
-                                                                       attributes: ["italic": "true"],
-                                                                       children: [JSONTreeTextNode(value: "hello")])])
+                                                                       children: [JSONTreeTextNode(value: "hello")], attributes: ["italic": "true"])])
                 )
             }
 
@@ -3509,8 +3507,8 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
                 root.t = JSONTree(initialRoot:
                     JSONTreeElementNode(type: DefaultTreeNodeType.root.rawValue,
                                         children: [
-                                            JSONTreeElementNode(type: "t", attributes: ["id": "1", "value": "init"], children: []),
-                                            JSONTreeElementNode(type: "t", attributes: ["id": "2", "value": "init"], children: [])
+                                            JSONTreeElementNode(type: "t", attributes: ["id": "1", "value": "init"]),
+                                            JSONTreeElementNode(type: "t", children: [], attributes: ["id": "2", "value": "init"])
                                         ])
                 )
             }
@@ -3523,7 +3521,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
 
             await subscribeDocs(d1,
                                 d2,
-                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["value": "\"changed\""], fromPath: nil),
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["value": "changed"], fromPath: nil),
                                  TreeEditOpInfoForDebug(from: 0, to: 2, value: nil, fromPath: nil, toPath: nil)],
                                 [TreeEditOpInfoForDebug(from: 0, to: 2, value: nil, fromPath: nil, toPath: nil)])
 

@@ -16,39 +16,35 @@
 
 import Foundation
 
-typealias AnyValueTypeDictionary = [String: Any?]
+typealias AnyValueTypeDictionary = [String: Any]
 
 extension AnyValueTypeDictionary {
     var stringValueTypeDictionary: [String: String] {
         self.convertToDictionaryStringValues(self)
     }
 
-    func convertToDictionaryStringValues(_ dictionary: [String: Any?]) -> [String: String] {
+    func convertToDictionaryStringValues(_ dictionary: [String: Any]) -> [String: String] {
         var convertedDictionary: [String: String] = [:]
 
         for (key, value) in dictionary {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+
             if let value = value as? Encodable,
-               let jsonData = try? JSONEncoder().encode(value),
+               let jsonData = try? encoder.encode(value),
                let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
             } else if let value = value as? [String: Any],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
+                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
                       let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
             } else if let value = value as? [[String: Any]],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
+                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
                       let stringValue = String(data: jsonData, encoding: .utf8)
             {
                 convertedDictionary[key] = stringValue
-            } else if let value {
-                if value is String {
-                    convertedDictionary[key] = String("\"\(value)\"")
-                } else {
-                    convertedDictionary[key] = String("\(value)")
-                }
-                print("Warning: non-encodable value for key '\(key)': \(value)")
             } else {
                 convertedDictionary[key] = "null"
             }

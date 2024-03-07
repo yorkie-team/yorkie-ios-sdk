@@ -67,9 +67,9 @@ class TreeStyleOperation: Operation {
         }
 
         return changes.compactMap { change in
-            let attributes: [String: Codable] = {
+            let attributes: [String: Any] = {
                 if case .attributes(let attributes) = change.value {
-                    return attributes
+                    return attributes.toJSONObejct
                 } else {
                     return [:]
                 }
