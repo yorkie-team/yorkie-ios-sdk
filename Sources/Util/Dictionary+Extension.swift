@@ -27,27 +27,7 @@ extension AnyValueTypeDictionary {
         var convertedDictionary: [String: String] = [:]
 
         for (key, value) in dictionary {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = .sortedKeys
-
-            if let value = value as? Encodable,
-               let jsonData = try? encoder.encode(value),
-               let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else if let value = value as? [String: Any],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
-                      let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else if let value = value as? [[String: Any]],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
-                      let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else {
-                convertedDictionary[key] = convertToJSONString(value)
-            }
+            convertedDictionary[key] = convertToJSONString(value)
         }
 
         return convertedDictionary
@@ -81,28 +61,6 @@ extension AnyValueTypeDictionary {
 typealias StringValueTypeDictionary = [String: String]
 
 extension StringValueTypeDictionary {
-    var anyValueTypeDictionary: AnyValueTypeDictionary {
-        var result = AnyValueTypeDictionary()
-
-        for item in self {
-            if let value = Int(item.value) {
-                result[item.key] = value
-            } else if let value = Double(item.value) {
-                result[item.key] = value
-            } else if let value = Bool(item.value) {
-                result[item.key] = value
-            } else if let data = item.value.data(using: .utf8),
-                      let object = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
-            {
-                result[item.key] = object
-            } else {
-                result[item.key] = item.value
-            }
-        }
-
-        return result
-    }
-
     var toJSONObejct: [String: Any] {
         self.compactMapValues { $0.toJSONObject }
     }
