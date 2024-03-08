@@ -64,4 +64,26 @@ extension StringValueTypeDictionary {
     var toJSONObejct: [String: Any] {
         self.compactMapValues { $0.toJSONObject }
     }
+
+    /**
+     * `stringifyAttributes` makes values of attributes to JSON parsable string.
+     */
+    static func stringifyAttributes(_ attributes: Codable) -> [String: String] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+
+        guard let jsonData = try? encoder.encode(attributes),
+              let jsonObject = try? JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) as? [String: Any]
+        else {
+            return [:]
+        }
+
+        return jsonObject.mapValues {
+            if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]) {
+                return String(data: result, encoding: .utf8) ?? ""
+            } else {
+                return ""
+            }
+        }
+    }
 }

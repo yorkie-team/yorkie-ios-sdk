@@ -100,7 +100,7 @@ struct TreeStyleOpInfoForDebug: OperationInfoForDebug {
             XCTAssertEqual(value.count, operation.value.count)
             if operation.value.count - 1 >= 0 {
                 for key in operation.value.keys {
-                    XCTAssertEqual(value[key]?.toJSONString, convertToJSONString(operation.value[key] as Any))
+                    XCTAssertEqual(value[key]?.toJSONString, convertToJSONString(operation.value[key] ?? NSNull()))
                 }
             }
         }

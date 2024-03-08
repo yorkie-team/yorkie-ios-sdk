@@ -17,30 +17,6 @@
 import Combine
 import Foundation
 
-public typealias Attributes = Codable
-
-/**
- * `stringifyAttributes` makes values of attributes to JSON parsable string.
- */
-func stringifyAttributes(_ attributes: Attributes) -> [String: String] {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = .sortedKeys
-
-    guard let jsonData = try? encoder.encode(attributes),
-          let jsonObject = try? JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) as? [String: Any]
-    else {
-        return [:]
-    }
-
-    return jsonObject.mapValues {
-        if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]) {
-            return String(data: result, encoding: .utf8) ?? ""
-        } else {
-            return ""
-        }
-    }
-}
-
 class TextChange {
     /**
      * `TextChangeType` is the type of TextChange.
@@ -55,9 +31,9 @@ class TextChange {
     public let from: Int
     public let to: Int
     public var content: String?
-    public var attributes: Attributes?
+    public var attributes: Codable?
 
-    init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String? = nil, attributes: Attributes? = nil) {
+    init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String? = nil, attributes: Codable? = nil) {
         self.type = type
         self.actor = actor
         self.from = from
@@ -160,7 +136,7 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
 }
 
 final class CRDTText: CRDTGCElement {
-    public typealias TextVal = (attributes: Attributes, content: String)
+    public typealias TextVal = (attributes: Codable, content: String)
 
     var createdAt: TimeTicket
     var movedAt: TimeTicket?

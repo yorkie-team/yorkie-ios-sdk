@@ -61,7 +61,7 @@ public class JSONText {
      * `edit` edits this text with the given content.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Attributes? = nil) -> (Int, Int)? {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) -> (Int, Int)? {
         guard let context, let text else {
             Logger.critical("it is not initialized yet")
             return nil
@@ -83,7 +83,7 @@ public class JSONText {
 
         var attrs: [String: String]?
         if let attributes {
-            attrs = stringifyAttributes(attributes)
+            attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
         guard let (maxCreatedAtMapByActor, _, rangeAfterEdit) = try? text.edit(range, content, ticket, attrs) else {
@@ -97,7 +97,7 @@ public class JSONText {
                                      toPos: range.1,
                                      maxCreatedAtMapByActor: maxCreatedAtMapByActor,
                                      content: content,
-                                     attributes: attributes != nil ? stringifyAttributes(attributes!) : nil,
+                                     attributes: attrs,
                                      executedAt: ticket)
         )
 
@@ -128,7 +128,7 @@ public class JSONText {
      * `setStyle` styles this text with the given attributes.
      */
     @discardableResult
-    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Attributes) -> Bool {
+    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) -> Bool {
         guard let context, let text else {
             Logger.critical("it is not initialized yet")
             return false
@@ -148,7 +148,7 @@ public class JSONText {
 
         let ticket = context.issueTimeTicket
         let maxCreatedAtMapByActor: [String: TimeTicket]
-        let stringAttrs = stringifyAttributes(attributes)
+        let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         do {
             (maxCreatedAtMapByActor, _) = try text.setStyle(range, stringAttrs, ticket)
         } catch {

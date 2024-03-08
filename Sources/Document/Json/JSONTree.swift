@@ -89,7 +89,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
 
     public init(type: TreeNodeType, children: [any JSONTreeNode] = [], attributes: Codable) {
         self.type = type
-        self.attributes = stringifyAttributes(attributes)
+        self.attributes = StringValueTypeDictionary.stringifyAttributes(attributes)
         self.children = children
     }
 
@@ -302,8 +302,8 @@ public class JSONTree {
         return tree.indexTree
     }
 
-    public func styleByPath(_ path: [Int], _ attributes: Attributes) throws {
-        try self.styleByPathInternal(path, stringifyAttributes(attributes))
+    public func styleByPath(_ path: [Int], _ attributes: Codable) throws {
+        try self.styleByPathInternal(path, StringValueTypeDictionary.stringifyAttributes(attributes))
     }
 
     public func styleByPath(_ path: [Int], _ attributes: [String: Any]) throws {
@@ -339,8 +339,8 @@ public class JSONTree {
     /**
      * `style` sets the attributes to the elements of the given range.
      */
-    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: Attributes) throws {
-        try self.styleInternal(fromIdx, toIdx, stringifyAttributes(attributes))
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws {
+        try self.styleInternal(fromIdx, toIdx, StringValueTypeDictionary.stringifyAttributes(attributes))
     }
 
     public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any]) throws {
