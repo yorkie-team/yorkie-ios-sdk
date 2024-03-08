@@ -46,7 +46,7 @@ extension AnyValueTypeDictionary {
             {
                 convertedDictionary[key] = stringValue
             } else {
-                convertedDictionary[key] = "null"
+                convertedDictionary[key] = convertToJSONString(value)
             }
         }
 

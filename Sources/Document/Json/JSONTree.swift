@@ -111,7 +111,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
                     if object is [String: Any] {
                         return "\(key.toJSONString):\(value)"
                     } else {
-                        return "\(key.toJSONString):\(convertJSONString(object))"
+                        return "\(key.toJSONString):\(convertToJSONString(object))"
                     }
                 } else {
                     return "\(key.toJSONString):null"
