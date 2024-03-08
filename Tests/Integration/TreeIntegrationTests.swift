@@ -887,13 +887,15 @@ final class TreeIntegrationStyleTests: XCTestCase {
             try (root.t as? JSONTree)?.style(2, 3, ["c": "d", "z": 3, "b": false])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn b=false c=\"d\" z=3></tn></p></tc></doc>")
 
-            struct styles: Codable {
+            // swiftlint: disable identifier_name
+            struct Styles: Codable {
                 let c: String
                 let z: Int
                 let b: Bool
             }
+            // swiftlint: enable identifier_name
 
-            try (root.t as? JSONTree)?.style(2, 3, styles(c: "d", z: 3, b: false))
+            try (root.t as? JSONTree)?.style(2, 3, Styles(c: "d", z: 3, b: false))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn b=false c=\"d\" z=3></tn></p></tc></doc>")
         }
     }
