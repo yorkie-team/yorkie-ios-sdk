@@ -310,6 +310,8 @@ final class CRDTTreeNode: IndexTreeNode {
 
             return childClone
         }
+        clone.insPrevID = self.insPrevID
+        clone.insNextID = self.insNextID
 
         return clone
     }
