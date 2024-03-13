@@ -68,7 +68,7 @@ public enum SyncMode {
     case pushOnly
 }
 
-struct Attachment {
+class Attachment {
     var doc: Document
     var docID: String
     var isRealtimeSync: Bool
@@ -76,6 +76,16 @@ struct Attachment {
     var remoteChangeEventReceived: Bool
     var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
     var watchLoopReconnectTimer: Timer?
+
+    init(doc: Document, docID: String, isRealtimeSync: Bool, realtimeSyncMode: SyncMode, remoteChangeEventReceived: Bool, remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>? = nil, watchLoopReconnectTimer: Timer? = nil) {
+        self.doc = doc
+        self.docID = docID
+        self.isRealtimeSync = isRealtimeSync
+        self.realtimeSyncMode = realtimeSyncMode
+        self.remoteChangeEventReceived = remoteChangeEventReceived
+        self.remoteWatchStream = remoteWatchStream
+        self.watchLoopReconnectTimer = watchLoopReconnectTimer
+    }
 }
 
 /**
@@ -811,7 +821,7 @@ public actor Client {
 
             // NOTE(chacha912, hackerwins): If syncLoop already executed with
             // PushPull, ignore the response when the syncMode is PushOnly.
-            if responsePack.hasChanges(), syncMode == .pushOnly {
+            if responsePack.hasChanges(), attachment.realtimeSyncMode == .pushOnly {
                 return doc
             }
 
