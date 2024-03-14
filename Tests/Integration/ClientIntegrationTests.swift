@@ -429,4 +429,113 @@ final class ClientIntegrationTests: XCTestCase {
 
         XCTAssertEqual(result1, result2)
     }
+
+    func test_should_prevent_remote_changes_in_push_only_mode() async throws {
+        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+        try await c1.attach(d1)
+        try await c2.attach(d2)
+
+        let expect1 = expectation(description: "d2 1")
+        let expect2 = expectation(description: "d1 3")
+        let expect3 = expectation(description: "wait task")
+
+        var d1EventCount = 0
+        var d1lastEvent: DocEvent?
+        await d1.subscribe { event in
+            d1EventCount += 1
+            d1lastEvent = event
+
+            if d1EventCount == 3 {
+                expect2.fulfill()
+            }
+        }
+
+        var d2EventCount = 0
+        var d2lastEvent: DocEvent?
+        await d2.subscribe { event in
+            d2EventCount += 1
+            d2lastEvent = event
+
+            if d2EventCount == 1 {
+                expect1.fulfill()
+            }
+        }
+
+        try await d1.update { root, _ in
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
+                ]))
+        }
+
+        await fulfillment(of: [expect1], timeout: 2)
+        XCTAssert(d2lastEvent is RemoteChangeEvent)
+
+        var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+        var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+        XCTAssertEqual(d1XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
+        XCTAssertEqual(d2XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
+
+        try await d1.update { root, _ in
+            try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "a"))
+        }
+
+        try await c1.sync()
+
+        // The Task at below will be performed when the pushPull API sent the request and wait a response in the syncInternal().
+        Task {
+            // In push-only mode, remote-change events should not occur.
+            try await c2.pauseRemoteChanges(d2)
+            var remoteChangeOccured = false
+
+            await d2.subscribe { event in
+                if event.type == .remoteChange {
+                    remoteChangeOccured = true
+                }
+            }
+
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+            await d2.unsubscribe()
+            XCTAssert(remoteChangeOccured == false)
+
+            try await c2.resumeRemoteChanges(d2)
+
+            expect3.fulfill()
+        }
+
+        // Simulate the situation in the runSyncLoop where a pushpull request has been sent
+        // but a response has not yet been received.
+        try await c2.sync()
+
+        await fulfillment(of: [expect3])
+
+        try await d2.update { root, _ in
+            try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
+        }
+
+        await fulfillment(of: [expect2], timeout: 2)
+        XCTAssert(d1lastEvent is RemoteChangeEvent)
+
+        d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+        d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+
+        XCTAssertEqual(d1XML, /* html */ "<doc><p>1ba2</p><p>34</p></doc>")
+        XCTAssertEqual(d2XML, /* html */ "<doc><p>1ba2</p><p>34</p></doc>")
+
+        await d1.unsubscribe()
+        await d2.unsubscribe()
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
 }
