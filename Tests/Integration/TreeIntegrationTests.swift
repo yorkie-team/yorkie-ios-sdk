@@ -246,9 +246,12 @@ final class TreeIntegrationTests: XCTestCase {
 
         var treeOperations = [TreeEditOpInfo]()
 
+        let expect = expectation(description: "wait event")
+
         await doc.subscribe("$.t") { event, _ in
             if let event = event as? LocalChangeEvent {
                 treeOperations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
+                expect.fulfill()
             }
         }
 
@@ -258,7 +261,7 @@ final class TreeIntegrationTests: XCTestCase {
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p><tn>aXb</tn></p></tc></doc>")
         }
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        await fulfillment(of: [expect], timeout: 1)
 
         XCTAssertEqual(treeOperations[0].type, .treeEdit)
         XCTAssertEqual(treeOperations[0].fromPath, [0, 0, 0, 1])
