@@ -16,42 +16,18 @@
 
 import Foundation
 
-typealias AnyValueTypeDictionary = [String: Any?]
+typealias AnyValueTypeDictionary = [String: Any]
 
 extension AnyValueTypeDictionary {
     var stringValueTypeDictionary: [String: String] {
         self.convertToDictionaryStringValues(self)
     }
 
-    func convertToDictionaryStringValues(_ dictionary: [String: Any?]) -> [String: String] {
+    func convertToDictionaryStringValues(_ dictionary: [String: Any]) -> [String: String] {
         var convertedDictionary: [String: String] = [:]
 
         for (key, value) in dictionary {
-            if let value = value as? Encodable,
-               let jsonData = try? JSONEncoder().encode(value),
-               let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else if let value = value as? [String: Any],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
-                      let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else if let value = value as? [[String: Any]],
-                      let jsonData = try? JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed, .withoutEscapingSlashes]),
-                      let stringValue = String(data: jsonData, encoding: .utf8)
-            {
-                convertedDictionary[key] = stringValue
-            } else if let value {
-                if value is String {
-                    convertedDictionary[key] = String("\"\(value)\"")
-                } else {
-                    convertedDictionary[key] = String("\(value)")
-                }
-                print("Warning: non-encodable value for key '\(key)': \(value)")
-            } else {
-                convertedDictionary[key] = "null"
-            }
+            convertedDictionary[key] = convertToJSONString(value)
         }
 
         return convertedDictionary
@@ -85,29 +61,29 @@ extension AnyValueTypeDictionary {
 typealias StringValueTypeDictionary = [String: String]
 
 extension StringValueTypeDictionary {
-    var anyValueTypeDictionary: AnyValueTypeDictionary {
-        var result = AnyValueTypeDictionary()
-
-        for item in self {
-            if let value = Int(item.value) {
-                result[item.key] = value
-            } else if let value = Double(item.value) {
-                result[item.key] = value
-            } else if let value = Bool(item.value) {
-                result[item.key] = value
-            } else if let data = item.value.data(using: .utf8),
-                      let object = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
-            {
-                result[item.key] = object
-            } else {
-                result[item.key] = item.value
-            }
-        }
-
-        return result
-    }
-
     var toJSONObejct: [String: Any] {
         self.compactMapValues { $0.toJSONObject }
+    }
+
+    /**
+     * `stringifyAttributes` makes values of attributes to JSON parsable string.
+     */
+    static func stringifyAttributes(_ attributes: Codable) -> [String: String] {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+
+        guard let jsonData = try? encoder.encode(attributes),
+              let jsonObject = try? JSONSerialization.jsonObject(with: jsonData, options: .fragmentsAllowed) as? [String: Any]
+        else {
+            return [:]
+        }
+
+        return jsonObject.mapValues {
+            if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]) {
+                return String(data: result, encoding: .utf8) ?? ""
+            } else {
+                return ""
+            }
+        }
     }
 }

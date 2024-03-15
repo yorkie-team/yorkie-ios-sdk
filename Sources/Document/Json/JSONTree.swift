@@ -36,14 +36,13 @@ extension CRDTTreeNode {
         if self.isText {
             return JSONTreeTextNode(value: self.value)
         } else {
-            var attrs = [String: String]()
+            var attrs = [String: Any]()
             self.attrs?.forEach {
-                attrs[$0.key] = $0.value
+                attrs[$0.key] = $0.value.toJSONObject
             }
 
             return JSONTreeElementNode(type: self.type,
-                                       attributes: attrs.toJSONObejct,
-                                       children: self.children.compactMap { $0.toJSONTreeNode })
+                                       children: self.children.compactMap { $0.toJSONTreeNode }, attributes: attrs)
         }
     }
 }
@@ -53,7 +52,7 @@ extension CRDTTreeNode {
  */
 public struct JSONTreeElementNode: JSONTreeNode {
     public let type: TreeNodeType
-    public let attributes: [String: Any?]
+    public let attributes: [String: String]
     public let children: [any JSONTreeNode]
 
     public static func == (lhs: JSONTreeElementNode, rhs: JSONTreeElementNode) -> Bool {
@@ -82,9 +81,15 @@ public struct JSONTreeElementNode: JSONTreeNode {
         return true
     }
 
-    public init(type: TreeNodeType, attributes: [String: Any?] = [:], children: [any JSONTreeNode] = []) {
+    public init(type: TreeNodeType, children: [any JSONTreeNode] = [], attributes: [String: Any] = [:]) {
         self.type = type
-        self.attributes = attributes
+        self.attributes = attributes.stringValueTypeDictionary
+        self.children = children
+    }
+
+    public init(type: TreeNodeType, children: [any JSONTreeNode] = [], attributes: Codable) {
+        self.type = type
+        self.attributes = StringValueTypeDictionary.stringifyAttributes(attributes)
         self.children = children
     }
 
@@ -100,20 +105,14 @@ public struct JSONTreeElementNode: JSONTreeNode {
             let sortedKeys = self.attributes.keys.sorted()
 
             let attrsString = sortedKeys.compactMap { key in
-                if let attrs = attributes[key] as? Encodable, let value = attrs.toJSONString {
-                    return "\(key.toJSONString):\(value)"
-                } else if let value = attributes[key] as? Any, JSONSerialization.isValidJSONObject(value),
-                          let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes])
-                {
-                    return "\(key.toJSONString):\(String(data: data, encoding: .utf8) ?? "null")"
-                } else if let value = attributes[key] as? Int {
-                    return "\(key.toJSONString):\(value)"
-                } else if let value = attributes[key] as? Double {
-                    return "\(key.toJSONString):\(value)"
-                } else if let value = attributes[key] as? Bool {
-                    return "\(key.toJSONString):\(value)"
-                } else if let value = attributes[key] as? String {
-                    return "\(key.toJSONString):\(value.toJSONString)"
+                if let value = self.attributes[key] {
+                    let object = value.toJSONObject
+
+                    if object is [String: Any] {
+                        return "\(key.toJSONString):\(value)"
+                    } else {
+                        return "\(key.toJSONString):\(convertToJSONString(object))"
+                    }
                 } else {
                     return "\(key.toJSONString):null"
                 }
@@ -159,7 +158,7 @@ func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context:
     } else if let node = treeNode as? JSONTreeElementNode {
         let attrs = RHT()
 
-        for (key, value) in node.attributes.stringValueTypeDictionary {
+        for (key, value) in node.attributes {
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
@@ -187,7 +186,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
     } else if let node = content as? JSONTreeElementNode {
         let attrs = RHT()
 
-        for (key, value) in node.attributes.stringValueTypeDictionary {
+        for (key, value) in node.attributes {
             attrs.set(key: key, value: value, executedAt: ticket)
         }
 
@@ -303,10 +302,18 @@ public class JSONTree {
         return tree.indexTree
     }
 
+    public func styleByPath(_ path: [Int], _ attributes: Codable) throws {
+        try self.styleByPathInternal(path, StringValueTypeDictionary.stringifyAttributes(attributes))
+    }
+
+    public func styleByPath(_ path: [Int], _ attributes: [String: Any]) throws {
+        try self.styleByPathInternal(path, attributes.stringValueTypeDictionary)
+    }
+
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
      */
-    public func styleByPath(_ path: [Int], _ attributes: [String: Any?]) throws {
+    public func styleByPathInternal(_ path: [Int], _ stringAttrs: [String: String]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -317,8 +324,6 @@ public class JSONTree {
 
         let (fromPos, toPos) = try tree.pathToPosRange(path)
         let ticket = context.issueTimeTicket
-
-        let stringAttrs = attributes.stringValueTypeDictionary
 
         try tree.style((fromPos, toPos), stringAttrs, ticket)
 
@@ -334,7 +339,15 @@ public class JSONTree {
     /**
      * `style` sets the attributes to the elements of the given range.
      */
-    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any?]) throws {
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws {
+        try self.styleInternal(fromIdx, toIdx, StringValueTypeDictionary.stringifyAttributes(attributes))
+    }
+
+    public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any]) throws {
+        try self.styleInternal(fromIdx, toIdx, attributes.stringValueTypeDictionary)
+    }
+
+    func styleInternal(_ fromIdx: Int, _ toIdx: Int, _ stringAttrs: [String: String]) throws {
         guard let context, let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
@@ -346,8 +359,6 @@ public class JSONTree {
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
         let ticket = context.issueTimeTicket
-
-        let stringAttrs = attributes.stringValueTypeDictionary
 
         try tree.style((fromPos, toPos), stringAttrs, ticket)
 

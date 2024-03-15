@@ -310,6 +310,8 @@ final class CRDTTreeNode: IndexTreeNode {
 
             return childClone
         }
+        clone.insPrevID = self.insPrevID
+        clone.insNextID = self.insNextID
 
         return clone
     }
@@ -416,11 +418,7 @@ final class CRDTTreeNode: IndexTreeNode {
         if let attrs = node.attrs?.toObject() {
             for key in attrs.keys.sorted() {
                 if let value = attrs[key]?.value {
-                    if value.first == "\"", value.last == "\"" {
-                        xml += " \(key)=\(value)"
-                    } else {
-                        xml += " \(key)=\"\(value)\""
-                    }
+                    xml += " \(key)=\(value)"
                 }
             }
         }
