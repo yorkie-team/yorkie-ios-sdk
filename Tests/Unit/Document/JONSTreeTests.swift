@@ -24,16 +24,15 @@ final class JONSTreeTests: XCTestCase {
         XCTAssertEqual(textNode.toJSONString, "{\"type\":\"text\",\"value\":\"X\"}")
 
         let elementNode = JSONTreeElementNode(type: "doc",
-                                              attributes: [
+                                              children: [
+                                                  JSONTreeElementNode(type: "p"),
+                                                  JSONTreeTextNode(value: "Y")
+                                              ], attributes: [
                                                   "intValue": 100,
                                                   "doubleValue": 10.5,
                                                   "boolean": true,
                                                   "string": "testString",
                                                   "point": ["x": 100, "y": 200]
-                                              ],
-                                              children: [
-                                                  JSONTreeElementNode(type: "p"),
-                                                  JSONTreeTextNode(value: "Y")
                                               ])
 
         XCTAssertEqual(elementNode.toJSONString, "{\"type\":\"doc\",\"children\":[{\"type\":\"p\",\"children\":[]},{\"type\":\"text\",\"value\":\"Y\"}],\"attributes\":{\"boolean\":true,\"doubleValue\":10.5,\"intValue\":100,\"point\":{\"x\":100,\"y\":200},\"string\":\"testString\"}}")
