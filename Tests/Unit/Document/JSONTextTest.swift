@@ -113,21 +113,26 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root, _ in root.text = JSONText() }
 
-        await doc.subscribe("$.text") {
-            view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
-        }
-
-        let commands: [(from: Int, to: Int, content: String)] = [
-            (from: 0, to: 0, content: "ABC"),
-            (from: 3, to: 3, content: "DEF"),
-            (from: 2, to: 4, content: "1"),
-            (from: 1, to: 4, content: "2")
+        let commands: [(from: Int, to: Int, content: String, exp: XCTestExpectation)] = [
+            (from: 0, to: 0, content: "ABC", expectation(description: "1")),
+            (from: 3, to: 3, content: "DEF", expectation(description: "2")),
+            (from: 2, to: 4, content: "1", expectation(description: "3")),
+            (from: 1, to: 4, content: "2", expectation(description: "4"))
         ]
 
-        for cmd in commands {
+        var eventCount = 0
+        await doc.subscribe("$.text") { event, _ in
+            view.applyChanges(operations: (event as! ChangeEvent).value.operations)
+            commands[eventCount].exp.fulfill()
+            eventCount += 1
+        }
+
+        for (index, cmd) in commands.enumerated() {
             try await doc.update { root, _ in
                 (root.text as? JSONText)?.edit(cmd.from, cmd.to, cmd.content)
             }
+
+            await fulfillment(of: [commands[index].exp], timeout: 1_000_000_000)
 
             let text = await(doc.getRoot()["text"] as? JSONText)?.toString
             XCTAssertEqual(view.toString, text)
@@ -140,8 +145,8 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root, _ in root.text = JSONText() }
 
-        await doc.subscribe("$.text") {
-            view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
+        await doc.subscribe("$.text") { event, _ in
+            view.applyChanges(operations: (event as! ChangeEvent).value.operations)
         }
 
         let commands: [(from: Int, to: Int, content: String)] = [
@@ -165,6 +170,8 @@ final class JSONTextTest: XCTestCase {
             }
 
             let text = await(doc.getRoot()["text"] as? JSONText)?.toString
+
+            try await Task.sleep(nanoseconds: 50_000_000)
             XCTAssertEqual(view.toString, text)
         }
     }
@@ -175,8 +182,8 @@ final class JSONTextTest: XCTestCase {
 
         try await doc.update { root, _ in root.text = JSONText() }
 
-        await doc.subscribe("$.text") {
-            view.applyChanges(operations: ($0 as! ChangeEvent).value.operations)
+        await doc.subscribe("$.text") { event, _ in
+            view.applyChanges(operations: (event as! ChangeEvent).value.operations)
         }
 
         let commands: [(from: Int, to: Int, content: String)] = [
@@ -195,6 +202,8 @@ final class JSONTextTest: XCTestCase {
             try await doc.update { root, _ in
                 (root.text as? JSONText)?.edit(cmd.from, cmd.to, cmd.content)
             }
+
+            try await Task.sleep(nanoseconds: 50_000_000)
 
             let text = await(doc.getRoot()["text"] as? JSONText)?.toString
             XCTAssertEqual(view.toString, text)

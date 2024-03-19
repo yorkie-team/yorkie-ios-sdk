@@ -67,7 +67,7 @@ public enum PresenceSubscriptionType: String {
  *
  */
 public actor Document {
-    typealias SubscribeCallback = (DocEvent) -> Void
+    public typealias SubscribeCallback = (DocEvent, isolated Document) async -> Void
 
     private let key: DocumentKey
     private(set) var status: DocumentStatus
@@ -166,7 +166,7 @@ public actor Document {
      * `subscribe` registers a callback to subscribe to events on the document.
      * The callback will be called when the targetPath or any of its nested values change.
      */
-    public func subscribe(_ targetPath: String? = nil, _ callback: @escaping (DocEvent) -> Void) {
+    public func subscribe(_ targetPath: String? = nil, _ callback: @escaping SubscribeCallback) {
         if let targetPath {
             self.subscribeCallbacks[targetPath] = callback
         } else {
@@ -178,7 +178,7 @@ public actor Document {
      * `subscribePresence` registers a callback to subscribe to events on the document.
      * The callback will be called when the targetPath or any of its nested values change.
      */
-    public func subscribePresence(_ type: PresenceSubscriptionType = .presence, _ callback: @escaping (DocEvent) -> Void) {
+    public func subscribePresence(_ type: PresenceSubscriptionType = .presence, _ callback: @escaping SubscribeCallback) {
         self.presenceSubscribeCallback[type.rawValue] = callback
     }
 
@@ -529,7 +529,11 @@ public actor Document {
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
         if presenceEvents.contains(event.type) {
-            self.presenceSubscribeCallback[PresenceSubscriptionType.presence.rawValue]?(event)
+            if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.presence.rawValue] {
+                Task {
+                    await callback(event, self)
+                }
+            }
 
             if let id = self.changeID.getActorID() {
                 var isMine = false
@@ -550,11 +554,19 @@ public actor Document {
                 }
 
                 if isMine {
-                    self.presenceSubscribeCallback[PresenceSubscriptionType.myPresence.rawValue]?(event)
+                    if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.myPresence.rawValue] {
+                        Task {
+                            await callback(event, self)
+                        }
+                    }
                 }
 
                 if isOthers {
-                    self.presenceSubscribeCallback[PresenceSubscriptionType.others.rawValue]?(event)
+                    if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.others.rawValue] {
+                        Task {
+                            await callback(event, self)
+                        }
+                    }
                 }
             }
         } else {
@@ -574,14 +586,25 @@ public actor Document {
                     for (key, value) in operations {
                         let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
 
-                        self.subscribeCallbacks[key]?(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info))
+                        if let callback = self.subscribeCallbacks[key] {
+                            Task {
+                                await callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
+                            }
+                        }
                     }
                 }
             } else {
-                self.subscribeCallbacks["$"]?(event)
+                if let callback = self.subscribeCallbacks["$"] {
+                    Task {
+                        await callback(event, self)
+                    }
+                }
             }
-
-            self.defaultSubscribeCallback?(event)
+            if let callback = self.defaultSubscribeCallback {
+                Task {
+                    await callback(event, self)
+                }
+            }
         }
     }
 

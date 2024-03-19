@@ -731,13 +731,13 @@ class DocumentTests: XCTestCase {
         var eventCount = 0
         let paths = [["$", "$.", "$..obj"], ["$..obj", "$..obj", "$..obj", "$."]]
 
-        await target.subscribe { event in
+        await target.subscribe { event, _ in
             XCTAssertEqual(event.type, .localChange)
             XCTAssertEqual((event as? LocalChangeEvent)?.value.operations.compactMap { $0.path }, paths[eventCount])
             eventCount += 1
         }
 
-        await target.subscribe("$.") { _ in
+        await target.subscribe("$.") { _, _ in
             Task {
                 let array = try? await target.getValueByPath("$.") as? JSONObject
 
@@ -812,7 +812,7 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_array() async throws {
         let target = Document(key: "test-doc")
 
-        await target.subscribe { event in
+        await target.subscribe { event, _ in
             XCTAssertEqual(event.type, .localChange)
 
             if let ops = (event as? LocalChangeEvent)?.value.operations {
@@ -827,7 +827,7 @@ class DocumentTests: XCTestCase {
             }
         }
 
-        await target.subscribe("$.arr") { event in
+        await target.subscribe("$.arr") { event, _ in
             XCTAssertEqual(event.type, .localChange)
 
             if let ops = (event as? LocalChangeEvent)?.value.operations {
@@ -859,7 +859,7 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_counter() async throws {
         let target = Document(key: "test-doc")
 
-        await target.subscribe { event in
+        await target.subscribe { event, _ in
             XCTAssertEqual(event.type, .localChange)
 
             if let ops = (event as? LocalChangeEvent)?.value.operations {
@@ -887,7 +887,7 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_text() async throws {
         let target = Document(key: "test-doc")
 
-        await target.subscribe { event in
+        await target.subscribe { event, _ in
             XCTAssertEqual(event.type, .localChange)
 
             if let ops = (event as? LocalChangeEvent)?.value.operations {
@@ -911,7 +911,7 @@ class DocumentTests: XCTestCase {
     func test_change_paths_test_for_text_with_attributes() async throws {
         let target = Document(key: "test-doc")
 
-        await target.subscribe { event in
+        await target.subscribe { event, _ in
             XCTAssertEqual(event.type, .localChange)
 
             if let ops = (event as? LocalChangeEvent)?.value.operations {

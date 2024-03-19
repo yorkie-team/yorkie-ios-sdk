@@ -114,7 +114,7 @@ func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationI
     var d1Operations: [any OperationInfo] = []
     var d1Index = 0
 
-    await d1.subscribe("$.t") { event in
+    await d1.subscribe("$.t") { event, _ in
         if let event = event as? LocalChangeEvent {
             d1Operations.append(contentsOf: event.value.operations)
         } else if let event = event as? RemoteChangeEvent {
@@ -135,7 +135,7 @@ func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationI
     var d2Operations: [any OperationInfo] = []
     var d2Index = 0
 
-    await d2.subscribe("$.t") { event in
+    await d2.subscribe("$.t") { event, _ in
         if let event = event as? LocalChangeEvent {
             d2Operations.append(contentsOf: event.value.operations.compactMap { $0 as? TreeEditOpInfo })
         } else if let event = event as? RemoteChangeEvent {

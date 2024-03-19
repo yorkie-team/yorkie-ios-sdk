@@ -449,7 +449,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         var d1EventCount = 0
         var d1lastEvent: DocEvent?
-        await d1.subscribe { event in
+        await d1.subscribe { event, _ in
             d1EventCount += 1
             d1lastEvent = event
 
@@ -460,7 +460,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         var d2EventCount = 0
         var d2lastEvent: DocEvent?
-        await d2.subscribe { event in
+        await d2.subscribe { event, _ in
             d2EventCount += 1
             d2lastEvent = event
 
@@ -498,7 +498,7 @@ final class ClientIntegrationTests: XCTestCase {
             try await c2.pauseRemoteChanges(d2)
             var remoteChangeOccured = false
 
-            await d2.subscribe { event in
+            await d2.subscribe { event, _ in
                 if event.type == .remoteChange {
                     remoteChangeOccured = true
                 }
