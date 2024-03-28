@@ -67,7 +67,7 @@ public enum PresenceSubscriptionType: String {
  *
  */
 public actor Document {
-    public typealias SubscribeCallback = (DocEvent, isolated Document) async -> Void
+    public typealias SubscribeCallback = (DocEvent, isolated Document) -> Void
 
     private let key: DocumentKey
     private(set) var status: DocumentStatus
@@ -530,9 +530,7 @@ public actor Document {
 
         if presenceEvents.contains(event.type) {
             if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.presence.rawValue] {
-                Task {
-                    await callback(event, self)
-                }
+                callback(event, self)
             }
 
             if let id = self.changeID.getActorID() {
@@ -555,17 +553,13 @@ public actor Document {
 
                 if isMine {
                     if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.myPresence.rawValue] {
-                        Task {
-                            await callback(event, self)
-                        }
+                        callback(event, self)
                     }
                 }
 
                 if isOthers {
                     if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.others.rawValue] {
-                        Task {
-                            await callback(event, self)
-                        }
+                        callback(event, self)
                     }
                 }
             }
@@ -587,23 +581,17 @@ public actor Document {
                         let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
 
                         if let callback = self.subscribeCallbacks[key] {
-                            Task {
-                                await callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
-                            }
+                            callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
                         }
                     }
                 }
             } else {
                 if let callback = self.subscribeCallbacks["$"] {
-                    Task {
-                        await callback(event, self)
-                    }
+                    callback(event, self)
                 }
             }
             if let callback = self.defaultSubscribeCallback {
-                Task {
-                    await callback(event, self)
-                }
+                callback(event, self)
             }
         }
     }
