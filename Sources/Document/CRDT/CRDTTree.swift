@@ -250,7 +250,8 @@ final class CRDTTreeNode: IndexTreeNode {
             }
 
             self.innerValue = newValue
-            self.size = newValue.count
+            // Yorkie use UTF16 for String.
+            self.size = newValue.utf16.count
         }
     }
 
