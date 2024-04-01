@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import Foundation
+
 /**
  * About `index`, `path`, `size` and `TreePos` in crdt.IndexTree.
  *
@@ -125,7 +127,7 @@ protocol IndexTreeNode: AnyObject {
     // For extension
     var isRemoved: Bool { get }
     var type: TreeNodeType { get }
-    var value: String { get set }
+    var value: NSString { get set }
     var innerChildren: [Self] { get set }
 
     func cloneText(offset: Int32) -> Self
@@ -192,10 +194,10 @@ extension IndexTreeNode {
             return nil
         }
 
-        let leftValue = String(self.value.substring(from: 0, to: Int(offset) - 1))
-        let rightValue = String(self.value.substring(from: Int(offset), to: self.value.count - 1))
+        let leftValue = self.value.substring(to: Int(offset)) as NSString
+        let rightValue = self.value.substring(from: Int(offset)) as NSString
 
-        if rightValue.isEmpty {
+        if rightValue.length == 0 {
             return nil
         }
 

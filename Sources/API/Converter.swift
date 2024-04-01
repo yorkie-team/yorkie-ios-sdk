@@ -896,7 +896,7 @@ extension Converter {
             pbTreeNode.id = toTreeNodeID(node.id)
             pbTreeNode.type = node.type
             if node.isText {
-                pbTreeNode.value = node.value
+                pbTreeNode.value = node.value as String
             }
             if let id = node.insPrevID {
                 pbTreeNode.insPrevID = toTreeNodeID(id)
@@ -985,7 +985,7 @@ extension Converter {
         let node = CRDTTreeNode(id: id, type: pbTreeNode.type)
 
         if node.isText {
-            node.value = pbTreeNode.value
+            node.value = pbTreeNode.value as NSString
         } else {
             node.attrs = RHT()
             
