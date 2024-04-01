@@ -132,14 +132,18 @@ public struct JSONTreeElementNode: JSONTreeNode {
  */
 public struct JSONTreeTextNode: JSONTreeNode {
     public let type = DefaultTreeNodeType.text.rawValue
-    public let value: String
+    public let value: NSString
 
     public init(value: String) {
+        self.value = value as NSString
+    }
+
+    public init(value: NSString) {
         self.value = value
     }
 
     public var toJSONString: String {
-        return "{\"type\":\(self.type.toJSONString),\"value\":\(self.value.toJSONString)}"
+        return "{\"type\":\(self.type.toJSONString),\"value\":\((self.value as String).toJSONString)}"
     }
 }
 
@@ -206,7 +210,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
  * `validateTextNode` ensures that a text node has a non-empty string value.
  */
 func validateTextNode(_ textNode: JSONTreeTextNode) throws {
-    if textNode.value.isEmpty {
+    if textNode.value.length == 0 {
         throw YorkieError.unexpected(message: "text node cannot have empty value")
     }
 }
@@ -393,7 +397,7 @@ public class JSONTree {
         if let contents = contents as? [JSONTreeTextNode] {
             var compVal = ""
             for content in contents {
-                compVal += content.value
+                compVal += content.value as String
             }
 
             crdtNodes = try [createCRDTTreeNode(context: context, content: JSONTreeTextNode(value: compVal))]

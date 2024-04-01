@@ -235,7 +235,7 @@ final class CRDTTreeNode: IndexTreeNode {
     var size: Int
     weak var parent: CRDTTreeNode?
     var type: TreeNodeType
-    var value: String {
+    var value: NSString {
         get {
             if self.isText == false {
                 fatalError("cannot get value of element node: \(self.type)")
@@ -251,11 +251,11 @@ final class CRDTTreeNode: IndexTreeNode {
 
             self.innerValue = newValue
             // Yorkie use UTF16 for String.
-            self.size = newValue.utf16.count
+            self.size = newValue.length
         }
     }
 
-    var innerValue: String
+    var innerValue: NSString
 
     var innerChildren: [CRDTTreeNode]
 
@@ -273,7 +273,7 @@ final class CRDTTreeNode: IndexTreeNode {
      */
     var insNextID: CRDTTreeNodeID?
 
-    init(id: CRDTTreeNodeID, type: TreeNodeType, value: String? = nil, children: [CRDTTreeNode]? = nil, attributes: RHT? = nil, removedAt: TimeTicket? = nil) {
+    init(id: CRDTTreeNodeID, type: TreeNodeType, value: NSString? = nil, children: [CRDTTreeNode]? = nil, attributes: RHT? = nil, removedAt: TimeTicket? = nil) {
         self.size = 0
         self.innerValue = ""
         self.parent = nil
@@ -412,7 +412,7 @@ final class CRDTTreeNode: IndexTreeNode {
      */
     static func toXML(node: CRDTTreeNode) -> String {
         if node.isText {
-            return node.value
+            return node.value as String
         }
 
         var xml = "<\(node.type)"
@@ -439,7 +439,7 @@ final class CRDTTreeNode: IndexTreeNode {
     static func toTestTreeNode(_ node: CRDTTreeNode) -> TreeNodeForTest {
         if node.isText {
             return TreeNodeForTest(type: node.type,
-                                   value: node.value,
+                                   value: node.value as String,
                                    size: node.size,
                                    isRemoved: node.isRemoved)
         } else {
@@ -452,7 +452,7 @@ final class CRDTTreeNode: IndexTreeNode {
 
     var toJSONString: String {
         if self.type == DefaultTreeNodeType.text.rawValue {
-            return "{\"type\":\(self.type.toJSONString),\"value\":\(self.value.toJSONString)}"
+            return "{\"type\":\(self.type.toJSONString),\"value\":\((self.value as String).toJSONString)}"
         } else {
             var childrenString = ""
             if children.isEmpty == false {
