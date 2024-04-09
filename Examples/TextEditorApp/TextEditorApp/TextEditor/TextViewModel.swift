@@ -56,7 +56,7 @@ class TextViewModel {
             }
 
             // subscribe document event.
-            await self.document.subscribe { [weak self] event in
+            await self.document.subscribe { [weak self] event, _ in
                 switch event.type {
                 case .snapshot, .remoteChange:
                     Task { [weak self] in
@@ -67,7 +67,7 @@ class TextViewModel {
                 }
             }
 
-            await self.document.subscribePresence(.others) { [weak self] event in
+            await self.document.subscribePresence(.others) { [weak self] event, _ in
                 if let event = event as? PresenceChangedEvent {
                     if let fromPos: TextPosStruct = self?.decodePresence(event.value.presence["from"]),
                        let toPos: TextPosStruct = self?.decodePresence(event.value.presence["to"])
