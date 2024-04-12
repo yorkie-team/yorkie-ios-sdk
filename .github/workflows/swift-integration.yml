@@ -17,7 +17,7 @@ jobs:
     - name: Setup Yorkie Server
       run: brew install yorkie
     - name: Run Yorkie Server
-      run: yorkie server
+      run: yorkie server &
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
     
