@@ -8,8 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
+    - uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: '15.3'
     - uses: actions/checkout@v4
     - name: SwiftLint
       run: swiftlint lint --strict
