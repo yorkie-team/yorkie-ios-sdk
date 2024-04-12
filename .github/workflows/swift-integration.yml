@@ -16,11 +16,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: Setup Yorkie Server
       run: brew install yorkie
-    - name: Run Yorkie Server
-      uses: BerniWittmann/background-server-action@v1
-      with: 
-	start: yorkie server
     - name: Run tests
-      run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
-    
-
+      uses: BerniWittmann/background-server-action@v1
+      with:
+        command: swift test --enable-code-coverage -v --filter YorkieIntegrationTests 
+	start: yorkie server
