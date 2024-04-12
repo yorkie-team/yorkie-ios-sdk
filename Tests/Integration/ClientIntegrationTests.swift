@@ -220,13 +220,13 @@ final class ClientIntegrationTests: XCTestCase {
         ]
 
         let exp = self.expectation(description: "exp")
-        
+
         c1.eventStream.sink { event in
             switch event {
             case let event as StreamConnectionStatusChangedEvent:
                 XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
                 c1NumberOfEvents += 1
-                
+
                 if c1NumberOfEvents == c1ExpectedValues.count {
                     exp.fulfill()
                 }
@@ -244,7 +244,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.detach(d1)
 
         try await c1.deactivate()
-        
+
         await fulfillment(of: [exp], timeout: 10)
     }
 
