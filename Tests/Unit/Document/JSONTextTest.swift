@@ -132,7 +132,7 @@ final class JSONTextTest: XCTestCase {
                 (root.text as? JSONText)?.edit(cmd.from, cmd.to, cmd.content)
             }
 
-            await fulfillment(of: [commands[index].exp], timeout: 1_000_000_000)
+            await fulfillment(of: [commands[index].exp], timeout: 2)
 
             let text = await(doc.getRoot()["text"] as? JSONText)?.toString
             XCTAssertEqual(view.toString, text)

@@ -517,7 +517,7 @@ final class ClientIntegrationTests: XCTestCase {
         // but a response has not yet been received.
         try await c2.sync()
 
-        await fulfillment(of: [expect3])
+        await fulfillment(of: [expect3], timeout: 10)
 
         try await d2.update { root, _ in
             try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
