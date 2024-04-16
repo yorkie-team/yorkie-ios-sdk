@@ -573,39 +573,7 @@ class CRDTTree: CRDTGCElement {
      */
     @discardableResult
     func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
-        var changes: [TreeChange] = []
-
-        var value: TreeChangeValue?
-
-        if let attributes {
-            value = .attributes(attributes)
-        }
-
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
-            let (node, _) = token
-            if node.isRemoved == false, node.isText == false, let attributes {
-                if node.attrs == nil {
-                    node.attrs = RHT()
-                }
-                for (key, value) in attributes {
-                    node.attrs?.set(key: key, value: value, executedAt: editedAt)
-                }
-
-                try changes.append(TreeChange(actor: editedAt.actorID,
-                                              type: .style,
-                                              from: self.toIndex(fromParent, fromLeft),
-                                              to: self.toIndex(toParent, toLeft),
-                                              fromPath: self.toPath(fromParent, fromLeft),
-                                              toPath: self.toPath(toParent, toLeft),
-                                              value: value,
-                                              splitLevel: 0) // dummy value.
-                )
-            }
-        }
-
-        return changes
+        try self.performChangeStyle(range, attributes, nil, editedAt)
     }
 
     /**
@@ -613,11 +581,26 @@ class CRDTTree: CRDTGCElement {
      */
     @discardableResult
     func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket) throws -> [TreeChange] {
+        try self.performChangeStyle(range, nil, attributesToRemove, editedAt)
+    }
+
+    private func performChangeStyle(_ range: TreePosRange, _ attributes: [String: String]?, _ attributesToRemove: [String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
         var changes: [TreeChange] = []
-        let actorID = editedAt.actorID
-        let value: TreeChangeValue = .attributesToRemove(attributesToRemove)
+
+        let value: TreeChangeValue?
+        let type: TreeChangeType
+
+        if let attributes {
+            value = .attributes(attributes)
+            type = .style
+        } else if let attributesToRemove {
+            value = .attributesToRemove(attributesToRemove)
+            type = .removeStyle
+        } else {
+            fatalError()
+        }
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
@@ -625,12 +608,15 @@ class CRDTTree: CRDTGCElement {
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
-                for key in attributesToRemove {
+                for (key, value) in attributes ?? [:] {
+                    node.attrs?.set(key: key, value: value, executedAt: editedAt)
+                }
+                for key in attributesToRemove ?? [] {
                     node.attrs?.remove(key: key, executedAt: editedAt)
                 }
 
-                try changes.append(TreeChange(actor: actorID,
-                                              type: .removeStyle,
+                try changes.append(TreeChange(actor: editedAt.actorID,
+                                              type: type,
                                               from: self.toIndex(fromParent, fromLeft),
                                               to: self.toIndex(toParent, toLeft),
                                               fromPath: self.toPath(fromParent, fromLeft),
