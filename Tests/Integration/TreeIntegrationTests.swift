@@ -1146,11 +1146,10 @@ final class TreeIntegrationStyleTests: XCTestCase {
     func test_can_handle_client_reload_case() async throws {
         let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: options)
-        let c2 = Client(rpcAddress: rpcAddress, options: options)
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
 
         try await c1.activate()
         try await c2.activate()
@@ -1158,8 +1157,8 @@ final class TreeIntegrationStyleTests: XCTestCase {
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        try await c1.attach(d1, [:], false)
-        try await c2.attach(d2, [:], false)
+        try await c1.attach(d1, [:], .manual)
+        try await c2.attach(d2, [:], .manual)
 
         // Perform a dummy update to apply changes up to the snapshot threshold.
         let snapshotThreshold = 500
@@ -1276,10 +1275,10 @@ final class TreeIntegrationStyleTests: XCTestCase {
         XCTAssertEqual(d2XML, /* html */ "<r><c><u><p><n></n></p></u></c><c><p><n>1 카카오2 네이3</n></p></c></r>")
 
         // A new client has been added.
-        let c3 = Client(rpcAddress: rpcAddress, options: options)
+        let c3 = Client(rpcAddress)
         try await c3.activate()
         let d3 = Document(key: docKey)
-        try await c3.attach(d3, [:], false)
+        try await c3.attach(d3, [:], .manual)
 
         var d3XML = await(d3.getRoot().t as? JSONTree)?.toXML()
 

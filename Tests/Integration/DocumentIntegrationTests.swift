@@ -33,7 +33,7 @@ final class DocumentIntegrationTests: XCTestCase {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress, options)
 
         self.d1 = Document(key: docKey)
 
@@ -96,11 +96,10 @@ final class DocumentIntegrationTests: XCTestCase {
     }
 
     func test_removed_document_creation() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         try await self.c1.activate()
         try await self.c2.activate()
@@ -137,11 +136,10 @@ final class DocumentIntegrationTests: XCTestCase {
     }
 
     func test_removed_document_pushpull() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         try await self.c1.activate()
         try await self.c2.activate()
@@ -187,11 +185,10 @@ final class DocumentIntegrationTests: XCTestCase {
     }
 
     func test_removed_document_detachment() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         try await self.c1.activate()
         try await self.c2.activate()
@@ -232,11 +229,10 @@ final class DocumentIntegrationTests: XCTestCase {
     }
 
     func test_removed_document_removal() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         try await self.c1.activate()
         try await self.c2.activate()
@@ -284,10 +280,9 @@ final class DocumentIntegrationTests: XCTestCase {
     //           └───────────┘ └─────┘
     //              Detach     PushPull
     func test_document_state_transition() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
 
         try await self.c1.activate()
 
@@ -367,11 +362,10 @@ final class DocumentIntegrationTests: XCTestCase {
     }
 
     func test_specify_the_topic_to_subscribe_to() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         try await self.c1.activate()
         try await self.c2.activate()

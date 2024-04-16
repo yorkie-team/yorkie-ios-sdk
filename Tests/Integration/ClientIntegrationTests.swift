@@ -23,317 +23,231 @@ final class ClientIntegrationTests: XCTestCase {
 
     let rpcAddress = RPCAddress(host: "localhost", port: 8080)
 
+    func test_can_be_activated_decativated() async throws {
+        var options = ClientOptions()
+        let clientKey = "\(self.description)-\(Date().description)"
+        options.key = clientKey
+        options.syncLoopDuration = 50
+        options.reconnectStreamDelay = 1000
+
+        let clientWithKey = Client(self.rpcAddress, options)
+
+        var boolResult = await clientWithKey.isActive
+        XCTAssertFalse(boolResult)
+        try await clientWithKey.activate()
+        boolResult = await clientWithKey.isActive
+        XCTAssertTrue(boolResult)
+        var key = clientWithKey.key
+        XCTAssertEqual(key, clientKey)
+        try await clientWithKey.deactivate()
+        boolResult = await clientWithKey.isActive
+        XCTAssertFalse(boolResult)
+
+        let clientWithoutKey = Client(self.rpcAddress)
+
+        boolResult = await clientWithoutKey.isActive
+        XCTAssertFalse(boolResult)
+        try await clientWithoutKey.activate()
+        boolResult = await clientWithoutKey.isActive
+        XCTAssertTrue(boolResult)
+        key = clientWithoutKey.key
+        XCTAssertEqual(key.count, 36)
+        try await clientWithoutKey.deactivate()
+        boolResult = await clientWithoutKey.isActive
+        XCTAssertFalse(boolResult)
+    }
+
     func test_can_handle_sync() async throws {
-        let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
-
-        let c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        let c2 = Client(rpcAddress: self.rpcAddress, options: options)
-
-        let d1 = Document(key: docKey)
-        try await d1.update { root, _ in
-            root.k1 = ""
-            root.k2 = ""
-            root.k3 = ""
-        }
-
-        let d2 = Document(key: docKey)
-        try await d1.update { root, _ in
-            root.k1 = ""
-            root.k2 = ""
-            root.k3 = ""
-        }
-
-        try await c1.activate()
-        try await c2.activate()
-
-        try await c1.attach(d1, [:], false)
-        try await c2.attach(d2, [:], false)
-
-        try await d1.update { root, _ in
-            root.k1 = "v1"
-        }
-
-        try await c1.sync()
-        try await c2.sync()
-
-        var result = await d2.getRoot().get(key: "k1") as? String
-        XCTAssert(result == "v1")
-
-        try await d1.update { root, _ in
-            root.k2 = "v2"
-        }
-
-        try await c1.sync()
-        try await c2.sync()
-
-        result = await d2.getRoot().get(key: "k2") as? String
-        XCTAssert(result == "v2")
-
-        try await d1.update { root, _ in
-            root.k3 = "v3"
-        }
-
-        try await c1.sync()
-        try await c2.sync()
-
-        result = await d2.getRoot().get(key: "k3") as? String
-        XCTAssert(result == "v3")
-
-        try await c1.detach(d1)
-        try await c2.detach(d2)
-
-        try await c1.deactivate()
-        try await c2.deactivate()
-    }
-
-    func test_can_handle_sync_auto() async throws {
-        let options = ClientOptions()
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
-
-        let c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        let c2 = Client(rpcAddress: self.rpcAddress, options: options)
-
-        let d1 = Document(key: docKey)
-        try await d1.update { root, _ in
-            root.k1 = ""
-            root.k2 = ""
-            root.k3 = ""
-        }
-
-        let d2 = Document(key: docKey)
-        try await d1.update { root, _ in
-            root.k1 = ""
-            root.k2 = ""
-            root.k3 = ""
-        }
-
-        try await c1.activate()
-        try await c2.activate()
-
-        try await c1.attach(d1)
-        try await c2.attach(d2)
-
-        try await d1.update { root, _ in
-            root.k1 = "v1"
-            root.k2 = "v2"
-            root.k3 = "v3"
-        }
-
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        var result = await d2.getRoot().get(key: "k1") as? String
-        XCTAssert(result == "v1")
-        result = await d2.getRoot().get(key: "k2") as? String
-        XCTAssert(result == "v2")
-        result = await d2.getRoot().get(key: "k3") as? String
-        XCTAssert(result == "v3")
-
-        try await d1.update { root, _ in
-            root.integer = Int32.max
-            root.long = Int64.max
-            root.double = Double.pi
-        }
-
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        let resultInteger = await d2.getRoot().get(key: "integer") as? Int32
-        XCTAssert(resultInteger == Int32.max)
-        let resultLong = await d2.getRoot().get(key: "long") as? Int64
-        XCTAssert(resultLong == Int64.max)
-        let resultDouble = await d2.getRoot().get(key: "double") as? Double
-        XCTAssert(resultDouble == Double.pi)
-
-        let curr = Date()
-
-        try await d1.update { root, _ in
-            root.true = true
-            root.false = false
-            root.date = curr
-        }
-
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        let resultTrue = await d2.getRoot().get(key: "true") as? Bool
-        XCTAssert(resultTrue == true)
-        let resultFalse = await d2.getRoot().get(key: "false") as? Bool
-        XCTAssert(resultFalse == false)
-        let resultDate = await d2.getRoot().get(key: "date") as? Date
-        XCTAssert(resultDate?.trimedLessThanMilliseconds == curr.trimedLessThanMilliseconds)
-
-        try await c1.detach(d1)
-        try await c2.detach(d2)
-
-        try await c1.deactivate()
-        try await c2.deactivate()
-    }
-
-    func test_stream_connection_evnts() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
-
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-
-        var eventCount = 0
-
-        c1.eventStream.sink { event in
-            switch event {
-            case let event as StreamConnectionStatusChangedEvent:
-                eventCount += 1
-                switch event.value {
-                case .connected:
-                    XCTAssertEqual(eventCount, 1)
-                case .disconnected:
-                    XCTAssertEqual(eventCount, 2)
-                }
-            default:
-                break
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.k1 = "v1"
             }
-        }.store(in: &self.cancellables)
 
-        try await c1.activate()
+            try await c1.sync()
+            try await c2.sync()
 
-        let d1 = Document(key: docKey)
+            var d1JSON = await d1.toSortedJSON()
+            var d2JSON = await d2.toSortedJSON()
 
-        try await c1.attach(d1)
+            XCTAssertEqual(d1JSON, d2JSON)
 
-        try await c1.detach(d1)
-        try await c1.deactivate()
-
-        XCTAssertEqual(eventCount, 2)
-    }
-
-    func test_client_pause_resume() async throws {
-        let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
-
-        try await c1.activate()
-
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
-
-        let d1 = Document(key: docKey)
-
-        var c1NumberOfEvents = 0
-        let c1ExpectedValues = [
-            StreamConnectionStatus.connected,
-            StreamConnectionStatus.disconnected,
-            StreamConnectionStatus.connected,
-            StreamConnectionStatus.disconnected
-        ]
-
-        let exp = self.expectation(description: "exp")
-
-        c1.eventStream.sink { event in
-            switch event {
-            case let event as StreamConnectionStatusChangedEvent:
-                XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
-                c1NumberOfEvents += 1
-
-                if c1NumberOfEvents == c1ExpectedValues.count {
-                    exp.fulfill()
-                }
-            default:
-                break
+            try await d1.update { root, _ in
+                root.k2 = "v2"
             }
-        }.store(in: &self.cancellables)
 
-        try await c1.attach(d1)
+            try await c1.sync()
+            try await c2.sync()
 
-        try await c1.pause(d1)
+            d1JSON = await d1.toSortedJSON()
+            d2JSON = await d2.toSortedJSON()
 
-        try await c1.resume(d1)
+            XCTAssertEqual(d1JSON, d2JSON)
 
-        try await c1.detach(d1)
+            try await d1.update { root, _ in
+                root.k3 = "v3"
+            }
 
-        try await c1.deactivate()
+            try await c1.sync()
+            try await c2.sync()
 
-        await fulfillment(of: [exp], timeout: 10)
+            d1JSON = await d1.toSortedJSON()
+            d2JSON = await d2.toSortedJSON()
+
+            XCTAssertEqual(d1JSON, d2JSON)
+        }
     }
 
-    func test_should_apply_previous_changes_when_resuming_document() async throws {
-        let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+    /*
+     func test_can_recover_from_temporary_disconnect_realtime_sync() async throws {
+         let c1 = Client(rpcAddress)
+         let c2 = Client(rpcAddress)
+         try await c1.activate()
+         try await c2.activate()
 
+         let docKey = "\(self.description)-\(Date().description)".toDocKey
+         let d1 = Document(key: docKey)
+         let d2 = Document(key: docKey)
+
+         try await c1.attach(d1)
+         try await c2.attach(d2)
+
+         let d1Exp = self.expectation(description: "D1 exp 1")
+         let d2Exp = self.expectation(description: "D2 exp 1")
+
+         var d1EventCount = 0
+         var d2EventCount = 0
+
+         await d1.subscribe { event, _ in
+             d1EventCount += 1
+
+             if event is RemoteChangeEvent {
+                 d1Exp.fulfill()
+             }
+         }
+
+         await d2.subscribe { event, _ in
+             d2EventCount += 1
+
+             if event is LocalChangeEvent {
+                 d2Exp.fulfill()
+             }
+         }
+
+         // Normal Condition
+         try await d2.update { root, _ in
+             root.k1 = "undefined"
+         }
+
+         await fulfillment(of: [d1Exp, d2Exp], timeout: 5)
+
+         var d1JSON = await d1.toSortedJSON()
+         var d2JSON = await d2.toSortedJSON()
+
+         XCTAssertEqual(d1JSON, d2JSON)
+     }
+     */
+
+    func test_can_change_sync_mode_realtime_manual() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
-
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        let exps = [self.expectation(description: "Exp 1"), self.expectation(description: "Exp 2"), self.expectation(description: "Exp 3")]
-        var expCount = 0
+        // 01. c1 and c2 attach the doc with manual sync mode.
+        //     c1 updates the doc, but c2 does't get until call sync manually.
+        try await c1.attach(d1, [:], .manual)
+        try await c2.attach(d2, [:], .manual)
 
-        c2.eventStream.sink { event in
-            if event.type == .documentSynced {
-                exps[safe: expCount]?.fulfill()
-                expCount += 1
-            }
-        }.store(in: &self.cancellables)
-
-        // 01. c2 attach the doc with realtime sync mode at first.
-        try await c1.attach(d1, [:], false)
-        try await c2.attach(d2)
         try await d1.update { root, _ in
             root.version = "v1"
         }
+
+        var d1JSON = await d1.toSortedJSON()
+        var d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"version\":\"v1\"}")
+        XCTAssertEqual(d2JSON, "{}")
+
         try await c1.sync()
-        await fulfillment(of: [exps[0]], timeout: 1.5)
+        try await c2.sync()
 
-        var d1Doc = await d1.toSortedJSON()
-        var d2Doc = await d2.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d2JSON, "{\"version\":\"v1\"}")
 
-        XCTAssertEqual(d1Doc, "{\"version\":\"v1\"}")
-        XCTAssertEqual(d2Doc, "{\"version\":\"v1\"}")
+        // 02. c2 changes the sync mode to realtime sync mode.
+        let c2Exp1 = expectation(description: "C2 Exp")
 
-        // 02. c2 pauses realtime sync mode. So, c2 doesn't get the changes of c1
-        try await c2.pause(d2)
+        var cancellable = c2.eventStream.sink { event in
+            if event.type == .documentSynced {
+                c2Exp1.fulfill()
+            }
+        }
+
+        try await c2.changeSyncMode(d2, .realtime)
+        await fulfillment(of: [c2Exp1], timeout: 5) // sync occurs when resuming
+
+        cancellable.cancel()
+
+        let c2Exp2 = expectation(description: "C2 Exp 2")
+
+        cancellable = c2.eventStream.sink { event in
+            if event.type == .documentSynced {
+                c2Exp2.fulfill()
+            }
+        }
+
         try await d1.update { root, _ in
             root.version = "v2"
         }
+
         try await c1.sync()
 
-        d1Doc = await d1.toSortedJSON()
-        d2Doc = await d2.toSortedJSON()
+        await fulfillment(of: [c2Exp2], timeout: 5)
 
-        XCTAssertEqual(d1Doc, "{\"version\":\"v2\"}")
-        XCTAssertEqual(d2Doc, "{\"version\":\"v1\"}")
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"version\":\"v2\"}")
+        XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
 
-        // 03. c2 resumes realtime sync mode.
-        // c2 should be able to apply changes made to the document while c2 is not in realtime sync.
-        try await c2.resume(d2)
-        await fulfillment(of: [exps[1]], timeout: 1.5)
+        cancellable.cancel()
 
-        d2Doc = await d2.toSortedJSON()
-        XCTAssertEqual(d2Doc, "{\"version\":\"v2\"}")
-
-        // 04. c2 should automatically synchronize changes.
+        // 03. c2 changes the sync mode to manual sync mode again.
+        try await c2.changeSyncMode(d2, .manual)
         try await d1.update { root, _ in
             root.version = "v3"
         }
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"version\":\"v3\"}")
+        XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
+
         try await c1.sync()
-        await fulfillment(of: [exps[2]], timeout: 1.5)
-
-        d1Doc = await d1.toSortedJSON()
-        d2Doc = await d2.toSortedJSON()
-
-        XCTAssertEqual(d1Doc, "{\"version\":\"v3\"}")
-        XCTAssertEqual(d2Doc, "{\"version\":\"v3\"}")
+        try await c2.sync()
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d2JSON, "{\"version\":\"v3\"}")
 
         try await c1.deactivate()
         try await c2.deactivate()
     }
 
-    func test_can_change_sync_mode_in_realtime_sync() async throws {
-        let c1 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
-        let c3 = Client(rpcAddress: self.rpcAddress, options: ClientOptions())
+    // swiftlint: disable function_body_length
+    func test_can_change_sync_mode_in_realtime() async throws {
+        // |    | Step1    | Step2    | Step3    | Step4    |
+        // | c1 | PushPull | PushOnly | SyncOff  | PushPull |
+        // | c2 | PushPull | SyncOff  | PushOnly | PushPull |
+        // | c3 | PushPull | PushPull | PushPull | PushPull |
 
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        let c3 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         try await c3.activate()
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
-
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
         let d3 = Document(key: docKey)
@@ -343,205 +257,414 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.attach(d2)
         try await c3.attach(d3)
 
-        // 02. c1, c2 sync in realtime.
+        let expectedEvents1: [DocEventType] = [.localChange, .remoteChange, .remoteChange, .localChange, .localChange, .remoteChange, .remoteChange, .remoteChange, .remoteChange]
+        let expectedEvents2: [DocEventType] = [.localChange, .remoteChange, .remoteChange, .localChange, .localChange, .remoteChange, .remoteChange, .remoteChange, .remoteChange]
+        let expectedEvents3: [DocEventType] = [.localChange, .remoteChange, .remoteChange, .localChange, .remoteChange, .localChange, .remoteChange, .remoteChange, .remoteChange]
+        let d1Exp1 = expectation(description: "D1 Exp 1")
+        let d2Exp1 = expectation(description: "D2 Exp 1")
+        let d3Exp1 = expectation(description: "D3 Exp 1")
+        let d1Exp2 = expectation(description: "D1 Exp 2")
+        let d2Exp2 = expectation(description: "D2 Exp 2")
+        let d3Exp2 = expectation(description: "D3 Exp 2")
+        let d1Exp3 = expectation(description: "D1 Exp 3")
+        let d2Exp3 = expectation(description: "D2 Exp 3")
+        let d3Exp3 = expectation(description: "D3 Exp 3")
+        let d1Exp4 = expectation(description: "D1 Exp 4")
+        let d2Exp4 = expectation(description: "D2 Exp 4")
+        let d3Exp4 = expectation(description: "D3 Exp 4")
+
+        var d1EventCount = 0
+        var d2EventCount = 0
+        var d3EventCount = 0
+
+        await d1.subscribe { event, _ in
+            XCTAssertEqual(event.type, expectedEvents1[d1EventCount])
+            d1EventCount += 1
+
+            if d1EventCount == 3 {
+                d1Exp1.fulfill()
+            }
+            if d1EventCount == 4 {
+                d1Exp2.fulfill()
+            }
+            if d1EventCount == 5 {
+                d1Exp3.fulfill()
+            }
+            if d1EventCount == 9 {
+                d1Exp4.fulfill()
+            }
+        }
+
+        await d2.subscribe { event, _ in
+            XCTAssertEqual(event.type, expectedEvents2[d2EventCount])
+            d2EventCount += 1
+
+            if d2EventCount == 3 {
+                d2Exp1.fulfill()
+            }
+            if d2EventCount == 4 {
+                d2Exp2.fulfill()
+            }
+            if d2EventCount == 5 {
+                d2Exp3.fulfill()
+            }
+            if d2EventCount == 9 {
+                d2Exp4.fulfill()
+            }
+        }
+
+        await d3.subscribe { event, _ in
+            XCTAssertEqual(event.type, expectedEvents3[d3EventCount])
+            d3EventCount += 1
+
+            if d3EventCount == 3 {
+                d3Exp1.fulfill()
+            }
+            if d3EventCount == 5 {
+                d3Exp2.fulfill()
+            }
+            if d3EventCount == 8 {
+                d3Exp3.fulfill()
+            }
+            if d3EventCount == 9 {
+                d3Exp4.fulfill()
+            }
+        }
+
+        // 02. [Step1] c1, c2, c3 sync in realtime.
         try await d1.update { root, _ in
             root.c1 = Int64(0)
         }
-
         try await d2.update { root, _ in
             root.c2 = Int64(0)
         }
+        try await d3.update { root, _ in
+            root.c3 = Int64(0)
+        }
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        await fulfillment(of: [d1Exp1, d2Exp1, d3Exp1], timeout: 5)
 
-        var d1Doc = await d1.toSortedJSON()
-        var d2Doc = await d2.toSortedJSON()
+        var d1JSON = await d1.toSortedJSON()
+        var d2JSON = await d2.toSortedJSON()
+        var d3JSON = await d3.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"c1\":0,\"c2\":0,\"c3\":0}")
+        XCTAssertEqual(d2JSON, "{\"c1\":0,\"c2\":0,\"c3\":0}")
+        XCTAssertEqual(d3JSON, "{\"c1\":0,\"c2\":0,\"c3\":0}")
 
-        XCTAssertEqual(d1Doc, "{\"c1\":0,\"c2\":0}")
-        XCTAssertEqual(d2Doc, "{\"c1\":0,\"c2\":0}")
-
-        // 03. c1 and c2 sync with push-only mode. So, the changes of c1 and c2
-        // are not reflected to each other.
-        // But, c can get the changes of c1 and c2, because c3 sync with push-pull mode.
-        try await c1.pauseRemoteChanges(d1)
-        try await c2.pauseRemoteChanges(d2)
-
+        // 03. [Step2] c1 sync with push-only mode, c2 sync with sync-off mode.
+        // c3 can get the changes of c1 and c2, because c3 sync with push-pull mode.
+        try await c1.changeSyncMode(d1, .realtimePushOnly)
+        try await c2.changeSyncMode(d2, .realtimeSyncOff)
         try await d1.update { root, _ in
             root.c1 = Int64(1)
         }
-
         try await d2.update { root, _ in
             root.c2 = Int64(1)
         }
+        try await d3.update { root, _ in
+            root.c3 = Int64(1)
+        }
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        await fulfillment(of: [d1Exp2, d2Exp2, d3Exp2], timeout: 5)
 
-        d1Doc = await d1.toSortedJSON()
-        d2Doc = await d2.toSortedJSON()
-        let d3Doc = await d3.toSortedJSON()
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        d3JSON = await d3.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"c1\":1,\"c2\":0,\"c3\":0}")
+        XCTAssertEqual(d2JSON, "{\"c1\":0,\"c2\":1,\"c3\":0}")
+        XCTAssertEqual(d3JSON, "{\"c1\":1,\"c2\":0,\"c3\":1}")
 
-        XCTAssertEqual(d1Doc, "{\"c1\":1,\"c2\":0}")
-        XCTAssertEqual(d2Doc, "{\"c1\":0,\"c2\":1}")
-        XCTAssertEqual(d3Doc, "{\"c1\":1,\"c2\":1}")
+        // 04. [Step3] c1 sync with sync-off mode, c2 sync with push-only mode.
+        try await c1.changeSyncMode(d1, .realtimeSyncOff)
+        try await c2.changeSyncMode(d2, .realtimePushOnly)
+        try await d1.update { root, _ in
+            root.c1 = Int64(2)
+        }
+        try await d2.update { root, _ in
+            root.c2 = Int64(2)
+        }
+        try await d3.update { root, _ in
+            root.c3 = Int64(2)
+        }
 
-        // 04. c1 and c2 sync with push-pull mode.
-        try await c1.resumeRemoteChanges(d1)
-        try await c2.resumeRemoteChanges(d2)
+        await fulfillment(of: [d1Exp3, d2Exp3, d3Exp3], timeout: 5)
 
-        try await Task.sleep(nanoseconds: 1_500_000_000)
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        d3JSON = await d3.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"c1\":2,\"c2\":0,\"c3\":0}")
+        XCTAssertEqual(d2JSON, "{\"c1\":0,\"c2\":2,\"c3\":0}")
+        XCTAssertEqual(d3JSON, "{\"c1\":1,\"c2\":2,\"c3\":2}")
 
-        d1Doc = await d1.toSortedJSON()
-        d2Doc = await d2.toSortedJSON()
+        // 05. [Step4] c1 and c2 sync with push-pull mode.
+        try await c1.changeSyncMode(d1, .realtime)
+        try await c2.changeSyncMode(d2, .realtime)
 
-        XCTAssertEqual(d1Doc, "{\"c1\":1,\"c2\":1}")
-        XCTAssertEqual(d2Doc, "{\"c1\":1,\"c2\":1}")
+        await fulfillment(of: [d1Exp4, d2Exp4, d3Exp4], timeout: 5)
+
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        d3JSON = await d3.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"c1\":2,\"c2\":2,\"c3\":2}")
+        XCTAssertEqual(d2JSON, "{\"c1\":2,\"c2\":2,\"c3\":2}")
+        XCTAssertEqual(d3JSON, "{\"c1\":2,\"c2\":2,\"c3\":2}")
 
         try await c1.deactivate()
         try await c2.deactivate()
         try await c3.deactivate()
     }
 
-    func test_can_be_built_from_a_snapshot() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+    // swiftlint: enable function_body_length
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-
-        try await c1.activate()
-        try await c2.activate()
-
-        let doc1 = Document(key: docKey)
-        try await c1.attach(doc1, [:], false)
-        let doc2 = Document(key: docKey)
-        try await c2.attach(doc2, [:], false)
-
-        let snapshotThreshold = 500
-
-        try await doc1.update { root, _ in
-            root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abc")]))
-            root.text = JSONText()
-        }
-
-        for index in 0 ..< snapshotThreshold {
-            try await doc1.update { root, _ in
-                try (root.tree as? JSONTree)?.edit(0, 0, JSONTreeTextNode(value: "\(index),"))
-                (root.text as? JSONText)?.edit(0, 0, "\(index),")
-            }
-        }
-
-        try await c1.sync()
-        try await c2.sync()
-
-        let result1 = await doc1.toSortedJSON()
-        let result2 = await doc2.toSortedJSON()
-
-        XCTAssertEqual(result1, result2)
-    }
-
-    func test_should_prevent_remote_changes_in_push_only_mode() async throws {
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-
+    func test_should_apply_previous_changes_when_switching_to_realtime_sync() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
-        try await c1.attach(d1)
+
+        let exp1 = expectation(description: "exp 1")
+        var cancellable = c2.eventStream.sink { event in
+            if event.type == .documentSynced {
+                exp1.fulfill()
+            }
+        }
+
+        // 01. c2 attach the doc with realtime sync mode at first.
+        try await c1.attach(d1, [:], .manual)
         try await c2.attach(d2)
 
-        let expect1 = expectation(description: "d2 1")
-        let expect2 = expectation(description: "d1 3")
-        let expect3 = expectation(description: "wait task")
-
-        var d1EventCount = 0
-        var d1lastEvent: DocEvent?
-        await d1.subscribe { event, _ in
-            d1EventCount += 1
-            d1lastEvent = event
-
-            if d1EventCount == 3 {
-                expect2.fulfill()
-            }
-        }
-
-        var d2EventCount = 0
-        var d2lastEvent: DocEvent?
-        await d2.subscribe { event, _ in
-            d2EventCount += 1
-            d2lastEvent = event
-
-            if d2EventCount == 1 {
-                expect1.fulfill()
-            }
-        }
-
         try await d1.update { root, _ in
-            root.t = JSONTree(initialRoot:
-                JSONTreeElementNode(type: "doc", children: [
-                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
-                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
-                ]))
-        }
-
-        await fulfillment(of: [expect1], timeout: 2)
-        XCTAssert(d2lastEvent is RemoteChangeEvent)
-
-        var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
-        var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
-
-        XCTAssertEqual(d1XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
-        XCTAssertEqual(d2XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
-
-        try await d1.update { root, _ in
-            try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "a"))
+            root.version = "v1"
         }
 
         try await c1.sync()
 
-        // The Task at below will be performed when the pushPull API sent the request and wait a response in the syncInternal().
-        Task {
-            // In push-only mode, remote-change events should not occur.
-            try await c2.pauseRemoteChanges(d2)
-            var remoteChangeOccured = false
+        var d1JSON = await d1.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"version\":\"v1\"}")
 
-            await d2.subscribe { event, _ in
-                if event.type == .remoteChange {
-                    remoteChangeOccured = true
-                }
-            }
+        await fulfillment(of: [exp1], timeout: 5)
 
-            try await Task.sleep(nanoseconds: 2_000_000_000)
-            await d2.unsubscribe()
-            XCTAssert(remoteChangeOccured == false)
+        var d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d2JSON, "{\"version\":\"v1\"}")
 
-            try await c2.resumeRemoteChanges(d2)
-
-            expect3.fulfill()
+        // 02. c2 is changed to manual sync. So, c2 doesn't get the changes of c1.
+        try await c2.changeSyncMode(d2, .manual)
+        try await d1.update { root, _ in
+            root.version = "v2"
         }
+        try await c1.sync()
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"version\":\"v2\"}")
+        XCTAssertEqual(d2JSON, "{\"version\":\"v1\"}")
+
+        // 03. c2 is changed to realtime sync.
+        // c2 should be able to apply changes made to the document while c2 is not in realtime sync.
+        cancellable.cancel()
+
+        let exp2 = expectation(description: "exp 2")
+
+        cancellable = c2.eventStream.sink { event in
+            if event.type == .documentSynced {
+                exp2.fulfill()
+            }
+        }
+
+        try await c2.changeSyncMode(d2, .realtime)
+
+        await fulfillment(of: [exp2], timeout: 5)
+
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
+
+        // 04. c2 should automatically synchronize changes.
+        cancellable.cancel()
+
+        let exp3 = expectation(description: "exp 3")
+
+        cancellable = c2.eventStream.sink { event in
+            if event.type == .documentSynced {
+                exp3.fulfill()
+            }
+        }
+
+        try await d1.update { root, _ in
+            root.version = "v3"
+        }
+        try await c1.sync()
+
+        await fulfillment(of: [exp3], timeout: 5)
+
+        d1JSON = await d1.toSortedJSON()
+        d2JSON = await d2.toSortedJSON()
+        XCTAssertEqual(d1JSON, "{\"version\":\"v3\"}")
+        XCTAssertEqual(d2JSON, "{\"version\":\"v3\"}")
+
+        cancellable.cancel()
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
+
+    func test_should_not_include_changes_applied_in_push_only_mode_when_switching_to_realtime_sync() async throws {
+        let c1 = Client(rpcAddress)
+        try await c1.activate()
+
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+
+        try await c1.attach(d1, [:], .manual)
+
+        // 02. cli update the document with creating a counter
+        //     and sync with push-pull mode: CP(1, 1) -> CP(2, 2)
+        try await d1.update { root, _ in
+            root.counter = JSONCounter(value: Int64(0))
+        }
+
+        var checkpoint = await d1.checkpoint
+        XCTAssertEqual(checkpoint.getClientSeq(), 1)
+        XCTAssertEqual(checkpoint.getServerSeq(), 1)
+
+        try await c1.sync()
+        checkpoint = await d1.checkpoint
+        XCTAssertEqual(checkpoint.getClientSeq(), 2)
+        XCTAssertEqual(checkpoint.getServerSeq(), 2)
+
+        // 03. cli update the document with increasing the counter(0 -> 1)
+        //     and sync with push-only mode: CP(2, 2) -> CP(3, 2)
+        let exp1 = expectation(description: "exp 1")
+        let cancellable = c1.eventStream.sink { event in
+            if event.type == .documentSynced {
+                exp1.fulfill()
+            }
+        }
+
+        try await d1.update { root, _ in
+            (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+        }
+
+        var changePack = await d1.createChangePack()
+        XCTAssertEqual(changePack.getChangeSize(), 1)
+
+        try await c1.changeSyncMode(d1, .realtimePushOnly)
+        await fulfillment(of: [exp1], timeout: 5)
+
+        cancellable.cancel()
+
+        checkpoint = await d1.checkpoint
+        XCTAssertEqual(checkpoint.getClientSeq(), 3)
+        XCTAssertEqual(checkpoint.getServerSeq(), 2)
+
+        try await c1.changeSyncMode(d1, .manual)
+
+        // 04. cli update the document with increasing the counter(1 -> 2)
+        //     and sync with push-pull mode. CP(3, 2) -> CP(4, 4)
+        try await d1.update { root, _ in
+            (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+        }
+
+        // The previous increase(0 -> 1) is already pushed to the server,
+        // so the ChangePack of the request only has the increase(1 -> 2).
+        changePack = await d1.createChangePack()
+        XCTAssertEqual(changePack.getChangeSize(), 1)
+
+        try await c1.sync()
+        checkpoint = await d1.checkpoint
+        XCTAssertEqual(checkpoint.getClientSeq(), 4)
+        XCTAssertEqual(checkpoint.getServerSeq(), 4)
+
+        let value = await(d1.getRoot().counter as? JSONCounter<Int64>)?.value
+        XCTAssertEqual(value, 2)
+
+        try await c1.deactivate()
+    }
+
+    func test_should_prevent_remote_changes_in_push_only_mode() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        // 01. c2 attach the doc with realtime sync mode at first.
+        try await c1.attach(d1)
+        try await c2.attach(d2)
+
+        let exp1 = expectation(description: "exp 1")
+        let exp2 = expectation(description: "exp 2")
+        var eventCount1 = 0
+
+        await d1.subscribe { event, _ in
+            eventCount1 += 1
+            if event.type == .remoteChange, eventCount1 == 3 {
+                exp1.fulfill()
+            }
+        }
+
+        await d2.subscribe { event, _ in
+            if event.type == .remoteChange {
+                exp2.fulfill()
+            }
+        }
+
+        try await d1.update { root, _ in
+            root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
+            ]))
+        }
+
+        await fulfillment(of: [exp2], timeout: 5)
+
+        await d2.unsubscribe()
+
+        var d1JSON = await(d1.getRoot().tree as? JSONTree)?.toXML()
+        var d2JSON = await(d2.getRoot().tree as? JSONTree)?.toXML()
+        XCTAssertEqual(d1JSON, "<doc><p>12</p><p>34</p></doc>")
+        XCTAssertEqual(d2JSON, "<doc><p>12</p><p>34</p></doc>")
+
+        try await d1.update { root, _ in
+            try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "a"))
+        }
+        try await c1.sync()
 
         // Simulate the situation in the runSyncLoop where a pushpull request has been sent
         // but a response has not yet been received.
         try await c2.sync()
 
-        await fulfillment(of: [expect3], timeout: 10)
+        // In push-only mode, remote-change events should not occur.
+        try await c2.changeSyncMode(d2, .realtimePushOnly)
+        var remoteChangeOccured = false
 
-        try await d2.update { root, _ in
-            try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
+        await d2.subscribe { event, _ in
+            if event.type == .remoteChange {
+                remoteChangeOccured = true
+            }
         }
 
-        await fulfillment(of: [expect2], timeout: 2)
-        XCTAssert(d1lastEvent is RemoteChangeEvent)
+        try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
-        d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertFalse(remoteChangeOccured)
 
-        XCTAssertEqual(d1XML, /* html */ "<doc><p>1ba2</p><p>34</p></doc>")
-        XCTAssertEqual(d2XML, /* html */ "<doc><p>1ba2</p><p>34</p></doc>")
+        try await c2.changeSyncMode(d2, .realtime)
 
-        await d1.unsubscribe()
-        await d2.unsubscribe()
+        try await d2.update { root, _ in
+            try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
+        }
+
+        await fulfillment(of: [exp1], timeout: 5)
+
+        d1JSON = await(d1.getRoot().tree as? JSONTree)?.toXML()
+        d2JSON = await(d2.getRoot().tree as? JSONTree)?.toXML()
+        XCTAssertEqual(d1JSON, "<doc><p>1ba2</p><p>34</p></doc>")
+        XCTAssertEqual(d2JSON, "<doc><p>1ba2</p><p>34</p></doc>")
 
         try await c1.deactivate()
         try await c2.deactivate()

@@ -37,8 +37,7 @@ class KanbanViewModel: ObservableObject {
     private let document: Document
 
     init() {
-        self.client = Client(rpcAddress: RPCAddress(host: "localhost", port: 8080),
-                             options: ClientOptions())
+        self.client = Client(RPCAddress(host: "localhost", port: 8080))
 
         let docKey = "KanbanViewModel-8"
         self.document = Document(key: docKey)

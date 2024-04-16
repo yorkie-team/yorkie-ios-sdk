@@ -59,11 +59,10 @@ final class CounterIntegrationTests: XCTestCase {
     }
 
     func test_can_sync_counter() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         self.d1 = Document(key: docKey)
         self.d2 = Document(key: docKey)
@@ -71,8 +70,8 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, [:], false)
-        try await self.c2.attach(self.d2, [:], false)
+        try await self.c1.attach(self.d1, [:], .manual)
+        try await self.c2.attach(self.d2, [:], .manual)
 
         try await self.d1.update { root, _ in
             root.age = JSONCounter(value: Int32(1))
@@ -112,11 +111,10 @@ final class CounterIntegrationTests: XCTestCase {
     }
 
     func test_can_sync_counter_with_array() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        self.c1 = Client(rpcAddress: self.rpcAddress, options: options)
-        self.c2 = Client(rpcAddress: self.rpcAddress, options: options)
+        self.c1 = Client(self.rpcAddress)
+        self.c2 = Client(self.rpcAddress)
 
         self.d1 = Document(key: docKey)
         self.d2 = Document(key: docKey)
@@ -124,8 +122,8 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c1.activate()
         try await self.c2.activate()
 
-        try await self.c1.attach(self.d1, [:], false)
-        try await self.c2.attach(self.d2, [:], false)
+        try await self.c1.attach(self.d1, [:], .manual)
+        try await self.c2.attach(self.d2, [:], .manual)
 
         try await self.d1.update { root, _ in
             root.counts = [JSONCounter(value: Int32(1))]
