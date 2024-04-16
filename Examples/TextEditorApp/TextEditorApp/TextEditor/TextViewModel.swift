@@ -34,8 +34,7 @@ class TextViewModel {
         self.operationSubject = operationSubject
 
         // create client with RPCAddress.
-        self.client = Client(rpcAddress: RPCAddress(host: "localhost", port: 8080),
-                             options: ClientOptions())
+        self.client = Client(RPCAddress(host: "localhost", port: 8080))
 
         // create a document
         self.document = Document(key: "codemirror")
@@ -141,12 +140,12 @@ class TextViewModel {
         }
     }
 
-    func pause() async {
-        try? await self.client.pauseRemoteChanges(self.document)
+    func pause() async throws {
+        try await self.client.changeSyncMode(self.document, .realtimePushOnly)
     }
 
-    func resume() async {
-        try? await self.client.resumeRemoteChanges(self.document)
+    func resume() async throws {
+        try await self.client.changeSyncMode(self.document, .realtime)
     }
 
     private func decodePresence<T: Decodable>(_ dictionary: Any?) -> T? {

@@ -46,10 +46,14 @@ class TextEditorViewController: UIViewController {
         didSet {
             if oldValue != self.isCompositioning {
                 Task {
-                    if self.isCompositioning {
-                        await self.model?.pause()
-                    } else {
-                        await self.model?.resume()
+                    do {
+                        if self.isCompositioning {
+                            try await self.model?.pause()
+                        } else {
+                            try await self.model?.resume()
+                        }
+                    } catch {
+                        assertionFailure()
                     }
                 }
             }

@@ -23,16 +23,16 @@ final class PresenceTests: XCTestCase {
     func test_can_be_built_from_a_snapshot() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
 
         try await c1.activate()
         try await c2.activate()
 
         let doc1 = Document(key: docKey)
-        try await c1.attach(doc1, [:], false)
+        try await c1.attach(doc1, [:], .manual)
         let doc2 = Document(key: docKey)
-        try await c2.attach(doc2, [:], false)
+        try await c2.attach(doc2, [:], .manual)
 
         let snapshotThreshold = 500
 
@@ -55,16 +55,16 @@ final class PresenceTests: XCTestCase {
     func test_can_be_set_initial_value_in_attach_and_be_removed_in_detach() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
 
         try await c1.activate()
         try await c2.activate()
 
         let doc1 = Document(key: docKey)
-        try await c1.attach(doc1, ["key": "key1"], false)
+        try await c1.attach(doc1, ["key": "key1"], .manual)
         let doc2 = Document(key: docKey)
-        try await c2.attach(doc2, ["key": "key2"], false)
+        try await c2.attach(doc2, ["key": "key2"], .manual)
 
         var presence = await doc1.getPresenceForTest(c1.id!)?["key"] as? String
         XCTAssertEqual(presence, "key1")
@@ -89,16 +89,16 @@ final class PresenceTests: XCTestCase {
     func test_should_be_initialized_as_an_empty_object_if_no_initial_value_is_set_during_attach() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
 
         try await c1.activate()
         try await c2.activate()
 
         let doc1 = Document(key: docKey)
-        try await c1.attach(doc1, [:], false)
+        try await c1.attach(doc1, [:], .manual)
         let doc2 = Document(key: docKey)
-        try await c2.attach(doc2, [:], false)
+        try await c2.attach(doc2, [:], .manual)
 
         var presence = await doc1.getPresenceForTest(c1.id!)
         XCTAssertTrue(presence!.isEmpty)
@@ -118,8 +118,8 @@ final class PresenceTests: XCTestCase {
     func test_can_be_updated_partially_by_doc_update_function() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
 
@@ -146,9 +146,9 @@ final class PresenceTests: XCTestCase {
     }
 
     func test_should_return_only_online_clients() async throws {
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c3 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        let c3 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         try await c3.activate()
@@ -166,16 +166,16 @@ final class PresenceTests: XCTestCase {
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a1", "cursor": ["x": 0, "y": 0]])
 
-        await doc1.subscribePresence { _, _ in
+        await doc1.subscribePresence { event, _ in
             eventCount1 += 1
 
-            if eventCount1 == 1 {
+            if eventCount1 == 1, event.type == .watched {
                 expect1.fulfill()
             }
-            if eventCount1 == 2 {
+            if eventCount1 == 2, event.type == .unwatched {
                 expect2.fulfill()
             }
-            if eventCount1 == 3 {
+            if eventCount1 == 3, event.type == .watched {
                 expect3.fulfill()
             }
         }
@@ -184,7 +184,7 @@ final class PresenceTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b1", "cursor": ["x": 0, "y": 0]])
         let doc3 = Document(key: docKey)
-        try await c3.attach(doc3, ["name": "c1", "cursor": ["x": 0, "y": 0]], false)
+        try await c3.attach(doc3, ["name": "c1", "cursor": ["x": 0, "y": 0]], .manual)
 
         await fulfillment(of: [expect1], timeout: 5)
 
@@ -196,10 +196,10 @@ final class PresenceTests: XCTestCase {
         XCTAssert(resultPresences1.first { $0.clientID == c2ID }!.presence == doc2Presence)
         XCTAssert(resultPresences1.first { $0.clientID == c3ID } == nil)
 
-        // 02. c2 pauses the document (in manual sync), c3 resumes the document (in realtime sync).
-        try await c2.pause(doc2)
+        // 02. c2 is changed to manual sync, while c3 is changed to realtime sync.
+        try await c2.changeSyncMode(doc2, .manual)
         await fulfillment(of: [expect2], timeout: 5) // c2 unwatched
-        try await c3.resume(doc3)
+        try await c3.changeSyncMode(doc3, .realtime)
         await fulfillment(of: [expect3], timeout: 5) // c3 watched
 
         resultPresences1 = await doc1.getPresences()
@@ -216,8 +216,8 @@ final class PresenceTests: XCTestCase {
     }
 
     func test_can_get_presence_value_using_p_get_within_doc_update_function() async throws {
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         let c1ID = await c1.id!
@@ -225,10 +225,10 @@ final class PresenceTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
-        try await c1.attach(doc1, ["counter": 0], false)
+        try await c1.attach(doc1, ["counter": 0], .manual)
 
         let doc2 = Document(key: docKey)
-        try await c2.attach(doc2, ["counter": 0], false)
+        try await c2.attach(doc2, ["counter": 0], .manual)
 
         try await doc1.update { _, presence in
             if let counter: Int = presence.get("counter") {
@@ -319,8 +319,8 @@ final class PresenceSubscribeTests: XCTestCase {
     func test_should_be_synced_eventually() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         let c1ID = await c1.id!
@@ -404,8 +404,8 @@ final class PresenceSubscribeTests: XCTestCase {
     func test_should_receive_presence_changed_event_for_final_presence_if_there_are_multiple_presence_changes_within_doc_update() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         let c1ID = await c1.id!
@@ -475,8 +475,8 @@ final class PresenceSubscribeTests: XCTestCase {
     func test_can_receive_unwatched_event_when_a_client_detaches() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         let c1ID = await c1.id!
@@ -536,16 +536,16 @@ final class PresenceSubscribeTests: XCTestCase {
     }
 
     func test_can_receive_presence_related_event_only_when_using_realtime_sync() async throws {
-        let c1 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c2 = Client(rpcAddress: rpcAddress, options: ClientOptions())
-        let c3 = Client(rpcAddress: rpcAddress, options: ClientOptions())
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        let c3 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
         try await c3.activate()
         let c2ID = await c2.id!
         let c3ID = await c3.id!
 
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
 
         var eventCount1 = 0
         var eventReceived1 = [EventResult]()
@@ -593,7 +593,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b1", "cursor": ["x": 0, "y": 0]])
         let doc3 = Document(key: docKey)
-        try await c3.attach(doc3, ["name": "c1", "cursor": ["x": 0, "y": 0]], false)
+        try await c3.attach(doc3, ["name": "c1", "cursor": ["x": 0, "y": 0]], .manual)
 
         await fulfillment(of: [expect1], timeout: 5) // c2 watched
 
@@ -608,11 +608,11 @@ final class PresenceSubscribeTests: XCTestCase {
 
         await fulfillment(of: [expect2], timeout: 5) // c2 presence-changed
 
-        // 03. c2 pauses the document (in manual sync), c3 resumes the document (in realtime sync).
+        // 03. c2 is changed to manual sync, c3 resumes the document (in realtime sync).
         //     c1 receives an unwatched event from c2 and a watched event from c3.
-        try await c2.pause(doc2)
+        try await c2.changeSyncMode(doc2, .manual)
         await fulfillment(of: [expect3], timeout: 5) // c2 unwatched
-        try await c3.resume(doc3)
+        try await c3.changeSyncMode(doc3, .realtime)
         await fulfillment(of: [expect5], timeout: 5) // c3 watched, c3 presence-changed
 
         // 04. c2 and c3 update the presence.
@@ -626,9 +626,9 @@ final class PresenceSubscribeTests: XCTestCase {
 
         await fulfillment(of: [expect6], timeout: 5) // c3 presence-changed
 
-        // 05. c3 pauses the document (in manual sync),
+        // 05. c3 is changed to manual sync,
         //     c1 receives an unwatched event from c3.
-        try await c3.pause(doc3)
+        try await c3.changeSyncMode(doc3, .manual)
         await fulfillment(of: [expect7], timeout: 5) // c3 unwatched
 
         // 06. c2 performs manual sync and then resumes(switches to realtime sync).
@@ -638,7 +638,7 @@ final class PresenceSubscribeTests: XCTestCase {
         // We need to fix this issue.
         try await c2.sync()
         try await Task.sleep(nanoseconds: 1_500_000_000)
-        try await c2.resume(doc2)
+        try await c2.changeSyncMode(doc2, .realtime)
         await fulfillment(of: [expect8], timeout: 5) // c2 watched
 
         let result1 = [

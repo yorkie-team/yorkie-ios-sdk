@@ -143,27 +143,26 @@ class GCTests: XCTestCase {
     }
 
     func test_getGarbageLength_should_return_the_actual_number_of_elements_garbage_collected() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
 
-        let client1 = Client(rpcAddress: rpcAddress, options: options)
-        let client2 = Client(rpcAddress: rpcAddress, options: options)
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
 
         try await client1.activate()
         try await client2.activate()
 
         // 1. initial state
-        try await client1.attach(doc1, [:], false)
+        try await client1.attach(doc1, [:], .manual)
 
         try await doc1.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
         }
 
         try await client1.sync()
-        try await client2.attach(doc2, [:], false)
+        try await client2.attach(doc2, [:], .manual)
 
         // 2. client1 updates doc
         try await doc1.update { root, _ in
@@ -435,20 +434,19 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_tree_garbage_collection_for_multi_client() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
 
-        let client1 = Client(rpcAddress: rpcAddress, options: options)
-        let client2 = Client(rpcAddress: rpcAddress, options: options)
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
 
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, [:], false)
-        try await client2.attach(doc2, [:], false)
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
 
         try await doc1.update { root, _ in
             root.t = JSONTree(initialRoot:
@@ -542,20 +540,19 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_garbage_collection_for_container_type() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
 
-        let client1 = Client(rpcAddress: rpcAddress, options: options)
-        let client2 = Client(rpcAddress: rpcAddress, options: options)
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
 
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, [:], false)
-        try await client2.attach(doc2, [:], false)
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
 
         try await doc1.update({ root, _ in
             root["1"] = Int64(1)
@@ -631,20 +628,19 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_garbage_collection_for_text_type() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
 
-        let client1 = Client(rpcAddress: rpcAddress, options: options)
-        let client2 = Client(rpcAddress: rpcAddress, options: options)
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
 
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, [:], false)
-        try await client2.attach(doc2, [:], false)
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
 
         try await doc1.update({ root, _ in
             root.text = JSONText()
@@ -724,20 +720,19 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_garbage_collection_with_detached_document_test() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
 
-        let client1 = Client(rpcAddress: rpcAddress, options: options)
-        let client2 = Client(rpcAddress: rpcAddress, options: options)
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
 
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, [:], false)
-        try await client2.attach(doc2, [:], false)
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
 
         try await doc1.update({ root, _ in
             root["1"] = Int64(1)
@@ -801,16 +796,15 @@ class GCTests: XCTestCase {
     }
 
     func test_can_collect_removed_elements_from_both_root_and_clone() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc = Document(key: docKey)
 
-        let client = Client(rpcAddress: rpcAddress, options: options)
+        let client = Client(rpcAddress)
 
         try await client.activate()
 
-        try await client.attach(doc, [:], false)
+        try await client.attach(doc, [:], .manual)
 
         try await doc.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
@@ -831,19 +825,18 @@ class GCTests: XCTestCase {
     }
 
     func test_can_purges_removed_elements_after_peers_can_not_access_them() async throws {
-        let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
 
-        let client1 = Client(rpcAddress: rpcAddress, options: options)
-        let client2 = Client(rpcAddress: rpcAddress, options: options)
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
 
         try await client1.activate()
         try await client2.activate()
 
-        try await client1.attach(doc1, [:], false)
+        try await client1.attach(doc1, [:], .manual)
 
         try await doc1.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
@@ -858,7 +851,7 @@ class GCTests: XCTestCase {
 
         try await client1.sync()
 
-        try await client2.attach(doc2, [:], false)
+        try await client2.attach(doc2, [:], .manual)
 
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 1)
