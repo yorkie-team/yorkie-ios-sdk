@@ -20,5 +20,3 @@ jobs:
     - run: docker-compose -f docker/docker-compose-ci.yml up --build -d
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
-    
-

@@ -36,12 +36,14 @@ class TreeStyleOperation: Operation {
      * `attributes` returns the content of Edit.
      */
     let attributes: [String: String]
+    let attributesToRemove: [String]
 
-    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, attributes: [String: String], executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, attributes: [String: String], attributesToRemove: [String], executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
         self.attributes = attributes
+        self.attributesToRemove = attributesToRemove
         self.executedAt = executedAt
     }
 
@@ -60,7 +62,13 @@ class TreeStyleOperation: Operation {
             fatalError("fail to execute, only Tree can execute edit")
         }
 
-        let changes = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt)
+        let changes: [TreeChange]
+
+        if self.attributes.isEmpty == false {
+            changes = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt)
+        } else {
+            changes = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt)
+        }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError.unexpected(message: "fail to get path")

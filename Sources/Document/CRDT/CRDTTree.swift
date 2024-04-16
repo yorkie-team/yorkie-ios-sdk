@@ -35,11 +35,13 @@ struct TreeNodeForTest: Codable {
 enum TreeChangeType {
     case content
     case style
+    case removeStyle
 }
 
 enum TreeChangeValue {
     case nodes([CRDTTreeNode])
     case attributes([String: String])
+    case attributesToRemove([String])
 }
 
 /**
@@ -571,28 +573,50 @@ class CRDTTree: CRDTGCElement {
      */
     @discardableResult
     func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
+        try self.performChangeStyle(range, attributes, nil, editedAt)
+    }
+
+    /**
+     * `removeStyle` removes the given attributes of the given range.
+     */
+    @discardableResult
+    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket) throws -> [TreeChange] {
+        try self.performChangeStyle(range, nil, attributesToRemove, editedAt)
+    }
+
+    private func performChangeStyle(_ range: TreePosRange, _ attributes: [String: String]?, _ attributesToRemove: [String]?, _ editedAt: TimeTicket) throws -> [TreeChange] {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
         var changes: [TreeChange] = []
 
-        var value: TreeChangeValue?
+        let value: TreeChangeValue?
+        let type: TreeChangeType
 
         if let attributes {
             value = .attributes(attributes)
+            type = .style
+        } else if let attributesToRemove {
+            value = .attributesToRemove(attributesToRemove)
+            type = .removeStyle
+        } else {
+            fatalError()
         }
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
-            if node.isRemoved == false, node.isText == false, let attributes {
+            if node.isRemoved == false, node.isText == false {
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
-                for (key, value) in attributes {
+                for (key, value) in attributes ?? [:] {
                     node.attrs?.set(key: key, value: value, executedAt: editedAt)
+                }
+                for key in attributesToRemove ?? [] {
+                    node.attrs?.remove(key: key, executedAt: editedAt)
                 }
 
                 try changes.append(TreeChange(actor: editedAt.actorID,
-                                              type: .style,
+                                              type: type,
                                               from: self.toIndex(fromParent, fromLeft),
                                               to: self.toIndex(toParent, toLeft),
                                               fromPath: self.toPath(fromParent, fromLeft),

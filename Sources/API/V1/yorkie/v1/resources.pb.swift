@@ -952,6 +952,11 @@ struct Yorkie_V1_Operation {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    var attributesToRemove: [String] {
+      get {return _storage._attributesToRemove}
+      set {_uniqueStorage()._attributesToRemove = newValue}
+    }
+
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
@@ -2533,7 +2538,15 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -2625,7 +2638,15 @@ extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -2825,7 +2846,15 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _attributes: Dictionary<String,String> = [:]
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -2993,7 +3022,15 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -3095,7 +3132,15 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -3187,7 +3232,15 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _splitLevel: Int32 = 0
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -3290,6 +3343,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
     3: .same(proto: "to"),
     4: .same(proto: "attributes"),
     5: .standard(proto: "executed_at"),
+    6: .standard(proto: "attributes_to_remove"),
   ]
 
   fileprivate class _StorageClass {
@@ -3298,8 +3352,17 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
     var _to: Yorkie_V1_TreePos? = nil
     var _attributes: Dictionary<String,String> = [:]
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _attributesToRemove: [String] = []
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -3309,6 +3372,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
       _to = source._to
       _attributes = source._attributes
       _executedAt = source._executedAt
+      _attributesToRemove = source._attributesToRemove
     }
   }
 
@@ -3332,6 +3396,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._to) }()
         case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._attributesToRemove) }()
         default: break
         }
       }
@@ -3359,6 +3424,9 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
       } }()
+      if !_storage._attributesToRemove.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._attributesToRemove, fieldNumber: 6)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3373,6 +3441,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._to != rhs_storage._to {return false}
         if _storage._attributes != rhs_storage._attributes {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._attributesToRemove != rhs_storage._attributesToRemove {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -3973,7 +4042,15 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _next: Yorkie_V1_RGANode? = nil
     var _element: Yorkie_V1_JSONElement? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -4205,7 +4282,15 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     var _depth: Int32 = 0
     var _attributes: Dictionary<String,Yorkie_V1_NodeAttr> = [:]
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 

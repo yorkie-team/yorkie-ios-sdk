@@ -219,11 +219,17 @@ final class ClientIntegrationTests: XCTestCase {
             StreamConnectionStatus.disconnected
         ]
 
+        let exp = self.expectation(description: "exp")
+
         c1.eventStream.sink { event in
             switch event {
             case let event as StreamConnectionStatusChangedEvent:
                 XCTAssertEqual(event.value, c1ExpectedValues[c1NumberOfEvents])
                 c1NumberOfEvents += 1
+
+                if c1NumberOfEvents == c1ExpectedValues.count {
+                    exp.fulfill()
+                }
             default:
                 break
             }
@@ -238,6 +244,8 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.detach(d1)
 
         try await c1.deactivate()
+
+        await fulfillment(of: [exp], timeout: 10)
     }
 
     func test_should_apply_previous_changes_when_resuming_document() async throws {
@@ -517,7 +525,7 @@ final class ClientIntegrationTests: XCTestCase {
         // but a response has not yet been received.
         try await c2.sync()
 
-        await fulfillment(of: [expect3])
+        await fulfillment(of: [expect3], timeout: 10)
 
         try await d2.update { root, _ in
             try (root.t as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))

@@ -8,12 +8,14 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: latest-stable
-    - uses: actions/checkout@v3
+        xcode-version: '15.3'
+    - uses: actions/checkout@v4
+    - name: SwiftLint install
+      run: brew install swiftlint
     - name: SwiftLint
       run: swiftlint lint --strict
     - name: SwiftFormat
@@ -23,7 +25,7 @@ jobs:
     - name: Prepare Code Coverage
       run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: lcov.info
       env:

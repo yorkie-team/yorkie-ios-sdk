@@ -431,6 +431,7 @@ extension Converter {
             treeStyleOperation.attributes.forEach { key, value in
                 pbTreeStyleOperation.attributes[key] = value
             }
+            pbTreeStyleOperation.attributesToRemove = treeStyleOperation.attributesToRemove
             pbTreeStyleOperation.executedAt = toTimeTicket(treeStyleOperation.executedAt)
             pbOperation.treeStyle = pbTreeStyleOperation
         } else {
@@ -510,7 +511,8 @@ extension Converter {
                 return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
                                           fromPos: fromTreePos(pbTreeStyleOperation.from),
                                           toPos: fromTreePos(pbTreeStyleOperation.to),
-                                          attributes: pbTreeStyleOperation.attributes,
+                                          attributes: pbTreeStyleOperation.attributes, 
+                                          attributesToRemove: pbTreeStyleOperation.attributesToRemove,
                                           executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
             } else {
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
