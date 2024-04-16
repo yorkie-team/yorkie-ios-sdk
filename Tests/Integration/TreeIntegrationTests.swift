@@ -3598,8 +3598,8 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
                                 [TreeEditOpInfoForDebug(from: 1, to: 3, value: nil, fromPath: nil, toPath: nil),
                                  TreeEditOpInfoForDebug(from: 1, to: 1, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil)],
                                 [TreeEditOpInfoForDebug(from: 2, to: 2, value: [JSONTreeTextNode(value: "c")], fromPath: nil, toPath: nil),
-                                 TreeEditOpInfoForDebug(from: 1, to: 2, value: [], fromPath: nil, toPath: nil),
-                                 TreeEditOpInfoForDebug(from: 3, to: 4, value: [], fromPath: nil, toPath: nil)])
+                                 TreeEditOpInfoForDebug(from: 3, to: 4, value: [], fromPath: nil, toPath: nil),
+                                 TreeEditOpInfoForDebug(from: 1, to: 2, value: [], fromPath: nil, toPath: nil)])
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.edit(1, 3)
             }
