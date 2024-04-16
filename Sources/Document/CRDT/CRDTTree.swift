@@ -1130,7 +1130,7 @@ class CRDTTree: CRDTGCElement {
                 }
             }
         }
-        return changes
+        return changes.reversed()
     }
 
     /**
