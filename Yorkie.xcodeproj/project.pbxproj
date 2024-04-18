@@ -11,7 +11,6 @@
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
 		9A20CE86299F61CD00E4CE7E /* Auth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A20CE85299F61CD00E4CE7E /* Auth.swift */; };
 		9A232B772A7D0C0F0041C826 /* Dictionary+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A232B762A7D0C0F0041C826 /* Dictionary+Extension.swift */; };
-		9A30D40429514F150036F732 /* ClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8C230928D15F5A00432DE5 /* ClientTests.swift */; };
 		9A3CF3E9296583050024E3DD /* StyleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3E8296583050024E3DD /* StyleOperation.swift */; };
 		9A3CF3ED29666AB30024E3DD /* JSONTextTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3EC29666AB30024E3DD /* JSONTextTest.swift */; };
 		9A3CF3EF2966A7370024E3DD /* CRDTTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A3CF3EE2966A7370024E3DD /* CRDTTextTests.swift */; };
@@ -23,6 +22,7 @@
 		9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */; };
 		9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC744292DD82500C89478 /* YorkieCountable.swift */; };
 		9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
+		9A5A80D82BD0BD190047B978 /* Attachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5A80D72BD0BD180047B978 /* Attachment.swift */; };
 		9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */ = {isa = PBXBuildFile; productRef = 9A5D9DDB2A710FB40096C40C /* Semaphore */; };
 		9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A6294C7E1E00BF27F5 /* Logging */; };
 		9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */; };
@@ -151,6 +151,8 @@
 		9A4DC73D2923203700C89478 /* JSONCounter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONCounter.swift; sourceTree = "<group>"; };
 		9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CounterIntegrationTests.swift; sourceTree = "<group>"; };
 		9A4DC744292DD82500C89478 /* YorkieCountable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieCountable.swift; sourceTree = "<group>"; };
+		9A5A80D52BD0BC8A0047B978 /* DocumentBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentBenchmarkTests.swift; sourceTree = "<group>"; };
+		9A5A80D72BD0BD180047B978 /* Attachment.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Attachment.swift; sourceTree = "<group>"; };
 		9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGATreeSplit.swift; sourceTree = "<group>"; };
 		9A66B19F2955833E00D10B94 /* LLRBTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLRBTree.swift; sourceTree = "<group>"; };
 		9A7C75E92A0261DD000B6E5A /* Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Version.swift; sourceTree = "<group>"; };
@@ -218,7 +220,6 @@
 		CE8C22F628C9E89100432DE5 /* TimeTicket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTicket.swift; sourceTree = "<group>"; };
 		CE8C230428C9F1BD00432DE5 /* Client.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Client.swift; sourceTree = "<group>"; };
 		CE8C230628D1514900432DE5 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Logger.swift; path = Sources/Core/Logger.swift; sourceTree = SOURCE_ROOT; };
-		CE8C230928D15F5A00432DE5 /* ClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientTests.swift; sourceTree = "<group>"; };
 		CE8ED31528F55BF7009A5419 /* SetOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetOperation.swift; sourceTree = "<group>"; };
 		CE8ED31828F55F3E009A5419 /* SetOperationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetOperationTests.swift; sourceTree = "<group>"; };
 		CE8ED31B28F56506009A5419 /* RemoveOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveOperation.swift; sourceTree = "<group>"; };
@@ -310,11 +311,20 @@
 		96DA808F28C5B7B400E2C1DA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				9A5A80D62BD0BC8A0047B978 /* Benchmark */,
 				CE0EE07A292CD14100CB81F4 /* Unit */,
 				9ADECA002919FC1A006BA331 /* Integration */,
 				96DA809228C5B7B400E2C1DA /* Info.plist */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		9A5A80D62BD0BC8A0047B978 /* Benchmark */ = {
+			isa = PBXGroup;
+			children = (
+				9A5A80D52BD0BC8A0047B978 /* DocumentBenchmarkTests.swift */,
+			);
+			path = Benchmark;
 			sourceTree = "<group>";
 		};
 		9A97C18A2A8F32BA002AEFC5 /* Presence */ = {
@@ -356,7 +366,6 @@
 		9ADECA002919FC1A006BA331 /* Integration */ = {
 			isa = PBXGroup;
 			children = (
-				CE8C230928D15F5A00432DE5 /* ClientTests.swift */,
 				96DA809028C5B7B400E2C1DA /* GRPCTests.swift */,
 				9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */,
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
@@ -478,6 +487,7 @@
 		CE8C22E328C9E53400432DE5 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				9A5A80D72BD0BD180047B978 /* Attachment.swift */,
 				9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */,
 				CE8C230428C9F1BD00432DE5 /* Client.swift */,
 				9A20CE85299F61CD00E4CE7E /* Auth.swift */,
@@ -705,8 +715,9 @@
 		96DA807928C5B7B400E2C1DA /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				BuildIndependentTargetsInParallel = YES;
 				LastSwiftUpdateCheck = 1250;
-				LastUpgradeCheck = 1250;
+				LastUpgradeCheck = 1530;
 				TargetAttributes = {
 					96DA808128C5B7B400E2C1DA = {
 						CreatedOnToolsVersion = 12.5.1;
@@ -807,6 +818,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CEA2DA4A28F6938700431B61 /* String+Extensions.swift in Sources */,
+				9A5A80D82BD0BD190047B978 /* Attachment.swift in Sources */,
 				CEF64375290A349F00C32B99 /* DocEvent.swift in Sources */,
 				CE9557CD2907523A00DF4DFA /* JSONArray.swift in Sources */,
 				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
@@ -892,7 +904,6 @@
 				9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */,
 				9AFB4EBC2A93980A00494401 /* Dictionary+Extension.swift in Sources */,
 				9A93DB6B2A67DBE000A0F449 /* IntegrationHelper.swift in Sources */,
-				9A30D40429514F150036F732 /* ClientTests.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
 				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,
 				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
@@ -1062,11 +1073,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
@@ -1075,6 +1088,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.yorkie.Yorkie;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
@@ -1088,11 +1102,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Automatic;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
@@ -1101,6 +1117,7 @@
 					"@executable_path/Frameworks",
 					"@loader_path/Frameworks",
 				);
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu11 gnu++14";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.yorkie.Yorkie;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
