@@ -136,7 +136,7 @@ public struct ClientOptions {
     }
 }
 
-public struct RPCAddress {
+public struct RPCAddress: Equatable {
     public static let tlsPort = 443
 
     let host: String
@@ -149,6 +149,24 @@ public struct RPCAddress {
     public init(host: String, port: Int = Self.tlsPort) {
         self.host = host
         self.port = port
+    }
+}
+
+extension URL {
+    var toRPCAddress: RPCAddress? {
+        guard let host = self.host else { return nil }
+
+        if let port = self.port {
+            return RPCAddress(host: host, port: port)
+        } else if let scheme = self.scheme {
+            if scheme == "https" {
+                return RPCAddress(host: host, port: RPCAddress.tlsPort)
+            } else if scheme == "http" {
+                return RPCAddress(host: host, port: 80)
+            }
+        }
+
+        return RPCAddress(host: host)
     }
 }
 
@@ -209,6 +227,18 @@ public actor Client {
 
         self.rpcClient = YorkieServiceAsyncClient(channel: channel, interceptors: authInterceptors)
         self.eventStream = PassthroughSubject()
+    }
+
+    /**
+     * @param url - the url of the RPC server.
+     * @param opts - the options of the client.
+     */
+    init?(_ url: URL, _ options: ClientOptions = ClientOptions()) {
+        guard let rpcAddress = url.toRPCAddress else {
+            return nil
+        }
+
+        self.init(rpcAddress, options)
     }
 
     deinit {
