@@ -27,6 +27,10 @@ public struct DocumentOptions {
      * `disableGC` disables garbage collection if true.
      */
     var disableGC: Bool
+
+    public init(disableGC: Bool) {
+        self.disableGC = disableGC
+    }
 }
 
 /**
