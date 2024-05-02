@@ -681,11 +681,13 @@ public actor Document {
     /**
      * `getPresences` returns the presences of online clients.
      */
-    public func getPresences() -> [PeerElement] {
+    public func getPresences(_ excludeMyself: Bool = false) -> [PeerElement] {
         var presences = [PeerElement]()
 
+        let excludeID = excludeMyself == true ? self.changeID.getActorID() : nil
+
         for clientID in self.onlineClients {
-            if let presence = getPresence(clientID) {
+            if clientID != excludeID, let presence = getPresence(clientID) {
                 presences.append((clientID, presence))
             }
         }
