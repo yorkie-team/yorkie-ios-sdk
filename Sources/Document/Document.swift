@@ -123,12 +123,13 @@ public actor Document {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
 
-        let clone = self.cloned
-        let context = ChangeContext(id: self.changeID.next(), root: clone.root, message: message)
-
         guard let actorID = self.changeID.getActorID() else {
             throw YorkieError.unexpected(message: "actor ID is null.")
         }
+
+        // 01. Update the clone object and create a change.
+        let clone = self.cloned
+        let context = ChangeContext(id: self.changeID.next(), root: clone.root, message: message)
 
         let proxy = JSONObject(target: clone.root.object, context: context)
 
@@ -142,6 +143,7 @@ public actor Document {
 
         self.clone?.presences[actorID] = presence.presence
 
+        // 02. Update the root object and presences from changes.
         if context.hasChange {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
@@ -150,10 +152,12 @@ public actor Document {
             self.localChanges.append(change)
             self.changeID = change.id
 
-            if change.hasOperations {
+            // 03. Publish the document change event.
+            // NOTE(chacha912): Check opInfos, which represent the actually executed operations.
+            if !opInfos.isEmpty {
                 let changeInfo = ChangeInfo(message: change.message ?? "",
                                             operations: opInfos,
-                                            actorID: change.id.getActorID())
+                                            actorID: actorID)
                 let changeEvent = LocalChangeEvent(value: changeInfo)
                 self.publish(changeEvent)
             }
@@ -677,11 +681,13 @@ public actor Document {
     /**
      * `getPresences` returns the presences of online clients.
      */
-    public func getPresences() -> [PeerElement] {
+    public func getPresences(_ excludeMyself: Bool = false) -> [PeerElement] {
         var presences = [PeerElement]()
 
+        let excludeID = excludeMyself == true ? self.changeID.getActorID() : nil
+
         for clientID in self.onlineClients {
-            if let presence = getPresence(clientID) {
+            if clientID != excludeID, let presence = getPresence(clientID) {
                 presences.append((clientID, presence))
             }
         }

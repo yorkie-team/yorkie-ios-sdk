@@ -62,8 +62,8 @@ public struct Change {
             try $0.execute(root: root)
         }
 
-        if let actorID = self.id.getActorID() {
-            switch self.presenceChange {
+        if let presenceChange = self.presenceChange, let actorID = self.id.getActorID() {
+            switch presenceChange {
             case .put(let presence):
                 presences[actorID] = presence
             default:
