@@ -49,7 +49,6 @@
 		9ADAEE56296571D8007E9F9F /* CRDTText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5329654377007E9F9F /* CRDTText.swift */; };
 		9ADAEE5829657696007E9F9F /* JSONText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5729657696007E9F9F /* JSONText.swift */; };
 		9ADAEE5A29657E03007E9F9F /* EditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5929657E03007E9F9F /* EditOperation.swift */; };
-		9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */; };
 		9ADEC9FD29192EE0006BA331 /* Codable+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */; };
 		9AEA80DC296FE38D000672FC /* TextIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA80DB296FE38D000672FC /* TextIntegrationTests.swift */; };
 		9AF55ED1290684BD006B7146 /* ConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF55ED0290684BD006B7146 /* ConverterTests.swift */; };
@@ -180,7 +179,6 @@
 		9ADAEE5329654377007E9F9F /* CRDTText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTText.swift; sourceTree = "<group>"; };
 		9ADAEE5729657696007E9F9F /* JSONText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONText.swift; sourceTree = "<group>"; };
 		9ADAEE5929657E03007E9F9F /* EditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditOperation.swift; sourceTree = "<group>"; };
-		9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClientEvent.swift; sourceTree = "<group>"; };
 		9ADEC9FC29192EE0006BA331 /* Codable+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Codable+Extension.swift"; sourceTree = "<group>"; };
 		9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientIntegrationTests.swift; sourceTree = "<group>"; };
 		9AEA80DB296FE38D000672FC /* TextIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextIntegrationTests.swift; sourceTree = "<group>"; };
@@ -491,7 +489,6 @@
 			isa = PBXGroup;
 			children = (
 				9A5A80D72BD0BD180047B978 /* Attachment.swift */,
-				9ADEC9FA2914D45B006BA331 /* ClientEvent.swift */,
 				CE8C230428C9F1BD00432DE5 /* Client.swift */,
 				9A20CE85299F61CD00E4CE7E /* Auth.swift */,
 			);
@@ -872,7 +869,6 @@
 				9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */,
 				9A232B772A7D0C0F0041C826 /* Dictionary+Extension.swift in Sources */,
 				CE3EC96728D30E74009471BC /* CRDTElement.swift in Sources */,
-				9ADEC9FB2914D45B006BA331 /* ClientEvent.swift in Sources */,
 				CE8BB74B28FE71550020F62A /* Document.swift in Sources */,
 				CE8BB74D28FE86020020F62A /* ObjectDataHandler.swift in Sources */,
 				9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */,

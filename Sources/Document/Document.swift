@@ -86,6 +86,8 @@ public actor Document {
     private var defaultSubscribeCallback: SubscribeCallback?
     private var subscribeCallbacks: [String: SubscribeCallback]
     private var presenceSubscribeCallback: [String: SubscribeCallback]
+    private var connectionSubscribeCallback: SubscribeCallback?
+    private var syncSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -191,6 +193,22 @@ public actor Document {
     }
 
     /**
+     * `subscribeConnection` registers a callback to subscribe to events on the document.
+     * The callback will be called when the stream connection status changes.
+     */
+    public func subscribeConnection(_ callback: @escaping SubscribeCallback) {
+        self.connectionSubscribeCallback = callback
+    }
+
+    /**
+     * `subscribePresence` registers a callback to subscribe to events on the document.
+     * The callback will be called when the targetPath or any of its nested values change.
+     */
+    public func subscribeSync(_ callback: @escaping SubscribeCallback) {
+        self.syncSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -206,6 +224,20 @@ public actor Document {
      */
     public func unsubscribePresence(_ type: PresenceSubscriptionType = .presence) {
         self.presenceSubscribeCallback.removeValue(forKey: type.rawValue)
+    }
+
+    /**
+     * `unsubscribeConnection` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribeConnection() {
+        self.connectionSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeSync` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribeSync() {
+        self.syncSubscribeCallback = nil
     }
 
     /**
@@ -238,7 +270,7 @@ public actor Document {
 
         // 04. Update the status.
         if pack.isRemoved {
-            self.setStatus(.removed)
+            self.applyStatus(.removed)
         }
 
         Logger.trace("\(self.root.toJSON())")
@@ -504,8 +536,20 @@ public actor Document {
         return rootObject.get(keyPath: subPath)
     }
 
-    public func setStatus(_ status: DocumentStatus) {
+    /**
+     * `applyStatus` applies the document status into this document.
+     */
+    func applyStatus(_ status: DocumentStatus) {
         self.status = status
+
+        if status == .detached {
+            self.setActor(ActorIDs.initial)
+        }
+
+        let event = StatusChangedEvent(source: status == .removed ? .remote : .local,
+                                       value: StatusInfo(status: status, actorID: status == .attached ? self.changeID.getActorID() : nil))
+
+        self.publish(event)
     }
 
     public nonisolated var debugDescription: String {
@@ -527,6 +571,14 @@ public actor Document {
         default:
             assertionFailure("Not presence Event type. \(eventType)")
         }
+    }
+
+    func publishConnectionEvent(_ status: StreamConnectionStatus) {
+        self.publish(ConnectionChangedEvent(value: status))
+    }
+
+    func publishSyncEvent(_ status: DocumentSyncStatus) {
+        self.publish(SyncStatusChangedEvent(value: status))
     }
 
     /**
@@ -571,37 +623,36 @@ public actor Document {
                     }
                 }
             }
-        } else {
-            if event.type != .snapshot {
-                if let event = event as? ChangeEvent {
-                    var operations = [String: [any OperationInfo]]()
+        } else if event.type == .connectionChanged {
+            self.connectionSubscribeCallback?(event, self)
+        } else if event.type == .syncStatusChanged {
+            self.syncSubscribeCallback?(event, self)
+        } else if event.type == .snapshot {
+            self.subscribeCallbacks["$"]?(event, self)
+        } else if let event = event as? ChangeEvent {
+            var operations = [String: [any OperationInfo]]()
 
-                    for operationInfo in event.value.operations {
-                        for targetPath in self.subscribeCallbacks.keys where self.isSameElementOrChildOf(operationInfo.path, targetPath) {
-                            if operations[targetPath] == nil {
-                                operations[targetPath] = [any OperationInfo]()
-                            }
-                            operations[targetPath]?.append(operationInfo)
-                        }
+            for operationInfo in event.value.operations {
+                for targetPath in self.subscribeCallbacks.keys where self.isSameElementOrChildOf(operationInfo.path, targetPath) {
+                    if operations[targetPath] == nil {
+                        operations[targetPath] = [any OperationInfo]()
                     }
-
-                    for (key, value) in operations {
-                        let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
-
-                        if let callback = self.subscribeCallbacks[key] {
-                            callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
-                        }
-                    }
-                }
-            } else {
-                if let callback = self.subscribeCallbacks["$"] {
-                    callback(event, self)
+                    operations[targetPath]?.append(operationInfo)
                 }
             }
-            if let callback = self.defaultSubscribeCallback {
-                callback(event, self)
+
+            for (key, value) in operations {
+                let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
+
+                if let callback = self.subscribeCallbacks[key] {
+                    callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
+                }
             }
+
+            self.subscribeCallbacks["$"]?(event, self)
         }
+
+        self.defaultSubscribeCallback?(event, self)
     }
 
     private func isSameElementOrChildOf(_ elem: String, _ parent: String) -> Bool {

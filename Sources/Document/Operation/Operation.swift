@@ -17,6 +17,17 @@
 import Foundation
 
 /**
+ * `OpSource` represents the source of the operation. It is used to handle
+ * corner cases in the operations created by undo/redo allow the removed
+ * elements when executing them.
+ */
+public enum OpSource {
+    case local
+    case remote
+    case undoRedo
+}
+
+/**
  * `OperationInfoType` is operation info types
  */
 public enum OperationInfoType: String {
