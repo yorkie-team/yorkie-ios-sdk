@@ -427,7 +427,9 @@ extension Converter {
             pbTreeStyleOperation.parentCreatedAt = toTimeTicket(treeStyleOperation.parentCreatedAt)
             pbTreeStyleOperation.from = toTreePos(treeStyleOperation.fromPos)
             pbTreeStyleOperation.to = toTreePos(treeStyleOperation.toPos)
-            
+            treeStyleOperation.maxCreatedAtMapByActor.forEach { key, value in
+                pbTreeStyleOperation.createdAtMapByActor[key] = toTimeTicket(value)
+            }
             treeStyleOperation.attributes.forEach { key, value in
                 pbTreeStyleOperation.attributes[key] = value
             }
@@ -511,7 +513,8 @@ extension Converter {
                 return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
                                           fromPos: fromTreePos(pbTreeStyleOperation.from),
                                           toPos: fromTreePos(pbTreeStyleOperation.to),
-                                          attributes: pbTreeStyleOperation.attributes, 
+                                          maxCreatedAtMapByActor: pbTreeStyleOperation.createdAtMapByActor.compactMapValues({ fromTimeTicket($0) }),
+                                          attributes: pbTreeStyleOperation.attributes,
                                           attributesToRemove: pbTreeStyleOperation.attributesToRemove,
                                           executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
             } else {

@@ -329,12 +329,13 @@ public class JSONTree {
         let (fromPos, toPos) = try tree.pathToPosRange(path)
         let ticket = context.issueTimeTicket
 
-        try tree.style((fromPos, toPos), stringAttrs, ticket)
+        let (maxCreationMapByActor, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
 
         // TreeStyleOperation
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
                                                    toPos: toPos,
+                                                   maxCreatedAtMapByActor: maxCreationMapByActor,
                                                    attributes: stringAttrs,
                                                    attributesToRemove: [],
                                                    executedAt: ticket)
@@ -365,11 +366,12 @@ public class JSONTree {
         let toPos = try tree.findPos(toIdx)
         let ticket = context.issueTimeTicket
 
-        try tree.style((fromPos, toPos), stringAttrs, ticket)
+        let (maxCreationMapByActor, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
 
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
                                                    toPos: toPos,
+                                                   maxCreatedAtMapByActor: maxCreationMapByActor,
                                                    attributes: stringAttrs,
                                                    attributesToRemove: [],
                                                    executedAt: ticket)
@@ -397,6 +399,7 @@ public class JSONTree {
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
                                                    toPos: toPos,
+                                                   maxCreatedAtMapByActor: [:],
                                                    attributes: [:],
                                                    attributesToRemove: attributesToRemove,
                                                    executedAt: ticket)

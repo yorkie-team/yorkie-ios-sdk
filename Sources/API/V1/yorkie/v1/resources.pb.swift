@@ -957,6 +957,11 @@ struct Yorkie_V1_Operation {
       set {_uniqueStorage()._attributesToRemove = newValue}
     }
 
+    var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
+      get {return _storage._createdAtMapByActor}
+      set {_uniqueStorage()._createdAtMapByActor = newValue}
+    }
+
     var unknownFields = SwiftProtobuf.UnknownStorage()
 
     init() {}
@@ -3344,6 +3349,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
     4: .same(proto: "attributes"),
     5: .standard(proto: "executed_at"),
     6: .standard(proto: "attributes_to_remove"),
+    7: .standard(proto: "created_at_map_by_actor"),
   ]
 
   fileprivate class _StorageClass {
@@ -3353,6 +3359,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
     var _attributes: Dictionary<String,String> = [:]
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _attributesToRemove: [String] = []
+    var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
 
     #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
@@ -3373,6 +3380,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
       _attributes = source._attributes
       _executedAt = source._executedAt
       _attributesToRemove = source._attributesToRemove
+      _createdAtMapByActor = source._createdAtMapByActor
     }
   }
 
@@ -3397,6 +3405,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
         case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
         case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._attributesToRemove) }()
+        case 7: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: &_storage._createdAtMapByActor) }()
         default: break
         }
       }
@@ -3427,6 +3436,9 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
       if !_storage._attributesToRemove.isEmpty {
         try visitor.visitRepeatedStringField(value: _storage._attributesToRemove, fieldNumber: 6)
       }
+      if !_storage._createdAtMapByActor.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: _storage._createdAtMapByActor, fieldNumber: 7)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3442,6 +3454,7 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._attributes != rhs_storage._attributes {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
         if _storage._attributesToRemove != rhs_storage._attributesToRemove {return false}
+        if _storage._createdAtMapByActor != rhs_storage._createdAtMapByActor {return false}
         return true
       }
       if !storagesAreEqual {return false}

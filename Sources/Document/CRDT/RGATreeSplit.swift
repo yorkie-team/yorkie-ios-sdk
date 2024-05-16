@@ -348,15 +348,15 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `canDelete` checks if node is able to delete.
      */
-    public func canDelete(_ editedAt: TimeTicket, _ latestCreatedAt: TimeTicket) -> Bool {
-        !self.createdAt.after(latestCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    public func canDelete(_ editedAt: TimeTicket, _ maxCreatedAt: TimeTicket) -> Bool {
+        !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
     /**
      * `canStyle` checks if node is able to set style.
      */
-    public func canStyle(_ editedAt: TimeTicket, _ latestCreatedAt: TimeTicket) -> Bool {
-        !self.createdAt.after(latestCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    public func canStyle(_ editedAt: TimeTicket, _ maxCreatedAt: TimeTicket) -> Bool {
+        !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
     /**
@@ -427,14 +427,14 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * @param range - range of RGATreeSplitNode
      * @param editedAt - edited time
      * @param value - value
-     * @param latestCreatedAtMapByActor - latestCreatedAtMapByActor
+     * @param maxCreatedAtMapByActor - maxCreatedAtMapByActor
      * @returns `[RGATreeSplitNodePos, Map<string, TimeTicket>, Array<Change>]`
      */
     @discardableResult
     public func edit(_ range: RGATreeSplitPosRange,
                      _ editedAt: TimeTicket,
                      _ value: T?,
-                     _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> (RGATreeSplitPos, [String: TimeTicket], [ContentChange<T>])
+                     _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> (RGATreeSplitPos, [String: TimeTicket], [ContentChange<T>])
     {
         // 01. split nodes with from and to
         let (toLeft, toRight) = try self.findNodeWithSplit(range.1, editedAt)
@@ -442,7 +442,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         // 02. delete between from and to
         let nodesToDelete = self.findBetween(fromRight, toRight)
-        var (changes, latestCreatedAtMap, removedNodeMapByNodeKey) = try self.deleteNodes(nodesToDelete, editedAt, latestCreatedAtMapByActor)
+        var (changes, maxCreatedAtMap, removedNodeMapByNodeKey) = try self.deleteNodes(nodesToDelete, editedAt, maxCreatedAtMapByActor)
 
         let caretID = toRight?.id ?? toLeft.id
         var caretPos = RGATreeSplitPos(caretID, 0)
@@ -470,7 +470,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             self.removedNodeMap[key] = removedNode
         }
 
-        return (caretPos, latestCreatedAtMap, changes)
+        return (caretPos, maxCreatedAtMap, changes)
     }
 
     /**
@@ -692,9 +692,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
     private func deleteNodes(_ candidates: [RGATreeSplitNode<T>],
                              _ editedAt: TimeTicket,
-                             _ latestCreatedAtMapByActor: [String: TimeTicket]?) throws -> ([ContentChange<T>],
-                                                                                            [String: TimeTicket],
-                                                                                            [String: RGATreeSplitNode<T>])
+                             _ maxCreatedAtMapByActor: [String: TimeTicket]?) throws -> ([ContentChange<T>],
+                                                                                         [String: TimeTicket],
+                                                                                         [String: RGATreeSplitNode<T>])
     {
         guard !candidates.isEmpty else {
             return ([], [:], [:])
@@ -703,7 +703,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // There are 2 types of nodes in `candidates`: should delete, should not delete.
         // `nodesToKeep` contains nodes should not delete,
         // then is used to find the boundary of the range to be deleted.
-        let (nodesToDelete, nodesToKeep) = try self.filterNodes(candidates, editedAt, latestCreatedAtMapByActor)
+        let (nodesToDelete, nodesToKeep) = try self.filterNodes(candidates, editedAt, maxCreatedAtMapByActor)
 
         var createdAtMapByActor = [ActorID: TimeTicket]()
         var removedNodeMap = [ActorID: RGATreeSplitNode<T>]()
@@ -730,9 +730,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
     private func filterNodes(_ candidates: [RGATreeSplitNode<T>],
                              _ editedAt: TimeTicket,
-                             _ latestCreatedAtMapByActor: [ActorID: TimeTicket]?) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?])
+                             _ maxCreatedAtMapByActor: [ActorID: TimeTicket]?) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?])
     {
-        let isRemote = latestCreatedAtMapByActor != nil
+        let isRemote = maxCreatedAtMapByActor != nil
         var nodesToDelete = [RGATreeSplitNode<T>]()
         var nodesToKeep = [RGATreeSplitNode<T>?]()
 
@@ -740,19 +740,19 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         nodesToKeep.append(leftEdge)
 
         for node in candidates {
-            let latestCreatedAt: TimeTicket
+            let maxCreatedAt: TimeTicket
 
             if isRemote {
-                if let latest = latestCreatedAtMapByActor?[node.createdAt.actorID] {
-                    latestCreatedAt = latest
+                if let latest = maxCreatedAtMapByActor?[node.createdAt.actorID] {
+                    maxCreatedAt = latest
                 } else {
-                    latestCreatedAt = TimeTicket.initial
+                    maxCreatedAt = TimeTicket.initial
                 }
             } else {
-                latestCreatedAt = TimeTicket.max
+                maxCreatedAt = TimeTicket.max
             }
 
-            if node.canDelete(editedAt, latestCreatedAt) {
+            if node.canDelete(editedAt, maxCreatedAt) {
                 nodesToDelete.append(node)
             } else {
                 nodesToKeep.append(node)
