@@ -222,7 +222,8 @@ public struct InitializedEvent: DocEvent {
     /**
      * InitializedEvent type
      */
-    public var value: [PeerElement]
+    public let source: OpSource = .local
+    public let value: [PeerElement]
 }
 
 public struct WatchedEvent: DocEvent {

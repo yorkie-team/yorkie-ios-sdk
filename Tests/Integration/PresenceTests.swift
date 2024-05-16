@@ -401,6 +401,62 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    func test_should_not_be_accessible_to_other_clients_presence_when_the_stream_is_disconnected() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+        let c2ID = await c2.id!
+
+        let doc1 = Document(key: docKey)
+
+        try await c1.attach(doc1, ["name": "a"])
+
+        let expect1 = expectation(description: "sub 1")
+
+        await doc1.subscribePresence { event, _ in
+            if let event = event as? WatchedEvent,
+               event.value.clientID == c2ID
+            {
+                expect1.fulfill()
+            }
+        }
+
+        let expect2 = expectation(description: "sub 2")
+
+        await doc1.subscribeConnection { event, _ in
+            if let event = event as? ConnectionChangedEvent,
+               event.value == .disconnected
+            {
+                expect2.fulfill()
+            }
+        }
+
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, ["name": "b"])
+
+        await fulfillment(of: [expect1], timeout: 5, enforceOrder: false)
+        await doc1.unsubscribePresence()
+
+        var presence = await doc1.getPresence(c2ID)
+
+        XCTAssertEqual(presence?["name"] as? String, "b")
+
+        try await c1.changeSyncMode(doc1, .manual)
+
+        await fulfillment(of: [expect2], timeout: 5, enforceOrder: false)
+        await doc1.unsubscribeConnection()
+
+        presence = await doc1.getPresence(c2ID)
+
+        XCTAssert(presence == nil)
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
+
     func test_should_receive_presence_changed_event_for_final_presence_if_there_are_multiple_presence_changes_within_doc_update() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 

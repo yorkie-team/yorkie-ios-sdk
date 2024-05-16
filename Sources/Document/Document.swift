@@ -125,7 +125,7 @@ public actor Document {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
 
-        guard let actorID = self.changeID.getActorID() else {
+        guard let actorID = self.actorID else {
             throw YorkieError.unexpected(message: "actor ID is null.")
         }
 
@@ -325,6 +325,10 @@ public actor Document {
         self.changeID.setActor(actorID)
 
         // TODOs also apply into root.
+    }
+
+    var actorID: ActorID? {
+        self.changeID.getActorID()
     }
 
     /**
@@ -547,7 +551,7 @@ public actor Document {
         }
 
         let event = StatusChangedEvent(source: status == .removed ? .remote : .local,
-                                       value: StatusInfo(status: status, actorID: status == .attached ? self.changeID.getActorID() : nil))
+                                       value: StatusInfo(status: status, actorID: status == .attached ? self.actorID : nil))
 
         self.publish(event)
     }
@@ -581,6 +585,10 @@ public actor Document {
         self.publish(SyncStatusChangedEvent(value: status))
     }
 
+    func publishInitializedEvent() {
+        self.publish(InitializedEvent(value: self.getPresences()))
+    }
+
     /**
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
@@ -593,7 +601,7 @@ public actor Document {
                 callback(event, self)
             }
 
-            if let id = self.changeID.getActorID() {
+            if let id = self.actorID {
                 var isMine = false
                 var isOthers = false
 
@@ -680,6 +688,14 @@ public actor Document {
     }
 
     /**
+     * `resetOnlineClients` resets the online client set.
+     *
+     */
+    func resetOnlineClients() {
+        self.onlineClients = Set<ActorID>()
+    }
+
+    /**
      * `addOnlineClient` adds the given clientID into the online client set.
      */
     func addOnlineClient(_ clientID: ActorID) {
@@ -704,7 +720,7 @@ public actor Document {
      * `getMyPresence` returns the presence of the current client.
      */
     public func getMyPresence() -> [String: Any]? {
-        guard self.status == .attached, let id = self.changeID.getActorID() else {
+        guard self.status == .attached, let id = self.actorID else {
             return nil
         }
 
@@ -715,6 +731,10 @@ public actor Document {
      * `getPresence` returns the presence of the given clientID.
      */
     public func getPresence(_ clientID: ActorID) -> [String: Any]? {
+        if clientID == self.actorID {
+            return self.getMyPresence()
+        }
+
         guard self.onlineClients.contains(clientID) else {
             return nil
         }
@@ -735,10 +755,12 @@ public actor Document {
     public func getPresences(_ excludeMyself: Bool = false) -> [PeerElement] {
         var presences = [PeerElement]()
 
-        let excludeID = excludeMyself == true ? self.changeID.getActorID() : nil
+        if !excludeMyself, let actorID, let presence = getMyPresence() {
+            presences.append(PeerElement(actorID, presence))
+        }
 
         for clientID in self.onlineClients {
-            if clientID != excludeID, let presence = getPresence(clientID) {
+            if let presence = getPresence(clientID) {
                 presences.append((clientID, presence))
             }
         }
