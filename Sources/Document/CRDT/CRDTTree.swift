@@ -606,10 +606,8 @@ class CRDTTree: CRDTGCElement {
                     node.attrs = RHT()
                 }
                 var affectedKeys = Set<String>()
-                for (key, value) in attributes ?? [:] {
-                    if node.attrs?.set(key: key, value: value, executedAt: editedAt) ?? false {
-                        affectedKeys.insert(key)
-                    }
+                for (key, value) in attributes ?? [:] where node.attrs?.set(key: key, value: value, executedAt: editedAt) ?? false {
+                    affectedKeys.insert(key)
                 }
 
                 if !affectedKeys.isEmpty {
