@@ -633,6 +633,8 @@ public actor Client {
                     }
                 }
             }
+
+            await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
         }
     }
 
