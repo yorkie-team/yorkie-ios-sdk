@@ -87,7 +87,7 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             var garbageLen = await doc.getGarbageLength()
             XCTAssertEqual(size, garbageLen)
-            let garbageCollect = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+            let garbageCollect = await doc.garbageCollect(TimeTicket.max)
             XCTAssertEqual(size, garbageCollect)
 
             garbageLen = await doc.getGarbageLength()
@@ -120,7 +120,7 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             var garbageLen = await doc.getGarbageLength()
             XCTAssertEqual(size, garbageLen)
-            let garbageCollect = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+            let garbageCollect = await doc.garbageCollect(TimeTicket.max)
             XCTAssertEqual(size, garbageCollect)
 
             garbageLen = await doc.getGarbageLength()

@@ -60,7 +60,7 @@ class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(4, len)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(4, len)
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
@@ -87,7 +87,7 @@ class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(4, len)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(0, len)
         len = await doc.getGarbageLength()
         XCTAssertEqual(4, len)
@@ -105,7 +105,7 @@ class GCTests: XCTestCase {
             root.remove(key: "1")
         }, "deltes the array")
 
-        let len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        let len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(size + 1, len)
     }
 
@@ -131,7 +131,7 @@ class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(1, len)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(1, len)
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
@@ -191,8 +191,8 @@ class GCTests: XCTestCase {
         XCTAssertEqual(doc2Len, gcNodeLen)
 
         // Actual garbage-collected nodes
-        doc1Len = await doc1.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
-        doc2Len = await doc2.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        doc1Len = await doc1.garbageCollect(TimeTicket.max)
+        doc2Len = await doc2.garbageCollect(TimeTicket.max)
 
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)
@@ -219,7 +219,7 @@ class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(1, len)
-        await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        await doc.garbageCollect(TimeTicket.max)
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
 
@@ -275,7 +275,7 @@ class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(expectedGarbageLen, len)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(expectedGarbageLen, len)
 
         len = await doc.getGarbageLength()
@@ -323,7 +323,7 @@ class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(expectedGarbageLen, len)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(expectedGarbageLen, len)
 
         len = await doc.getGarbageLength()
@@ -370,7 +370,7 @@ class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(len, 2)
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -394,7 +394,7 @@ class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 1)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(len, 1)
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -423,7 +423,7 @@ class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 5)
-        len = await doc.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        len = await doc.garbageCollect(TimeTicket.max)
         XCTAssertEqual(len, 5)
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -887,6 +887,169 @@ class GCTests: XCTestCase {
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 5)
         try await client1.sync()
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.deactivate()
+        try await client2.deactivate()
+    }
+
+    func test_garbage_collection_test_for_nested_object() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc = Document(key: docKey)
+
+        try await doc.update { root, _ in
+            root.shape = ["point": ["x": Int64(0), "y": Int64(0)]]
+            root.remove(key: "shape")
+        }
+
+        let len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 4)
+
+        let nodeCount = await doc.garbageCollect(TimeTicket.max)
+        XCTAssertEqual(nodeCount, 4)
+    }
+
+    func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_text_type() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
+
+        try await doc1.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "z")
+        }
+        try await doc1.update { root, _ in
+            (root.t as? JSONText)?.edit(0, 1, "a")
+        }
+        try await doc1.update { root, _ in
+            (root.t as? JSONText)?.edit(1, 1, "b")
+        }
+        try await doc1.update { root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "d")
+        }
+
+        try await client1.sync()
+        try await client2.sync()
+
+        var strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
+        var strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
+        XCTAssertEqual(strDoc1, "abd")
+        XCTAssertEqual(strDoc2, "abd")
+        var len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 1)
+
+        try await doc1.update { root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }
+
+        try await client1.sync()
+        try await client2.sync()
+        try await client2.sync()
+        strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
+        strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
+        XCTAssertEqual(strDoc1, "abcd")
+        XCTAssertEqual(strDoc2, "abcd")
+
+        try await doc1.update { root, _ in
+            (root.t as? JSONText)?.edit(1, 3, "")
+        }
+
+        try await client1.sync()
+        strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
+        XCTAssertEqual(strDoc1, "ad")
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2) // b,c
+
+        try await client2.sync()
+        try await client2.sync()
+        try await client1.sync()
+        strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
+        XCTAssertEqual(strDoc2, "ad")
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.deactivate()
+        try await client2.deactivate()
+    }
+
+    func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_tree_type() async throws {
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
+
+        try await doc1.update { root, _ in
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "r",
+                                    children: [
+                                        JSONTreeTextNode(value: "z")
+                                    ])
+            )
+        }
+        try await doc1.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([0], [1], JSONTreeTextNode(value: "a"))
+        }
+        try await doc1.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([1], [1], JSONTreeTextNode(value: "b"))
+        }
+        try await doc1.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([2], [2], JSONTreeTextNode(value: "d"))
+        }
+        try await client1.sync()
+        try await client2.sync()
+        var strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
+        var strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(strDoc1, "<r>abd</r>")
+        XCTAssertEqual(strDoc2, "<r>abd</r>")
+        var len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 1)
+
+        try await doc1.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([2], [2], JSONTreeTextNode(value: "c"))
+        }
+        try await client1.sync()
+        try await client2.sync()
+        try await client2.sync()
+        strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
+        strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(strDoc1, "<r>abcd</r>")
+        XCTAssertEqual(strDoc2, "<r>abcd</r>")
+
+        try await doc1.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([1], [3])
+        }
+        try await client1.sync()
+        strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(strDoc1, "<r>ad</r>")
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2) // b, c
+
+        try await client2.sync()
+        try await client2.sync()
+        try await client1.sync()
+        strDoc1 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(strDoc1, "<r>ad</r>")
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 

@@ -1051,7 +1051,7 @@ class DocumentTests: XCTestCase {
         var length = await target.getGarbageLength()
         XCTAssertEqual(length, 2)
 
-        await target.garbageCollect(lessThanOrEqualTo: TimeTicket.max)
+        await target.garbageCollect(TimeTicket.max)
         result = await target.toSortedJSON()
         XCTAssertEqual(result, "{}")
         length = await target.getGarbageLength()

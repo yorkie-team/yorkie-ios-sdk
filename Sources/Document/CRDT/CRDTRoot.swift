@@ -222,11 +222,10 @@ class CRDTRoot {
             }
 
             let removedNodeCount = element.purgeRemovedNodesBefore(ticket: ticket)
-            guard removedNodeCount > 0 else {
-                continue
+            if element.removedNodesLength == 0 {
+                self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt.toIDString)
             }
 
-            self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt.toIDString)
             count += removedNodeCount
         }
 
