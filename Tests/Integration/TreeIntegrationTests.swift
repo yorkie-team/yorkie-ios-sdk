@@ -3765,6 +3765,52 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    func test_concurrent_style_and_style() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p",
+                                                                children: [
+                                                                    JSONTreeTextNode(value: "hello")
+                                                                ])
+                                        ])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, d2XML)
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>hello</p></doc>")
+
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["bold": "true"], fromPath: nil),
+                                 TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["bold": "false"], fromPath: nil)],
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["bold": "false"], fromPath: nil)])
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.style(0, 1, ["bold": "true"])
+            }
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.style(0, 1, ["bold": "false"])
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, d2XML)
+            XCTAssertEqual(d1XML, /* html */ "<doc><p bold=\"false\">hello</p></doc>")
+        }
+    }
+
     func test_emoji() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in

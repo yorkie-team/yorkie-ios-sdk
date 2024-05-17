@@ -37,19 +37,22 @@ class RHT {
     /**
      * `set` sets the value of the given key.
      */
-    func set(key: String, value: String, executedAt: TimeTicket) {
-        if let prev = nodeMapByKey[key] {
-            if executedAt.after(prev.updatedAt) {
-                if !prev.isRemoved {
-                    self.numberOfRemovedElement -= 1
-                }
-                let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
-                self.nodeMapByKey[key] = node
+    @discardableResult
+    func set(key: String, value: String, executedAt: TimeTicket) -> Bool {
+        let prev = self.nodeMapByKey[key]
+
+        if prev == nil || executedAt.after(prev!.updatedAt) {
+            if prev != nil && !prev!.isRemoved {
+                self.numberOfRemovedElement -= 1
             }
-        } else {
+
             let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
             self.nodeMapByKey[key] = node
+
+            return true
         }
+
+        return false
     }
 
     /**
