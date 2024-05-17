@@ -611,11 +611,19 @@ public actor Client {
 
         Task {
             if let stream = self.attachmentMap[docKey]?.remoteWatchStream?.responseStream {
+                await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
+
                 do {
                     for try await response in stream {
                         await self.handleWatchDocumentsResponse(docKey: docKey, response: response)
                     }
                 } catch {
+                    await self.attachmentMap[docKey]?.doc.resetOnlineClients()
+                    await self.attachmentMap[docKey]?.doc.publishInitializedEvent()
+                    await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.disconnected)
+
+                    Logger.debug("[WD] c:\"\(self.key)\" unwatches")
+
                     if let status = error as? GRPCStatus, status.code == .cancelled {
                         // Canceled by Client by detach. so there is No need to reconnect.
                     } else {
@@ -665,7 +673,9 @@ public actor Client {
         switch body {
         case .initialization(let initialization):
             var onlineClients = Set<ActorID>()
-            for pbClientID in initialization.clientIds {
+            let actorID = await self.attachmentMap[docKey]?.doc.actorID
+
+            for pbClientID in initialization.clientIds.filter({ $0 != actorID }) {
                 onlineClients.insert(pbClientID)
             }
 
@@ -716,12 +726,6 @@ public actor Client {
 
         self.attachmentMap[docKey]?.watchLoopReconnectTimer?.invalidate()
         self.attachmentMap[docKey]?.watchLoopReconnectTimer = nil
-
-        Logger.debug("[WD] c:\"\(self.key)\" unwatches")
-
-        Task {
-            await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.disconnected)
-        }
     }
 
     private func onStreamDisconnect(_ docKey: DocumentKey) throws {
