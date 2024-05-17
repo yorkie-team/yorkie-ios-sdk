@@ -21,6 +21,21 @@ import Foundation
  */
 public enum DocEventType: String {
     /**
+     * status changed event type
+     */
+    case statusChanged = "status-changed"
+
+    /**
+     * `connectionChanged` means that the watch stream connection status has changed.
+     */
+    case connectionChanged = "connection-changed"
+
+    /**
+     * `syncStatusChanged` means that the document sync status has changed.
+     */
+    case syncStatusChanged = "sync-status-changed"
+
+    /**
      * snapshot event type
      */
     case snapshot
@@ -62,6 +77,76 @@ public enum DocEventType: String {
  */
 public protocol DocEvent {
     var type: DocEventType { get }
+}
+
+public struct StatusInfo {
+    public let status: DocumentStatus
+    public let actorID: ActorID?
+}
+
+/**
+ * `StatusChangedEvent` is an event that occurs when
+ * the client's stream connection state changes.
+ */
+public struct StatusChangedEvent: DocEvent {
+    public let type: DocEventType = .statusChanged
+    /**
+     * StatusChangedEvent type
+     */
+    var source: OpSource
+    var value: StatusInfo
+}
+
+/**
+ * `StreamConnectionStatus` is stream connection status types
+ */
+public enum StreamConnectionStatus {
+    /**
+     * stream connected
+     */
+    case connected
+    /**
+     * stream disconnected
+     */
+    case disconnected
+}
+
+/**
+ * `ConnectionChangedEvent` is an event that occurs when
+ * the client's stream connection state changes.
+ */
+public struct ConnectionChangedEvent: DocEvent {
+    public let type: DocEventType = .connectionChanged
+    /**
+     * ConnectionChanged type
+     */
+    var value: StreamConnectionStatus
+}
+
+/**
+ * `DocumentSyncStatus` is document sync result types
+ */
+public enum DocumentSyncStatus: String {
+    /**
+     * type when Document synced.
+     */
+    case synced
+    /**
+     * type when Document sync failed.
+     */
+    case syncFailed = "sync-failed"
+}
+
+/**
+ * `SyncStatusChangedEvent` is an event that occurs when document
+ * attached to the client are synced.
+ */
+public struct SyncStatusChangedEvent: DocEvent {
+    public let type: DocEventType = .syncStatusChanged
+    /**
+     * SyncStatusChangedEvent type
+     */
+    var value: DocumentSyncStatus
 }
 
 /**

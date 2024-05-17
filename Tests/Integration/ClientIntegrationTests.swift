@@ -180,8 +180,8 @@ final class ClientIntegrationTests: XCTestCase {
         // 02. c2 changes the sync mode to realtime sync mode.
         let c2Exp1 = expectation(description: "C2 Exp")
 
-        var cancellable = c2.eventStream.sink { event in
-            if event.type == .documentSynced {
+        await d2.subscribeSync { event, _ in
+            if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 c2Exp1.fulfill()
             }
         }
@@ -189,12 +189,12 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.changeSyncMode(d2, .realtime)
         await fulfillment(of: [c2Exp1], timeout: 5) // sync occurs when resuming
 
-        cancellable.cancel()
+        await d2.unsubscribeSync()
 
         let c2Exp2 = expectation(description: "C2 Exp 2")
 
-        cancellable = c2.eventStream.sink { event in
-            if event.type == .documentSynced {
+        await d2.subscribeSync { event, _ in
+            if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 c2Exp2.fulfill()
             }
         }
@@ -212,7 +212,7 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertEqual(d1JSON, "{\"version\":\"v2\"}")
         XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
 
-        cancellable.cancel()
+        await d2.unsubscribeSync()
 
         // 03. c2 changes the sync mode to manual sync mode again.
         try await c2.changeSyncMode(d2, .manual)
@@ -278,6 +278,9 @@ final class ClientIntegrationTests: XCTestCase {
         var d3EventCount = 0
 
         await d1.subscribe { event, _ in
+            guard event is ChangeEvent else {
+                return
+            }
             XCTAssertEqual(event.type, expectedEvents1[d1EventCount])
             d1EventCount += 1
 
@@ -296,6 +299,10 @@ final class ClientIntegrationTests: XCTestCase {
         }
 
         await d2.subscribe { event, _ in
+            guard event is ChangeEvent else {
+                return
+            }
+
             XCTAssertEqual(event.type, expectedEvents2[d2EventCount])
             d2EventCount += 1
 
@@ -314,6 +321,10 @@ final class ClientIntegrationTests: XCTestCase {
         }
 
         await d3.subscribe { event, _ in
+            guard event is ChangeEvent else {
+                return
+            }
+
             XCTAssertEqual(event.type, expectedEvents3[d3EventCount])
             d3EventCount += 1
 
@@ -427,8 +438,8 @@ final class ClientIntegrationTests: XCTestCase {
         let d2 = Document(key: docKey)
 
         let exp1 = expectation(description: "exp 1")
-        var cancellable = c2.eventStream.sink { event in
-            if event.type == .documentSynced {
+        await d2.subscribeSync { event, _ in
+            if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp1.fulfill()
             }
         }
@@ -464,12 +475,12 @@ final class ClientIntegrationTests: XCTestCase {
 
         // 03. c2 is changed to realtime sync.
         // c2 should be able to apply changes made to the document while c2 is not in realtime sync.
-        cancellable.cancel()
+        await d2.unsubscribeSync()
 
         let exp2 = expectation(description: "exp 2")
 
-        cancellable = c2.eventStream.sink { event in
-            if event.type == .documentSynced {
+        await d2.subscribeSync { event, _ in
+            if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp2.fulfill()
             }
         }
@@ -482,12 +493,12 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
 
         // 04. c2 should automatically synchronize changes.
-        cancellable.cancel()
+        await d2.unsubscribeSync()
 
         let exp3 = expectation(description: "exp 3")
 
-        cancellable = c2.eventStream.sink { event in
-            if event.type == .documentSynced {
+        await d2.subscribeSync { event, _ in
+            if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp3.fulfill()
             }
         }
@@ -504,7 +515,7 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertEqual(d1JSON, "{\"version\":\"v3\"}")
         XCTAssertEqual(d2JSON, "{\"version\":\"v3\"}")
 
-        cancellable.cancel()
+        await d2.unsubscribeSync()
 
         try await c1.deactivate()
         try await c2.deactivate()
@@ -537,8 +548,8 @@ final class ClientIntegrationTests: XCTestCase {
         // 03. cli update the document with increasing the counter(0 -> 1)
         //     and sync with push-only mode: CP(2, 2) -> CP(3, 2)
         let exp1 = expectation(description: "exp 1")
-        let cancellable = c1.eventStream.sink { event in
-            if event.type == .documentSynced {
+        await d1.subscribeSync { event, _ in
+            if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp1.fulfill()
             }
         }
@@ -553,7 +564,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.changeSyncMode(d1, .realtimePushOnly)
         await fulfillment(of: [exp1], timeout: 5)
 
-        cancellable.cancel()
+        await d1.unsubscribeSync()
 
         checkpoint = await d1.checkpoint
         XCTAssertEqual(checkpoint.getClientSeq(), 3)
@@ -603,7 +614,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         await d1.subscribe { event, _ in
             eventCount1 += 1
-            if event.type == .remoteChange, eventCount1 == 3 {
+            if event.type == .remoteChange, eventCount1 == 6 {
                 exp1.fulfill()
             }
         }

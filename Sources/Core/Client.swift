@@ -39,20 +39,6 @@ public enum ClientStatus: String {
 }
 
 /**
- * `StreamConnectionStatus` is stream connection status types
- */
-enum StreamConnectionStatus {
-    /**
-     * stream connected
-     */
-    case connected
-    /**
-     * stream disconnected
-     */
-    case disconnected
-}
-
-/**
  * `SyncMode` defines synchronization modes for the PushPullChanges API.
  */
 public enum SyncMode {
@@ -193,7 +179,6 @@ public actor Client {
     public nonisolated let key: String
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus
-    public nonisolated let eventStream: PassthroughSubject<BaseClientEvent, Never>
 
     /**
      * @param rpcAddr - the address of the RPC server.
@@ -226,7 +211,6 @@ public actor Client {
         let authInterceptors = AuthClientInterceptors(apiKey: options.apiKey, token: options.token)
 
         self.rpcClient = YorkieServiceAsyncClient(channel: channel, interceptors: authInterceptors)
-        self.eventStream = PassthroughSubject()
     }
 
     /**
@@ -268,9 +252,6 @@ public actor Client {
             self.status = .activated
             await self.runSyncLoop()
 
-            let changeEvent = StatusChangedEvent(value: self.status)
-            self.eventStream.send(changeEvent)
-
             Logger.debug("Client(\(self.key)) activated")
         } catch {
             Logger.error("Failed to request activate client(\(self.key)).", error: error)
@@ -303,9 +284,6 @@ public actor Client {
         }
 
         self.status = .deactivated
-
-        let changeEvent = StatusChangedEvent(value: self.status)
-        self.eventStream.send(changeEvent)
 
         Logger.info("Client(\(self.key) deactivated.")
     }
@@ -353,7 +331,7 @@ public actor Client {
                 throw YorkieError.documentRemoved(message: "\(doc) is removed.")
             }
 
-            await doc.setStatus(.attached)
+            await doc.applyStatus(.attached)
 
             self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, syncMode: syncMode, remoteChangeEventReceived: false)
 
@@ -412,7 +390,7 @@ public actor Client {
             try await doc.applyChangePack(pack)
 
             if await doc.status != .removed {
-                await doc.setStatus(.detached)
+                await doc.applyStatus(.detached)
             }
 
             try self.stopWatchLoop(doc.getKey())
@@ -533,9 +511,6 @@ public actor Client {
         do {
             return try await self.performSyncInternal(false, attachment)
         } catch {
-            let event = DocumentSyncedEvent(value: .syncFailed)
-            self.eventStream.send(event)
-
             throw error
         }
     }
@@ -603,11 +578,6 @@ public actor Client {
 
             self.setSyncTimer(false)
         } catch {
-            Logger.error("[SL] c:\"\(self.key)\" sync failed: \(error)")
-
-            let event = DocumentSyncedEvent(value: .syncFailed)
-            self.eventStream.send(event)
-
             self.setSyncTimer(true)
         }
     }
@@ -639,9 +609,6 @@ public actor Client {
         self.changeDocKeyOfAuthInterceptors(docKey)
         self.attachmentMap[docKey]?.remoteWatchStream = self.rpcClient.makeWatchDocumentCall(request)
 
-        let event = StreamConnectionStatusChangedEvent(value: .connected)
-        self.eventStream.send(event)
-
         Task {
             if let stream = self.attachmentMap[docKey]?.remoteWatchStream?.responseStream {
                 do {
@@ -658,6 +625,8 @@ public actor Client {
                     }
                 }
             }
+
+            await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
         }
     }
 
@@ -710,9 +679,6 @@ public actor Client {
             switch pbWatchEvent.type {
             case .documentChanged:
                 self.attachmentMap[docKey]?.remoteChangeEventReceived = true
-
-                let event = DocumentChangedEvent(value: [docKey])
-                self.eventStream.send(event)
             case .documentWatched:
                 await self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
@@ -753,8 +719,9 @@ public actor Client {
 
         Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
-        let event = StreamConnectionStatusChangedEvent(value: .disconnected)
-        self.eventStream.send(event)
+        Task {
+            await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.disconnected)
+        }
     }
 
     private func onStreamDisconnect(_ docKey: DocumentKey) throws {
@@ -808,14 +775,15 @@ public actor Client {
                 self.attachmentMap.removeValue(forKey: docKey)
             }
 
-            let event = DocumentSyncedEvent(value: .synced)
-            self.eventStream.send(event)
+            await doc.publishSyncEvent(.synced)
 
             let remoteSize = responsePack.getChangeSize()
             Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {
+            await doc.publishSyncEvent(.syncFailed)
+
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 
             throw error
