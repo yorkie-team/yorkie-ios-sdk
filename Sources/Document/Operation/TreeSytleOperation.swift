@@ -32,16 +32,18 @@ class TreeStyleOperation: Operation {
      * `toPos` returns the end point of the editing range.
      */
     let toPos: CRDTTreePos
+    let maxCreatedAtMapByActor: [String: TimeTicket]
     /**
      * `attributes` returns the content of Edit.
      */
     let attributes: [String: String]
     let attributesToRemove: [String]
 
-    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, attributes: [String: String], attributesToRemove: [String], executedAt: TimeTicket) {
+    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, maxCreatedAtMapByActor: [String: TimeTicket], attributes: [String: String], attributesToRemove: [String], executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
+        self.maxCreatedAtMapByActor = maxCreatedAtMapByActor
         self.attributes = attributes
         self.attributesToRemove = attributesToRemove
         self.executedAt = executedAt
@@ -65,7 +67,7 @@ class TreeStyleOperation: Operation {
         let changes: [TreeChange]
 
         if self.attributes.isEmpty == false {
-            changes = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt)
+            (_, changes) = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
         } else {
             changes = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt)
         }

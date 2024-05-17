@@ -163,7 +163,7 @@ final class CRDTText: CRDTGCElement {
               _ content: String,
               _ editedAt: TimeTicket,
               _ attributes: [String: String]? = nil,
-              _ latestCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange], RGATreeSplitPosRange)
+              _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange], RGATreeSplitPosRange)
     {
         let value = !content.isEmpty ? TextValue(content) : nil
         if !content.isEmpty, let attributes {
@@ -172,11 +172,11 @@ final class CRDTText: CRDTGCElement {
             }
         }
 
-        let (caretPos, latestCreatedAtMap, contentChanges) = try self.rgaTreeSplit.edit(
+        let (caretPos, maxCreatedAtMap, contentChanges) = try self.rgaTreeSplit.edit(
             range,
             editedAt,
             value,
-            latestCreatedAtMapByActor
+            maxCreatedAtMapByActor
         )
 
         let changes = contentChanges.compactMap { TextChange(type: .content, actor: $0.actor, from: $0.from, to: $0.to, content: $0.content?.toString) }
@@ -187,7 +187,7 @@ final class CRDTText: CRDTGCElement {
             }
         }
 
-        return (latestCreatedAtMap, changes, (caretPos, caretPos))
+        return (maxCreatedAtMap, changes, (caretPos, caretPos))
     }
 
     /**
@@ -203,7 +203,7 @@ final class CRDTText: CRDTGCElement {
     func setStyle(_ range: RGATreeSplitPosRange,
                   _ attributes: [String: String],
                   _ editedAt: TimeTicket,
-                  _ latestCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [TextChange])
+                  _ maxCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [TextChange])
     {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
@@ -217,19 +217,19 @@ final class CRDTText: CRDTGCElement {
         for node in nodes {
             let actorID = node.createdAt.actorID
 
-            let latestCreatedAt: TimeTicket
+            let maxCreatedAt: TimeTicket
 
-            if latestCreatedAtMapByActor.isEmpty {
-                latestCreatedAt = TimeTicket.max
+            if maxCreatedAtMapByActor.isEmpty {
+                maxCreatedAt = TimeTicket.max
             } else {
-                latestCreatedAt = latestCreatedAtMapByActor[actorID] ?? TimeTicket.initial
+                maxCreatedAt = maxCreatedAtMapByActor[actorID] ?? TimeTicket.initial
             }
 
-            if node.canStyle(editedAt, latestCreatedAt) {
-                let latestCreatedAt = createdAtMapByActor[actorID]
+            if node.canStyle(editedAt, maxCreatedAt) {
+                let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
 
-                if latestCreatedAt == nil || createdAt.after(latestCreatedAt!) {
+                if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
                     createdAtMapByActor[actorID] = createdAt
                 }
                 toBeStyleds.append(node)
