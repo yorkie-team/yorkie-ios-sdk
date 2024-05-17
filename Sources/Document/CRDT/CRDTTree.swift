@@ -588,7 +588,6 @@ class CRDTTree: CRDTGCElement {
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
 
         var changes: [TreeChange] = []
-        let value = attributes != nil ? TreeChangeValue.attributes(attributes!) : nil
         var createdAtMapByActor = [String: TimeTicket]()
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
@@ -606,19 +605,32 @@ class CRDTTree: CRDTGCElement {
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
+                var affectedKeys = Set<String>()
                 for (key, value) in attributes ?? [:] {
-                    node.attrs?.set(key: key, value: value, executedAt: editedAt)
+                    if node.attrs?.set(key: key, value: value, executedAt: editedAt) ?? false {
+                        affectedKeys.insert(key)
+                    }
                 }
 
-                try changes.append(TreeChange(actor: editedAt.actorID,
-                                              type: .style,
-                                              from: self.toIndex(fromParent, fromLeft),
-                                              to: self.toIndex(toParent, toLeft),
-                                              fromPath: self.toPath(fromParent, fromLeft),
-                                              toPath: self.toPath(toParent, toLeft),
-                                              value: value,
-                                              splitLevel: 0) // dummy value.
-                )
+                if !affectedKeys.isEmpty {
+                    var affectedAttrs = [String: String]()
+
+                    for affectedKey in affectedKeys {
+                        if let attr = attributes?[affectedKey] {
+                            affectedAttrs[affectedKey] = attr
+                        }
+                    }
+
+                    try changes.append(TreeChange(actor: editedAt.actorID,
+                                                  type: .style,
+                                                  from: self.toIndex(fromParent, fromLeft),
+                                                  to: self.toIndex(toParent, toLeft),
+                                                  fromPath: self.toPath(fromParent, fromLeft),
+                                                  toPath: self.toPath(toParent, toLeft),
+                                                  value: TreeChangeValue.attributes(affectedAttrs),
+                                                  splitLevel: 0) // dummy value.
+                    )
+                }
             }
         }
 
