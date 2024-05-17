@@ -265,7 +265,7 @@ public actor Document {
 
         // 03. Do Garbage collection.
         if let ticket = pack.getMinSyncedTicket() {
-            self.garbageCollect(lessThanOrEqualTo: ticket)
+            self.garbageCollect(ticket)
         }
 
         // 04. Update the status.
@@ -361,7 +361,7 @@ public actor Document {
      *
      */
     @discardableResult
-    func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
+    func garbageCollect(_ ticket: TimeTicket) -> Int {
         if self.opts.disableGC {
             return 0
         }
