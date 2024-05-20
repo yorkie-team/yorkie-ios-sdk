@@ -37,6 +37,15 @@ class ChangeContext {
         self.delimiter = TimeTicket.Values.initialDelimiter
     }
 
+    func deepcopy() -> ChangeContext {
+        let clone = ChangeContext(id: self.id, root: self.root.deepcopy(), message: self.message)
+
+        clone.operations = self.operations
+        clone.delimiter = self.delimiter
+
+        return clone
+    }
+
     /**
      * `push` pushes the given operation to this context.
      */

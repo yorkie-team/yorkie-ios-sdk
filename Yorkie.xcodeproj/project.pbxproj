@@ -39,6 +39,7 @@
 		9AB38FD42A9337DF006FA879 /* PresenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB38FD32A9337DF006FA879 /* PresenceTests.swift */; };
 		9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */; };
 		9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */; };
+		9AC481502BFB164900C51338 /* TreeConcurrencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */; };
 		9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */; };
 		9AD11BF52A544362005C84D2 /* TreeSytleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */; };
 		9AD6E7E329C190E7001A1F89 /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */; };
@@ -167,6 +168,7 @@
 		9A97C18B2A8F32CE002AEFC5 /* Presence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presence.swift; sourceTree = "<group>"; };
 		9AB38FD32A9337DF006FA879 /* PresenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceTests.swift; sourceTree = "<group>"; };
 		9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTreeTests.swift; sourceTree = "<group>"; };
+		9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TreeConcurrencyTests.swift; sourceTree = "<group>"; };
 		9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeEditOperation.swift; sourceTree = "<group>"; };
 		9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeSytleOperation.swift; sourceTree = "<group>"; };
 		9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
@@ -366,6 +368,7 @@
 		9ADECA002919FC1A006BA331 /* Integration */ = {
 			isa = PBXGroup;
 			children = (
+				9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */,
 				96DA809028C5B7B400E2C1DA /* GRPCTests.swift */,
 				9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */,
 				9ADECA012919FC1A006BA331 /* ClientIntegrationTests.swift */,
@@ -889,6 +892,7 @@
 				CEA2DA4428F672AD00431B61 /* AddOperationTests.swift in Sources */,
 				CE8BB74028FE2F000020F62A /* ChangeContextTests.swift in Sources */,
 				CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */,
+				9AC481502BFB164900C51338 /* TreeConcurrencyTests.swift in Sources */,
 				CE8BB74128FE2F030020F62A /* CheckpointTests.swift in Sources */,
 				9A4BC6042AA08D6A00A9D436 /* String+Extensions.swift in Sources */,
 				9A3CF3EF2966A7370024E3DD /* CRDTTextTests.swift in Sources */,
