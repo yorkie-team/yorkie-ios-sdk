@@ -13,6 +13,7 @@ jobs:
     - uses: maxim-lobanov/setup-xcode@v1
       with:
         xcode-version: latest-stable
+    - uses: actions/checkout@v4
     - name: Setup yorkie server
       run: brew install yorkie
     - name: Run yorkie server
