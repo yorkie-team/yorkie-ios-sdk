@@ -306,7 +306,7 @@ final class CRDTTreeNode: IndexTreeNode {
         if self.type == DefaultTreeNodeType.text.rawValue {
             clone.value = self.value
         }
-        clone.attrs = self.attrs
+        clone.attrs = self.attrs?.deepcopy()
         clone.innerChildren = self.innerChildren.compactMap { child in
             let childClone = child.deepcopy()
             childClone?.parent = clone
