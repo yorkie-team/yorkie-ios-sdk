@@ -306,7 +306,7 @@ final class CRDTTreeNode: IndexTreeNode {
         if self.type == DefaultTreeNodeType.text.rawValue {
             clone.value = self.value
         }
-        clone.attrs = self.attrs
+        clone.attrs = self.attrs?.deepcopy()
         clone.innerChildren = self.innerChildren.compactMap { child in
             let childClone = child.deepcopy()
             childClone?.parent = clone
@@ -413,11 +413,7 @@ final class CRDTTreeNode: IndexTreeNode {
      * `canStyle` checks if node is able to style.
      */
     func canStyle(_ editedAt: TimeTicket, _ maxCreatedAt: TimeTicket) -> Bool {
-        if self.isText {
-            return false
-        }
-
-        return !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+        !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
     /**
