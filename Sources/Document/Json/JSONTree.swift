@@ -259,6 +259,15 @@ public class JSONTree {
         self.tree = tree
     }
 
+    func deepcopy() -> JSONTree {
+        let clone = JSONTree(initialRoot: self.initialRoot)
+
+        clone.context = self.context?.deepcopy()
+        clone.tree = self.tree?.deepcopy() as? CRDTTree
+
+        return clone
+    }
+
     /**
      * `id` returns the ID of this tree.
      */

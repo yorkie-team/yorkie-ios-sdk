@@ -197,7 +197,7 @@ public actor Client {
 
         let builder: ClientConnection.Builder
         if rpcAddress.isSecured {
-            builder = ClientConnection.usingTLSBackedByNetworkFramework(on: self.group)
+            builder = ClientConnection.usingPlatformAppropriateTLS(for: self.group)
         } else {
             builder = ClientConnection.insecure(group: self.group)
         }
@@ -226,7 +226,6 @@ public actor Client {
     }
 
     deinit {
-        try? self.group.syncShutdownGracefully()
         try? self.rpcClient.channel.close().wait()
     }
 

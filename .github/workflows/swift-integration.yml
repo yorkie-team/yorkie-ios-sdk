@@ -8,15 +8,15 @@ on:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
       with:
         xcode-version: latest-stable
-    - uses: actions/checkout@v3
-    - name: Setup Docker on macOS using Colima, Lima-VM, and Homebrew.
-      uses: douglascamata/setup-docker-macos-action@main
-      id: docker
-    - run: docker-compose -f docker/docker-compose-ci.yml up --build -d
+    - uses: actions/checkout@v4
+    - name: Setup yorkie server
+      run: brew install yorkie
+    - name: Run yorkie server
+      run: yorkie server & 
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
