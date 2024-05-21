@@ -413,11 +413,7 @@ final class CRDTTreeNode: IndexTreeNode {
      * `canStyle` checks if node is able to style.
      */
     func canStyle(_ editedAt: TimeTicket, _ maxCreatedAt: TimeTicket) -> Bool {
-        if self.isText {
-            return false
-        }
-
-        return !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+        !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
     /**
