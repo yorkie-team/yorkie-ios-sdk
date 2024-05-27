@@ -37,7 +37,7 @@ func getNodeLength(_ root: CRDTTreeNode?) -> Int {
 }
 
 final class GCTests: XCTestCase {
-    func test_shuld_collect_garbage() async throws {
+    func test_should_collect_garbage() async throws {
         let doc = Document(key: "test-doc")
 
         var result = await doc.toSortedJSON()
