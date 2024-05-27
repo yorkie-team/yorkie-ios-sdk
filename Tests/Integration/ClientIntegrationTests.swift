@@ -680,4 +680,69 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
         try await c2.deactivate()
     }
+    
+    func test_should_avoid_unnecessary_syncs_in_push_only_mode() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        try await c1.attach(d1)
+        try await c2.attach(d2)
+
+        let exp1 = expectation(description: "exp 1")
+        var exp2 = expectation(description: "exp 2")
+        
+        await d2.subscribeSync { event, _ in
+            exp2.fulfill()
+        }
+
+        try await d1.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+        }
+
+        await fulfillment(of: [exp2], timeout: 5)
+        exp2 = expectation(description: "exp 2")
+        
+        var d1JSON = await(d1.getRoot().t as? JSONText)?.toString
+        var d2JSON = await(d2.getRoot().t as? JSONText)?.toString
+        XCTAssertEqual(d1JSON, "a")
+        XCTAssertEqual(d2JSON, "a")
+
+        await d1.subscribeSync { event, _ in
+            exp1.fulfill()
+        }
+
+        try await c1.changeSyncMode(d1, .realtimePushOnly)
+
+        try await d2.update { root, _ in
+            (root.t as? JSONText)?.edit(1, 1, "b")
+        }
+
+        await fulfillment(of: [exp2], timeout: 5)
+        exp2 = expectation(description: "exp 2")
+        
+        try await d2.update { root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }
+
+        await fulfillment(of: [exp2], timeout: 5)
+
+        try await c1.changeSyncMode(d1, .realtime)
+
+        await fulfillment(of: [exp1], timeout: 5)
+
+        d1JSON = await(d1.getRoot().t as? JSONText)?.toString
+        d2JSON = await(d2.getRoot().t as? JSONText)?.toString
+        XCTAssertEqual(d1JSON, "abc")
+        XCTAssertEqual(d2JSON, "abc")
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
 }
