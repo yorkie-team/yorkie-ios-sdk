@@ -315,6 +315,9 @@ public class JSONTree {
         return tree.indexTree
     }
 
+    /**
+     * `styleByPath` sets the attributes to the elements of the given path.
+     */
     public func styleByPath(_ path: [Int], _ attributes: Codable) throws {
         try self.styleByPathInternal(path, StringValueTypeDictionary.stringifyAttributes(attributes))
     }
@@ -323,11 +326,8 @@ public class JSONTree {
         try self.styleByPathInternal(path, attributes.stringValueTypeDictionary)
     }
 
-    /**
-     * `styleByPath` sets the attributes to the elements of the given path.
-     */
     public func styleByPathInternal(_ path: [Int], _ stringAttrs: [String: String]) throws {
-        guard let context, let tree else {
+        guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
@@ -336,34 +336,23 @@ public class JSONTree {
         }
 
         let (fromPos, toPos) = try tree.pathToPosRange(path)
-        let ticket = context.issueTimeTicket
 
-        let (maxCreationMapByActor, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
-
-        // TreeStyleOperation
-        context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
-                                                   fromPos: fromPos,
-                                                   toPos: toPos,
-                                                   maxCreatedAtMapByActor: maxCreationMapByActor,
-                                                   attributes: stringAttrs,
-                                                   attributesToRemove: [],
-                                                   executedAt: ticket)
-        )
+        try self.styleInternal(fromPos, toPos, stringAttrs)
     }
 
     /**
      * `style` sets the attributes to the elements of the given range.
      */
     public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws {
-        try self.styleInternal(fromIdx, toIdx, StringValueTypeDictionary.stringifyAttributes(attributes))
+        try self.styleByIndexInternal(fromIdx, toIdx, StringValueTypeDictionary.stringifyAttributes(attributes))
     }
 
     public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: [String: Any]) throws {
-        try self.styleInternal(fromIdx, toIdx, attributes.stringValueTypeDictionary)
+        try self.styleByIndexInternal(fromIdx, toIdx, attributes.stringValueTypeDictionary)
     }
 
-    func styleInternal(_ fromIdx: Int, _ toIdx: Int, _ stringAttrs: [String: String]) throws {
-        guard let context, let tree else {
+    func styleByIndexInternal(_ fromIdx: Int, _ toIdx: Int, _ stringAttrs: [String: String]) throws {
+        guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
@@ -373,9 +362,18 @@ public class JSONTree {
 
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
+
+        try self.styleInternal(fromPos, toPos, stringAttrs)
+    }
+
+    func styleInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ stringAttrs: [String: String]) throws {
+        guard let context, let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
         let ticket = context.issueTimeTicket
 
-        let (maxCreationMapByActor, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
+        let (maxCreationMapByActor, pairs, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
 
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
@@ -385,13 +383,34 @@ public class JSONTree {
                                                    attributesToRemove: [],
                                                    executedAt: ticket)
         )
+
+        for pair in pairs {
+            self.context?.registerGCPair(pair)
+        }
+    }
+
+    /**
+     * `remoteStyleByPath` removes the attributes to the elements of the given path.
+     */
+    public func removeStyleByPath(_ path: [Int], _ attributesToRemove: [String]) throws {
+        guard let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        if path.isEmpty {
+            throw YorkieError.unexpected(message: "path should not be empty")
+        }
+
+        let (fromPos, toPos) = try tree.pathToPosRange(path)
+
+        try self.removeStyleInternal(fromPos, toPos, attributesToRemove)
     }
 
     /**
      * `removeStyle` removes the attributes to the elements of the given range.
      */
     public func removeStyle(_ fromIdx: Int, _ toIdx: Int, _ attributesToRemove: [String]) throws {
-        guard let context, let tree else {
+        guard let tree else {
             throw YorkieError.unexpected(message: "it is not initialized yet")
         }
 
@@ -401,9 +420,22 @@ public class JSONTree {
 
         let fromPos = try tree.findPos(fromIdx)
         let toPos = try tree.findPos(toIdx)
+
+        try self.removeStyleInternal(fromPos, toPos, attributesToRemove)
+    }
+
+    private func removeStyleInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ attributesToRemove: [String]) throws {
+        guard let context, let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
         let ticket = context.issueTimeTicket
 
-        try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+        let (pairs, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+
+        for pair in pairs {
+            self.context?.registerGCPair(pair)
+        }
 
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,

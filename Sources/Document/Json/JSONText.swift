@@ -148,9 +148,10 @@ public class JSONText {
 
         let ticket = context.issueTimeTicket
         let maxCreatedAtMapByActor: [String: TimeTicket]
+        let pairs: [GCPair]
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         do {
-            (maxCreatedAtMapByActor, _) = try text.setStyle(range, stringAttrs, ticket)
+            (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(range, stringAttrs, ticket)
         } catch {
             Logger.critical("can't set Style")
             return false
@@ -162,6 +163,10 @@ public class JSONText {
                                                maxCreatedAtMapByActor: maxCreatedAtMapByActor,
                                                attributes: stringAttrs,
                                                executedAt: ticket))
+
+        for pair in pairs {
+            self.context?.registerGCPair(pair)
+        }
 
         return true
     }
@@ -208,6 +213,18 @@ public class JSONText {
      */
     public var toString: String {
         self.text?.toString ?? ""
+    }
+
+    /**
+     * `toSortedJSON` returns the JSON string of this tree.
+     */
+    public func toSortedJSON() -> String {
+        guard self.context != nil, let text else {
+            Logger.critical("it is not initialized yet")
+            return ""
+        }
+
+        return text.toSortedJSON()
     }
 
     /**

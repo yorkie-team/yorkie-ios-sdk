@@ -47,8 +47,15 @@ class CRDTRoot {
      */
     private var elementHasRemovedNodesSetByCreatedAt: Set<String> = Set()
 
+    /**
+     * `gcPairMap` is a hash table that maps the IDString of GCChild to the
+     * element itself and its parent.
+     */
+    private var gcPairMap: [String: GCPair]
+
     init(rootObject: CRDTObject = CRDTObject(createdAt: TimeTicket.initial)) {
         self.rootObject = rootObject
+        self.gcPairMap = [:]
         self.elementPairMapByCreatedAt[self.rootObject.createdAt.toIDString] = (element: self.rootObject, parent: nil)
 
         self.rootObject.getDescendants(callback: { element, parent in
@@ -130,6 +137,22 @@ class CRDTRoot {
     }
 
     /**
+     * `registerGCPair` registers the given pair to hash table.
+     */
+    func registerGCPair(_ pair: GCPair) {
+        guard let childID = pair.child?.toIDString else {
+            return
+        }
+
+        if self.gcPairMap[childID] != nil {
+            self.gcPairMap.removeValue(forKey: childID)
+            return
+        }
+
+        self.gcPairMap[childID] = pair
+    }
+
+    /**
      * `elementMapSize` returns the size of element map.
      */
     var elementMapSize: Int {
@@ -182,6 +205,8 @@ class CRDTRoot {
             count += element.removedNodesLength
         }
 
+        count += self.gcPairMap.count
+
         return count
     }
 
@@ -203,8 +228,8 @@ class CRDTRoot {
     func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
         var count = 0
 
-        for item in self.removedElementSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[item],
+        for createdAt in self.removedElementSetByCreatedAt {
+            guard let pair = self.elementPairMapByCreatedAt[createdAt],
                   let removedAt = pair.element.removedAt, removedAt <= ticket
             else {
                 continue
@@ -214,8 +239,8 @@ class CRDTRoot {
             count += self.garbageCollectInternal(element: pair.element)
         }
 
-        for item in self.elementHasRemovedNodesSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[item],
+        for createdAt in self.elementHasRemovedNodesSetByCreatedAt {
+            guard let pair = self.elementPairMapByCreatedAt[createdAt],
                   let element = pair.element as? CRDTGCElement
             else {
                 continue
@@ -227,6 +252,17 @@ class CRDTRoot {
             }
 
             count += removedNodeCount
+        }
+
+        for pair in self.gcPairMap.values {
+            if let child = pair.child {
+                if let removedAt = child.removedAt, ticket >= removedAt {
+                    pair.parent?.purge(node: child)
+                }
+
+                self.gcPairMap.removeValue(forKey: child.toIDString)
+            }
+            count += 1
         }
 
         return count

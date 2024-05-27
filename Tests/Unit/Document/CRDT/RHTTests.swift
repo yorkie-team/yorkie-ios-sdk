@@ -157,3 +157,173 @@ class RHTTests: XCTestCase {
         }
     }
 }
+
+final class GCTestsForRHT: XCTestCase {
+    enum OpCode {
+        case noOp
+        case set
+        case remove
+    }
+
+    struct Operation {
+        let code: OpCode
+        let key: String
+        let val: String
+    }
+
+    struct Step {
+        let op: Operation
+        let expectJSON: String
+        let expectSize: Int?
+
+        init(op: Operation, expectJSON: String, expectSize: Int? = nil) {
+            self.op = op
+            self.expectJSON = expectJSON
+            self.expectSize = expectSize
+        }
+    }
+
+    struct TestCase {
+        let desc: String
+        let steps: [Step]
+    }
+
+    func test_rht_garbage_collection_marshal() async throws {
+        let tests: [TestCase] = [
+            TestCase(desc: "1. empty hash table",
+                     steps: [
+                         Step(op: Operation(code: .noOp, key: "", val: ""),
+                              expectJSON: "{}")
+                     ]),
+            TestCase(desc: "2. only one element",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "hello\\\\\\\\\\\t", val: "world\"\u{000C}\u{0008}"),
+                              expectJSON: "{\"hello\\\\\\\\\\\\\\\\\\\\\\t\":\"world\\\"\\f\\b\"}")
+                     ]),
+            TestCase(desc: "2. non-empty hash table",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "hi", val: "test\r"),
+                              expectJSON: "{\"hello\\\\\\\\\\\\\\\\\\\\\\t\":\"world\\\"\\f\\b\",\"hi\":\"test\\r\"}")
+                     ])
+        ]
+
+        let rht = RHT()
+
+        for test in tests {
+            for step in test.steps {
+                if step.op.code == .set {
+                    rht.set(key: step.op.key, value: step.op.val, executedAt: timeT())
+                }
+
+                let result = rht.toSortedJSON()
+                XCTAssertEqual(result, step.expectJSON)
+            }
+        }
+    }
+
+    func test_rht_garbage_collection_set() async throws {
+        let tests: [TestCase] = [
+            TestCase(desc: "1. set elements",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "key1", val: "value1"),
+                              expectJSON: "{\"key1\":\"value1\"}",
+                              expectSize: 1),
+                         Step(op: Operation(code: .set, key: "key2", val: "value2"),
+                              expectJSON: "{\"key1\":\"value1\",\"key2\":\"value2\"}",
+                              expectSize: 2)
+                     ]),
+            TestCase(desc: "2. change elements",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "key1", val: "value2"),
+                              expectJSON: "{\"key1\":\"value2\",\"key2\":\"value2\"}",
+                              expectSize: 2),
+                         Step(op: Operation(code: .set, key: "key2", val: "value1"),
+                              expectJSON: "{\"key1\":\"value2\",\"key2\":\"value1\"}",
+                              expectSize: 2)
+                     ])
+        ]
+
+        let rht = RHT()
+
+        for test in tests {
+            for step in test.steps {
+                if step.op.code == .set {
+                    rht.set(key: step.op.key, value: step.op.val, executedAt: timeT())
+                }
+
+                let result = rht.toJSON()
+                XCTAssertEqual(result, step.expectJSON)
+            }
+        }
+    }
+
+    func test_rht_garbage_collection_remove() async throws {
+        let tests: [TestCase] = [
+            TestCase(desc: "1. set elements",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "key1", val: "value1"),
+                              expectJSON: "{\"key1\":\"value1\"}",
+                              expectSize: 1),
+                         Step(op: Operation(code: .set, key: "key2", val: "value2"),
+                              expectJSON: "{\"key1\":\"value1\",\"key2\":\"value2\"}",
+                              expectSize: 2)
+                     ]),
+            TestCase(desc: "2. remove elements",
+                     steps: [
+                         Step(op: Operation(code: .remove, key: "key1", val: "value1"),
+                              expectJSON: "{\"key2\":\"value2\"}",
+                              expectSize: 1)
+                     ]),
+            TestCase(desc: "3. set after remove",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "key1", val: "value11"),
+                              expectJSON: "{\"key1\":\"value11\",\"key2\":\"value2\"}",
+                              expectSize: 2)
+                     ]),
+            TestCase(desc: "4. remove elements",
+                     steps: [
+                         Step(op: Operation(code: .set, key: "key2", val: "value22"),
+                              expectJSON: "{\"key1\":\"value11\",\"key2\":\"value22\"}",
+                              expectSize: 2),
+                         Step(op: Operation(code: .remove, key: "key1", val: "value11"),
+                              expectJSON: "{\"key2\":\"value22\"}",
+                              expectSize: 1)
+                     ]),
+            TestCase(desc: "5. remove element again",
+                     steps: [
+                         Step(op: Operation(code: .remove, key: "key1", val: "value11"),
+                              expectJSON: "{\"key2\":\"value22\"}",
+                              expectSize: 1)
+                     ]),
+            TestCase(desc: "6. remove elements(cleared)",
+                     steps: [
+                         Step(op: Operation(code: .remove, key: "key2", val: "value22"),
+                              expectJSON: "{}",
+                              expectSize: 0)
+                     ]),
+            TestCase(desc: "7. remove not exist key",
+                     steps: [
+                         Step(op: Operation(code: .remove, key: "not-exist-key", val: ""),
+                              expectJSON: "{}",
+                              expectSize: 0)
+                     ])
+        ]
+
+        let rht = RHT()
+
+        for test in tests {
+            for step in test.steps {
+                if step.op.code == .set {
+                    rht.set(key: step.op.key, value: step.op.val, executedAt: timeT())
+                } else if step.op.code == .remove {
+                    rht.remove(key: step.op.key, executedAt: timeT())
+                }
+
+                let result = rht.toSortedJSON()
+                XCTAssertEqual(result, step.expectJSON, test.desc)
+                XCTAssertEqual(rht.size, step.expectSize, test.desc)
+                XCTAssertEqual(rht.toObject().count, step.expectSize, test.desc)
+            }
+        }
+    }
+}

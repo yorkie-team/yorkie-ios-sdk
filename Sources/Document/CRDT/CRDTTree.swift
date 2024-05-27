@@ -230,7 +230,7 @@ typealias TreePosRange = (CRDTTreePos, CRDTTreePos)
 public typealias TreePosStructRange = (CRDTTreePosStruct, CRDTTreePosStruct)
 
 /**
- * `CRDTTreeNode` is a node of CRDTTree. It is includes the logical clock and
+ * `CRDTTreeNode` is a node of CRDTTree. It includes the logical clock and
  * links to other nodes to resolve conflicts.
  */
 final class CRDTTreeNode: IndexTreeNode {
@@ -417,6 +417,23 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
+     * `setAttrs` sets the attributes of the node.
+     */
+    func setAttrs(_ attrs: [String: String], _ editedAt: TimeTicket) -> [(RHTNode?, RHTNode?)] {
+        if self.attrs == nil {
+            self.attrs = RHT()
+        }
+
+        var pairs = [(RHTNode?, RHTNode?)]()
+
+        for attr in attrs {
+            pairs.append(self.attrs!.set(key: attr.key, value: attr.value, executedAt: editedAt))
+        }
+
+        return pairs
+    }
+
+    /**
      * toXML converts the given CRDTNode to XML string.
      */
     static func toXML(node: CRDTTreeNode) -> String {
@@ -488,6 +505,16 @@ final class CRDTTreeNode: IndexTreeNode {
 
             return resultString
         }
+    }
+}
+
+extension CRDTTreeNode: GCParent {
+    func purge(node: any GCChild) {
+        guard let node = node as? RHTNode else {
+            return
+        }
+
+        self.attrs?.purge(node)
     }
 }
 
@@ -579,19 +606,19 @@ class CRDTTree: CRDTGCElement {
      * `style` applies the given attributes of the given range.
      */
     @discardableResult
-    func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]?) throws -> ([String: TimeTicket], [TreeChange]) {
+    func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]?) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
 
         var changes: [TreeChange] = []
         var createdAtMapByActor = [String: TimeTicket]()
-
+        var pairs = [GCPair]()
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             let actorID = node.createdAt.actorID
             var maxCreatedAt: TimeTicket? = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor?[actorID] ?? TimeTicket.initial : TimeTicket.max
 
-            if node.canStyle(editedAt, maxCreatedAt!), !node.isText, attributes != nil {
+            if node.canStyle(editedAt, maxCreatedAt!), !node.isText, let attributes {
                 maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
                 if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
@@ -601,20 +628,15 @@ class CRDTTree: CRDTGCElement {
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
-                var affectedKeys = Set<String>()
-                for (key, value) in attributes ?? [:] where node.attrs?.set(key: key, value: value, executedAt: editedAt) ?? false {
-                    affectedKeys.insert(key)
+                let updatedAttrPairs = node.setAttrs(attributes, editedAt)
+                var affectedAttrs = [String: String]()
+                for (_, curr) in updatedAttrPairs {
+                    if let key = curr?.key {
+                        affectedAttrs[key] = attributes[key]
+                    }
                 }
 
-                if !affectedKeys.isEmpty {
-                    var affectedAttrs = [String: String]()
-
-                    for affectedKey in affectedKeys {
-                        if let attr = attributes?[affectedKey] {
-                            affectedAttrs[affectedKey] = attr
-                        }
-                    }
-
+                if !affectedAttrs.isEmpty {
                     try changes.append(TreeChange(actor: editedAt.actorID,
                                                   type: .style,
                                                   from: self.toIndex(fromParent, fromLeft),
@@ -624,22 +646,25 @@ class CRDTTree: CRDTGCElement {
                                                   value: TreeChangeValue.attributes(affectedAttrs),
                                                   splitLevel: 0) // dummy value.
                     )
+
+                    for (prev, _) in updatedAttrPairs where prev != nil {
+                        pairs.append(GCPair(parent: node, child: prev))
+                    }
                 }
             }
         }
 
-        return (createdAtMapByActor, changes)
+        return (createdAtMapByActor, pairs, changes)
     }
 
     /**
      * `removeStyle` removes the given attributes of the given range.
      */
-    @discardableResult
-    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket) throws -> [TreeChange] {
+    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket) throws -> ([GCPair], [TreeChange]) {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
         var changes: [TreeChange] = []
-
+        var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
@@ -649,7 +674,10 @@ class CRDTTree: CRDTGCElement {
                     node.attrs = RHT()
                 }
                 for key in attributesToRemove {
-                    node.attrs?.remove(key: key, executedAt: editedAt)
+                    let nodesToBeRemoved = node.attrs!.remove(key: key, executedAt: editedAt)
+                    for rhtNode in nodesToBeRemoved {
+                        pairs.append(GCPair(parent: node, child: rhtNode))
+                    }
                 }
 
                 try changes.append(TreeChange(actor: editedAt.actorID,
@@ -664,7 +692,7 @@ class CRDTTree: CRDTGCElement {
             }
         }
 
-        return changes
+        return (pairs, changes)
     }
 
     /**

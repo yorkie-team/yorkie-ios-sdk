@@ -59,3 +59,27 @@ func buildIndexTree(_ node: JSONTreeElementNode) async throws -> IndexTree<CRDTT
     }
     return try await(doc.getRoot().t as? JSONTree)?.getIndexTree()
 }
+
+/**
+ * `idT` is a dummy CRDTTreeNodeID for testing.
+ */
+let idT = CRDTTreeNodeID(createdAt: TimeTicket.initial, offset: 0)
+
+/**
+ * `dummyContext` is a helper context that is used for testing.
+ */
+let dummyContext = ChangeContext(id: ChangeID.initial, root: CRDTRoot())
+
+/**
+ * `posT` is a helper function that issues a new CRDTTreeNodeID.
+ */
+func posT(_ offset: Int32 = 0) -> CRDTTreeNodeID {
+    CRDTTreeNodeID(createdAt: dummyContext.issueTimeTicket, offset: offset)
+}
+
+/**
+ * `timeT` is a helper function that issues a new TimeTicket.
+ */
+func timeT() -> TimeTicket {
+    dummyContext.issueTimeTicket
+}
