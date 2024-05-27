@@ -251,7 +251,7 @@ final class GCTestsForRHT: XCTestCase {
                     rht.set(key: step.op.key, value: step.op.val, executedAt: timeT())
                 }
 
-                let result = rht.toJSON()
+                let result = rht.toSortedJSON()
                 XCTAssertEqual(result, step.expectJSON)
             }
         }
