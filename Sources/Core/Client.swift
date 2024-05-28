@@ -715,7 +715,7 @@ public actor Client {
 
             // NOTE(chacha912, hackerwins): If syncLoop already executed with
             // PushPull, ignore the response when the syncMode is PushOnly.
-            if responsePack.hasChanges(), attachment.syncMode == .realtimePushOnly {
+            if responsePack.hasChanges(), (attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff) {
                 return doc
             }
 
