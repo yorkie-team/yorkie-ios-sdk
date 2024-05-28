@@ -41,7 +41,7 @@ class Attachment {
         if self.syncMode == .realtimeSyncOff {
             return false
         }
-        
+
         if self.syncMode == .realtimePushOnly {
             return await self.doc.hasLocalChanges()
         }

@@ -680,7 +680,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
         try await c2.deactivate()
     }
-    
+
     func test_should_avoid_unnecessary_syncs_in_push_only_mode() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -696,8 +696,8 @@ final class ClientIntegrationTests: XCTestCase {
 
         let exp1 = expectation(description: "exp 1")
         var exp2 = expectation(description: "exp 2")
-        
-        await d2.subscribeSync { event, _ in
+
+        await d2.subscribeSync { _, _ in
             exp2.fulfill()
         }
 
@@ -708,13 +708,13 @@ final class ClientIntegrationTests: XCTestCase {
 
         await fulfillment(of: [exp2], timeout: 5)
         exp2 = expectation(description: "exp 2")
-        
+
         var d1JSON = await(d1.getRoot().t as? JSONText)?.toString
         var d2JSON = await(d2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(d1JSON, "a")
         XCTAssertEqual(d2JSON, "a")
 
-        await d1.subscribeSync { event, _ in
+        await d1.subscribeSync { _, _ in
             exp1.fulfill()
         }
 
@@ -726,7 +726,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         await fulfillment(of: [exp2], timeout: 5)
         exp2 = expectation(description: "exp 2")
-        
+
         try await d2.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }
