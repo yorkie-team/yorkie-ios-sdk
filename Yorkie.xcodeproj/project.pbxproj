@@ -22,8 +22,15 @@
 		9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */; };
 		9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A4DC744292DD82500C89478 /* YorkieCountable.swift */; };
 		9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */; };
+		9A569CAD2C060080007EF118 /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CA72C060080007EF118 /* resources.pb.swift */; };
+		9A569CAE2C060080007EF118 /* yorkie.connect.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CA82C060080007EF118 /* yorkie.connect.swift */; };
+		9A569CAF2C060080007EF118 /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CA92C060080007EF118 /* yorkie.pb.swift */; };
+		9A569CB62C0600D0007EF118 /* JONSTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CB32C0600C9007EF118 /* JONSTreeTests.swift */; };
+		9A569CB92C060132007EF118 /* Connect in Frameworks */ = {isa = PBXBuildFile; productRef = 9A569CB82C060132007EF118 /* Connect */; };
+		9A569CBB2C060150007EF118 /* GC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CBA2C060150007EF118 /* GC.swift */; };
+		9A569CBC2C0601B8007EF118 /* GCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CB22C0600C9007EF118 /* GCTests.swift */; };
+		9A569CBD2C060307007EF118 /* GCIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A569CB02C06009B007EF118 /* GCIntegrationTests.swift */; };
 		9A5A80D82BD0BD190047B978 /* Attachment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5A80D72BD0BD180047B978 /* Attachment.swift */; };
-		9A5A80DA2BD238400047B978 /* URLTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5A80D92BD238400047B978 /* URLTests.swift */; };
 		9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */ = {isa = PBXBuildFile; productRef = 9A5D9DDB2A710FB40096C40C /* Semaphore */; };
 		9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = 9A6399A6294C7E1E00BF27F5 /* Logging */; };
 		9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */; };
@@ -42,11 +49,7 @@
 		9AC481502BFB164900C51338 /* TreeConcurrencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */; };
 		9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */; };
 		9AD11BF52A544362005C84D2 /* TreeSytleOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */; };
-		9AD6E7E329C190E7001A1F89 /* resources.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */; };
-		9AD6E7E529C190E7001A1F89 /* yorkie.grpc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7E029C190E7001A1F89 /* yorkie.grpc.swift */; };
-		9AD6E7E629C190E7001A1F89 /* yorkie.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7E129C190E7001A1F89 /* yorkie.pb.swift */; };
 		9AD6E7E929C19E0A001A1F89 /* DocumentIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD6E7E829C19E0A001A1F89 /* DocumentIntegrationTests.swift */; };
-		9ADA77062A8DF1F2007504FF /* GCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADA77052A8DF1F2007504FF /* GCTests.swift */; };
 		9ADAEE56296571D8007E9F9F /* CRDTText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5329654377007E9F9F /* CRDTText.swift */; };
 		9ADAEE5829657696007E9F9F /* JSONText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5729657696007E9F9F /* JSONText.swift */; };
 		9ADAEE5A29657E03007E9F9F /* EditOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ADAEE5929657E03007E9F9F /* EditOperation.swift */; };
@@ -117,8 +120,6 @@
 		CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */; };
 		CEDDE26E2914EAD00032B16A /* JSONObjectable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */; };
 		CEDDE2722914EB5C0032B16A /* YorkieJSONObjectableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */; };
-		CEEB17E828C84D6A004988DD /* GRPC in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17E728C84D6A004988DD /* GRPC */; };
-		CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = CEEB17EA28C84D7B004988DD /* SwiftProtobuf */; };
 		CEF64375290A349F00C32B99 /* DocEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64374290A349F00C32B99 /* DocEvent.swift */; };
 		CEF64378290A380000C32B99 /* DocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64376290A37BB00C32B99 /* DocumentTests.swift */; };
 		CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEF64379290A4F0B00C32B99 /* Optional+Extensions.swift */; };
@@ -152,9 +153,15 @@
 		9A4DC73D2923203700C89478 /* JSONCounter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONCounter.swift; sourceTree = "<group>"; };
 		9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CounterIntegrationTests.swift; sourceTree = "<group>"; };
 		9A4DC744292DD82500C89478 /* YorkieCountable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieCountable.swift; sourceTree = "<group>"; };
+		9A569CA72C060080007EF118 /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
+		9A569CA82C060080007EF118 /* yorkie.connect.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.connect.swift; sourceTree = "<group>"; };
+		9A569CA92C060080007EF118 /* yorkie.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.pb.swift; sourceTree = "<group>"; };
+		9A569CB02C06009B007EF118 /* GCIntegrationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GCIntegrationTests.swift; sourceTree = "<group>"; };
+		9A569CB22C0600C9007EF118 /* GCTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GCTests.swift; sourceTree = "<group>"; };
+		9A569CB32C0600C9007EF118 /* JONSTreeTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = JONSTreeTests.swift; sourceTree = "<group>"; };
+		9A569CBA2C060150007EF118 /* GC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GC.swift; sourceTree = "<group>"; };
 		9A5A80D52BD0BC8A0047B978 /* DocumentBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentBenchmarkTests.swift; sourceTree = "<group>"; };
 		9A5A80D72BD0BD180047B978 /* Attachment.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Attachment.swift; sourceTree = "<group>"; };
-		9A5A80D92BD238400047B978 /* URLTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = URLTests.swift; sourceTree = "<group>"; };
 		9A66B19D295446BF00D10B94 /* RGATreeSplit.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RGATreeSplit.swift; sourceTree = "<group>"; };
 		9A66B19F2955833E00D10B94 /* LLRBTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLRBTree.swift; sourceTree = "<group>"; };
 		9A7C75E92A0261DD000B6E5A /* Version.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Version.swift; sourceTree = "<group>"; };
@@ -171,13 +178,9 @@
 		9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TreeConcurrencyTests.swift; sourceTree = "<group>"; };
 		9AD11BF22A544353005C84D2 /* TreeEditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeEditOperation.swift; sourceTree = "<group>"; };
 		9AD11BF42A544362005C84D2 /* TreeSytleOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeSytleOperation.swift; sourceTree = "<group>"; };
-		9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = resources.pb.swift; sourceTree = "<group>"; };
 		9AD6E7DF29C190E7001A1F89 /* yorkie.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = yorkie.proto; sourceTree = "<group>"; };
-		9AD6E7E029C190E7001A1F89 /* yorkie.grpc.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.grpc.swift; sourceTree = "<group>"; };
-		9AD6E7E129C190E7001A1F89 /* yorkie.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = yorkie.pb.swift; sourceTree = "<group>"; };
 		9AD6E7E229C190E7001A1F89 /* resources.proto */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.protobuf; path = resources.proto; sourceTree = "<group>"; };
 		9AD6E7E829C19E0A001A1F89 /* DocumentIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentIntegrationTests.swift; sourceTree = "<group>"; };
-		9ADA77052A8DF1F2007504FF /* GCTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GCTests.swift; sourceTree = "<group>"; };
 		9ADAEE5329654377007E9F9F /* CRDTText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTText.swift; sourceTree = "<group>"; };
 		9ADAEE5729657696007E9F9F /* JSONText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONText.swift; sourceTree = "<group>"; };
 		9ADAEE5929657E03007E9F9F /* EditOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditOperation.swift; sourceTree = "<group>"; };
@@ -259,10 +262,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9A569CB92C060132007EF118 /* Connect in Frameworks */,
 				9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */,
 				9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */,
-				CEEB17E828C84D6A004988DD /* GRPC in Frameworks */,
-				CEEB17EB28C84D7B004988DD /* SwiftProtobuf in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -321,6 +323,33 @@
 			path = Tests;
 			sourceTree = "<group>";
 		};
+		9A569CAA2C060080007EF118 /* v1 */ = {
+			isa = PBXGroup;
+			children = (
+				9A569CA72C060080007EF118 /* resources.pb.swift */,
+				9A569CA82C060080007EF118 /* yorkie.connect.swift */,
+				9A569CA92C060080007EF118 /* yorkie.pb.swift */,
+			);
+			path = v1;
+			sourceTree = "<group>";
+		};
+		9A569CAB2C060080007EF118 /* yorkie */ = {
+			isa = PBXGroup;
+			children = (
+				9A569CAA2C060080007EF118 /* v1 */,
+			);
+			path = yorkie;
+			sourceTree = "<group>";
+		};
+		9A569CAC2C060080007EF118 /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				9A569CAB2C060080007EF118 /* yorkie */,
+			);
+			name = Generated;
+			path = V1/Generated;
+			sourceTree = "<group>";
+		};
 		9A5A80D62BD0BC8A0047B978 /* Benchmark */ = {
 			isa = PBXGroup;
 			children = (
@@ -356,10 +385,7 @@
 		9AD6E7DD29C190E7001A1F89 /* v1 */ = {
 			isa = PBXGroup;
 			children = (
-				9AD6E7DE29C190E7001A1F89 /* resources.pb.swift */,
 				9AD6E7DF29C190E7001A1F89 /* yorkie.proto */,
-				9AD6E7E029C190E7001A1F89 /* yorkie.grpc.swift */,
-				9AD6E7E129C190E7001A1F89 /* yorkie.pb.swift */,
 				9AD6E7E229C190E7001A1F89 /* resources.proto */,
 			);
 			path = v1;
@@ -368,6 +394,7 @@
 		9ADECA002919FC1A006BA331 /* Integration */ = {
 			isa = PBXGroup;
 			children = (
+				9A569CB02C06009B007EF118 /* GCIntegrationTests.swift */,
 				9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */,
 				96DA809028C5B7B400E2C1DA /* GRPCTests.swift */,
 				9A4DC742292B5E0500C89478 /* CounterIntegrationTests.swift */,
@@ -377,7 +404,6 @@
 				9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */,
 				9A93DB6A2A67DBE000A0F449 /* IntegrationHelper.swift */,
 				9AB38FD32A9337DF006FA879 /* PresenceTests.swift */,
-				9ADA77052A8DF1F2007504FF /* GCTests.swift */,
 			);
 			path = Integration;
 			sourceTree = "<group>";
@@ -404,7 +430,6 @@
 		CE3EC94A28D1885F009471BC /* Util */ = {
 			isa = PBXGroup;
 			children = (
-				9A5A80D92BD238400047B978 /* URLTests.swift */,
 				9A8150512967FCD700DFADFB /* Helper.swift */,
 				CE3EC95028D195E0009471BC /* LLRBTreeTests.swift */,
 				CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */,
@@ -443,17 +468,15 @@
 		CE3EC97028D40421009471BC /* Document */ = {
 			isa = PBXGroup;
 			children = (
+				9A569CB22C0600C9007EF118 /* GCTests.swift */,
 				CEDDE26F2914EB060032B16A /* Util */,
 				CE8BB73528FE28350020F62A /* Change */,
 				CE3EC96F28D40415009471BC /* CRDT */,
 				CE8ED31728F55F25009A5419 /* Operation */,
 				CEC631DB28F4F14100915A85 /* Json */,
 				CE3EC96B28D3FFDB009471BC /* Time */,
-				CE9557BE2902024700DF4DFA /* JSONObjectTests.swift */,
-				CEBC84062909130900781AE9 /* JSONArrayTests.swift */,
 				CEF64376290A37BB00C32B99 /* DocumentTests.swift */,
 				CE9F6FAD2910FBBA002F776D /* DocumentConcurrentAccessTests.swift */,
-				9A3CF3EC29666AB30024E3DD /* JSONTextTest.swift */,
 			);
 			path = Document;
 			sourceTree = "<group>";
@@ -461,6 +484,7 @@
 		CE6071E828C5EC2500A8783E /* API */ = {
 			isa = PBXGroup;
 			children = (
+				9A569CAC2C060080007EF118 /* Generated */,
 				9AD6E7DB29C18897001A1F89 /* V1 */,
 				CE7B997328E1766F00D56198 /* Converter.swift */,
 				CE7B997528E1773A00D56198 /* GRPCTypeAlias.swift */,
@@ -545,6 +569,7 @@
 		CE8C22E728C9E55800432DE5 /* CRDT */ = {
 			isa = PBXGroup;
 			children = (
+				9A569CBA2C060150007EF118 /* GC.swift */,
 				9A4DC736292273D200C89478 /* CRDTCounter.swift */,
 				CE3EC96628D30E74009471BC /* CRDTElement.swift */,
 				CE3EC97428D41903009471BC /* Primitive.swift */,
@@ -617,7 +642,10 @@
 		CEC631DB28F4F14100915A85 /* Json */ = {
 			isa = PBXGroup;
 			children = (
-				CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */,
+				9A569CB32C0600C9007EF118 /* JONSTreeTests.swift */,
+				CE9557BE2902024700DF4DFA /* JSONObjectTests.swift */,
+				CEBC84062909130900781AE9 /* JSONArrayTests.swift */,
+				9A3CF3EC29666AB30024E3DD /* JSONTextTest.swift */,
 			);
 			path = Json;
 			sourceTree = "<group>";
@@ -650,6 +678,7 @@
 		CEDDE26F2914EB060032B16A /* Util */ = {
 			isa = PBXGroup;
 			children = (
+				CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */,
 				CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */,
 			);
 			path = Util;
@@ -685,10 +714,9 @@
 			);
 			name = Yorkie;
 			packageProductDependencies = (
-				CEEB17E728C84D6A004988DD /* GRPC */,
-				CEEB17EA28C84D7B004988DD /* SwiftProtobuf */,
 				9A6399A6294C7E1E00BF27F5 /* Logging */,
 				9A5D9DDB2A710FB40096C40C /* Semaphore */,
+				9A569CB82C060132007EF118 /* Connect */,
 			);
 			productName = Yorkie;
 			productReference = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */;
@@ -741,10 +769,9 @@
 			);
 			mainGroup = 96DA807828C5B7B400E2C1DA;
 			packageReferences = (
-				CEEB17E628C84D6A004988DD /* XCRemoteSwiftPackageReference "grpc-swift" */,
-				CEEB17E928C84D7B004988DD /* XCRemoteSwiftPackageReference "swift-protobuf" */,
 				9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */,
 				9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */,
+				9A569CB72C060132007EF118 /* XCRemoteSwiftPackageReference "connect-swift" */,
 			);
 			productRefGroup = 96DA808328C5B7B400E2C1DA /* Products */;
 			projectDirPath = "";
@@ -827,13 +854,13 @@
 				CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */,
 				CE9557CF2908B6BA00DF4DFA /* JSONDatable.swift in Sources */,
 				9A20CE86299F61CD00E4CE7E /* Auth.swift in Sources */,
-				9AD6E7E329C190E7001A1F89 /* resources.pb.swift in Sources */,
 				CE3EC96928D30FEF009471BC /* ActorID.swift in Sources */,
 				CE6BD03C28E6BA9C00E97B8C /* ElementRHT.swift in Sources */,
 				9A3CF3E9296583050024E3DD /* StyleOperation.swift in Sources */,
 				9ADAEE5A29657E03007E9F9F /* EditOperation.swift in Sources */,
 				CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */,
 				9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */,
+				9A569CAF2C060080007EF118 /* yorkie.pb.swift in Sources */,
 				9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */,
 				9A7E88C02A4962A700AF8997 /* IndexTree.swift in Sources */,
 				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
@@ -855,10 +882,13 @@
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8BB74328FE59240020F62A /* ChangePack.swift in Sources */,
 				CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */,
+				9A569CAE2C060080007EF118 /* yorkie.connect.swift in Sources */,
 				CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */,
 				9A66B1A02955833E00D10B94 /* LLRBTree.swift in Sources */,
+				9A569CAD2C060080007EF118 /* resources.pb.swift in Sources */,
 				CEFF0015290120000020561A /* JSONObject.swift in Sources */,
 				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,
+				9A569CBB2C060150007EF118 /* GC.swift in Sources */,
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
 				9ADAEE5829657696007E9F9F /* JSONText.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
@@ -868,7 +898,6 @@
 				9A7E88BE2A49600B00AF8997 /* JSONTree.swift in Sources */,
 				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
-				9AD6E7E629C190E7001A1F89 /* yorkie.pb.swift in Sources */,
 				9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */,
 				9A232B772A7D0C0F0041C826 /* Dictionary+Extension.swift in Sources */,
 				CE3EC96728D30E74009471BC /* CRDTElement.swift in Sources */,
@@ -876,7 +905,6 @@
 				CE8BB74D28FE86020020F62A /* ObjectDataHandler.swift in Sources */,
 				9A4DC747292DE2CA00C89478 /* GRPCTypeAlias.swift in Sources */,
 				CE8ED31628F55BF7009A5419 /* SetOperation.swift in Sources */,
-				9AD6E7E529C190E7001A1F89 /* yorkie.grpc.swift in Sources */,
 				CEBC840A2909252000781AE9 /* ElementConverter.swift in Sources */,
 				9A4DC73C2922741200C89478 /* IncreaseOperation.swift in Sources */,
 				9A4DC745292DD82500C89478 /* YorkieCountable.swift in Sources */,
@@ -899,6 +927,7 @@
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* ElementRHTTests.swift in Sources */,
 				9AD6E7E929C19E0A001A1F89 /* DocumentIntegrationTests.swift in Sources */,
+				9A569CBD2C060307007EF118 /* GCIntegrationTests.swift in Sources */,
 				9A8150522967FCD700DFADFB /* Helper.swift in Sources */,
 				CE8BB73B28FE2BE90020F62A /* ChangeIDTests.swift in Sources */,
 				9A4DC743292B5E0500C89478 /* CounterIntegrationTests.swift in Sources */,
@@ -910,10 +939,10 @@
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
 				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,
 				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
+				9A569CBC2C0601B8007EF118 /* GCTests.swift in Sources */,
 				CE9F6FAE2910FBBA002F776D /* DocumentConcurrentAccessTests.swift in Sources */,
 				CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */,
 				CEDDE2722914EB5C0032B16A /* YorkieJSONObjectableTests.swift in Sources */,
-				9ADA77062A8DF1F2007504FF /* GCTests.swift in Sources */,
 				9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */,
 				CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */,
 				CE7B997828E178EF00D56198 /* PrimitiveTests.swift in Sources */,
@@ -931,8 +960,8 @@
 				CE7B998628E520D600D56198 /* CRDTArrayTests.swift in Sources */,
 				9AB38FD42A9337DF006FA879 /* PresenceTests.swift in Sources */,
 				CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */,
-				9A5A80DA2BD238400047B978 /* URLTests.swift in Sources */,
 				9AFB4EBD2A94DA0600494401 /* ClientIntegrationTests.swift in Sources */,
+				9A569CB62C0600D0007EF118 /* JONSTreeTests.swift in Sources */,
 				96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */,
 				CEBC84072909130900781AE9 /* JSONArrayTests.swift in Sources */,
 				CEC631DE28F4F36100915A85 /* StringEscapingTests.swift in Sources */,
@@ -1199,6 +1228,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9A569CB72C060132007EF118 /* XCRemoteSwiftPackageReference "connect-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/connectrpc/connect-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.13.0;
+			};
+		};
 		9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/Semaphore.git";
@@ -1215,25 +1252,14 @@
 				minimumVersion = 1.4.0;
 			};
 		};
-		CEEB17E628C84D6A004988DD /* XCRemoteSwiftPackageReference "grpc-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/grpc/grpc-swift.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.13.0;
-			};
-		};
-		CEEB17E928C84D7B004988DD /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apple/swift-protobuf.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.19.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9A569CB82C060132007EF118 /* Connect */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9A569CB72C060132007EF118 /* XCRemoteSwiftPackageReference "connect-swift" */;
+			productName = Connect;
+		};
 		9A5D9DDB2A710FB40096C40C /* Semaphore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */;
@@ -1243,16 +1269,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */;
 			productName = Logging;
-		};
-		CEEB17E728C84D6A004988DD /* GRPC */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CEEB17E628C84D6A004988DD /* XCRemoteSwiftPackageReference "grpc-swift" */;
-			productName = GRPC;
-		};
-		CEEB17EA28C84D7B004988DD /* SwiftProtobuf */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = CEEB17E928C84D7B004988DD /* XCRemoteSwiftPackageReference "swift-protobuf" */;
-			productName = SwiftProtobuf;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -17,11 +17,11 @@
 import XCTest
 @testable import Yorkie
 
-class GCTests: XCTestCase {
+class GCIntegrationTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
     func test_getGarbageLength_should_return_the_actual_number_of_elements_garbage_collected() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -80,7 +80,7 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_tree_garbage_collection_for_multi_client() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -186,7 +186,7 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_garbage_collection_for_container_type() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -274,7 +274,7 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_garbage_collection_for_text_type() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -366,7 +366,7 @@ class GCTests: XCTestCase {
     }
 
     func test_can_handle_garbage_collection_with_detached_document_test() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -442,7 +442,7 @@ class GCTests: XCTestCase {
     }
 
     func test_can_collect_removed_elements_from_both_root_and_clone() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc = Document(key: docKey)
 
@@ -471,7 +471,7 @@ class GCTests: XCTestCase {
     }
 
     func test_can_purges_removed_elements_after_peers_can_not_access_them() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -541,7 +541,7 @@ class GCTests: XCTestCase {
     }
 
     func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_text_type() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
@@ -614,7 +614,7 @@ class GCTests: XCTestCase {
     }
 
     func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_tree_type() async throws {
-        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
         let doc1 = Document(key: docKey)
         let doc2 = Document(key: docKey)
