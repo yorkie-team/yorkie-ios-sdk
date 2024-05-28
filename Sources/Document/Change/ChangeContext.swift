@@ -76,6 +76,13 @@ class ChangeContext {
     }
 
     /**
+     * `registerGCPair` registers the given pair to hash table.
+     */
+    func registerGCPair(_ pair: GCPair) {
+        self.root.registerGCPair(pair)
+    }
+
+    /**
      * `getChange` creates a new instance of Change in this context.
      */
     func getChange() -> Change {

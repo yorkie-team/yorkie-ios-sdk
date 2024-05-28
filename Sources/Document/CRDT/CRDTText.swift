@@ -81,7 +81,8 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     /**
      * `setAttr` sets attribute of the given key, updated time and value.
      */
-    public func setAttr(key: String, value: String, updatedAt: TimeTicket) {
+    @discardableResult
+    func setAttr(key: String, value: String, updatedAt: TimeTicket) -> (RHTNode?, RHTNode?) {
         self.attributes.set(key: key, value: value, executedAt: updatedAt)
     }
 
@@ -132,6 +133,14 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
 
     public var description: String {
         self.content as String
+    }
+}
+
+extension TextValue: GCParent {
+    func purge(node: any GCChild) {
+        if let node = node as? RHTNode {
+            self.attributes.purge(node)
+        }
     }
 }
 
@@ -203,7 +212,7 @@ final class CRDTText: CRDTGCElement {
     func setStyle(_ range: RGATreeSplitPosRange,
                   _ attributes: [String: String],
                   _ editedAt: TimeTicket,
-                  _ maxCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [TextChange])
+                  _ maxCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [GCPair], [TextChange])
     {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
@@ -236,6 +245,7 @@ final class CRDTText: CRDTGCElement {
             }
         }
 
+        var pairs = [GCPair]()
         for node in toBeStyleds {
             if node.isRemoved {
                 continue
@@ -250,24 +260,27 @@ final class CRDTText: CRDTGCElement {
                                       attributes: attributes))
 
             for (key, jsonValue) in attributes {
-                node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
+                let (prev, _) = node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
+                if prev != nil {
+                    pairs.append(GCPair(parent: node.value, child: prev))
+                }
             }
         }
 
-        return (createdAtMapByActor, changes)
+        return (createdAtMapByActor, pairs, changes)
     }
 
     /**
      * `hasRemoteChangeLock` checks whether remoteChangeLock has.
      */
-    public var hasRemoteChangeLock: Bool {
+    var hasRemoteChangeLock: Bool {
         self.remoteChangeLock
     }
 
     /**
      * `indexRangeToPosRange` returns the position range of the given index range.
      */
-    public func indexRangeToPosRange(_ fromIdx: Int, _ toIdx: Int) throws -> RGATreeSplitPosRange {
+    func indexRangeToPosRange(_ fromIdx: Int, _ toIdx: Int) throws -> RGATreeSplitPosRange {
         let fromPos = try self.rgaTreeSplit.indexToPos(fromIdx)
         if fromIdx == toIdx {
             return (fromPos, fromPos)
@@ -279,7 +292,7 @@ final class CRDTText: CRDTGCElement {
     /**
      * `length` returns size of RGATreeList.
      */
-    public var length: Int {
+    var length: Int {
         self.rgaTreeSplit.length
     }
 
@@ -287,14 +300,14 @@ final class CRDTText: CRDTGCElement {
      * `checkWeight` returns false when there is an incorrect weight node.
      * for debugging purpose.
      */
-    public func checkWeight() -> Bool {
+    func checkWeight() -> Bool {
         self.rgaTreeSplit.checkWeight()
     }
 
     /**
      * `toJSON` returns the JSON encoding of this rich text.
      */
-    public func toJSON() -> String {
+    func toJSON() -> String {
         var json = [String]()
 
         for item in self.rgaTreeSplit where !item.isRemoved {
@@ -310,7 +323,7 @@ final class CRDTText: CRDTGCElement {
     /**
      * `toSortedJSON` returns the sorted JSON encoding of this rich text.
      */
-    public func toSortedJSON() -> String {
+    func toSortedJSON() -> String {
         self.toJSON()
     }
 
@@ -318,36 +331,36 @@ final class CRDTText: CRDTGCElement {
      * `toTestString` returns a String containing the meta data of this value
      * for debugging purpose.
      */
-    public var toTestString: String {
+    var toTestString: String {
         self.rgaTreeSplit.toTestString
     }
 
-    public var toString: String {
+    var toString: String {
         self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value.toString }.joined(separator: "")
     }
 
-    public var values: [TextValue]? {
+    var values: [TextValue]? {
         self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value }
     }
 
     /**
      * `removedNodesLen` returns length of removed nodes
      */
-    public var removedNodesLength: Int {
+    var removedNodesLength: Int {
         self.rgaTreeSplit.removedNodesLength
     }
 
     /**
      * `purgeRemovedNodesBefore` purges removed nodes before the given time.
      */
-    public func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
+    func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
         self.rgaTreeSplit.purgeRemovedNodesBefore(ticket)
     }
 
     /**
      * `deepcopy` copies itself deeply.
      */
-    public func deepcopy() -> CRDTElement {
+    func deepcopy() -> CRDTElement {
         let text = CRDTText(rgaTreeSplit: self.rgaTreeSplit.deepcopy(), createdAt: self.createdAt)
         text.remove(self.removedAt)
         return text
@@ -356,7 +369,7 @@ final class CRDTText: CRDTGCElement {
     /**
      * `findIndexesFromRange` returns pair of integer offsets of the given range.
      */
-    public func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
+    func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
         try self.rgaTreeSplit.findIndexesFromRange(range)
     }
 }

@@ -65,15 +65,20 @@ class TreeStyleOperation: Operation {
         }
 
         let changes: [TreeChange]
+        let pairs: [GCPair]
 
         if self.attributes.isEmpty == false {
-            (_, changes) = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
+            (_, pairs, changes) = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
         } else {
-            changes = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt)
+            (pairs, changes) = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt)
         }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError.unexpected(message: "fail to get path")
+        }
+
+        for pair in pairs {
+            root.registerGCPair(pair)
         }
 
         return changes.compactMap { change in

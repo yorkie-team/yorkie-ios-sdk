@@ -19,11 +19,36 @@ import Foundation
 /**
  * `RHTNode` is a node of RHT(Replicated Hashtable).
  */
-struct RHTNode {
+class RHTNode: GCChild {
     var key: String
     var value: String
     var updatedAt: TimeTicket
     var isRemoved: Bool
+
+    init(key: String, value: String, updatedAt: TimeTicket, isRemoved: Bool) {
+        self.key = key
+        self.value = value
+        self.updatedAt = updatedAt
+        self.isRemoved = isRemoved
+    }
+
+    /**
+     * `toIDString` returns the IDString of this node.
+     */
+    var toIDString: String {
+        "\(self.updatedAt.toIDString):\(self.key)"
+    }
+
+    /**
+     * `removedAt` returns the time when this node was removed.
+     */
+    var removedAt: TimeTicket? {
+        if self.isRemoved {
+            return self.updatedAt
+        }
+
+        return nil
+    }
 }
 
 /**
@@ -38,52 +63,62 @@ class RHT {
      * `set` sets the value of the given key.
      */
     @discardableResult
-    func set(key: String, value: String, executedAt: TimeTicket) -> Bool {
+    func set(key: String, value: String, executedAt: TimeTicket) -> (RHTNode?, RHTNode?) {
         let prev = self.nodeMapByKey[key]
 
-        if prev == nil || executedAt.after(prev!.updatedAt) {
-            if prev != nil && !prev!.isRemoved {
-                self.numberOfRemovedElement -= 1
-            }
+        if prev != nil && prev!.isRemoved && executedAt.after(prev!.updatedAt) {
+            self.numberOfRemovedElement -= 1
+        }
 
+        if prev == nil || executedAt.after(prev!.updatedAt) {
             let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
             self.nodeMapByKey[key] = node
 
-            return true
+            if prev != nil, prev!.isRemoved {
+                return (prev, node)
+            }
+
+            return (nil, node)
         }
 
-        return false
+        return (prev?.isRemoved ?? false ? prev : nil, nil)
     }
 
     /**
      * `remove` removes the Element of the given key.
      */
     @discardableResult
-    func remove(key: String, executedAt: TimeTicket) -> String {
-        guard let prev = self.nodeMapByKey[key] else {
-            self.numberOfRemovedElement += 1
-            let node = RHTNode(key: key, value: "", updatedAt: executedAt, isRemoved: true)
-            self.nodeMapByKey[key] = node
+    func remove(key: String, executedAt: TimeTicket) -> [RHTNode] {
+        let prev = self.nodeMapByKey[key]
+        var gcNodes = [RHTNode]()
 
-            return ""
-        }
+        if prev == nil || executedAt.after(prev!.updatedAt) {
+            if prev == nil {
+                self.numberOfRemovedElement += 1
+                let node = RHTNode(key: key, value: "", updatedAt: executedAt, isRemoved: true)
+                self.nodeMapByKey[key] = node
 
-        if executedAt.after(prev.updatedAt) {
-            let alreadyRemoved = prev.isRemoved
+                gcNodes.append(node)
+                return gcNodes
+            }
+
+            let alreadyRemoved = prev!.isRemoved
             if !alreadyRemoved {
                 self.numberOfRemovedElement += 1
             }
-            let node = RHTNode(key: key, value: prev.value, updatedAt: executedAt, isRemoved: true)
-            self.nodeMapByKey[key] = node
 
             if alreadyRemoved {
-                return ""
+                gcNodes.append(prev!)
             }
 
-            return prev.value
+            let node = RHTNode(key: key, value: prev!.value, updatedAt: executedAt, isRemoved: true)
+            self.nodeMapByKey[key] = node
+            gcNodes.append(node)
+
+            return gcNodes
         }
 
-        return ""
+        return gcNodes
     }
 
     /**
@@ -122,8 +157,22 @@ class RHT {
      */
     func toJSON() -> String {
         var result = [String]()
-        for (key, node) in self.nodeMapByKey {
-            result.append("\"\(key)\":\"\(node.value.escaped())\"")
+        for (key, node) in self.nodeMapByKey.filter({ _, value in !value.isRemoved }) {
+            result.append("\"\(key.escaped())\":\"\(node.value.escaped())\"")
+        }
+
+        return result.isEmpty ? "{}" : "{\(result.joined(separator: ","))}"
+    }
+
+    /**
+     * `toSortedJSON` returns the JSON encoding of this hashtable.
+     */
+    func toSortedJSON() -> String {
+        var result = [String]()
+        let sortedKeys = self.nodeMapByKey.filter { _, value in !value.isRemoved }.keys.sorted()
+
+        for key in sortedKeys {
+            result.append("\"\(key.escaped())\":\"\(self.nodeMapByKey[key]!.value.escaped())\"")
         }
 
         return result.isEmpty ? "{}" : "{\(result.joined(separator: ","))}"
@@ -167,6 +216,19 @@ class RHT {
         }
 
         return result
+    }
+
+    /**
+     * `purge` purges the given child node.
+     */
+    func purge(_ child: RHTNode) {
+        let node = self.nodeMapByKey[child.key]
+        if node == nil || node!.toIDString != child.toIDString {
+            return
+        }
+
+        self.nodeMapByKey.removeValue(forKey: child.key)
+        self.numberOfRemovedElement -= 1
     }
 }
 

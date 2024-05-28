@@ -67,7 +67,11 @@ struct StyleOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        let (_, changes) = try text.setStyle((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
+        let (_, pairs, changes) = try text.setStyle((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
+
+        for pair in pairs {
+            root.registerGCPair(pair)
+        }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError.unexpected(message: "fail to get path")
