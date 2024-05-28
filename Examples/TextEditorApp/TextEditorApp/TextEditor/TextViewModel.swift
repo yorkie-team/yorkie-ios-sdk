@@ -34,7 +34,7 @@ class TextViewModel {
         self.operationSubject = operationSubject
 
         // create client with RPCAddress.
-        self.client = Client(RPCAddress(host: "localhost", port: 8080))
+        self.client = Client("http://localhost:8080")
 
         // create a document
         self.document = Document(key: "codemirror")

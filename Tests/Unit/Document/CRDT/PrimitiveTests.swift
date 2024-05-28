@@ -85,7 +85,7 @@ class PrimitiveTests: XCTestCase {
     }
 
     func test_value_is_bytes() throws {
-        let testData = "abcdefg".data(using: .utf8)!
+        let testData = Data("abcdefg".utf8)
         let primitiveValue = Primitive(value: .bytes(testData), createdAt: TimeTicket.initial)
         let valueFromData = try Converter.valueFrom(.bytes, data: primitiveValue.toBytes())
         switch valueFromData {

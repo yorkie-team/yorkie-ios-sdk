@@ -1144,7 +1144,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
 
     // swiftlint: disable function_body_length
     func test_can_handle_client_reload_case() async throws {
-        let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+        let rpcAddress = "http://localhost:8080"
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 

@@ -14,71 +14,30 @@
  * limitations under the License.
  */
 
-import GRPC
+import Connect
 import XCTest
 @testable import Yorkie
 
 class GRPCTests: XCTestCase {
-    func test_connect_yorkie() {
+    func test_connect_yorkie() async {
         let testClientKey = UUID().uuidString
-        let group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
 
-        defer {
-            try? group.syncShutdownGracefully()
-        }
+        let protocolClient = ProtocolClient(httpClient: URLSessionHTTPClient(),
+                                            config: ProtocolClientConfig(host: "http://localhost:8080",
+                                                                         networkProtocol: .connect,
+                                                                         codec: ProtoCodec()))
 
-        guard let channel = try? GRPCChannelPool.with(target: .host("localhost", port: 8080),
-                                                      transportSecurity: .plaintext,
-                                                      eventLoopGroup: group)
-        else {
-            XCTFail("channel is nil.")
-            return
-        }
+        let client = YorkieServiceClient(client: protocolClient)
 
-        let client = YorkieServiceNIOClient(channel: channel)
-        var activateRequest = ActivateClientRequest()
-        activateRequest.clientKey = testClientKey
-        let activateResponse = try? client.activateClient(activateRequest, callOptions: nil).response.wait()
-        guard let activateResponse else {
+        let activateRequest = ActivateClientRequest.with { $0.clientKey = testClientKey }
+        let activateResponse = await client.activateClient(request: activateRequest)
+        guard let message = activateResponse.message else {
             XCTFail("The response of activate is nil.")
             return
         }
 
-        var deactivateRequest = DeactivateClientRequest()
-        deactivateRequest.clientID = activateResponse.clientID
-        guard (try? client.deactivateClient(deactivateRequest).response.wait()) != nil else {
-            XCTFail("The response of deactivate is nil.")
-            return
-        }
-    }
-
-    func test_connect_yorkie_with_async() async throws {
-        let testClientKey = UUID().uuidString
-        let group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
-        defer {
-            try? group.syncShutdownGracefully()
-        }
-
-        guard let channel = try? GRPCChannelPool.with(target: .host("localhost", port: 8080),
-                                                      transportSecurity: .plaintext,
-                                                      eventLoopGroup: group)
-        else {
-            XCTFail("channel is nil.")
-            return
-        }
-
-        let client = YorkieServiceAsyncClient(channel: channel)
-        var activateRequest = ActivateClientRequest()
-        activateRequest.clientKey = testClientKey
-        let activateResponse = try? await client.activateClient(activateRequest, callOptions: nil)
-        guard let activateResponse else {
-            XCTFail("The response of activate is nil.")
-            return
-        }
-
-        var deactivateRequest = DeactivateClientRequest()
-        deactivateRequest.clientID = activateResponse.clientID
-        guard (try? await client.deactivateClient(deactivateRequest)) != nil else {
+        let deactivateRequest = DeactivateClientRequest.with { $0.clientID = message.clientID }
+        guard (await client.deactivateClient(request: deactivateRequest)).message != nil else {
             XCTFail("The response of deactivate is nil.")
             return
         }

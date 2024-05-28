@@ -15,10 +15,9 @@
  */
 
 import Combine
+import Connect
 import Foundation
-import GRPC
 import Logging
-import NIO
 import Semaphore
 
 public typealias PresenceMap = [ActorID: Presence]
@@ -122,40 +121,6 @@ public struct ClientOptions {
     }
 }
 
-public struct RPCAddress: Equatable {
-    public static let tlsPort = 443
-
-    let host: String
-    let port: Int
-
-    public var isSecured: Bool {
-        self.port == Self.tlsPort
-    }
-
-    public init(host: String, port: Int = Self.tlsPort) {
-        self.host = host
-        self.port = port
-    }
-}
-
-extension URL {
-    var toRPCAddress: RPCAddress? {
-        guard let host = self.host else { return nil }
-
-        if let port = self.port {
-            return RPCAddress(host: host, port: port)
-        } else if let scheme = self.scheme {
-            if scheme == "https" {
-                return RPCAddress(host: host, port: RPCAddress.tlsPort)
-            } else if scheme == "http" {
-                return RPCAddress(host: host, port: 80)
-            }
-        }
-
-        return RPCAddress(host: host)
-    }
-}
-
 /**
  * `Client` is a normal client that can communicate with the server.
  * It has documents and sends changes of the documents in local
@@ -167,10 +132,8 @@ public actor Client {
     private let reconnectStreamDelay: Int
     private let maximumAttachmentTimeout: Int
 
-    private var rpcClient: YorkieServiceAsyncClient
-
-    private let group: EventLoopGroup
-
+    private var rpcClient: YorkieServiceClient
+    private var authHeader: AuthHeader
     private var semaphoresForInitialzation = [DocumentKey: DispatchSemaphore]()
     private let syncSemaphore = AsyncSemaphore(value: 1)
 
@@ -184,7 +147,7 @@ public actor Client {
      * @param rpcAddr - the address of the RPC server.
      * @param opts - the options of the client.
      */
-    public init(_ rpcAddress: RPCAddress, _ options: ClientOptions = ClientOptions()) {
+    public init(_ urlString: String, _ options: ClientOptions = ClientOptions()) {
         self.key = options.key ?? UUID().uuidString
 
         self.status = .deactivated
@@ -193,25 +156,13 @@ public actor Client {
         self.reconnectStreamDelay = options.reconnectStreamDelay
         self.maximumAttachmentTimeout = options.maximumAttachmentTimeout
 
-        self.group = PlatformSupport.makeEventLoopGroup(loopCount: 1) // EventLoopGroup helpers
+        let protocolClient = ProtocolClient(httpClient: URLSessionHTTPClient(),
+                                            config: ProtocolClientConfig(host: urlString,
+                                                                         networkProtocol: .connect,
+                                                                         codec: ProtoCodec()))
 
-        let builder: ClientConnection.Builder
-        if rpcAddress.isSecured {
-            builder = ClientConnection.usingPlatformAppropriateTLS(for: self.group)
-        } else {
-            builder = ClientConnection.insecure(group: self.group)
-        }
-
-        var gRPCLogger = Logging.Logger(label: "gRPC")
-        gRPCLogger.logLevel = .info
-        builder.withBackgroundActivityLogger(gRPCLogger)
-        builder.withMaximumReceiveMessageLength(Int.max)
-
-        let channel = builder.connect(host: rpcAddress.host, port: rpcAddress.port)
-
-        let authInterceptors = AuthClientInterceptors(apiKey: options.apiKey, token: options.token)
-
-        self.rpcClient = YorkieServiceAsyncClient(channel: channel, interceptors: authInterceptors)
+        self.rpcClient = YorkieServiceClient(client: protocolClient)
+        self.authHeader = AuthHeader(apiKey: options.apiKey, token: options.token)
     }
 
     /**
@@ -219,15 +170,7 @@ public actor Client {
      * @param opts - the options of the client.
      */
     init?(_ url: URL, _ options: ClientOptions = ClientOptions()) {
-        guard let rpcAddress = url.toRPCAddress else {
-            return nil
-        }
-
-        self.init(rpcAddress, options)
-    }
-
-    deinit {
-        try? self.rpcClient.channel.close().wait()
+        self.init(url.absoluteString, options)
     }
 
     /**
@@ -240,23 +183,21 @@ public actor Client {
             return
         }
 
-        var activateRequest = ActivateClientRequest()
-        activateRequest.clientKey = self.key
+        let activateRequest = ActivateClientRequest.with { $0.clientKey = self.key }
 
-        do {
-            self.changeDocKeyOfAuthInterceptors(nil)
-            let activateResponse = try await self.rpcClient.activateClient(activateRequest, callOptions: nil)
+        let activateResponse = await self.rpcClient.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
 
-            self.id = activateResponse.clientID
-
-            self.status = .activated
-            await self.runSyncLoop()
-
-            Logger.debug("Client(\(self.key)) activated")
-        } catch {
-            Logger.error("Failed to request activate client(\(self.key)).", error: error)
-            throw error
+        guard activateResponse.error == nil, let message = activateResponse.message else {
+            Logger.error("Failed to request activate client(\(self.key)).")
+            throw YorkieError.rpcError(message: activateResponse.error.debugDescription)
         }
+
+        self.id = message.clientID
+
+        self.status = .activated
+        await self.runSyncLoop()
+
+        Logger.debug("Client(\(self.key)) activated")
     }
 
     /**
@@ -271,16 +212,13 @@ public actor Client {
             try self.stopWatchLoop(item.key)
         }
 
-        var deactivateRequest = DeactivateClientRequest()
+        let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
-        deactivateRequest.clientID = clientID
+        let deactivateResponse = await self.rpcClient.deactivateClient(request: deactivateRequest)
 
-        do {
-            self.changeDocKeyOfAuthInterceptors(nil)
-            _ = try await self.rpcClient.deactivateClient(deactivateRequest)
-        } catch {
-            Logger.error("Failed to request deactivate client(\(self.key)).", error: error)
-            throw error
+        guard deactivateResponse.error == nil else {
+            Logger.error("Failed to request deactivate client(\(self.key)).")
+            throw YorkieError.rpcError(message: deactivateResponse.error.debugDescription)
         }
 
         self.status = .deactivated
@@ -311,9 +249,9 @@ public actor Client {
             presence.set(initialPresence)
         }
 
-        var attachDocumentRequest = AttachDocumentRequest()
-        attachDocumentRequest.clientID = clientID
-        attachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
+        var attachRequest = AttachDocumentRequest()
+        attachRequest.clientID = clientID
+        attachRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
             let docKey = doc.getKey()
@@ -321,10 +259,13 @@ public actor Client {
 
             self.semaphoresForInitialzation[docKey] = semaphore
 
-            self.changeDocKeyOfAuthInterceptors(docKey)
-            let result = try await self.rpcClient.attachDocument(attachDocumentRequest)
+            let attachResponse = await self.rpcClient.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
 
-            let pack = try Converter.fromChangePack(result.changePack)
+            guard attachResponse.error == nil, let message = attachResponse.message else {
+                throw YorkieError.rpcError(message: attachResponse.error.debugDescription)
+            }
+
+            let pack = try Converter.fromChangePack(message.changePack)
             try await doc.applyChangePack(pack)
 
             if await doc.status == .removed {
@@ -333,10 +274,10 @@ public actor Client {
 
             await doc.applyStatus(.attached)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: result.documentID, syncMode: syncMode, remoteChangeEventReceived: false)
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: message.documentID, syncMode: syncMode, remoteChangeEventReceived: false)
 
             if syncMode != .manual {
-                try self.runWatchLoop(docKey)
+                try await self.runWatchLoop(docKey)
                 try await self.waitForInitialization(semaphore, docKey)
             }
 
@@ -383,10 +324,14 @@ public actor Client {
         detachDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack())
 
         do {
-            self.changeDocKeyOfAuthInterceptors(doc.getKey())
-            let result = try await self.rpcClient.detachDocument(detachDocumentRequest)
+            let detachDocumentResponse = await self.rpcClient.detachDocument(request: detachDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
-            let pack = try Converter.fromChangePack(result.changePack)
+            guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
+                throw YorkieError.rpcError(message: detachDocumentResponse.error.debugDescription)
+            }
+
+            let pack = try Converter.fromChangePack(message.changePack)
+
             try await doc.applyChangePack(pack)
 
             if await doc.status != .removed {
@@ -429,10 +374,13 @@ public actor Client {
         removeDocumentRequest.changePack = Converter.toChangePack(pack: await doc.createChangePack(true))
 
         do {
-            self.changeDocKeyOfAuthInterceptors(doc.getKey())
-            let result = try await self.rpcClient.removeDocument(removeDocumentRequest)
+            let removeDocumentResponse = await self.rpcClient.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
-            let pack = try Converter.fromChangePack(result.changePack)
+            guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
+                throw YorkieError.rpcError(message: removeDocumentResponse.error.debugDescription)
+            }
+
+            let pack = try Converter.fromChangePack(message.changePack)
             try await doc.applyChangePack(pack)
 
             try self.stopWatchLoop(doc.getKey())
@@ -452,7 +400,7 @@ public actor Client {
      * `changeSyncMode` changes the synchronization mode of the given document.
      */
     @discardableResult
-    public func changeSyncMode(_ doc: Document, _ syncMode: SyncMode) throws -> Document {
+    public func changeSyncMode(_ doc: Document, _ syncMode: SyncMode) async throws -> Document {
         let docKey = doc.getKey()
 
         guard let attachment = self.attachmentMap[docKey] else {
@@ -482,7 +430,7 @@ public actor Client {
 
         // manual to realtime
         if prevSyncMode == .manual {
-            try self.runWatchLoop(docKey)
+            try await self.runWatchLoop(docKey)
         }
 
         return doc
@@ -520,7 +468,7 @@ public actor Client {
     }
 
     private func setSyncTimer(_ reconnect: Bool) {
-        let isDisconnectedWatchStream = self.attachmentMap.values.first(where: { $0.remoteWatchStream == nil }) != nil
+        let isDisconnectedWatchStream = self.attachmentMap.values.first(where: { $0.isDisconnectedStream }) != nil
         let syncLoopDuration = (reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration
 
         let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
@@ -587,9 +535,8 @@ public actor Client {
         await self.doSyncLoop()
     }
 
-    private func doWatchLoop(_ docKey: DocumentKey) throws {
-        self.attachmentMap[docKey]?.watchLoopReconnectTimer?.invalidate()
-        self.attachmentMap[docKey]?.watchLoopReconnectTimer = nil
+    private func doWatchLoop(_ docKey: DocumentKey) async throws {
+        self.attachmentMap[docKey]?.resetWatchLoopTimer()
 
         guard self.isActive, let id = self.id else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
@@ -601,47 +548,47 @@ public actor Client {
             return
         }
 
-        var request = WatchDocumentRequest()
-
-        request.clientID = id
-        request.documentID = docID
-
-        self.changeDocKeyOfAuthInterceptors(docKey)
-        self.attachmentMap[docKey]?.remoteWatchStream = self.rpcClient.makeWatchDocumentCall(request)
-
-        Task {
-            if let stream = self.attachmentMap[docKey]?.remoteWatchStream?.responseStream {
-                await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
-
-                do {
-                    for try await response in stream {
-                        await self.handleWatchDocumentsResponse(docKey: docKey, response: response)
-                    }
-                } catch {
+        let stream = self.rpcClient.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
+            Task {
+                switch result {
+                case .headers:
+                    break
+                case .message(let message):
+                    await self.handleWatchDocumentsResponse(docKey: docKey, response: message)
+                case .complete(let code, let error, _):
                     await self.attachmentMap[docKey]?.doc.resetOnlineClients()
                     await self.attachmentMap[docKey]?.doc.publishInitializedEvent()
                     await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.disconnected)
 
                     Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
-                    if let status = error as? GRPCStatus, status.code == .cancelled {
+                    if code == .canceled {
                         // Canceled by Client by detach. so there is No need to reconnect.
                     } else {
-                        Logger.warning("[WL] c:\"\(self.key)\" has Error \(error)")
+                        Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
 
-                        try self.onStreamDisconnect(docKey)
+                        try await self.onStreamDisconnect(docKey)
                     }
                 }
             }
+        })
 
-            await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
+        let request = WatchDocumentRequest.with {
+            $0.clientID = id
+            $0.documentID = docID
         }
+
+        stream.send(request)
+
+        self.attachmentMap[docKey]?.connectStream(stream)
+
+        await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
     }
 
-    private func runWatchLoop(_ docKey: DocumentKey) throws {
+    private func runWatchLoop(_ docKey: DocumentKey) async throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
 
-        try self.doWatchLoop(docKey)
+        try await self.doWatchLoop(docKey)
     }
 
     private func stopWatchLoop(_ docKey: DocumentKey) throws {
@@ -716,16 +663,12 @@ public actor Client {
         guard self.attachmentMap[docKey] != nil else {
             return
         }
-
-        guard self.attachmentMap[docKey]?.remoteWatchStream != nil else {
+        guard !(self.attachmentMap[docKey]!.isDisconnectedStream) else {
             return
         }
 
-        self.attachmentMap[docKey]?.remoteWatchStream?.cancel()
-        self.attachmentMap[docKey]?.remoteWatchStream = nil
-
-        self.attachmentMap[docKey]?.watchLoopReconnectTimer?.invalidate()
-        self.attachmentMap[docKey]?.watchLoopReconnectTimer = nil
+        self.attachmentMap[docKey]?.disconnectStream()
+        self.attachmentMap[docKey]?.resetWatchLoopTimer()
     }
 
     private func onStreamDisconnect(_ docKey: DocumentKey) throws {
@@ -762,10 +705,13 @@ public actor Client {
         do {
             let docKey = doc.getKey()
 
-            self.changeDocKeyOfAuthInterceptors(docKey)
-            let response = try await self.rpcClient.pushPullChanges(pushPullRequest)
+            let pushpullResponse = await self.rpcClient.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
 
-            let responsePack = try Converter.fromChangePack(response.changePack)
+            guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
+                throw YorkieError.rpcError(message: pushpullResponse.error.debugDescription)
+            }
+
+            let responsePack = try Converter.fromChangePack(message.changePack)
 
             // NOTE(chacha912, hackerwins): If syncLoop already executed with
             // PushPull, ignore the response when the syncMode is PushOnly.
@@ -792,9 +738,5 @@ public actor Client {
 
             throw error
         }
-    }
-
-    private func changeDocKeyOfAuthInterceptors(_ docKey: String?) {
-        self.rpcClient.interceptors = (self.rpcClient.interceptors as? AuthClientInterceptors)?.docKeyChangedInterceptors(docKey)
     }
 }

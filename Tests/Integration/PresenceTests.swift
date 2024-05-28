@@ -18,7 +18,7 @@ import XCTest
 @testable import Yorkie
 
 final class PresenceTests: XCTestCase {
-    let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+    let rpcAddress = "http://localhost:8080"
 
     func test_can_be_built_from_a_snapshot() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
@@ -248,7 +248,7 @@ final class PresenceTests: XCTestCase {
 }
 
 final class PresenceSubscribeTests: XCTestCase {
-    let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+    let rpcAddress = "http://localhost:8080"
 
     struct EventResult: Equatable {
         var type: DocEventType

@@ -227,7 +227,7 @@ final class TreeConcurrencyTests: XCTestCase {
                  op2: OperationInterface,
                  desc: String) async throws -> TestResult
     {
-        let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+        let rpcAddress = "http://localhost:8080"
 
         let docKey = "\(Date().description)-\(desc)".toDocKey
 
