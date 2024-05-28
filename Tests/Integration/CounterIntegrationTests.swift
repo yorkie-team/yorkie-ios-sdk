@@ -19,7 +19,7 @@ import XCTest
 
 // swiftlint: disable force_cast
 final class CounterIntegrationTests: XCTestCase {
-    let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+    let rpcAddress = "http://localhost:8080"
 
     var c1: Client!
     var c2: Client!

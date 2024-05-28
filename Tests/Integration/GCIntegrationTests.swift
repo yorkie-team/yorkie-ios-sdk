@@ -18,7 +18,7 @@ import XCTest
 @testable import Yorkie
 
 class GCTests: XCTestCase {
-    let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+    let rpcAddress = "http://localhost:8080"
 
     func test_getGarbageLength_should_return_the_actual_number_of_elements_garbage_collected() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey

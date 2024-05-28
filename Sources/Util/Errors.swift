@@ -26,4 +26,5 @@ enum YorkieError: Error {
     case documentNotAttached(message: String)
     case documentNotDetached(message: String)
     case documentRemoved(message: String)
+    case rpcError(message: String)
 }

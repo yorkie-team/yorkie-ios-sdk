@@ -21,7 +21,7 @@ import XCTest
 final class ClientIntegrationTests: XCTestCase {
     var cancellables = Set<AnyCancellable>()
 
-    let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+    let rpcAddress = "http://localhost:8080"
 
     func test_can_be_activated_decativated() async throws {
         var options = ClientOptions()

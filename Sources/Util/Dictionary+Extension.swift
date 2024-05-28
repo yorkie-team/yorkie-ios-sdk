@@ -80,7 +80,7 @@ extension StringValueTypeDictionary {
 
         return jsonObject.mapValues {
             if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]) {
-                return String(data: result, encoding: .utf8) ?? ""
+                return String(decoding: result, as: UTF8.self)
             } else {
                 return ""
             }

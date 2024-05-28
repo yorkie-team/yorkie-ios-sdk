@@ -18,7 +18,7 @@ import XCTest
 @testable import Yorkie
 
 func withTwoClientsAndDocuments(_ title: String, _ callback: (Client, Document, Client, Document) async throws -> Void) async throws {
-    let rpcAddress = RPCAddress(host: "localhost", port: 8080)
+    let rpcAddress = "http://localhost:8080"
 
     let docKey = "\(Date().description)-\(title)".toDocKey
 

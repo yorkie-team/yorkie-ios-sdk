@@ -17,11 +17,10 @@
 // Use a Swift typealias to remap the type names of Protobuf locally
 // Swift Protobuf Guide: https://github.com/apple/swift-protobuf/blob/main/Documentation/API.md#generated-struct-name
 import Foundation
+import Connect
 
-typealias YorkieServiceNIOClient = Yorkie_V1_YorkieServiceNIOClient
-typealias YorkieServiceAsyncClient = Yorkie_V1_YorkieServiceAsyncClient
-
-typealias YorkieServiceClientInterceptorFactoryProtocol = Yorkie_V1_YorkieServiceClientInterceptorFactoryProtocol
+typealias YorkieServiceClient = Yorkie_V1_YorkieServiceClient
+typealias YorkieServerStream = Connect.ServerOnlyStreamInterface<WatchDocumentRequest>
 
 typealias ActivateClientRequest = Yorkie_V1_ActivateClientRequest
 typealias ActivateClientResponse = Yorkie_V1_ActivateClientResponse

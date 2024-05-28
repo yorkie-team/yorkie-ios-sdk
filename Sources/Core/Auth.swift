@@ -14,96 +14,34 @@
  * limitations under the License.
  */
 
+import Connect
 import Foundation
-import GRPC
-import NIOCore
 
-class AuthClientInterceptor<Request, Response>: ClientInterceptor<Request, Response> {
+struct AuthHeader {
     let apiKey: String?
     let token: String?
-    let docKey: String?
 
-    init(apiKey: String? = nil, token: String? = nil, docKey: String? = nil) {
-        self.apiKey = apiKey
-        self.token = token
-        self.docKey = docKey
-    }
+    func makeHeader(_ docKey: String?) -> [String: [String]] {
+        var header = [String: [String]]()
 
-    override func send(_ part: GRPCClientRequestPart<Request>, promise: EventLoopPromise<Void>?, context: ClientInterceptorContext<Request, Response>) {
-        var part = part
+        if let apiKey {
+            header["x-api-key"] = [apiKey]
 
-        switch part {
-        case .metadata(var header):
-            if let apiKey {
-                header.add(name: "x-api-key", value: apiKey)
+            var shardKey = "\(apiKey)"
 
-                var shardKey = "\(apiKey)"
-
-                if let docKey = self.docKey, docKey.isEmpty == false {
-                    shardKey += "/\(docKey)"
-                }
-
-                header.add(name: "x-shard-key", value: shardKey)
+            if let docKey, docKey.isEmpty == false {
+                shardKey += "/\(docKey)"
             }
 
-            if let token {
-                header.add(name: "authorization", value: token)
-            }
-
-            header.add(name: "x-yorkie-user-agent", value: "yorkie-ios-sdk/\(yorkieVersion)")
-            part = .metadata(header)
-        default:
-            break
+            header["x-shard-key"] = [shardKey]
         }
 
-        context.send(part, promise: promise)
-    }
-}
+        if let token {
+            header["authorization"] = [token]
+        }
 
-final class AuthClientInterceptors: YorkieServiceClientInterceptorFactoryProtocol {
-    let apiKey: String?
-    let token: String?
-    let docKey: String?
+        header["x-yorkie-user-agent"] = ["yorkie-ios-sdk/\(yorkieVersion)"]
 
-    init(apiKey: String? = nil, token: String? = nil, docKey: String? = nil) {
-        self.apiKey = apiKey
-        self.token = token
-        self.docKey = docKey
-    }
-
-    func docKeyChangedInterceptors(_ docKey: String?) -> AuthClientInterceptors {
-        AuthClientInterceptors(apiKey: self.apiKey, token: self.token, docKey: docKey)
-    }
-
-    func makeActivateClientInterceptors() -> [GRPC.ClientInterceptor<ActivateClientRequest, ActivateClientResponse>] {
-        [AuthClientInterceptor<ActivateClientRequest, ActivateClientResponse>(apiKey: self.apiKey, token: self.token)]
-    }
-
-    func makeDeactivateClientInterceptors() -> [GRPC.ClientInterceptor<DeactivateClientRequest, DeactivateClientResponse>] {
-        [AuthClientInterceptor<DeactivateClientRequest, DeactivateClientResponse>(apiKey: self.apiKey, token: self.token)]
-    }
-
-    func makeAttachDocumentInterceptors() -> [GRPC.ClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>] {
-        [AuthClientInterceptor<AttachDocumentRequest, AttachDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
-    }
-
-    func makeDetachDocumentInterceptors() -> [GRPC.ClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>] {
-        [AuthClientInterceptor<DetachDocumentRequest, DetachDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
-    }
-
-    func makeWatchDocumentInterceptors() -> [GRPC.ClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>] {
-        [AuthClientInterceptor<WatchDocumentRequest, WatchDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
-    }
-
-    func makeRemoveDocumentInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_RemoveDocumentRequest, Yorkie_V1_RemoveDocumentResponse>] {
-        [AuthClientInterceptor<RemoveDocumentRequest, RemoveDocumentResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
-    }
-
-    func makePushPullChangesInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_PushPullChangesRequest, Yorkie_V1_PushPullChangesResponse>] {
-        [AuthClientInterceptor<PushPullChangeRequest, PushPullChangeResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
-    }
-
-    func makeBroadcastInterceptors() -> [GRPC.ClientInterceptor<Yorkie_V1_BroadcastRequest, Yorkie_V1_BroadcastResponse>] {
-        [AuthClientInterceptor<BroadcastRequest, BroadcastResponse>(apiKey: self.apiKey, token: self.token, docKey: self.docKey)]
+        return header
     }
 }

@@ -14,24 +14,25 @@
  * limitations under the License.
  */
 
+import Connect
 import Foundation
-import GRPC
 
 class Attachment {
     var doc: Document
     var docID: String
     var syncMode: SyncMode
     var remoteChangeEventReceived: Bool
-    var remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>?
+    var remoteWatchStream: (any YorkieServerStream)?
     var watchLoopReconnectTimer: Timer?
+    private var isDisconnected: Bool
 
-    init(doc: Document, docID: String, syncMode: SyncMode, remoteChangeEventReceived: Bool, remoteWatchStream: GRPCAsyncServerStreamingCall<WatchDocumentRequest, WatchDocumentResponse>? = nil, watchLoopReconnectTimer: Timer? = nil) {
+    init(doc: Document, docID: String, syncMode: SyncMode, remoteChangeEventReceived: Bool, watchLoopReconnectTimer: Timer? = nil) {
         self.doc = doc
         self.docID = docID
         self.syncMode = syncMode
         self.remoteChangeEventReceived = remoteChangeEventReceived
-        self.remoteWatchStream = remoteWatchStream
         self.watchLoopReconnectTimer = watchLoopReconnectTimer
+        self.isDisconnected = false
     }
 
     /**
@@ -49,5 +50,30 @@ class Attachment {
         let hasLocalChanges = await doc.hasLocalChanges()
 
         return self.syncMode != .manual && (hasLocalChanges || self.remoteChangeEventReceived)
+    }
+
+    func connectStream(_ stream: (any YorkieServerStream)?) {
+        self.remoteWatchStream = stream
+        self.isDisconnected = false
+    }
+
+    func disconnectStream() {
+        self.remoteWatchStream?.cancel()
+        self.remoteWatchStream = nil
+
+        self.isDisconnected = true
+    }
+
+    func resetWatchLoopTimer() {
+        self.watchLoopReconnectTimer?.invalidate()
+        self.watchLoopReconnectTimer = nil
+    }
+
+    var isDisconnectedStream: Bool {
+        if #available(iOS 16.0.0, *) {
+            return self.remoteWatchStream == nil
+        } else {
+            return self.isDisconnected
+        }
     }
 }
