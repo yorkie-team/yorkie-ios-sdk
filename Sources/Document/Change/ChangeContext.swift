@@ -68,14 +68,6 @@ class ChangeContext {
     }
 
     /**
-     * `registerElementHasRemovedNodes` register GC element has removed node for
-     * garbage collection.
-     */
-    func registerElementHasRemovedNodes(_ element: CRDTGCElement) {
-        self.root.registerElementHasRemovedNodes(element)
-    }
-
-    /**
      * `registerGCPair` registers the given pair to hash table.
      */
     func registerGCPair(_ pair: GCPair) {

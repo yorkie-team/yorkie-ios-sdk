@@ -44,10 +44,12 @@ class TextChange {
 }
 
 /**
- * `TextValue` is a value of Text
+ * `CRDTTextValue` is a value of Text
  * which has a attributes that expresses the text style.
+ * Attributes are represented by RHT.
+ *
  */
-public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
+public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     required convenience init() {
         self.init("", RHT())
     }
@@ -73,8 +75,8 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     /**
      * `substring` returns a sub-string value of the given range.
      */
-    public func substring(from indexStart: Int, to indexEnd: Int) -> TextValue {
-        let value = TextValue(self.content.substring(with: NSRange(location: indexStart, length: indexEnd - indexStart)), self.attributes.deepcopy())
+    public func substring(from indexStart: Int, to indexEnd: Int) -> CRDTTextValue {
+        let value = CRDTTextValue(self.content.substring(with: NSRange(location: indexStart, length: indexEnd - indexStart)), self.attributes.deepcopy())
         return value
     }
 
@@ -134,9 +136,22 @@ public final class TextValue: RGATreeSplitValue, CustomStringConvertible {
     public var description: String {
         self.content as String
     }
+
+    /**
+     * `getGCPairs` returns the pairs of GC.
+     */
+    func getGCPairs() -> [GCPair] {
+        var pairs = [GCPair]()
+
+        for node in self.attributes where node.removedAt != nil {
+            pairs.append(GCPair(parent: self, child: node))
+        }
+
+        return pairs
+    }
 }
 
-extension TextValue: GCParent {
+extension CRDTTextValue: GCParent {
     func purge(node: any GCChild) {
         if let node = node as? RHTNode {
             self.attributes.purge(node)
@@ -144,7 +159,7 @@ extension TextValue: GCParent {
     }
 }
 
-final class CRDTText: CRDTGCElement {
+final class CRDTText: CRDTElement {
     public typealias TextVal = (attributes: Codable, content: String)
 
     var createdAt: TimeTicket
@@ -155,10 +170,10 @@ final class CRDTText: CRDTGCElement {
      * `rgaTreeSplit` returns rgaTreeSplit.
      *
      **/
-    private(set) var rgaTreeSplit: RGATreeSplit<TextValue>
+    private(set) var rgaTreeSplit: RGATreeSplit<CRDTTextValue>
     private var remoteChangeLock: Bool
 
-    init(rgaTreeSplit: RGATreeSplit<TextValue>, createdAt: TimeTicket) {
+    init(rgaTreeSplit: RGATreeSplit<CRDTTextValue>, createdAt: TimeTicket) {
         self.rgaTreeSplit = rgaTreeSplit
         self.remoteChangeLock = false
         self.createdAt = createdAt
@@ -172,16 +187,16 @@ final class CRDTText: CRDTGCElement {
               _ content: String,
               _ editedAt: TimeTicket,
               _ attributes: [String: String]? = nil,
-              _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange], RGATreeSplitPosRange)
+              _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange], [GCPair], RGATreeSplitPosRange)
     {
-        let value = !content.isEmpty ? TextValue(content) : nil
+        let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
             for (key, jsonValue) in attributes {
                 value?.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
             }
         }
 
-        let (caretPos, maxCreatedAtMap, contentChanges) = try self.rgaTreeSplit.edit(
+        let (caretPos, maxCreatedAtMap, pairs, contentChanges) = try self.rgaTreeSplit.edit(
             range,
             editedAt,
             value,
@@ -196,7 +211,7 @@ final class CRDTText: CRDTGCElement {
             }
         }
 
-        return (maxCreatedAtMap, changes, (caretPos, caretPos))
+        return (maxCreatedAtMap, changes, pairs, (caretPos, caretPos))
     }
 
     /**
@@ -207,6 +222,7 @@ final class CRDTText: CRDTGCElement {
      * @param range - range of RGATreeSplitNode
      * @param attributes - style attributes
      * @param editedAt - edited time
+     * @param maxCreatedAtMapByActor - maxCreatedAtMapByActor
      */
     @discardableResult
     func setStyle(_ range: RGATreeSplitPosRange,
@@ -222,7 +238,7 @@ final class CRDTText: CRDTGCElement {
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
         var createdAtMapByActor = [String: TimeTicket]()
-        var toBeStyleds = [RGATreeSplitNode<TextValue>]()
+        var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
         for node in nodes {
             let actorID = node.createdAt.actorID
 
@@ -339,22 +355,8 @@ final class CRDTText: CRDTGCElement {
         self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value.toString }.joined(separator: "")
     }
 
-    var values: [TextValue]? {
+    var values: [CRDTTextValue]? {
         self.rgaTreeSplit.compactMap { $0.isRemoved ? nil : $0.value }
-    }
-
-    /**
-     * `removedNodesLen` returns length of removed nodes
-     */
-    var removedNodesLength: Int {
-        self.rgaTreeSplit.removedNodesLength
-    }
-
-    /**
-     * `purgeRemovedNodesBefore` purges removed nodes before the given time.
-     */
-    func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
-        self.rgaTreeSplit.purgeRemovedNodesBefore(ticket)
     }
 
     /**
@@ -371,5 +373,25 @@ final class CRDTText: CRDTGCElement {
      */
     func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
         try self.rgaTreeSplit.findIndexesFromRange(range)
+    }
+}
+
+extension CRDTText: CRDTGCPairContainable {
+    /**
+     * `getGCPairs` returns the pairs of GC.
+     */
+    func getGCPairs() -> [GCPair] {
+        var pairs = [GCPair]()
+        for node in self.rgaTreeSplit {
+            if node.removedAt != nil {
+                pairs.append(GCPair(parent: self.rgaTreeSplit, child: node))
+            }
+
+            for pair in node.value.getGCPairs() {
+                pairs.append(pair)
+            }
+        }
+
+        return pairs
     }
 }

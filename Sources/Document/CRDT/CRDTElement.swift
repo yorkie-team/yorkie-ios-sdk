@@ -110,12 +110,3 @@ protocol CRDTContainer: CRDTElement {
 
     func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool)
 }
-
-/**
- * `CRDTGCElement` represents element which has garbage collecting method.
- */
-protocol CRDTGCElement: CRDTElement {
-    var removedNodesLength: Int { get }
-
-    func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int
-}

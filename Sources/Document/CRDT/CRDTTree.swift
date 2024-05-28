@@ -506,6 +506,21 @@ final class CRDTTreeNode: IndexTreeNode {
             return resultString
         }
     }
+
+    /**
+     * `getGCPairs` returns the pairs of GC.
+     */
+    func getGCPairs() -> [GCPair] {
+        var pairs = [GCPair]()
+
+        if let attrs = self.attrs {
+            for node in attrs where node.removedAt != nil {
+                pairs.append(GCPair(parent: self, child: node))
+            }
+        }
+
+        return pairs
+    }
 }
 
 extension CRDTTreeNode: GCParent {
@@ -518,23 +533,30 @@ extension CRDTTreeNode: GCParent {
     }
 }
 
+extension CRDTTreeNode: GCChild {
+    /**
+     * `toIDString` returns the IDString of this node.
+     */
+    var toIDString: String {
+        self.id.toIDString
+    }
+}
+
 /**
  * `CRDTTree` is a CRDT implementation of a tree.
  */
-class CRDTTree: CRDTGCElement {
+class CRDTTree: CRDTElement {
     var createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
     private(set) var indexTree: IndexTree<CRDTTreeNode>
     private var nodeMapByID: LLRBTree<CRDTTreeNodeID, CRDTTreeNode>
-    private var removedNodeMap: [String: CRDTTreeNode]
 
     init(root: CRDTTreeNode, createdAt: TimeTicket) {
         self.createdAt = createdAt
         self.indexTree = IndexTree(root: root)
         self.nodeMapByID = LLRBTree()
-        self.removedNodeMap = [String: CRDTTreeNode]()
 
         self.indexTree.traverse { node, _ in
             self.nodeMapByID.put(node.id, node)
@@ -700,7 +722,7 @@ class CRDTTree: CRDTGCElement {
      * If the content is undefined, the range will be removed.
      */
     @discardableResult
-    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket] = [:], _ issueTimeTicket: () -> TimeTicket) throws -> ([TreeChange], [String: TimeTicket]) {
+    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket] = [:], _ issueTimeTicket: () -> TimeTicket) throws -> ([TreeChange], [GCPair], [String: TimeTicket]) {
         // 01. find nodes from the given range and split nodes.
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -756,11 +778,12 @@ class CRDTTree: CRDTGCElement {
         var changes = try self.makeDeletionChanges(tokensToBeRemoved, editedAt)
 
         // 02. Delete: delete the nodes that are marked as removed.
+        var pairs = [GCPair]()
         for node in nodesToBeRemoved {
             node.remove(editedAt)
 
             if node.isRemoved {
-                self.removedNodeMap[node.id.toIDString] = node
+                pairs.append(GCPair(parent: self, child: node))
             }
         }
 
@@ -811,7 +834,7 @@ class CRDTTree: CRDTGCElement {
                     if fromParent.isRemoved {
                         node.remove(editedAt)
 
-                        self.removedNodeMap[node.id.toIDString] = node
+                        pairs.append(GCPair(parent: self, child: node))
                     }
 
                     self.nodeMapByID.put(node.id, node)
@@ -845,7 +868,7 @@ class CRDTTree: CRDTGCElement {
             }
         }
 
-        return (changes, maxCreatedAtMap)
+        return (changes, pairs, maxCreatedAtMap)
     }
 
     /**
@@ -867,71 +890,12 @@ class CRDTTree: CRDTGCElement {
     }
 
     /**
-     * `removedNodesLen` returns length of removed nodes
-     */
-    var removedNodesLength: Int {
-        self.removedNodeMap.count
-    }
-
-    /**
-     * `purgeRemovedNodesBefore` physically purges nodes that have been removed.
-     */
-    func purgeRemovedNodesBefore(ticket: TimeTicket) -> Int {
-        var nodesToBeRemoved = [CRDTTreeNode]()
-        var count = 0
-
-        for (_, node) in self.removedNodeMap {
-            if node.removedAt != nil, ticket >= node.removedAt! {
-                if nodesToBeRemoved.first(where: { $0 === node }) == nil {
-                    nodesToBeRemoved.append(node)
-                }
-                count += 1
-            }
-        }
-
-        for node in nodesToBeRemoved {
-            do {
-                try node.parent?.removeChild(child: node)
-            } catch {
-                assertionFailure("Can't remove Child from parents.")
-            }
-            self.nodeMapByID.remove(node.id)
-            self.purge(node)
-            self.removedNodeMap.removeValue(forKey: node.id.toIDString)
-        }
-
-        return count
-    }
-
-    /**
-     * `purge` physically purges the given node from RGATreeSplit.
-     */
-    func purge(_ node: CRDTTreeNode) {
-        if let insPrevID = node.insPrevID {
-            self.findFloorNode(insPrevID)?.insNextID = node.insNextID
-        }
-        if let insNextID = node.insNextID {
-            self.findFloorNode(insNextID)?.insPrevID = node.insPrevID
-        }
-
-        node.insPrevID = nil
-        node.insNextID = nil
-    }
-
-    /**
      * `findPos` finds the position of the given index in the tree.
      */
     func findPos(_ index: Int, _ preferText: Bool = true) throws -> CRDTTreePos {
         let treePos = try self.indexTree.findTreePos(index, preferText)
 
         return CRDTTreePos.fromTreePos(pos: treePos)
-    }
-
-    /**
-     * `removedNodesLen` returns size of removed nodes.
-     */
-    var removedNodesLen: Int {
-        self.removedNodeMap.count
     }
 
     /**
@@ -1256,5 +1220,53 @@ class CRDTTree: CRDTGCElement {
 
         let prev = siblings[offset - 1]
         return (prev, prev.isText ? .text : .end)
+    }
+}
+
+extension CRDTTree: GCParent {
+    /**
+     * `purge` physically purges the given node.
+     */
+    func purge(node: any GCChild) {
+        guard let node = node as? CRDTTreeNode else {
+            return
+        }
+
+        do {
+            try node.parent?.removeChild(child: node)
+        } catch {
+            return
+        }
+        self.nodeMapByID.remove(node.id)
+
+        if let insPrevID = node.insPrevID {
+            self.findFloorNode(insPrevID)?.insNextID = node.insNextID
+        }
+        if let insNextID = node.insNextID {
+            self.findFloorNode(insNextID)?.insPrevID = node.insPrevID
+        }
+
+        node.insPrevID = nil
+        node.insNextID = nil
+    }
+}
+
+extension CRDTTree: CRDTGCPairContainable {
+    /**
+     * `getGCPairs` returns the pairs of GC.
+     */
+    func getGCPairs() -> [GCPair] {
+        var pairs = [GCPair]()
+        self.indexTree.traverse { node, _ in
+            if node.removedAt != nil {
+                pairs.append(GCPair(parent: self, child: node))
+            }
+
+            for pair in node.getGCPairs() {
+                pairs.append(pair)
+            }
+        }
+
+        return pairs
     }
 }

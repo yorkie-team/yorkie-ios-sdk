@@ -224,6 +224,7 @@ class RHT {
     func purge(_ child: RHTNode) {
         let node = self.nodeMapByKey[child.key]
         if node == nil || node!.toIDString != child.toIDString {
+            // TODO(hackerwins): Should we return an error when the child is not found?
             return
         }
 

@@ -112,7 +112,7 @@ class CRDTRootTests: XCTestCase {
         target.registerRemovedElement(a2)
 
         // when
-        let result = target.removedElementSetSize
+        let result = target.garbageElementSetSize
 
         // then
         XCTAssertEqual(result, 2)

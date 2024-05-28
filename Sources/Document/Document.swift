@@ -433,7 +433,7 @@ public actor Document {
             """
             trying to apply \(changes.count) remote changes.
             elements:\(self.root.elementMapSize),
-            removeds:\(self.root.removedElementSetSize)
+            removeds:\(self.root.garbageElementSetSize)
             """)
 
         Logger.trace(changes.map { "\($0.id.toTestString)\t\($0.toTestString)" }.joined(separator: "\n"))
@@ -507,7 +507,7 @@ public actor Document {
             """
             after appling \(changes.count) remote changes.
             elements:\(self.root.elementMapSize),
-            removeds:\(self.root.removedElementSetSize)
+            removeds:\(self.root.garbageElementSetSize)
             """
         )
     }

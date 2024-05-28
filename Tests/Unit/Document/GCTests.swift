@@ -176,49 +176,39 @@ final class GCTests: XCTestCase {
         XCTAssertEqual("[0:00:0:0 ][3:00:1:0 12]{2:00:1:2 CD}", result)
     }
 
-    func test_should_collect_garbage_for_text_node_2() async throws {
+    func test_should_return_correct_gc_count_with_already_removed_text_node() async throws {
         let doc = Document(key: "test-doc")
 
         var result = await doc.toSortedJSON()
         XCTAssertEqual("{}", result)
 
-        var expectedMessage = "{\"k1\":[{\"val\":\"Hello \"},{\"val\":\"mario\"}]}"
-
         try await doc.update({ root, _ in
             root.k1 = JSONText()
-            (root.k1 as? JSONText)?.edit(0, 0, "Hello world")
-            (root.k1 as? JSONText)?.edit(6, 11, "mario")
-
-            XCTAssertEqual(expectedMessage, root.toJSON())
+            (root.k1 as? JSONText)?.edit(0, 0, "ab")
+            (root.k1 as? JSONText)?.edit(0, 1, "c")
         }, "edit text k1")
 
         result = await doc.toSortedJSON()
-        XCTAssertEqual(expectedMessage, result)
+        XCTAssertEqual("{\"k1\":[{\"val\":\"c\"},{\"val\":\"b\"}]}", result)
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(1, len)
 
-        expectedMessage = "{\"k1\":[{\"val\":\"Hi\"},{\"val\":\" \"},{\"val\":\"j\"},{\"val\":\"ane\"}]}"
-
         try await doc.update({ root, _ in
             if let text = root.k1 as? JSONText {
-                text.edit(0, 5, "Hi")
-                text.edit(3, 4, "j")
-                text.edit(4, 8, "ane")
+                text.edit(1, 2, "d")
             } else {
                 assertionFailure("No Text.")
             }
         }, "deletes 2")
 
         result = await doc.toSortedJSON()
-        XCTAssertEqual(expectedMessage, result)
-
-        let expectedGarbageLen = 4
+        XCTAssertEqual("{\"k1\":[{\"val\":\"c\"},{\"val\":\"d\"}]}", result)
 
         len = await doc.getGarbageLength()
-        XCTAssertEqual(expectedGarbageLen, len)
+        XCTAssertEqual(2, len)
         len = await doc.garbageCollect(TimeTicket.max)
-        XCTAssertEqual(expectedGarbageLen, len)
+        XCTAssertEqual(2, len)
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
@@ -375,6 +365,58 @@ final class GCTests: XCTestCase {
         XCTAssertEqual(nodeLengthBeforeGC - nodeLengthAfterGC, 5)
     }
 
+    func test_should_return_correct_gc_count_with_already_removed_tree_node() async throws {
+        let doc = Document(key: "test-doc")
+
+        let result = await doc.toSortedJSON()
+        XCTAssertEqual("{}", result)
+
+        try await doc.update { root, _ in
+            root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc",
+                                                               children: [
+                                                                   JSONTreeElementNode(type: "p",
+                                                                                       children: [
+                                                                                           JSONTreeElementNode(type: "tn",
+                                                                                                               children: [
+                                                                                                                   JSONTreeTextNode(value: "abc")
+                                                                                                               ])
+                                                                                       ])
+                                                               ])
+            )
+        }
+
+        var xml = await(doc.getRoot().t as? JSONTree)!.toXML()
+        XCTAssertEqual(xml, "<doc><p><tn>abc</tn></p></doc>")
+        var len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await doc.update { root, _ in
+            do {
+                try (root.t as? JSONTree)?.edit(3, 4)
+            } catch {
+                assertionFailure("Can't editByPath")
+            }
+        }
+
+        xml = await(doc.getRoot().t as? JSONTree)!.toXML()
+        XCTAssertEqual(xml, "<doc><p><tn>ac</tn></p></doc>")
+        len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 1)
+
+        try await doc.update { root, _ in
+            do {
+                try (root.t as? JSONTree)?.edit(2, 4)
+            } catch {
+                assertionFailure("Can't editByPath")
+            }
+        }
+
+        xml = await(doc.getRoot().t as? JSONTree)!.toXML()
+        XCTAssertEqual(xml, "<doc><p><tn></tn></p></doc>")
+        len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 3)
+    }
+
     func test_should_collect_garbage_for_nested_object() async throws {
         let doc = Document(key: "test-doc")
 
@@ -504,7 +546,7 @@ final class GCTestsForTree: XCTestCase {
 
             for step in test.steps {
                 if step.op.code == .gc {
-                    await doc.garbageCollect(timeT())
+                    await doc.garbageCollect(TimeTicket.max)
                 } else {
                     try await doc.update { root, _ in
                         switch step.op.code {
