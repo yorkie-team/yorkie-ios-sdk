@@ -39,3 +39,7 @@ protocol GCChild: AnyObject {
     var toIDString: String { get }
     var removedAt: TimeTicket? { get }
 }
+
+protocol CRDTGCPairContainable: CRDTElement {
+    func getGCPairs() -> [GCPair]
+}

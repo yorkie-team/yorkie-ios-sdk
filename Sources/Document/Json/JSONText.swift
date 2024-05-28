@@ -86,9 +86,13 @@ public class JSONText {
             attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
-        guard let (maxCreatedAtMapByActor, _, rangeAfterEdit) = try? text.edit(range, content, ticket, attrs) else {
+        guard let (maxCreatedAtMapByActor, _, pairs, rangeAfterEdit) = try? text.edit(range, content, ticket, attrs) else {
             Logger.critical("can't edit Text")
             return nil
+        }
+
+        for pair in pairs {
+            self.context?.registerGCPair(pair)
         }
 
         context.push(
@@ -100,10 +104,6 @@ public class JSONText {
                                      attributes: attrs,
                                      executedAt: ticket)
         )
-
-        if range.0 != range.1 {
-            context.registerElementHasRemovedNodes(text)
-        }
 
         return try? self.text?.findIndexesFromRange(rangeAfterEdit)
     }
@@ -230,7 +230,7 @@ public class JSONText {
     /**
      * `values` returns values of this text.
      */
-    public var values: [TextValue]? {
+    public var values: [CRDTTextValue]? {
         guard self.context != nil, let text else {
             Logger.critical("it is not initialized yet")
             return nil

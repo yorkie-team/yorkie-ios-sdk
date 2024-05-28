@@ -478,8 +478,12 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        let (_, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket) {
+        let (_, pairs, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket) {
             context.issueTimeTicket
+        }
+
+        for pair in pairs {
+            self.context?.registerGCPair(pair)
         }
 
         context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
@@ -490,10 +494,6 @@ public class JSONTree {
                                                   executedAt: ticket,
                                                   maxCreatedAtMapByActor: maxCreatedAtMapByActor)
         )
-
-        if fromPos != toPos {
-            context.registerElementHasRemovedNodes(tree)
-        }
 
         return true
     }

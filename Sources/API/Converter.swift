@@ -698,7 +698,7 @@ extension Converter {
      * `fromText` converts the given Protobuf format to model format.
      */
     static func fromText(_ pbText: PbJSONElement.Text) -> CRDTText {
-        let rgaTreeSplit = RGATreeSplit<TextValue>()
+        let rgaTreeSplit = RGATreeSplit<CRDTTextValue>()
 
         var prev = rgaTreeSplit.head
         pbText.nodes.forEach { pbNode in
@@ -1012,7 +1012,7 @@ extension Converter {
     /**
      * `toTextNodes` converts the given model to Protobuf format.
      */
-    static func toTextNodes(_ rgaTreeSplit: RGATreeSplit<TextValue>) -> [PbTextNode] {
+    static func toTextNodes(_ rgaTreeSplit: RGATreeSplit<CRDTTextValue>) -> [PbTextNode] {
         var pbTextNodes = [PbTextNode]()
         for textNode in rgaTreeSplit {
             var pbTextNode = PbTextNode()
@@ -1036,8 +1036,8 @@ extension Converter {
     /**
      * `fromTextNode` converts the given Protobuf format to model format.
      */
-    static func fromTextNode(_ pbTextNode: PbTextNode) -> RGATreeSplitNode<TextValue> {
-        let textValue = TextValue(pbTextNode.value)
+    static func fromTextNode(_ pbTextNode: PbTextNode) -> RGATreeSplitNode<CRDTTextValue> {
+        let textValue = CRDTTextValue(pbTextNode.value)
         pbTextNode.attributes.forEach {
             textValue.setAttr(key: $0.key, value: $0.value.value, updatedAt: fromTimeTicket($0.value.updatedAt))
         }

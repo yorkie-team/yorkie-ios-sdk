@@ -35,18 +35,11 @@ class CRDTRoot {
      */
     private var elementPairMapByCreatedAt: [String: CRDTElementPair] = [:]
     /**
-     * `removedElementSetByCreatedAt` is a hash set that contains the creation
+     * `gcElementSetByCreatedAt` is a hash set that contains the creation
      * time of the removed element. It is used to find the removed element when
      * executing garbage collection.
      */
-    private var removedElementSetByCreatedAt: Set<String> = Set()
-    /**
-     * `elementHasRemovedNodesSetByCreatedAt` is a hash set that contains the
-     * creation time of the element that has removed nodes. It is used to find
-     * the element that has removed nodes when executing garbage collection.
-     */
-    private var elementHasRemovedNodesSetByCreatedAt: Set<String> = Set()
-
+    private var gcElementSetByCreatedAt = Set<String>()
     /**
      * `gcPairMap` is a hash table that maps the IDString of GCChild to the
      * element itself and its parent.
@@ -60,6 +53,15 @@ class CRDTRoot {
 
         self.rootObject.getDescendants(callback: { element, parent in
             self.registerElement(element, parent: parent)
+            if element.removedAt != nil {
+                self.registerRemovedElement(element)
+            }
+            if let element = element as? CRDTGCPairContainable {
+                for pair in element.getGCPairs() {
+                    self.registerGCPair(pair)
+                }
+            }
+
             return false
         })
     }
@@ -118,22 +120,14 @@ class CRDTRoot {
      */
     func deregisterElement(_ element: CRDTElement) {
         self.elementPairMapByCreatedAt[element.createdAt.toIDString] = nil
-        self.removedElementSetByCreatedAt.remove(element.createdAt.toIDString)
+        self.gcElementSetByCreatedAt.remove(element.createdAt.toIDString)
     }
 
     /**
      * `registerRemovedElement` registers the given element to the hash set.
      */
     func registerRemovedElement(_ element: CRDTElement) {
-        self.removedElementSetByCreatedAt.insert(element.createdAt.toIDString)
-    }
-
-    /**
-     * `registerElementHasRemovedNodes` registers the given GC element to the
-     * hash set.
-     */
-    func registerElementHasRemovedNodes(_ element: CRDTElement) {
-        self.elementHasRemovedNodesSetByCreatedAt.insert(element.createdAt.toIDString)
+        self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
     }
 
     /**
@@ -160,29 +154,14 @@ class CRDTRoot {
     }
 
     /**
-     * `removedElementSetSize` returns the size of removed element set.
+     * `garbageElementSetSize` returns the size of removed element set.
      */
-    var removedElementSetSize: Int {
-        return self.removedElementSetByCreatedAt.count
-    }
-
-    /**
-     * `getObject` returns root object.
-     */
-    var object: CRDTObject {
-        return self.rootObject
-    }
-
-    /**
-     * `garbageLength` returns length of nodes which can be garbage collected.
-     */
-    var garbageLength: Int {
-        var count = 0
+    var garbageElementSetSize: Int {
         var seen = Set<String>()
 
-        for item in self.removedElementSetByCreatedAt {
-            seen.insert(item)
-            guard let pair = self.elementPairMapByCreatedAt[item],
+        for createdAt in self.gcElementSetByCreatedAt {
+            seen.insert(createdAt)
+            guard let pair = self.elementPairMapByCreatedAt[createdAt],
                   let element = pair.element as? CRDTContainer
             else {
                 continue
@@ -193,21 +172,21 @@ class CRDTRoot {
             }
         }
 
-        count += seen.count
+        return seen.count
+    }
 
-        for item in self.elementHasRemovedNodesSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[item],
-                  let element = pair.element as? CRDTGCElement
-            else {
-                continue
-            }
+    /**
+     * `object` returns root object.
+     */
+    var object: CRDTObject {
+        return self.rootObject
+    }
 
-            count += element.removedNodesLength
-        }
-
-        count += self.gcPairMap.count
-
-        return count
+    /**
+     * `garbageLength` returns length of nodes which can be garbage collected.
+     */
+    var garbageLength: Int {
+        self.garbageElementSetSize + self.gcPairMap.count
     }
 
     /**
@@ -228,7 +207,7 @@ class CRDTRoot {
     func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
         var count = 0
 
-        for createdAt in self.removedElementSetByCreatedAt {
+        for createdAt in self.gcElementSetByCreatedAt {
             guard let pair = self.elementPairMapByCreatedAt[createdAt],
                   let removedAt = pair.element.removedAt, removedAt <= ticket
             else {
@@ -239,30 +218,13 @@ class CRDTRoot {
             count += self.garbageCollectInternal(element: pair.element)
         }
 
-        for createdAt in self.elementHasRemovedNodesSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[createdAt],
-                  let element = pair.element as? CRDTGCElement
-            else {
-                continue
-            }
-
-            let removedNodeCount = element.purgeRemovedNodesBefore(ticket: ticket)
-            if element.removedNodesLength == 0 {
-                self.elementHasRemovedNodesSetByCreatedAt.remove(element.createdAt.toIDString)
-            }
-
-            count += removedNodeCount
-        }
-
         for pair in self.gcPairMap.values {
-            if let child = pair.child {
-                if let removedAt = child.removedAt, ticket >= removedAt {
-                    pair.parent?.purge(node: child)
-                }
+            if let child = pair.child, let removedAt = child.removedAt, ticket >= removedAt {
+                pair.parent?.purge(node: child)
 
                 self.gcPairMap.removeValue(forKey: child.toIDString)
+                count += 1
             }
-            count += 1
         }
 
         return count

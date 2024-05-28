@@ -73,10 +73,10 @@ struct EditOperation: Operation {
             throw YorkieError.unexpected(message: log)
         }
 
-        let changes = try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor).1
+        let (_, changes, pairs, _) = try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor)
 
-        if self.fromPos != self.toPos {
-            root.registerElementHasRemovedNodes(text)
+        for pair in pairs {
+            root.registerGCPair(pair)
         }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
