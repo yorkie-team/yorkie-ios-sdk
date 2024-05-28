@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "Yorkie",
-    platforms: [.iOS(.v13)],
+    platforms: [.iOS(.v13), .macOS(.v13)],
     products: [
         .library(
             name: "Yorkie",
@@ -25,7 +25,10 @@ let package = Package(
             path: "Sources",
             exclude: ["Info.plist",
                       "API/V1/yorkie/v1/resources.proto",
-                      "API/V1/yorkie/v1/yorkie.proto"]
+                      "API/V1/yorkie/v1/yorkie.proto",
+                      "API/V1/buf.gen.yaml",
+                      "API/V1/buf.yaml",
+                      "API/V1/run_protoc.sh"]
         ),
         .testTarget(
             name: "YorkieUnitTests",
