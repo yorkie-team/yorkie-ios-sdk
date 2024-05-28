@@ -42,6 +42,10 @@ class Attachment {
             return false
         }
 
+        if self.syncMode == .realtimePushOnly {
+            return await self.doc.hasLocalChanges()
+        }
+
         let hasLocalChanges = await doc.hasLocalChanges()
 
         return self.syncMode != .manual && (hasLocalChanges || self.remoteChangeEventReceived)
