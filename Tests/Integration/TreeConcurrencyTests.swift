@@ -284,8 +284,10 @@ final class TreeConcurrencyTests: XCTestCase {
                             _ initialXML: String,
                             _ rangesArr: [TwoRangesType],
                             _ op1Arr: [OperationInterface],
-                            _ op2Arr: [OperationInterface]) async throws
+                            _ op2Arr: [OperationInterface]) async throws -> Int
     {
+        var testCount = 0
+
         for ranges in rangesArr {
             for op1 in op1Arr {
                 var exps = [XCTestExpectation]()
@@ -309,10 +311,13 @@ final class TreeConcurrencyTests: XCTestCase {
                             exp.fulfill()
                         }
                     }
+                    testCount += 1
                 }
                 await fulfillment(of: exps, timeout: 10)
             }
         }
+
+        return testCount
     }
 
     // swiftlint: enable function_parameter_count
@@ -501,7 +506,7 @@ final class TreeConcurrencyTests: XCTestCase {
             )
         ]
 
-        try await runTestConcurrency(
+        let testCount = try await runTestConcurrency(
             "concurrently-edit-edit-test",
             initialTree,
             initialXML,
@@ -509,9 +514,11 @@ final class TreeConcurrencyTests: XCTestCase {
             edit1Operations,
             edit2Operations
         )
+
+        print("\(self.description) Test Count: \(testCount)")
     }
 
-    func skip_test_concurrently_style_style_test() async throws {
+    func test_concurrently_style_style_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
                                 children: [
@@ -579,7 +586,7 @@ final class TreeConcurrencyTests: XCTestCase {
         ]
 
         // Define range & style operations
-        try await runTestConcurrency(
+        let testCount = try await runTestConcurrency(
             "concurrently-style-style-test",
             initialTree,
             initialXML,
@@ -587,6 +594,8 @@ final class TreeConcurrencyTests: XCTestCase {
             styleOperations,
             styleOperations
         )
+
+        print("\(self.description) Test Count: \(testCount)")
     }
 
     func test_concurrently_edit_style_test() async throws {
@@ -681,7 +690,7 @@ final class TreeConcurrencyTests: XCTestCase {
             )
         ]
 
-        try await runTestConcurrency(
+        let testCount = try await runTestConcurrency(
             "concurrently-edit-style-test",
             initialTree,
             initialXML,
@@ -689,6 +698,7 @@ final class TreeConcurrencyTests: XCTestCase {
             editOperations,
             styleOperations
         )
+        print("\(self.description) Test Count: \(testCount)")
     }
 
     func skip_test_concurrently_split_split_test() async throws {
@@ -781,7 +791,7 @@ final class TreeConcurrencyTests: XCTestCase {
             )
         ]
 
-        try await runTestConcurrency(
+        let testCount = try await runTestConcurrency(
             "concurrently-split-split-test",
             initialTree,
             initialXML,
@@ -789,6 +799,7 @@ final class TreeConcurrencyTests: XCTestCase {
             splitOperations,
             splitOperations
         )
+        print("\(self.description) Test Count: \(testCount)")
     }
 
     func skip_test_concurrently_split_edit_test() async throws {
@@ -906,7 +917,7 @@ final class TreeConcurrencyTests: XCTestCase {
             )
         ]
 
-        try await runTestConcurrency(
+        let testCount = try await runTestConcurrency(
             "concurrently-split-edit-test",
             initialTree,
             initialXML,
@@ -914,6 +925,7 @@ final class TreeConcurrencyTests: XCTestCase {
             splitOperations,
             editOperations
         )
+        print("\(self.description) Test Count: \(testCount)")
     }
     // swiftlint: enable function_body_length
 }
