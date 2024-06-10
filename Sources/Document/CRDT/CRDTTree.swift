@@ -566,7 +566,7 @@ class CRDTTree: CRDTElement {
         self.indexTree = IndexTree(root: root)
         self.nodeMapByID = LLRBTree()
 
-        self.indexTree.traverse { node, _ in
+        self.indexTree.traverseAll { node, _ in
             self.nodeMapByID.put(node.id, node)
         }
     }
@@ -936,6 +936,13 @@ class CRDTTree: CRDTElement {
      */
     var size: Int {
         self.indexTree.size
+    }
+
+    /**
+     * `nodeSize` returns the size of the LLRBTree.
+     */
+    var nodeSize: Int {
+        self.nodeMapByID.size
     }
 
     /**

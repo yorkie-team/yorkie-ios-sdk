@@ -136,7 +136,8 @@ protocol IndexTreeNode: AnyObject {
 
 extension IndexTreeNode {
     /**
-     * `updateAncestorsSize` updates the size of the ancestors.
+     * `updateAncestorsSize` updates the size of the ancestors. It is used when
+     * the size of the node is changed.
      */
     func updateAncestorsSize() {
         var parent = self.parent
@@ -146,6 +147,27 @@ extension IndexTreeNode {
             parent?.size += self.paddedSize * sign
             parent = parent?.parent
         }
+    }
+
+    /**
+     * `updateDescendantsSize` updates the size of the descendants. It is used when
+     * the tree is newly created and the size of the descendants is not calculated.
+     */
+    @discardableResult
+    func updateDescendantsSize() -> Int {
+        if self.isRemoved {
+            self.size = 0
+            return 0
+        }
+
+        var sum = 0
+        for child in self.children {
+            sum += child.updateDescendantsSize()
+        }
+
+        self.size += sum
+
+        return self.paddedSize
     }
 
     /**
@@ -245,7 +267,8 @@ extension IndexTreeNode {
     }
 
     /**
-     * `prepend` prepends the given nodes to the children.
+     * `prepend` prepends the given nodes to the children. It is only used
+     * for creating a new node from snapshot.
      */
     func prepend(contentsOf newNode: [Self]) throws {
         guard self.isText == false else {
@@ -256,10 +279,6 @@ extension IndexTreeNode {
 
         for node in newNode {
             node.parent = self
-
-            if node.isRemoved == false {
-                node.updateAncestorsSize()
-            }
         }
     }
 
