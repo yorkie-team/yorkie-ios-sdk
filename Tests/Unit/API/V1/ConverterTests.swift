@@ -365,4 +365,36 @@ class ConverterTests: XCTestCase {
 
         XCTAssert(!(samplePresence == converted))
     }
+
+    func test_should_encode_and_decode_tree_properly() async throws {
+        let doc = Document(key: "test-doc")
+
+        try await doc.update { root, _ in
+            root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "r", children: [
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
+            ]))
+
+            try (root.tree as? JSONTree)?.editByPath([0, 1], [1, 1])
+        }
+
+        let xml = await(doc.getRoot().tree as? JSONTree)?.toXML()
+        let size = try await(doc.getRoot().tree as? JSONTree)?.getSize()
+
+        XCTAssertEqual(xml, "<r><p>14</p></r>")
+        XCTAssertEqual(size, 4)
+
+        let bytes = try await Converter.objectToBytes(obj: doc.getRootObject())
+        let obj = try Converter.bytesToObject(bytes: bytes)
+
+        let nodeSize = try await(doc.getRoot().tree as? JSONTree)?.getNodeSize()
+        let nodeSize2 = (obj.get(key: "tree") as? CRDTTree)?.nodeSize
+
+        XCTAssertEqual(nodeSize, nodeSize2)
+
+        let size1 = try await(doc.getRoot().tree as? JSONTree)?.getSize()
+        let size2 = (obj.get(key: "tree") as? CRDTTree)?.size
+
+        XCTAssertEqual(size1, size2)
+    }
 }

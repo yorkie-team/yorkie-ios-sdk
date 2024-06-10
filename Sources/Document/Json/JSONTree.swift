@@ -305,6 +305,17 @@ public class JSONTree {
     }
 
     /**
+     * `getNodeSize` returns the node size of this tree.
+     */
+    public func getNodeSize() throws -> Int {
+        guard self.context != nil, let tree else {
+            throw YorkieError.unexpected(message: "it is not initialized yet")
+        }
+
+        return tree.nodeSize
+    }
+
+    /**
      * `getIndexTree` returns the index tree of this tree.
      */
     func getIndexTree() throws -> IndexTree<CRDTTreeNode> {

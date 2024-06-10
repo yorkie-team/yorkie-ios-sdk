@@ -911,7 +911,7 @@ extension Converter {
             return pbTreeNodes
         }
         
-        traverse(node: node) { node, depth in
+        traverseAll(node: node) { node, depth in
             var pbTreeNode = PbTreeNode()
             pbTreeNode.id = toTreeNodeID(node.id)
             pbTreeNode.type = node.type
@@ -992,6 +992,8 @@ extension Converter {
             
             try parent?.prepend(contentsOf: [nodes[index]])
         }
+        
+        root.updateDescendantsSize()
         
         // build CRDTTree from the root to construct the links between nodes.
         return CRDTTree(root: root, createdAt: TimeTicket.initial).root
