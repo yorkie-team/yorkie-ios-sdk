@@ -50,7 +50,7 @@ public struct Change {
         }
 
         self.operations = operations
-        self.id.setActor(actorID)
+        self.id = self.id.setActor(actorID)
     }
 
     /**

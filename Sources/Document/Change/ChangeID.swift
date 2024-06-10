@@ -33,10 +33,11 @@ struct ChangeID {
     private var lamport: Int64
     private var actor: ActorID
 
-    init(clientSeq: UInt32, lamport: Int64, actor: ActorID) {
+    init(clientSeq: UInt32, lamport: Int64, actor: ActorID, serverSeq: Int64? = nil) {
         self.clientSeq = clientSeq
         self.lamport = lamport
         self.actor = actor
+        self.serverSeq = serverSeq
     }
 
     /**
@@ -69,8 +70,8 @@ struct ChangeID {
     /**
      * `setActor` sets the given actor.
      */
-    mutating func setActor(_ actorID: ActorID) {
-        self.actor = actorID
+    func setActor(_ actorID: ActorID) -> ChangeID {
+        ChangeID(clientSeq: self.clientSeq, lamport: self.lamport, actor: actorID, serverSeq: self.serverSeq)
     }
 
     /**
@@ -78,6 +79,17 @@ struct ChangeID {
      */
     func getClientSeq() -> UInt32 {
         return self.clientSeq
+    }
+
+    /**
+     * `getServerSeq` returns the server sequence of this ID.
+     */
+    func getServerSeq() -> String {
+        if let serverSeq {
+            return String(serverSeq)
+        } else {
+            return ""
+        }
     }
 
     /**

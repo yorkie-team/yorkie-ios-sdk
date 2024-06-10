@@ -159,7 +159,9 @@ public actor Document {
             if !opInfos.isEmpty {
                 let changeInfo = ChangeInfo(message: change.message ?? "",
                                             operations: opInfos,
-                                            actorID: actorID)
+                                            actorID: actorID,
+                                            clientSeq: change.id.getClientSeq(),
+                                            serverSeq: change.id.getServerSeq())
                 let changeEvent = LocalChangeEvent(value: changeInfo)
                 self.publish(changeEvent)
             }
@@ -322,7 +324,7 @@ public actor Document {
 
         self.localChanges = changes
 
-        self.changeID.setActor(actorID)
+        self.changeID = self.changeID.setActor(actorID)
 
         // TODOs also apply into root.
     }
@@ -484,7 +486,11 @@ public actor Document {
             let opInfos = try change.execute(root: self.root, presences: &self.presences)
 
             if change.hasOperations {
-                changeInfo = ChangeInfo(message: change.message ?? "", operations: opInfos, actorID: actorID)
+                changeInfo = ChangeInfo(message: change.message ?? "",
+                                        operations: opInfos,
+                                        actorID: actorID,
+                                        clientSeq: change.id.getClientSeq(),
+                                        serverSeq: change.id.getServerSeq())
             }
 
             // DocEvent should be emitted synchronously with applying changes.
@@ -650,7 +656,11 @@ public actor Document {
             }
 
             for (key, value) in operations {
-                let info = ChangeInfo(message: event.value.message, operations: value, actorID: event.value.actorID)
+                let info = ChangeInfo(message: event.value.message,
+                                      operations: value,
+                                      actorID: event.value.actorID,
+                                      clientSeq: event.value.clientSeq,
+                                      serverSeq: event.value.serverSeq)
 
                 if let callback = self.subscribeCallbacks[key] {
                     callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)

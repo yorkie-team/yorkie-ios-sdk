@@ -190,7 +190,8 @@ extension Converter {
     static func fromChangeID(_ pbChangeID: PbChangeID) -> ChangeID {
         ChangeID(clientSeq: pbChangeID.clientSeq,
                  lamport: pbChangeID.lamport,
-                 actor: pbChangeID.actorID.toHexString)
+                 actor: pbChangeID.actorID.toHexString,
+                 serverSeq: pbChangeID.serverSeq)
     }
 }
 
@@ -510,13 +511,27 @@ extension Converter {
                                          executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
                                          maxCreatedAtMapByActor: createdAtMapByActor)
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
-                return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
-                                          fromPos: fromTreePos(pbTreeStyleOperation.from),
-                                          toPos: fromTreePos(pbTreeStyleOperation.to),
-                                          maxCreatedAtMapByActor: pbTreeStyleOperation.createdAtMapByActor.compactMapValues({ fromTimeTicket($0) }),
-                                          attributes: pbTreeStyleOperation.attributes,
-                                          attributesToRemove: pbTreeStyleOperation.attributesToRemove,
-                                          executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
+                var createdAtMapByActor = [String: TimeTicket]()
+                pbTreeStyleOperation.createdAtMapByActor.forEach { key, value in
+                    createdAtMapByActor[key] = fromTimeTicket(value)
+                }
+                if !pbTreeStyleOperation.attributesToRemove.isEmpty {
+                    return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
+                                              fromPos: fromTreePos(pbTreeStyleOperation.from),
+                                              toPos: fromTreePos(pbTreeStyleOperation.to),
+                                              maxCreatedAtMapByActor: createdAtMapByActor,
+                                              attributes: [:],
+                                              attributesToRemove: pbTreeStyleOperation.attributesToRemove,
+                                              executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
+                } else {
+                    return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
+                                              fromPos: fromTreePos(pbTreeStyleOperation.from),
+                                              toPos: fromTreePos(pbTreeStyleOperation.to),
+                                              maxCreatedAtMapByActor: createdAtMapByActor,
+                                              attributes: pbTreeStyleOperation.attributes,
+                                              attributesToRemove: [],
+                                              executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
+                }
             } else {
                 throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
             }
