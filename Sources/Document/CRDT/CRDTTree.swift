@@ -109,7 +109,7 @@ extension CRDTTreePos {
         let parentNode = tree.findFloorNode(parentID)
         let leftNode = tree.findFloorNode(leftSiblingID)
         guard let parentNode, var leftNode else {
-            throw YorkieError.unexpected(message: "cannot find node at \(self)")
+            throw YorkieError.unexpected(message: "cannot find node of CRDTTreePos(\(parentID.toTestString), \(leftSiblingID.toTestString))")
         }
 
         /**
@@ -171,6 +171,14 @@ struct CRDTTreeNodeID: Equatable, Comparable {
      */
     var toIDString: String {
         "\(self.createdAt.toIDString):\(self.offset)"
+    }
+
+    /**
+     * `toTestString` returns a string containing the meta data of the ticket
+     * for debugging purpose.
+     */
+    var toTestString: String {
+        "\(self.createdAt.toTestString)/\(self.offset)"
     }
 
     static func < (lhs: CRDTTreeNodeID, rhs: CRDTTreeNodeID) -> Bool {
