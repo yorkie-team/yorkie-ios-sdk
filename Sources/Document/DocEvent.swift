@@ -175,6 +175,8 @@ public struct ChangeInfo {
     public let message: String
     public let operations: [any OperationInfo]
     public let actorID: ActorID?
+    public let clientSeq: UInt32
+    public let serverSeq: String
 }
 
 /**
