@@ -14,7 +14,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/connectrpc/connect-swift", from: "0.13.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0"),
-        .package(url: "https://github.com/groue/Semaphore.git", from: "0.0.8")
+        .package(url: "https://github.com/groue/Semaphore.git", from: "0.0.8"),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0")
     ],
     targets: [
         .target(
