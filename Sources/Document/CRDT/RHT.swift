@@ -85,6 +85,18 @@ class RHT {
     }
 
     /**
+     * SetInternal sets the value of the given key internally.
+     */
+    func setInternal(key: String, value: String, executedAt: TimeTicket, removed: Bool) {
+        let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: removed)
+        self.nodeMapByKey[key] = node
+
+        if removed {
+            self.numberOfRemovedElement += 1
+        }
+    }
+
+    /**
      * `remove` removes the Element of the given key.
      */
     @discardableResult
@@ -147,7 +159,7 @@ class RHT {
     func deepcopy() -> RHT {
         let rht = RHT()
         self.nodeMapByKey.forEach {
-            rht.set(key: $1.key, value: $1.value, executedAt: $1.updatedAt)
+            rht.setInternal(key: $1.key, value: $1.value, executedAt: $1.updatedAt, removed: $1.isRemoved)
         }
         return rht
     }

@@ -376,12 +376,20 @@ class ConverterTests: XCTestCase {
             ]))
 
             try (root.tree as? JSONTree)?.editByPath([0, 1], [1, 1])
+
+            try (root.tree as? JSONTree)?.style(0, 1, ["b": "t", "i": "t"])
+
+            let xml = (root.tree as? JSONTree)?.toXML()
+
+            XCTAssertEqual(xml, "<r><p b=\"t\" i=\"t\">14</p></r>")
+
+            try (root.tree as? JSONTree)?.removeStyle(0, 1, ["i"])
         }
 
         let xml = await(doc.getRoot().tree as? JSONTree)?.toXML()
         let size = try await(doc.getRoot().tree as? JSONTree)?.getSize()
 
-        XCTAssertEqual(xml, "<r><p>14</p></r>")
+        XCTAssertEqual(xml, "<r><p b=\"t\">14</p></r>")
         XCTAssertEqual(size, 4)
 
         let bytes = try await Converter.objectToBytes(obj: doc.getRootObject())

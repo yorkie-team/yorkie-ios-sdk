@@ -156,6 +156,16 @@ class RHTTests: XCTestCase {
             XCTAssertEqual(result[key]?.value, value)
         }
     }
+
+    func test_should_deepcopy_correctly() {
+        let rht = RHT()
+        rht.set(key: "key1", value: "value1", executedAt: timeT())
+        rht.remove(key: "key2", executedAt: timeT())
+
+        let rht2 = rht.deepcopy()
+        XCTAssertEqual(rht.toJSON(), rht2.toJSON())
+        XCTAssertEqual(rht.size, rht2.size)
+    }
 }
 
 final class GCTestsForRHT: XCTestCase {
