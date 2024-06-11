@@ -145,6 +145,9 @@ extension IndexTreeNode {
 
         while parent != nil {
             parent?.size += self.paddedSize * sign
+            if parent!.isRemoved {
+                break
+            }
             parent = parent?.parent
         }
     }
@@ -155,17 +158,17 @@ extension IndexTreeNode {
      */
     @discardableResult
     func updateDescendantsSize() -> Int {
-        if self.isRemoved {
-            self.size = 0
-            return 0
-        }
-
-        var sum = 0
+        var size = 0
         for child in self.children {
-            sum += child.updateDescendantsSize()
+            let childSize = child.updateDescendantsSize()
+            if child.isRemoved {
+                continue
+            }
+
+            size += childSize
         }
 
-        self.size += sum
+        self.size += size
 
         return self.paddedSize
     }

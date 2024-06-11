@@ -3248,6 +3248,143 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    func test_can_calculate_size_of_index_tree_correctly_during_concurrent_editing() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [
+                                                JSONTreeTextNode(value: "hello")
+                                            ])
+                                        ])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>hello</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>hello</p></doc>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(0, 7)
+            }
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(1, 2, JSONTreeTextNode(value: "p"))
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc></doc>")
+
+            var sized1 = try await(d1.getRoot().t as? JSONTree)?.getSize()
+            XCTAssertEqual(0, sized1)
+
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>pello</p></doc>")
+
+            var sized2 = try await(d2.getRoot().t as? JSONTree)?.getSize()
+            XCTAssertEqual(7, sized2)
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc></doc>")
+
+            sized1 = try await(d1.getRoot().t as? JSONTree)?.getSize()
+            sized2 = try await(d2.getRoot().t as? JSONTree)?.getSize()
+            XCTAssertEqual(sized1, sized2)
+        }
+    }
+
+    func test_can_keep_index_tree_consistent_from_snapshot() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "r",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [])
+                                        ])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<r><p></p></r>")
+            XCTAssertEqual(d2XML, /* html */ "<r><p></p></r>")
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.edit(0, 2)
+            }
+
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(1, 1, JSONTreeElementNode(type: "i", children: [JSONTreeTextNode(value: "a")]))
+                try (root.t as? JSONTree)?.edit(2, 3, JSONTreeTextNode(value: "b"))
+            }
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<r></r>")
+            let sized1 = try await(d1.getRoot().t as? JSONTree)?.getSize()
+            XCTAssertEqual(0, sized1)
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d2XML, /* html */ "<r><p><i>b</i></p></r>")
+            let sized2 = try await(d2.getRoot().t as? JSONTree)?.getSize()
+            XCTAssertEqual(5, sized2)
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<r></r>")
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<r></r>")
+
+            var d1Nodes = [(String, Int, Bool)]()
+            var d2Nodes = [(String, Int, Bool)]()
+            var sNodes = [(String, Int, Bool)]()
+
+            try await(d1.getRoot().t as? JSONTree)?.getIndexTree().traverseAll { node, _ in
+                d1Nodes.append((node.toJSONString, node.size, node.isRemoved))
+            }
+            try await(d2.getRoot().t as? JSONTree)?.getIndexTree().traverseAll { node, _ in
+                d2Nodes.append((node.toJSONString, node.size, node.isRemoved))
+            }
+
+            let sRoot = try await Converter.bytesToObject(bytes: Converter.objectToBytes(obj: d1.getRootObject()))
+
+            (sRoot.get(key: "t") as? CRDTTree)?.indexTree.traverseAll { node, _ in
+                sNodes.append((node.toJSONString, node.size, node.isRemoved))
+            }
+
+            XCTAssertEqual(d1Nodes.count, d2Nodes.count)
+
+            for index in 0 ..< d1Nodes.count {
+                XCTAssertEqual(d1Nodes[index].0, d2Nodes[index].0)
+                XCTAssertEqual(d1Nodes[index].1, d2Nodes[index].1)
+                XCTAssertEqual(d1Nodes[index].2, d2Nodes[index].2)
+            }
+
+            XCTAssertEqual(d1Nodes.count, sNodes.count)
+
+            for index in 0 ..< d1Nodes.count {
+                XCTAssertEqual(d1Nodes[index].0, sNodes[index].0)
+                XCTAssertEqual(d1Nodes[index].1, sNodes[index].1)
+                XCTAssertEqual(d1Nodes[index].2, sNodes[index].2)
+            }
+        }
+    }
+
     func test_can_split_and_merge_with_empty_paragraph_left() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
