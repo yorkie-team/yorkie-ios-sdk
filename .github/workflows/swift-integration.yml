@@ -14,9 +14,11 @@ jobs:
       with:
         xcode-version: latest-stable
     - uses: actions/checkout@v4
+    - name: Update Brew
+      run: brew update
     - name: Setup yorkie server
       run: brew reinstall yorkie
     - name: Run yorkie server
-      run: yorkie server & 
+      run: brew services start yorkie 
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
