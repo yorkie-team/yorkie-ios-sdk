@@ -194,13 +194,31 @@ public struct TreeEditOpInfo: OperationInfo {
     }
 }
 
+public enum TreeStyleOpValue: Equatable {
+    case attributes([String: Any])
+    case attributesToRemove([String])
+
+    public static func == (lhs: TreeStyleOpValue, rhs: TreeStyleOpValue) -> Bool {
+        switch (lhs, rhs) {
+        case (.attributes(let lhsAttributes), .attributes(let rhsAttributes)):
+            // Assuming [String: Any] comparison based on keys and string descriptions of values
+            return NSDictionary(dictionary: lhsAttributes).isEqual(to: rhsAttributes)
+        case (.attributesToRemove(let lhsAttributesToRemove), .attributesToRemove(let rhsAttributesToRemove)):
+            return lhsAttributesToRemove == rhsAttributesToRemove
+        default:
+            return false
+        }
+    }
+}
+
 public struct TreeStyleOpInfo: OperationInfo {
     public let type: OperationInfoType = .treeStyle
     public let path: String
     public let from: Int
     public let to: Int
     public let fromPath: [Int]
-    public let value: [String: Any]
+    public let toPath: [Int]
+    public let value: TreeStyleOpValue
 
     public static func == (lhs: TreeStyleOpInfo, rhs: TreeStyleOpInfo) -> Bool {
         if lhs.type != rhs.type {
@@ -216,6 +234,9 @@ public struct TreeStyleOpInfo: OperationInfo {
             return false
         }
         if lhs.fromPath != rhs.fromPath {
+            return false
+        }
+        if lhs.toPath != rhs.toPath {
             return false
         }
 

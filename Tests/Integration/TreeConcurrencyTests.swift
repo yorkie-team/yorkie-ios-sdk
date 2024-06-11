@@ -301,12 +301,11 @@ final class TreeConcurrencyTests: XCTestCase {
                     DispatchQueue.global().async {
                         Task {
                             let result = try await self.runTest(initialState: initialState.deepcopy(), initialXML: initialXML, ranges: ranges, op1: op1, op2: op2, desc: desc)
-
                             print("====== before d1: \(result.before.0)")
                             print("====== before d2: \(result.before.1)")
                             print("====== after d1: \(result.after.0)")
                             print("====== after d2: \(result.after.1)")
-                            XCTAssertEqual(result.after.0, result.after.1)
+                            XCTAssertEqual(result.after.0, result.after.1, desc)
 
                             exp.fulfill()
                         }
@@ -609,7 +608,7 @@ final class TreeConcurrencyTests: XCTestCase {
         )
         let initialXML = "<r><p color=\"red\">a</p><p color=\"red\">b</p><p color=\"red\">c</p></r>"
 
-        let content = JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "d")], attributes: ["italic": true])
+        let content = JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "d")], attributes: ["italic": true, "color": "blue"])
 
         let rangesArr = [
             // equal: <p>b</p> - <p>b</p>
@@ -679,7 +678,7 @@ final class TreeConcurrencyTests: XCTestCase {
                 .styleRemove,
                 "color",
                 "",
-                "remove-bold"
+                "remove-color"
             ),
             StyleOperationType(
                 .rangeAll,

@@ -98,12 +98,12 @@ extension CRDTTreePos {
     }
 
     /**
-     * `toTreeNodes` converts the pos to parent and left sibling nodes.
+     * `toTreeNodePair` converts the pos to parent and left sibling nodes.
      * If the position points to the middle of a node, then the left sibling node
      * is the node that contains the position. Otherwise, the left sibling node is
      * the node that is located at the left of the position.
      */
-    func toTreeNodes(tree: CRDTTree) throws -> (CRDTTreeNode, CRDTTreeNode) {
+    func toTreeNodePair(tree: CRDTTree) throws -> TreeNodePair {
         let parentID = self.parentID
         let leftSiblingID = self.leftSiblingID
         let parentNode = tree.findFloorNode(parentID)
@@ -231,6 +231,12 @@ public struct CRDTTreeNodeIDStruct: Codable {
  * `TreePosRange` represents a pair of CRDTTreePos.
  */
 typealias TreePosRange = (CRDTTreePos, CRDTTreePos)
+
+/**
+ * `TreeNodePair` represents a pair of CRDTTreeNode. It represents the position
+ * of the node in the tree with the left and parent nodes.
+ */
+typealias TreeNodePair = (CRDTTreeNode, CRDTTreeNode)
 
 /**
  * `TreePosStructRange` represents a pair of CRDTTreePosStruct.
@@ -597,9 +603,9 @@ class CRDTTree: CRDTElement {
      * This is different from `TreePos` which is a position of the tree in the
      * physical perspective.
      */
-    func findNodesAndSplitText(_ pos: CRDTTreePos, _ editedAt: TimeTicket? = nil) throws -> (CRDTTreeNode, CRDTTreeNode) {
+    func findNodesAndSplitText(_ pos: CRDTTreePos, _ editedAt: TimeTicket? = nil) throws -> TreeNodePair {
         // 01. Find the parent and left sibling node of the given position.
-        let (parent, leftSibling) = try pos.toTreeNodes(tree: self)
+        let (parent, leftSibling) = try pos.toTreeNodePair(tree: self)
         var leftNode = leftSibling
 
         // 02. Determine whether the position is left-most and the exact parent
@@ -636,7 +642,7 @@ class CRDTTree: CRDTElement {
      * `style` applies the given attributes of the given range.
      */
     @discardableResult
-    func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]?) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
+    func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
 
@@ -646,10 +652,10 @@ class CRDTTree: CRDTElement {
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             let actorID = node.createdAt.actorID
-            var maxCreatedAt: TimeTicket? = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor?[actorID] ?? TimeTicket.initial : TimeTicket.max
+            let maxCreatedAt = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor![actorID] ?? TimeTicket.initial : TimeTicket.max
 
-            if node.canStyle(editedAt, maxCreatedAt!), !node.isText, let attributes {
-                maxCreatedAt = createdAtMapByActor[actorID]
+            if node.canStyle(editedAt, maxCreatedAt), !node.isText, let attributes {
+                let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
                 if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
                     createdAtMapByActor[actorID] = createdAt
@@ -666,13 +672,16 @@ class CRDTTree: CRDTElement {
                     }
                 }
 
+                let parentOfNode = node.parent!
+                let previousNode = node.prevSibling ?? node.parent!
+
                 if !affectedAttrs.isEmpty {
                     try changes.append(TreeChange(actor: editedAt.actorID,
                                                   type: .style,
-                                                  from: self.toIndex(fromParent, fromLeft),
-                                                  to: self.toIndex(toParent, toLeft),
-                                                  fromPath: self.toPath(fromParent, fromLeft),
-                                                  toPath: self.toPath(toParent, toLeft),
+                                                  from: self.toIndex(parentOfNode, previousNode),
+                                                  to: self.toIndex(node, node),
+                                                  fromPath: self.toPath(parentOfNode, previousNode),
+                                                  toPath: self.toPath(node, node),
                                                   value: TreeChangeValue.attributes(affectedAttrs),
                                                   splitLevel: 0) // dummy value.
                     )
@@ -690,16 +699,26 @@ class CRDTTree: CRDTElement {
     /**
      * `removeStyle` removes the given attributes of the given range.
      */
-    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket) throws -> ([GCPair], [TreeChange]) {
+    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
         var changes: [TreeChange] = []
+        var createdAtMapByActor = [String: TimeTicket]()
         var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
-            if node.isRemoved == false, node.isText == false {
+            let actorID = node.createdAt.actorID
+            let maxCreatedAt = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor![actorID] ?? TimeTicket.initial : TimeTicket.max
+
+            if node.canStyle(editedAt, maxCreatedAt), !attributesToRemove.isEmpty {
+                let maxCreatedAt = createdAtMapByActor[actorID]
+                let createdAt = node.createdAt
+                if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
+                    createdAtMapByActor[actorID] = createdAt
+                }
+
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
@@ -710,19 +729,22 @@ class CRDTTree: CRDTElement {
                     }
                 }
 
+                let parentOfNode = node.parent!
+                let previousNode = node.prevSibling ?? node.parent!
+
                 try changes.append(TreeChange(actor: editedAt.actorID,
                                               type: .removeStyle,
-                                              from: self.toIndex(fromParent, fromLeft),
-                                              to: self.toIndex(toParent, toLeft),
-                                              fromPath: self.toPath(fromParent, fromLeft),
-                                              toPath: self.toPath(toParent, toLeft),
+                                              from: self.toIndex(parentOfNode, previousNode),
+                                              to: self.toIndex(node, node),
+                                              fromPath: self.toPath(parentOfNode, previousNode),
+                                              toPath: self.toPath(node, node),
                                               value: value,
                                               splitLevel: 0) // dummy value.
                 )
             }
         }
 
-        return (pairs, changes)
+        return (createdAtMapByActor, pairs, changes)
     }
 
     /**
@@ -730,7 +752,7 @@ class CRDTTree: CRDTElement {
      * If the content is undefined, the range will be removed.
      */
     @discardableResult
-    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket] = [:], _ issueTimeTicket: () -> TimeTicket) throws -> ([TreeChange], [GCPair], [String: TimeTicket]) {
+    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ issueTimeTicket: () -> TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([TreeChange], [GCPair], [String: TimeTicket]) {
         // 01. find nodes from the given range and split nodes.
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -760,7 +782,7 @@ class CRDTTree: CRDTElement {
 
             let actorID = node.createdAt.actorID
 
-            let maxCreatedAt = maxCreatedAtMapByActor.isEmpty == false ? maxCreatedAtMapByActor[actorID] ?? TimeTicket.initial : TimeTicket.max
+            let maxCreatedAt = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor![actorID] ?? TimeTicket.initial : TimeTicket.max
 
             // NOTE(sejongk): If the node is removable or its parent is going to
             // be removed, then this node should be removed.
@@ -886,7 +908,7 @@ class CRDTTree: CRDTElement {
     func editT(_ range: (Int, Int), _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ issueTimeTicket: () -> TimeTicket) throws {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
-        try self.edit((fromPos, toPos), contents, splitLevel, editedAt, [:], issueTimeTicket)
+        try self.edit((fromPos, toPos), contents, splitLevel, editedAt, issueTimeTicket)
     }
 
     /**

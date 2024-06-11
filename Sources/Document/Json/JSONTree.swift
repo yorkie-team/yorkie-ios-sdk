@@ -384,7 +384,7 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (maxCreationMapByActor, pairs, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
+        let (maxCreationMapByActor, pairs, _) = try tree.style((fromPos, toPos), stringAttrs, ticket)
 
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
@@ -442,7 +442,7 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+        let (maxCreationMapByActor, pairs, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
@@ -451,7 +451,7 @@ public class JSONTree {
         context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
                                                    fromPos: fromPos,
                                                    toPos: toPos,
-                                                   maxCreatedAtMapByActor: [:],
+                                                   maxCreatedAtMapByActor: maxCreationMapByActor,
                                                    attributes: [:],
                                                    attributesToRemove: attributesToRemove,
                                                    executedAt: ticket)
