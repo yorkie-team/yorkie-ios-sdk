@@ -209,6 +209,21 @@ extension IndexTreeNode {
     }
 
     /**
+     * `prevSibling` returns the previous sibling of the node.
+     */
+    var prevSibling: Self? {
+        guard let parent else {
+            return nil
+        }
+
+        guard let offset = try? parent.findOffset(node: self) else {
+            return nil
+        }
+
+        return parent.children[safe: offset - 1]
+    }
+
+    /**
      * `splitText` splits the given node at the given offset.
      */
     func splitText(_ offset: Int32, _ absOffset: Int32) throws -> Self? {

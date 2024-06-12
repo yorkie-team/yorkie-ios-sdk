@@ -70,7 +70,7 @@ class TreeStyleOperation: Operation {
         if self.attributes.isEmpty == false {
             (_, pairs, changes) = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
         } else {
-            (pairs, changes) = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt)
+            (_, pairs, changes) = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt, self.maxCreatedAtMapByActor)
         }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
@@ -82,11 +82,14 @@ class TreeStyleOperation: Operation {
         }
 
         return changes.compactMap { change in
-            let attributes: [String: Any] = {
-                if case .attributes(let attributes) = change.value {
-                    return attributes.toJSONObejct
-                } else {
-                    return [:]
+            let values: TreeStyleOpValue? = {
+                switch change.value {
+                case .attributes(let attributes):
+                    return .attributes(attributes.toJSONObejct)
+                case .attributesToRemove(let keys):
+                    return .attributesToRemove(keys)
+                default:
+                    return nil
                 }
             }()
 
@@ -95,7 +98,8 @@ class TreeStyleOperation: Operation {
                 from: change.from,
                 to: change.to,
                 fromPath: change.fromPath,
-                value: attributes
+                toPath: change.toPath,
+                value: values
             )
         }
     }

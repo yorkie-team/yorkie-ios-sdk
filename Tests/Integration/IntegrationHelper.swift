@@ -85,8 +85,9 @@ struct TreeEditOpInfoForDebug: OperationInfoForDebug {
 struct TreeStyleOpInfoForDebug: OperationInfoForDebug {
     let from: Int?
     let to: Int?
-    let value: [String: Codable]?
+    let value: TreeStyleOpValue?
     let fromPath: [Int]?
+    let toPath: [Int]?
 
     func compare(_ operation: TreeStyleOpInfo) {
         if let value = from {
@@ -96,15 +97,13 @@ struct TreeStyleOpInfoForDebug: OperationInfoForDebug {
             XCTAssertEqual(value, operation.to)
         }
         if let value = value {
-            XCTAssertEqual(value.count, operation.value.count)
-            if operation.value.count - 1 >= 0 {
-                for key in operation.value.keys {
-                    XCTAssertEqual(value[key]?.toJSONString, convertToJSONString(operation.value[key] ?? NSNull()))
-                }
-            }
+            XCTAssertEqual(value, operation.value)
         }
         if let value = fromPath {
             XCTAssertEqual(value, operation.fromPath)
+        }
+        if let value = toPath {
+            XCTAssertEqual(value, operation.toPath)
         }
     }
 }

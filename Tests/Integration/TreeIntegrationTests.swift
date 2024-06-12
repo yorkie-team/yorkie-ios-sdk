@@ -3722,6 +3722,104 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    func test_concurrent_insert_and_style() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [])
+                                        ])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p></p></doc>")
+            XCTAssertEqual(d1XML, d2XML)
+
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributes(["key": "a"]), fromPath: [0], toPath: [0, 0]),
+                                 TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributes(["key": "a"]), fromPath: [0], toPath: [0, 0]),
+                                 TreeEditOpInfoForDebug(from: 0, to: 0, value: [JSONTreeElementNode(type: "p")], fromPath: [0], toPath: [0])],
+                                [TreeEditOpInfoForDebug(from: 0, to: 0, value: [JSONTreeElementNode(type: "p")], fromPath: [0], toPath: [0]),
+                                 TreeStyleOpInfoForDebug(from: 2, to: 3, value: .attributes(["key": "a"]), fromPath: [1], toPath: [1, 0]),
+                                 TreeStyleOpInfoForDebug(from: 2, to: 3, value: .attributes(["key": "a"]), fromPath: [1], toPath: [1, 0])])
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.style(0, 1, ["key": "a"])
+            }
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.style(0, 1, ["key": "a"])
+            }
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p"))
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p></p><p key=\"a\"></p></doc>")
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
+    func test_concurrent_insert_and_removeStyle() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [], attributes: ["key": "a"])
+                                        ])
+                )
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            var d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p key=\"a\"></p></doc>")
+            XCTAssertEqual(d1XML, d2XML)
+
+            await subscribeDocs(d1,
+                                d2,
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributesToRemove(["key"]), fromPath: [0], toPath: [0, 0]),
+                                 TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributesToRemove(["key"]), fromPath: [0], toPath: [0, 0]),
+                                 TreeEditOpInfoForDebug(from: 0, to: 0, value: [JSONTreeElementNode(type: "p")], fromPath: [0], toPath: [0])],
+                                [TreeEditOpInfoForDebug(from: 0, to: 0, value: [JSONTreeElementNode(type: "p")], fromPath: [0], toPath: [0]),
+                                 TreeStyleOpInfoForDebug(from: 2, to: 3, value: .attributesToRemove(["key"]), fromPath: [1], toPath: [1, 0]),
+                                 TreeStyleOpInfoForDebug(from: 2, to: 3, value: .attributesToRemove(["key"]), fromPath: [1], toPath: [1, 0])])
+
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.removeStyle(0, 1, ["key"])
+            }
+            try await d1.update { root, _ in
+                try (root.t as? JSONTree)?.removeStyle(0, 1, ["key"])
+            }
+            try await d2.update { root, _ in
+                try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p"))
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p></p><p></p></doc>")
+            XCTAssertEqual(d1XML, d2XML)
+        }
+    }
+
     func test_concurrent_delete_and_style() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3742,7 +3840,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
 
             await subscribeDocs(d1,
                                 d2,
-                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["value": "changed"], fromPath: nil),
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributes(["value": "changed"]), fromPath: nil, toPath: nil),
                                  TreeEditOpInfoForDebug(from: 0, to: 2, value: nil, fromPath: nil, toPath: nil)],
                                 [TreeEditOpInfoForDebug(from: 0, to: 2, value: nil, fromPath: nil, toPath: nil)])
 
@@ -3789,9 +3887,9 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
 
             await subscribeDocs(d1,
                                 d2,
-                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["bold": "true"], fromPath: nil),
-                                 TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["bold": "false"], fromPath: nil)],
-                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: ["bold": "false"], fromPath: nil)])
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributes(["bold": "true"]), fromPath: nil, toPath: nil),
+                                 TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributes(["bold": "false"]), fromPath: nil, toPath: nil)],
+                                [TreeStyleOpInfoForDebug(from: 0, to: 1, value: .attributes(["bold": "false"]), fromPath: nil, toPath: nil)])
 
             try await d1.update { root, _ in
                 try (root.t as? JSONTree)?.style(0, 1, ["bold": "true"])

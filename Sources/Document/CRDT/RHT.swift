@@ -132,7 +132,7 @@ class RHT {
      * `get` returns the value of the given key.
      */
     func get(key: String) throws -> String {
-        guard let node = self.nodeMapByKey[key] else {
+        guard self.has(key: key), let node = self.nodeMapByKey[key] else {
             let log = "can't find the given node with: \(key)"
             Logger.critical(log)
             throw YorkieError.unexpected(message: log)

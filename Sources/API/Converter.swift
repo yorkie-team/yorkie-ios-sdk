@@ -1005,10 +1005,10 @@ extension Converter {
     static func fromTreeNode(_ pbTreeNode: PbTreeNode) -> CRDTTreeNode {
         let id = fromTreeNodeID(pbTreeNode.id)
         let node = CRDTTreeNode(id: id, type: pbTreeNode.type)
-
+        
         if node.isText {
             node.value = pbTreeNode.value as NSString
-        } else {
+        } else if !pbTreeNode.attributes.isEmpty {
             node.attrs = RHT()
             
             pbTreeNode.attributes.forEach { key, value in

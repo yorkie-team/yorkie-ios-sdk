@@ -14,8 +14,10 @@ jobs:
       with:
         xcode-version: latest-stable
     - uses: actions/checkout@v4
+    - name: Update Brew
+      run: brew update
     - name: Setup yorkie server
-      run: brew install yorkie
+      run: brew reinstall yorkie
     - name: Run yorkie server
       run: yorkie server & 
     - name: Run tests
