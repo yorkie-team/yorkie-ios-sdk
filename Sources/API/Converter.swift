@@ -900,7 +900,7 @@ extension Converter {
             return pbTreeNodes
         }
     }
-
+    
     /**
      * `toTreeNodes` converts the given model to Protobuf format.
      */
@@ -935,6 +935,7 @@ extension Converter {
                 var pbNodeAttr = PbNodeAttr()
                 pbNodeAttr.value = rhtNode.value
                 pbNodeAttr.updatedAt = toTimeTicket(rhtNode.updatedAt)
+                pbNodeAttr.isRemoved = rhtNode.isRemoved
                 pbTreeNode.attributes[rhtNode.key] = pbNodeAttr
             }
 
@@ -1012,7 +1013,7 @@ extension Converter {
             node.attrs = RHT()
             
             pbTreeNode.attributes.forEach { key, value in
-                node.attrs?.set(key: key, value: value.value, executedAt: fromTimeTicket(value.updatedAt))
+                node.attrs?.setInternal(key: key, value: value.value, executedAt: fromTimeTicket(value.updatedAt), removed: value.isRemoved)
             }
         }
         

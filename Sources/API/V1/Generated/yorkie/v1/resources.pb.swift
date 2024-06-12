@@ -1452,6 +1452,8 @@ public struct Yorkie_V1_NodeAttr {
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearUpdatedAt() {self._updatedAt = nil}
 
+  public var isRemoved: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -4133,6 +4135,7 @@ extension Yorkie_V1_NodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "value"),
     2: .standard(proto: "updated_at"),
+    3: .standard(proto: "is_removed"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4143,6 +4146,7 @@ extension Yorkie_V1_NodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.value) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.isRemoved) }()
       default: break
       }
     }
@@ -4159,12 +4163,16 @@ extension Yorkie_V1_NodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     try { if let v = self._updatedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    if self.isRemoved != false {
+      try visitor.visitSingularBoolField(value: self.isRemoved, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_NodeAttr, rhs: Yorkie_V1_NodeAttr) -> Bool {
     if lhs.value != rhs.value {return false}
     if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs.isRemoved != rhs.isRemoved {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
