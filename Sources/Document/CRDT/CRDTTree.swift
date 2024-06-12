@@ -351,11 +351,7 @@ final class CRDTTreeNode: IndexTreeNode {
         }
 
         if alived {
-            if self.parent?.removedAt == nil {
-                self.updateAncestorsSize()
-            } else {
-                self.parent?.size -= self.paddedSize
-            }
+            self.updateAncestorsSize()
         }
     }
 
