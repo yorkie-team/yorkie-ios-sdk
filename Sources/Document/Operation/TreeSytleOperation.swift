@@ -99,7 +99,7 @@ class TreeStyleOperation: Operation {
                 to: change.to,
                 fromPath: change.fromPath,
                 toPath: change.toPath,
-                value: values!
+                value: values
             )
         }
     }
