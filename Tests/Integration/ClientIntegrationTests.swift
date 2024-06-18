@@ -745,4 +745,37 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
         try await c2.deactivate()
     }
+
+    func test_duplicated_local_changes_not_sent_to_server() async throws {
+        try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [
+                                            JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
+                                            JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
+                                        ])
+                )
+            }
+
+            try await c1.sync()
+            try await c1.sync()
+            try await c1.sync()
+            try await c1.detach(d1)
+
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+
+            try await c2.sync()
+
+            let d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
+            XCTAssertEqual(d2XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
+
+            try await c2.detach(d2)
+
+            try await c1.deactivate()
+            try await c2.deactivate()
+        }
+    }
 }
