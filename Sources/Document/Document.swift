@@ -102,8 +102,8 @@ public actor Document {
 
     private let workSemaphore = AsyncSemaphore(value: 1)
 
-    var isApplyingChagePack = false
-    
+    public var isApplyingChagePack = false
+
     public init(key: String) {
         self.init(key: key, opts: DocumentOptions(disableGC: false))
     }
@@ -260,9 +260,8 @@ public actor Document {
      * - Parameter pack: change pack
      */
     func applyChangePack(_ pack: ChangePack) async throws {
-        
-        isApplyingChagePack = true
-        
+        self.isApplyingChagePack = true
+
         await self.workSemaphore.wait()
 
         if let snapshot = pack.getSnapshot() {
@@ -291,7 +290,7 @@ public actor Document {
 
         Logger.trace("\(self.root.toJSON())")
 
-        isApplyingChagePack = false
+        self.isApplyingChagePack = false
 
         self.workSemaphore.signal()
     }
