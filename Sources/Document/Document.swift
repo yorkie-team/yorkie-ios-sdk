@@ -16,6 +16,7 @@
 
 import Combine
 import Foundation
+import Semaphore
 
 /**
  * `DocumentOptions` are the options to create a new document.
@@ -99,6 +100,8 @@ public actor Document {
      */
     private var presences: [ActorID: StringValueTypeDictionary]
 
+    private let workSemaphore = AsyncSemaphore(value: 1)
+
     public init(key: String) {
         self.init(key: key, opts: DocumentOptions(disableGC: false))
     }
@@ -120,7 +123,13 @@ public actor Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) throws {
+    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) async throws -> Void, _ message: String? = nil) async throws {
+        await self.workSemaphore.wait()
+
+        defer {
+            self.workSemaphore.signal()
+        }
+
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -141,7 +150,7 @@ public actor Document {
 
         var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
 
-        try updater(proxy, &presence)
+        try await updater(proxy, &presence)
 
         self.clone?.presences[actorID] = presence.presence
 
@@ -250,7 +259,13 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(_ pack: ChangePack) throws {
+    func applyChangePack(_ pack: ChangePack) async throws {
+        await self.workSemaphore.wait()
+
+        defer {
+            self.workSemaphore.signal()
+        }
+
         if let snapshot = pack.getSnapshot() {
             try self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
         } else if pack.hasChanges() {
