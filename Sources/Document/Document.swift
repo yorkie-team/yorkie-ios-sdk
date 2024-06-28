@@ -124,6 +124,12 @@ public actor Document {
      * `update` executes the given updater to update this document.
      */
     public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) async throws -> Void, _ message: String? = nil) async throws {
+        await self.workSemaphore.wait()
+
+        defer {
+            self.workSemaphore.signal()
+        }
+
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -131,8 +137,6 @@ public actor Document {
         guard let actorID = self.actorID else {
             throw YorkieError.unexpected(message: "actor ID is null.")
         }
-
-        await self.workSemaphore.wait()
 
         // 01. Update the clone object and create a change.
         let clone = self.cloned
@@ -177,8 +181,6 @@ public actor Document {
 
             Logger.trace("after update a local change: \(self.toJSON())")
         }
-
-        self.workSemaphore.signal()
     }
 
     /**
@@ -260,6 +262,10 @@ public actor Document {
     func applyChangePack(_ pack: ChangePack) async throws {
         await self.workSemaphore.wait()
 
+        defer {
+            self.workSemaphore.signal()
+        }
+
         if let snapshot = pack.getSnapshot() {
             try self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
         } else if pack.hasChanges() {
@@ -285,8 +291,6 @@ public actor Document {
         }
 
         Logger.trace("\(self.root.toJSON())")
-
-        self.workSemaphore.signal()
     }
 
     /**
