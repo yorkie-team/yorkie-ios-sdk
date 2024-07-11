@@ -280,6 +280,14 @@ public actor Document {
         // 02. Update the checkpoint.
         self.checkpoint.forward(other: pack.getCheckpoint())
 
+        // NOTE(hackerwins): If the document has local changes, we need to apply
+        // them after applying the snapshot. We need to treat the local changes
+        // as remote changes because the application should apply the local
+        // changes to their own document.
+        if pack.hasSnapshot() {
+            try self.applyChanges(self.localChanges)
+        }
+
         // 03. Do Garbage collection.
         if let ticket = pack.getMinSyncedTicket() {
             self.garbageCollect(ticket)
