@@ -16,7 +16,6 @@
 
 import Combine
 import Foundation
-import Semaphore
 
 /**
  * `DocumentOptions` are the options to create a new document.
@@ -71,65 +70,49 @@ public enum PresenceSubscriptionType: String {
  * of the application. And we can edit it even while offline.
  *
  */
-public actor Document {
-    public typealias SubscribeCallback = (DocEvent, isolated Document) -> Void
+@MainActor
+public class Document {
+    public typealias SubscribeCallback = @MainActor (DocEvent, Document) -> Void
 
     private let key: DocumentKey
-    private(set) var status: DocumentStatus
-    private let opts: DocumentOptions
-    private var changeID: ChangeID
-    var checkpoint: Checkpoint
-    private var localChanges: [Change]
+    private(set) var status: DocumentStatus = .detached
+    private let disableGC: Bool
+    private var changeID: ChangeID = .initial
+    var checkpoint: Checkpoint = .initial
+    private var localChanges = [Change]()
 
-    private var root: CRDTRoot
+    private var root = CRDTRoot()
     private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
 
     private var defaultSubscribeCallback: SubscribeCallback?
-    private var subscribeCallbacks: [String: SubscribeCallback]
-    private var presenceSubscribeCallback: [String: SubscribeCallback]
+    private var subscribeCallbacks = [String: SubscribeCallback]()
+    private var presenceSubscribeCallback = [String: SubscribeCallback]()
     private var connectionSubscribeCallback: SubscribeCallback?
     private var syncSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
      */
-    public var onlineClients: Set<ActorID>
+    public var onlineClients = Set<ActorID>()
 
     /**
      * `presences` is a map of client IDs to their presence information.
      */
-    private var presences: [ActorID: StringValueTypeDictionary]
+    private var presences = [ActorID: StringValueTypeDictionary]()
 
-    private let workSemaphore = AsyncSemaphore(value: 1)
-
-    public init(key: String) {
+    public convenience nonisolated init(key: String) {
         self.init(key: key, opts: DocumentOptions(disableGC: false))
     }
 
-    public init(key: String, opts: DocumentOptions) {
+    public nonisolated init(key: DocumentKey, opts: DocumentOptions) {
         self.key = key
-        self.status = .detached
-        self.opts = opts
-        self.root = CRDTRoot()
-        self.changeID = ChangeID.initial
-        self.checkpoint = Checkpoint.initial
-        self.localChanges = []
-        self.subscribeCallbacks = [:]
-        self.presenceSubscribeCallback = [:]
-        self.onlineClients = Set<ActorID>()
-        self.presences = [:]
+        self.disableGC = opts.disableGC
     }
 
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) async throws -> Void, _ message: String? = nil) async throws {
-        await self.workSemaphore.wait()
-
-        defer {
-            self.workSemaphore.signal()
-        }
-
+    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -150,7 +133,7 @@ public actor Document {
 
         var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
 
-        try await updater(proxy, &presence)
+        try updater(proxy, &presence)
 
         self.clone?.presences[actorID] = presence.presence
 
@@ -259,13 +242,7 @@ public actor Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(_ pack: ChangePack) async throws {
-        await self.workSemaphore.wait()
-
-        defer {
-            self.workSemaphore.signal()
-        }
-
+    func applyChangePack(_ pack: ChangePack) throws {
         if let snapshot = pack.getSnapshot() {
             try self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
         } else if pack.hasChanges() {
@@ -387,7 +364,7 @@ public actor Document {
      */
     @discardableResult
     func garbageCollect(_ ticket: TimeTicket) -> Int {
-        if self.opts.disableGC {
+        if self.disableGC {
             return 0
         }
 
