@@ -778,4 +778,39 @@ final class ClientIntegrationTests: XCTestCase {
             try await c2.deactivate()
         }
     }
+
+    func test_should_handle_local_changes_correctly_when_receiving_snapshot() async throws {
+        try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.counter = JSONCounter(value: Int64(0))
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            // 01. c1 increases the counter for creating snapshot.
+            for _ in 0 ..< 500 {
+                try await d1.update { root, _ in
+                    (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+                }
+            }
+
+            try await c1.sync()
+
+            // 02. c2 receives the snapshot and increases the counter simultaneously.
+            Task {
+                try await c2.sync()
+            }
+            try await d2.update { root, _ in
+                (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+            }
+
+            try await c2.sync()
+            try await c1.sync()
+
+            let d1JSON = await d1.toSortedJSON()
+            let d2JSON = await d2.toSortedJSON()
+            XCTAssertEqual(d1JSON, d2JSON)
+        }
+    }
 }

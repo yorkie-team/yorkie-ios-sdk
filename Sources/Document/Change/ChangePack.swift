@@ -101,6 +101,13 @@ struct ChangePack {
     }
 
     /**
+     * `hasSnapshot` returns the whether this pack has snapshot or not.
+     */
+    func hasSnapshot() -> Bool {
+        self.snapshot != nil
+    }
+
+    /**
      * `getMinSyncedTicket` returns the minimum synced ticket of this pack.
      */
     func getMinSyncedTicket() -> TimeTicket? {
