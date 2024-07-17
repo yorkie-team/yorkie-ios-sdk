@@ -93,9 +93,7 @@ func addSizeOfLeftSiblings<T: IndexTreeNode>(parent: T, offset: Int) -> Int {
 
     let siblings = parent.children
 
-    for index in 0 ..< offset {
-        let leftSibling = siblings[index]
-
+    for leftSibling in siblings.prefix(upTo: offset) {
         if leftSibling.isRemoved {
             continue
         }
@@ -750,9 +748,7 @@ func findTextPos<T: IndexTreeNode>(node: T, pathElement: Int) throws -> TreePos<
         throw YorkieError.unexpected(message: "unacceptable path")
     }
 
-    for index in 0 ..< node.children.count {
-        let child = node.children[index]
-
+    for child in node.children {
         if child.size < pathElement {
             pathElement -= child.size
         } else {
@@ -859,14 +855,11 @@ class IndexTree<T: IndexTreeNode> {
         }
 
         var node = self.root
-        for index in 0 ..< path.count - 1 {
-            let pathElement = path[index]
-
-            if node.children[safe: pathElement] == nil {
+        for pathElement in path.dropLast() {
+            guard let child = node.children[safe: pathElement] else {
                 throw YorkieError.unexpected(message: "unacceptable path")
             }
-
-            node = node.children[pathElement]
+            node = child
         }
 
         if node.hasTextChild {

@@ -621,8 +621,7 @@ class CRDTTree: CRDTElement {
             let allChildren = realParent.innerChildren
             let index = isLeftMost ? 0 : (allChildren.firstIndex(where: { $0 === leftNode }) ?? -1) + 1
 
-            for index in index ..< allChildren.count {
-                let next = allChildren[index]
+            for next in allChildren.suffix(from: index) {
                 if !next.id.createdAt.after(editedAt) {
                     break
                 }
@@ -1141,8 +1140,7 @@ class CRDTTree: CRDTElement {
         // Generate ranges by accumulating consecutive nodes.
         var start: TreeToken<CRDTTreeNode>?
         var end: TreeToken<CRDTTreeNode>?
-        for index in 0 ..< candidates.count {
-            let cur = candidates[index]
+        for (index, cur) in candidates.enumerated() {
             let next = candidates[safe: index + 1]
             if start == nil {
                 start = cur
