@@ -30,32 +30,34 @@ enum Logger {
 
     private static var yorkieLogger = Logging.Logger(label: "Yorkie")
 
-    static func trace(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
-        self.log(level: .trace, message, error: error, filename: filename, function: function, line: line)
+    static func trace(_ message: @autoclosure () -> String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .trace, message(), error: error, filename: filename, function: function, line: line)
     }
 
-    static func debug(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
-        self.log(level: .debug, message, error: error, filename: filename, function: function, line: line)
+    static func debug(_ message: @autoclosure () -> String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .debug, message(), error: error, filename: filename, function: function, line: line)
     }
 
-    static func info(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
-        self.log(level: .info, message, error: error, filename: filename, function: function, line: line)
+    static func info(_ message: @autoclosure () -> String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .info, message(), error: error, filename: filename, function: function, line: line)
     }
 
-    static func warning(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
-        self.log(level: .warning, message, error: error, filename: filename, function: function, line: line)
+    static func warning(_ message: @autoclosure () -> String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .warning, message(), error: error, filename: filename, function: function, line: line)
     }
 
-    static func error(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
-        self.log(level: .error, message, error: error, filename: filename, function: function, line: line)
+    static func error(_ message: @autoclosure () -> String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .error, message(), error: error, filename: filename, function: function, line: line)
     }
 
-    static func critical(_ message: String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
-        self.log(level: .critical, message, error: error, filename: filename, function: function, line: line)
+    static func critical(_ message: @autoclosure () -> String, error: Error? = nil, filename: String = #fileID, function: String = #function, line: UInt = #line) {
+        self.log(level: .critical, message(), error: error, filename: filename, function: function, line: line)
     }
 
-    static func log(level: Logging.Logger.Level, _ message: String, error: Error? = nil, filename: String = #file, function: String = #function, line: UInt = #line) {
-        var log = message
+    static func log(level: Logging.Logger.Level, _ message: @autoclosure () -> String, error: Error? = nil, filename: String = #file, function: String = #function, line: UInt = #line) {
+        guard Logger.logLevel <= level else { return }
+
+        var log = message()
 
         if let error {
             log += "(\(String(describing: error)))"
