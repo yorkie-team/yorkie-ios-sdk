@@ -99,7 +99,7 @@ public struct JSONTreeElementNode: JSONTreeNode {
             childrenString = self.children.compactMap { $0.toJSONString }.joined(separator: ",")
         }
 
-        var resultString = "{\"type\":\(self.type.toJSONString),\"children\":[\(childrenString)]"
+        var resultString = "{"
 
         if self.attributes.isEmpty == false {
             let sortedKeys = self.attributes.keys.sorted()
@@ -118,10 +118,10 @@ public struct JSONTreeElementNode: JSONTreeNode {
                 }
             }.joined(separator: ",")
 
-            resultString += ",\"attributes\":{\(attrsString)}"
+            resultString += "\"attributes\":{\(attrsString)},"
         }
 
-        resultString += "}"
+        resultString += "\"children\":[\(childrenString)],\"type\":\(self.type.toJSONString)}"
 
         return resultString
     }

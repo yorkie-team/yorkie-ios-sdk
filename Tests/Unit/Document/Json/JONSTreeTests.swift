@@ -35,7 +35,7 @@ final class JONSTreeTests: XCTestCase {
                                                   "point": ["x": 100, "y": 200]
                                               ])
 
-        XCTAssertEqual(elementNode.toJSONString, "{\"type\":\"doc\",\"children\":[{\"type\":\"p\",\"children\":[]},{\"type\":\"text\",\"value\":\"Y\"}],\"attributes\":{\"boolean\":true,\"doubleValue\":10.5,\"intValue\":100,\"point\":{\"x\":100,\"y\":200},\"string\":\"testString\"}}")
+        XCTAssertEqual(elementNode.toJSONString, "{\"attributes\":{\"boolean\":true,\"doubleValue\":10.5,\"intValue\":100,\"point\":{\"x\":100,\"y\":200},\"string\":\"testString\"},\"children\":[{\"children\":[],\"type\":\"p\"},{\"type\":\"text\",\"value\":\"Y\"}],\"type\":\"doc\"}")
     }
 
     func test_json_newline_string() throws {

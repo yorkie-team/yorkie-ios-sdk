@@ -85,22 +85,22 @@ final class TreeIntegrationTests: XCTestCase {
             root.t = JSONTree()
             try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p></p></root>")
-            XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[]}]}}")
+            XCTAssertEqual(root.toJSON(), "{\"t\":{\"children\":[{\"children\":[],\"type\":\"p\"}],\"type\":\"root\"}}")
 
             // 02. Create a text into the paragraph.
             try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "AB"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>AB</p></root>")
-            XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"text\",\"value\":\"AB\"}]}]}}")
+            XCTAssertEqual(root.toJSON(), "{\"t\":{\"children\":[{\"children\":[{\"type\":\"text\",\"value\":\"AB\"}],\"type\":\"p\"}],\"type\":\"root\"}}")
 
             // 03. Insert a text into the paragraph.
             try (root.t as? JSONTree)?.edit(3, 3, JSONTreeTextNode(value: "CD"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>ABCD</p></root>")
-            XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"text\",\"value\":\"AB\"},{\"type\":\"text\",\"value\":\"CD\"}]}]}}")
+            XCTAssertEqual(root.toJSON(), "{\"t\":{\"children\":[{\"children\":[{\"type\":\"text\",\"value\":\"AB\"},{\"type\":\"text\",\"value\":\"CD\"}],\"type\":\"p\"}],\"type\":\"root\"}}")
 
             // 04. Replace ABCD with Yorkie
             try (root.t as? JSONTree)?.edit(1, 5, JSONTreeTextNode(value: "Yorkie"))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<root><p>Yorkie</p></root>")
-            XCTAssertEqual(root.toJSON(), "{\"t\":{\"type\":\"root\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"text\",\"value\":\"Yorkie\"}]}]}}")
+            XCTAssertEqual(root.toJSON(), "{\"t\":{\"children\":[{\"children\":[{\"type\":\"text\",\"value\":\"Yorkie\"}],\"type\":\"p\"}],\"type\":\"root\"}}")
         }
     }
 
@@ -931,7 +931,8 @@ final class TreeIntegrationStyleTests: XCTestCase {
             try (root.t as? JSONTree)?.styleByPath([0, 0, 0], ["z": "m"])
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), /* html */ "<doc><tc><p a=\"b\" c=\"q\"><tn z=\"m\"></tn></p></tc></doc>")
 
-            XCTAssertEqual(root.toJSON(), /* html */ "{\"t\":{\"type\":\"doc\",\"children\":[{\"type\":\"tc\",\"children\":[{\"type\":\"p\",\"children\":[{\"type\":\"tn\",\"children\":[],\"attributes\":{\"z\":\"m\"}}],\"attributes\":{\"a\":\"b\",\"c\":\"q\"}}]}]}}")
+            XCTAssertEqual(root.toJSON(), /* html */
+                           "{\"t\":{\"children\":[{\"children\":[{\"attributes\":{\"a\":\"b\",\"c\":\"q\"},\"children\":[{\"attributes\":{\"z\":\"m\"},\"children\":[],\"type\":\"tn\"}],\"type\":\"p\"}],\"type\":\"tc\"}],\"type\":\"doc\"}}")
         }
     }
 
