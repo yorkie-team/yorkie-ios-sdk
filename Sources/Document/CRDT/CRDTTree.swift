@@ -487,34 +487,26 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     var toJSONString: String {
-        if self.type == DefaultTreeNodeType.text.rawValue {
-            return "{\"type\":\(self.type.toJSONString),\"value\":\((self.value as String).toJSONString)}"
-        } else {
-            var childrenString = ""
-            if children.isEmpty == false {
-                childrenString = children.compactMap { $0.toJSONString }.joined(separator: ",")
-            }
-
-            var resultString = "{\"type\":\(self.type.toJSONString),\"children\":[\(childrenString)]"
-
-            if let attributes = self.attrs?.toObject().mapValues({ $0.value }), attributes.isEmpty == false {
-                let sortedKeys = attributes.keys.sorted()
-
-                let attrsString = sortedKeys.compactMap { key in
-                    if let value = attributes[key] {
-                        return "\(key.toJSONString):\(value)"
-                    } else {
-                        return nil
-                    }
-                }.joined(separator: ",")
-
-                resultString += ",\"attributes\":{\(attrsString)}"
-            }
-
-            resultString += "}"
-
-            return resultString
+        if let data = try? JSONSerialization.data(withJSONObject: toDictionary, options: [.sortedKeys]),
+           let result = String(data: data, encoding: .utf8)
+        {
+            return result
         }
+
+        return "{}"
+    }
+
+    var toDictionary: [String: Any] {
+        var dictionary: [String: Any] = ["type": self.type]
+
+        if self.type == DefaultTreeNodeType.text.rawValue {
+            dictionary["value"] = self.value as String
+        } else {
+            dictionary["children"] = self.children.map { $0.toDictionary }
+            dictionary["attributes"] = self.attrs?.toDictionary
+        }
+
+        return dictionary
     }
 
     /**

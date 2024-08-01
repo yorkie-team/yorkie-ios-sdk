@@ -230,6 +230,13 @@ class RHT {
         return result
     }
 
+    var toDictionary: [String: Any] {
+        self.nodeMapByKey.compactMapValues { node -> Any? in
+            guard !node.isRemoved else { return nil }
+            return try? JSONSerialization.jsonObject(with: Data(node.value.utf8), options: .fragmentsAllowed)
+        }
+    }
+
     /**
      * `purge` purges the given child node.
      */
