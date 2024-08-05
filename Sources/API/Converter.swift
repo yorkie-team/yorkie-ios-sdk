@@ -788,10 +788,10 @@ extension Converter {
      * `fromTree` converts the given Protobuf format to model format.
      */
     static func fromTree(_ pbTree: PbJSONElement.Tree) throws -> CRDTTree {
-        guard let root = try fromTreeNodes(pbTree.nodes) else {
+        guard let tree = try fromTreeNodes(pbTree.nodes, fromTimeTicket(pbTree.createdAt)) else {
             throw YorkieError.unexpected(message: "Can't get root from PbJSONElement.Tree")
         }
-        return CRDTTree(root: root, createdAt: fromTimeTicket(pbTree.createdAt))
+        return tree
     }
 
     /**
@@ -967,13 +967,13 @@ extension Converter {
             return nil
         }
         
-        return pbTreeNodes.compactMap { try? fromTreeNodes($0.content) }
+        return pbTreeNodes.compactMap { try? fromTreeNodes($0.content)?.root }
     }
 
     /**
      * `fromTreeNodes` converts the given Protobuf format to model format.
      */
-    static func fromTreeNodes(_ pbTreeNodes: [PbTreeNode]) throws -> CRDTTreeNode? {
+    static func fromTreeNodes(_ pbTreeNodes: [PbTreeNode], _ createdAt: TimeTicket = .initial) throws -> CRDTTree? {
         guard pbTreeNodes.isEmpty == false else {
             return nil
         }
@@ -997,7 +997,7 @@ extension Converter {
         root.updateDescendantsSize()
         
         // build CRDTTree from the root to construct the links between nodes.
-        return CRDTTree(root: root, createdAt: TimeTicket.initial).root
+        return CRDTTree(root: root, createdAt: createdAt)
     }
 
     /**
