@@ -243,7 +243,7 @@ public class Client {
         }
 
         doc.setActor(clientID)
-        try doc.update { _, presence in
+        try await doc.update { _, presence in
             presence.set(initialPresence)
         }
 
@@ -264,13 +264,13 @@ public class Client {
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
-            try doc.applyChangePack(pack)
+            try await doc.applyChangePack(pack)
 
             if doc.status == .removed {
                 throw YorkieError.documentRemoved(message: "\(doc) is removed.")
             }
 
-            doc.applyStatus(.attached)
+            await doc.applyStatus(.attached)
 
             self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: message.documentID, syncMode: syncMode, remoteChangeEventReceived: false)
 
@@ -312,7 +312,7 @@ public class Client {
             throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
-        try doc.update { _, presence in
+        try await doc.update { _, presence in
             presence.clear()
         }
 
@@ -330,10 +330,10 @@ public class Client {
 
             let pack = try Converter.fromChangePack(message.changePack)
 
-            try doc.applyChangePack(pack)
+            try await doc.applyChangePack(pack)
 
             if doc.status != .removed {
-                doc.applyStatus(.detached)
+                await doc.applyStatus(.detached)
             }
 
             try self.stopWatchLoop(doc.getKey())
@@ -379,7 +379,7 @@ public class Client {
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
-            try doc.applyChangePack(pack)
+            try await doc.applyChangePack(pack)
 
             try self.stopWatchLoop(doc.getKey())
 
@@ -533,7 +533,7 @@ public class Client {
         await self.doSyncLoop()
     }
 
-    private func doWatchLoop(_ docKey: DocumentKey) throws {
+    private func doWatchLoop(_ docKey: DocumentKey) async throws {
         self.attachmentMap[docKey]?.resetWatchLoopTimer()
 
         guard self.isActive, let id = self.id else {
@@ -580,13 +580,15 @@ public class Client {
 
         self.attachmentMap[docKey]?.connectStream(stream)
 
-        self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
+        await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
     }
 
     private func runWatchLoop(_ docKey: DocumentKey) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
 
-        try self.doWatchLoop(docKey)
+        Task {
+            try await self.doWatchLoop(docKey)
+        }
     }
 
     private func stopWatchLoop(_ docKey: DocumentKey) throws {
@@ -627,7 +629,7 @@ public class Client {
             self.semaphoresForInitialzation[docKey]?.signal()
 
             self.attachmentMap[docKey]?.doc.setOnlineClients(onlineClients)
-            self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized)
+            await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized)
         case .event(let pbWatchEvent):
             let publisher = pbWatchEvent.publisher
 
@@ -639,7 +641,7 @@ public class Client {
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
                 // unless we also know their initial presence data at this point.
                 if let presence = self.attachmentMap[docKey]?.doc.getPresence(publisher) {
-                    self.attachmentMap[docKey]?.doc.publishPresenceEvent(.watched, publisher, presence)
+                    await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.watched, publisher, presence)
                 }
             case .documentUnwatched:
                 // NOTE(chacha912): There is no presence, when PresenceChange(clear) is applied before unwatching.
@@ -649,7 +651,7 @@ public class Client {
                 self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
 
                 if let presence {
-                    self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
+                    await self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
                 }
             default:
                 break
@@ -717,20 +719,20 @@ public class Client {
                 return doc
             }
 
-            try doc.applyChangePack(responsePack)
+            try await doc.applyChangePack(responsePack)
 
             if doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: docKey)
             }
 
-            doc.publishSyncEvent(.synced)
+            await doc.publishSyncEvent(.synced)
 
             let remoteSize = responsePack.getChangeSize()
             Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {
-            doc.publishSyncEvent(.syncFailed)
+            await doc.publishSyncEvent(.syncFailed)
 
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 

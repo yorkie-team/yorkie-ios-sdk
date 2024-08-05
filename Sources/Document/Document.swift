@@ -112,7 +112,7 @@ public class Document {
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) throws {
+    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) async throws {
         guard self.status != .removed else {
             throw YorkieError.documentRemoved(message: "\(self) is removed.")
         }
@@ -155,11 +155,11 @@ public class Document {
                                             clientSeq: change.id.getClientSeq(),
                                             serverSeq: change.id.getServerSeq())
                 let changeEvent = LocalChangeEvent(value: changeInfo)
-                self.publish(changeEvent)
+                await self.publish(changeEvent)
             }
 
             if change.presenceChange != nil, let presence = self.getPresence(actorID) {
-                self.publish(PresenceChangedEvent(value: (actorID, presence)))
+                await self.publish(PresenceChangedEvent(value: (actorID, presence)))
             }
 
             Logger.trace("after update a local change: \(self.toJSON())")
@@ -242,11 +242,11 @@ public class Document {
      *
      * - Parameter pack: change pack
      */
-    func applyChangePack(_ pack: ChangePack) throws {
+    func applyChangePack(_ pack: ChangePack) async throws {
         if let snapshot = pack.getSnapshot() {
-            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
+            try await self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
         } else if pack.hasChanges() {
-            try self.applyChanges(pack.getChanges())
+            try await self.applyChanges(pack.getChanges())
         }
 
         // 01. Remove local changes applied to server.
@@ -262,7 +262,7 @@ public class Document {
         // as remote changes because the application should apply the local
         // changes to their own document.
         if pack.hasSnapshot() {
-            try self.applyChanges(self.localChanges)
+            try await self.applyChanges(self.localChanges)
         }
 
         // 03. Do Garbage collection.
@@ -272,7 +272,7 @@ public class Document {
 
         // 04. Update the status.
         if pack.isRemoved {
-            self.applyStatus(.removed)
+            await self.applyStatus(.removed)
         }
 
         Logger.trace("\(self.root.toJSON())")
@@ -414,7 +414,7 @@ public class Document {
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    public func applySnapshot(_ serverSeq: Int64, _ snapshot: Data) throws {
+    public func applySnapshot(_ serverSeq: Int64, _ snapshot: Data) async throws {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
@@ -424,13 +424,13 @@ public class Document {
         self.clone = nil
 
         let snapshotEvent = SnapshotEvent(value: snapshot)
-        self.publish(snapshotEvent)
+        await self.publish(snapshotEvent)
     }
 
     /**
      * `applyChanges` applies the given changes into this document.
      */
-    public func applyChanges(_ changes: [Change]) throws {
+    public func applyChanges(_ changes: [Change]) async throws {
         Logger.debug(
             """
             trying to apply \(changes.count) remote changes.
@@ -499,11 +499,11 @@ public class Document {
             // asynchronously, the model can be changed and breaking consistency.
             if let info = changeInfo {
                 let remoteChangeEvent = RemoteChangeEvent(value: info)
-                self.publish(remoteChangeEvent)
+                await self.publish(remoteChangeEvent)
             }
 
             if let presenceEvent {
-                self.publish(presenceEvent)
+                await self.publish(presenceEvent)
             }
 
             self.changeID = self.changeID.syncLamport(with: change.id.getLamport())
@@ -549,7 +549,7 @@ public class Document {
     /**
      * `applyStatus` applies the document status into this document.
      */
-    func applyStatus(_ status: DocumentStatus) {
+    func applyStatus(_ status: DocumentStatus) async {
         self.status = status
 
         if status == .detached {
@@ -559,51 +559,52 @@ public class Document {
         let event = StatusChangedEvent(source: status == .removed ? .remote : .local,
                                        value: StatusInfo(status: status, actorID: status == .attached ? self.actorID : nil))
 
-        self.publish(event)
+        await self.publish(event)
     }
 
     public nonisolated var debugDescription: String {
         "[\(self.key)]"
     }
 
-    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: [String: Any]? = nil) {
+    func publishPresenceEvent(_ eventType: DocEventType, _ peerActorID: ActorID? = nil, _ presence: [String: Any]? = nil) async {
         switch eventType {
         case .initialized:
-            self.publish(InitializedEvent(value: self.getPresences()))
+            await self.publish(InitializedEvent(value: self.getPresences()))
         case .watched:
             if let peerActorID, let presence = presence {
-                self.publish(WatchedEvent(value: (peerActorID, presence)))
+                await self.publish(WatchedEvent(value: (peerActorID, presence)))
             }
         case .unwatched:
             if let peerActorID, let presence = presence {
-                self.publish(UnwatchedEvent(value: (peerActorID, presence)))
+                await self.publish(UnwatchedEvent(value: (peerActorID, presence)))
             }
         default:
             assertionFailure("Not presence Event type. \(eventType)")
         }
     }
 
-    func publishConnectionEvent(_ status: StreamConnectionStatus) {
-        self.publish(ConnectionChangedEvent(value: status))
+    func publishConnectionEvent(_ status: StreamConnectionStatus) async {
+        await self.publish(ConnectionChangedEvent(value: status))
     }
 
-    func publishSyncEvent(_ status: DocumentSyncStatus) {
-        self.publish(SyncStatusChangedEvent(value: status))
+    func publishSyncEvent(_ status: DocumentSyncStatus) async {
+        await self.publish(SyncStatusChangedEvent(value: status))
     }
 
-    func publishInitializedEvent() {
-        self.publish(InitializedEvent(value: self.getPresences()))
+    func publishInitializedEvent() async {
+        await self.publish(InitializedEvent(value: self.getPresences()))
     }
 
     /**
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    private func publish(_ event: DocEvent) {
+    private func publish(_ event: DocEvent) async {
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
         if presenceEvents.contains(event.type) {
             if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.presence.rawValue] {
+                await Task.yield()
                 callback(event, self)
             }
 
@@ -627,21 +628,26 @@ public class Document {
 
                 if isMine {
                     if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.myPresence.rawValue] {
+                        await Task.yield()
                         callback(event, self)
                     }
                 }
 
                 if isOthers {
                     if let callback = self.presenceSubscribeCallback[PresenceSubscriptionType.others.rawValue] {
+                        await Task.yield()
                         callback(event, self)
                     }
                 }
             }
         } else if event.type == .connectionChanged {
+            await Task.yield()
             self.connectionSubscribeCallback?(event, self)
         } else if event.type == .syncStatusChanged {
+            await Task.yield()
             self.syncSubscribeCallback?(event, self)
         } else if event.type == .snapshot {
+            await Task.yield()
             self.subscribeCallbacks["$"]?(event, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
@@ -663,13 +669,16 @@ public class Document {
                                       serverSeq: event.value.serverSeq)
 
                 if let callback = self.subscribeCallbacks[key] {
+                    await Task.yield()
                     callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
                 }
             }
 
+            await Task.yield()
             self.subscribeCallbacks["$"]?(event, self)
         }
 
+        await Task.yield()
         self.defaultSubscribeCallback?(event, self)
     }
 
