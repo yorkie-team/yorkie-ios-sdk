@@ -66,13 +66,13 @@ class TextViewModel {
                 }
             }
 
-            await self.document.subscribePresence(.others) { [weak self] event, _ in
+            await self.document.subscribePresence(.others) { [weak self] event, document in
                 if let event = event as? PresenceChangedEvent {
                     if let fromPos: TextPosStruct = self?.decodePresence(event.value.presence["from"]),
                        let toPos: TextPosStruct = self?.decodePresence(event.value.presence["to"])
                     {
                         Task { [weak self] in
-                            if let (fromIdx, toIdx) = try? await(self?.document.getRoot().content as? JSONText)?.posRangeToIndexRange((fromPos, toPos)) {
+                            if let (fromIdx, toIdx) = try? (document.getRoot().content as? JSONText)?.posRangeToIndexRange((fromPos, toPos)) {
                                 let range: NSRange
 
                                 if fromIdx <= toIdx {

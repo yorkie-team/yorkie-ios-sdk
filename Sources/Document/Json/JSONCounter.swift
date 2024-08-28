@@ -103,3 +103,9 @@ public class JSONCounter<T: YorkieCountable> {
         self.increase(value: T(value))
     }
 }
+
+extension JSONCounter: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        "\(self._value)"
+    }
+}

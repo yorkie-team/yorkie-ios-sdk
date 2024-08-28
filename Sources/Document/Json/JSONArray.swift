@@ -20,7 +20,7 @@ import Foundation
  * `JSONArray` represents JSON array, but unlike regular JSON, it has time
  * tickets created by a logical clock to resolve conflicts.
  */
-public class JSONArray {
+public class JSONArray: CustomDebugStringConvertible {
     static let notAppend = -1
     static let notFound = -1
 
@@ -606,7 +606,7 @@ public class JSONArray {
         return Self.notFound
     }
 
-    var debugDescription: String {
+    public var debugDescription: String {
         self.target.debugDescription
     }
 }

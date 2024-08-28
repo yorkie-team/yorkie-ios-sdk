@@ -120,7 +120,7 @@ public struct ConnectionChangedEvent: DocEvent {
     /**
      * ConnectionChanged type
      */
-    var value: StreamConnectionStatus
+    public var value: StreamConnectionStatus
 }
 
 /**
@@ -146,7 +146,7 @@ public struct SyncStatusChangedEvent: DocEvent {
     /**
      * SyncStatusChangedEvent type
      */
-    var value: DocumentSyncStatus
+    public var value: DocumentSyncStatus
 }
 
 /**
