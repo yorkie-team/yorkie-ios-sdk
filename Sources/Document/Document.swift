@@ -88,6 +88,7 @@ public class Document {
     private var subscribeCallbacks = [String: SubscribeCallback]()
     private var presenceSubscribeCallback = [String: SubscribeCallback]()
     private var connectionSubscribeCallback: SubscribeCallback?
+    private var statusSubscribeCallback: SubscribeCallback?
     private var syncSubscribeCallback: SubscribeCallback?
 
     /**
@@ -192,6 +193,14 @@ public class Document {
      */
     public func subscribeConnection(_ callback: @escaping SubscribeCallback) {
         self.connectionSubscribeCallback = callback
+    }
+
+    /**
+     * `subscribeStatus` registers a callback to subscribe to events on the document.
+     * The callback will be called when the document status changes.
+     */
+    public func subscribeStatus(_ callback: @escaping SubscribeCallback) {
+        self.statusSubscribeCallback = callback
     }
 
     /**
@@ -639,6 +648,8 @@ public class Document {
             }
         } else if event.type == .connectionChanged {
             self.connectionSubscribeCallback?(event, self)
+        } else if event.type == .statusChanged {
+            self.statusSubscribeCallback?(event, self)
         } else if event.type == .syncStatusChanged {
             self.syncSubscribeCallback?(event, self)
         } else if event.type == .snapshot {
