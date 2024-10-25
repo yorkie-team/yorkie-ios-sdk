@@ -487,8 +487,10 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     var toJSONString: String {
-        if let data = try? JSONSerialization.data(withJSONObject: toDictionary, options: [.sortedKeys]) {
-            return String(decoding: data, as: UTF8.self)
+        if let data = try? JSONSerialization.data(withJSONObject: toDictionary, options: [.sortedKeys]),
+           let jsonString = String(data: data, encoding: .utf8)
+        {
+            return jsonString
         }
 
         return "{}"

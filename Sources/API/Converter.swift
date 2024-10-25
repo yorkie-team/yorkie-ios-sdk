@@ -34,7 +34,10 @@ enum Converter {
             let result = Double(bitPattern: UInt64(littleEndian: data.withUnsafeBytes { $0.load(as: UInt64.self) }))
             return .double(result)
         case .string:
-            return .string(String(decoding: data, as: UTF8.self))
+            guard let stringValue = String(data: data, encoding: .utf8) else {
+                throw YorkieError.unimplemented(message: String(describing: valueType))
+            }
+            return .string(stringValue)
         case .long:
             let result = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
             return .long(result)

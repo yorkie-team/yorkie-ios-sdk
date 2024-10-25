@@ -90,7 +90,7 @@ class PrimitiveTests: XCTestCase {
         let valueFromData = try Converter.valueFrom(.bytes, data: primitiveValue.toBytes())
         switch valueFromData {
         case .bytes(let value):
-            XCTAssertEqual(String(decoding: value, as: UTF8.self), "abcdefg")
+            XCTAssertEqual(String(data: value, encoding: .utf8), "abcdefg")
         default:
             XCTFail("Type error.")
         }

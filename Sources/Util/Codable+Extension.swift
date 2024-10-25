@@ -36,7 +36,7 @@ extension Encodable {
             return nil
         }
 
-        return String(decoding: data, as: UTF8.self)
+        return String(data: data, encoding: .utf8)
     }
 }
 
