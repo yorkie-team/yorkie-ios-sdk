@@ -153,3 +153,54 @@ func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationI
         }
     }
 }
+
+class EventCollector<T: Equatable> {
+    let doc: Document
+    var values: [T] = []
+    var count: Int {
+        return self.values.count
+    }
+
+    init(doc: Document) {
+        self.doc = doc
+    }
+
+    func add(event: T) {
+        self.values.append(event)
+    }
+
+    func asyncStream() -> AsyncStream<T> {
+        return AsyncStream<T> { continuation in
+            for value in self.values {
+                continuation.yield(value)
+            }
+            continuation.finish()
+        }
+    }
+
+    func verifyNthValue(at nth: Int, isEqualTo targetValue: T) async {
+        if nth > self.values.count {
+            XCTFail("Expected \(nth)th value: \(targetValue), but the stream ended before reaching the value")
+        }
+
+        var counter = 0
+        for await value in self.asyncStream() {
+            counter += 1
+
+            if counter == nth {
+                print("\(nth)th, value: \(value)")
+                XCTAssertTrue(value == targetValue, "Expected \(nth)th value: \(targetValue), actual value: \(value)")
+                break
+            }
+        }
+    }
+
+    func subscribeDocumentStatus() async where T == DocumentStatus {
+        await self.doc.subscribeStatus { [weak self] event, _ in
+            guard let status = (event as? StatusChangedEvent)?.value.status else {
+                return
+            }
+            self?.add(event: status)
+        }
+    }
+}
