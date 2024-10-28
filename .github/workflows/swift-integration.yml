@@ -9,6 +9,11 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    
+    env:
+      # yorkie server v0.4.31
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/880510a1dad7e32b2699c32a55706955981bdcca/Formula/y/yorkie.rb"
+        
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
       with:
@@ -17,7 +22,10 @@ jobs:
     - name: Update Brew
       run: brew update
     - name: Setup yorkie server
-      run: brew reinstall yorkie
+      run: |
+        curl -O ${{ env.YORKOE_RB_URL }} 
+        brew uninstall yorkie
+        brew install "yorkie.rb"
     - name: Run yorkie server
       run: yorkie server & 
     - name: Run tests
