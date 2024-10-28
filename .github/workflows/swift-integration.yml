@@ -24,7 +24,7 @@ jobs:
     - name: Setup yorkie server
       run: |
         curl -O ${{ env.YORKIE_RB_URL }} 
-        brew install ./yorkie.rb
+        brew install --formula ./yorkie.rb
     - name: Run yorkie server
       run: yorkie server & 
     - name: Run tests
