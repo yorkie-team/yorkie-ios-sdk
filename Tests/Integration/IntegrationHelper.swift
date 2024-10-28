@@ -155,8 +155,14 @@ func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationI
 }
 
 class EventCollector<T: Equatable> {
+    private let queue = DispatchQueue(label: "com.yorkie.eventcollector", attributes: .concurrent)
+    private var _values: [T] = []
+
     let doc: Document
-    var values: [T] = []
+    var values: [T] {
+        self.queue.sync { self._values }
+    }
+
     var count: Int {
         return self.values.count
     }
@@ -166,7 +172,9 @@ class EventCollector<T: Equatable> {
     }
 
     func add(event: T) {
-        self.values.append(event)
+        self.queue.async(flags: .barrier) {
+            self._values.append(event)
+        }
     }
 
     func asyncStream() -> AsyncStream<T> {
@@ -180,7 +188,8 @@ class EventCollector<T: Equatable> {
 
     func verifyNthValue(at nth: Int, isEqualTo targetValue: T) async {
         if nth > self.values.count {
-            XCTFail("Expected \(nth)th value: \(targetValue), but the stream ended before reaching the value")
+            XCTFail("Expected \(nth)th value: \(targetValue), but only received \(self.values.count) values")
+            return
         }
 
         var counter = 0
@@ -188,11 +197,12 @@ class EventCollector<T: Equatable> {
             counter += 1
 
             if counter == nth {
-                print("\(nth)th, value: \(value)")
                 XCTAssertTrue(value == targetValue, "Expected \(nth)th value: \(targetValue), actual value: \(value)")
-                break
+                return
             }
         }
+
+        XCTFail("Stream ended before finding \(nth)th value")
     }
 
     func subscribeDocumentStatus() async where T == DocumentStatus {
