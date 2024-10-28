@@ -24,7 +24,6 @@ jobs:
     - name: Setup yorkie server
       run: |
         curl -O ${{ env.YORKIE_RB_URL }} 
-        brew uninstall yorkie
         brew install ./yorkie.rb
     - name: Run yorkie server
       run: yorkie server & 
