@@ -849,6 +849,8 @@ extension RGATreeSplit: GCParent {
         guard let node = node as? RGATreeSplitNode<T> else {
             return
         }
+        self.treeByIndex.delete(node)
+        self.treeByID.remove(node.id)
 
         node.prev?.setNext(node.next)
         node.next?.setPrev(node.prev)
