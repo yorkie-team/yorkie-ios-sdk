@@ -470,4 +470,108 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.deactivate()
         try await self.c2.deactivate()
     }
+
+    func test_subscribe_document_status_changed_event() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        let eventCollectorD1 = EventCollector<DocumentStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocumentStatus>(doc: d2)
+        await eventCollectorD1.subscribeDocumentStatus()
+        await eventCollectorD2.subscribeDocumentStatus()
+
+        // 1. When the client attaches a document, it receives an attached event.
+        try await c1.attach(d1)
+        try await c2.attach(d2)
+
+        // 2. When c1 detaches a document, it receives a detached event.
+        try await c1.detach(d1)
+
+        // 3. When c2 deactivates, it should also receive a detached event.
+        try await c2.deactivate()
+
+        await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: .attached)
+        await eventCollectorD1.verifyNthValue(at: 2, isEqualTo: .detached)
+
+        await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .attached)
+        await eventCollectorD2.verifyNthValue(at: 2, isEqualTo: .detached)
+
+        // 4. When other document is attached, it receives an attached event.
+        let docKey2 = "\(self.description)-\(Date().description)".toDocKey
+        let d3 = Document(key: docKey2)
+        let d4 = Document(key: docKey2)
+        let eventCollectorD3 = EventCollector<DocumentStatus>(doc: d3)
+        let eventCollectorD4 = EventCollector<DocumentStatus>(doc: d4)
+        await eventCollectorD3.subscribeDocumentStatus()
+        await eventCollectorD4.subscribeDocumentStatus()
+
+        try await c1.attach(d3, [:], .manual)
+
+        try await c2.activate()
+        try await c2.attach(d4, [:], .manual)
+
+        // 5. When c1 removes a document, it receives a removed event.
+        try await c1.remove(d3)
+
+        // 6. When c2 syncs, it should also receive a removed event.
+        try await c2.sync()
+
+        await eventCollectorD3.verifyNthValue(at: 1, isEqualTo: .attached)
+        await eventCollectorD3.verifyNthValue(at: 2, isEqualTo: .removed)
+
+        await eventCollectorD4.verifyNthValue(at: 1, isEqualTo: .attached)
+        await eventCollectorD4.verifyNthValue(at: 2, isEqualTo: .removed)
+
+        // 7. If the document is in the removed state, a detached event should not occur when deactivating.
+        let eventCount3 = eventCollectorD3.count
+        let eventCount4 = eventCollectorD4.count
+        try await c1.deactivate()
+        try await c2.deactivate()
+
+        try await Task.sleep(nanoseconds: 500_000_000)
+
+        XCTAssertEqual(eventCount3, eventCollectorD3.count)
+        XCTAssertEqual(eventCount4, eventCollectorD4.count)
+    }
+
+    func test_document_status_changes_to_detached_when_deactivating() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        let eventCollectorD1 = EventCollector<DocumentStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocumentStatus>(doc: d2)
+        await eventCollectorD1.subscribeDocumentStatus()
+        await eventCollectorD2.subscribeDocumentStatus()
+
+        // 1. When the client attaches a document, it receives an attached event.
+        try await c1.attach(d1, [:], .manual)
+        try await c2.attach(d2, [:], .manual)
+
+        await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: .attached)
+        await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .attached)
+
+        // 2. When c1 removes a document, it receives a removed event.
+        try await c1.remove(d1)
+        await eventCollectorD1.verifyNthValue(at: 2, isEqualTo: .removed)
+
+        // 3. When c2 deactivates, it should also receive a removed event.
+        try await c2.deactivate()
+        // NOTE: For now, document status changes to `Detached` when deactivating.
+        // This behavior may change in the future.
+        await eventCollectorD2.verifyNthValue(at: 2, isEqualTo: .detached)
+
+        try await c1.deactivate()
+    }
 }

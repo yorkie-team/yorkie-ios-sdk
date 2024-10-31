@@ -206,10 +206,6 @@ public class Client {
             return
         }
 
-        for item in self.attachmentMap {
-            try self.stopWatchLoop(item.key)
-        }
-
         let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
         let deactivateResponse = await self.rpcClient.deactivateClient(request: deactivateRequest)
@@ -217,6 +213,11 @@ public class Client {
         guard deactivateResponse.error == nil else {
             Logger.error("Failed to request deactivate client(\(self.key)).")
             throw YorkieError.rpcError(message: deactivateResponse.error.debugDescription)
+        }
+
+        for (key, attachment) in self.attachmentMap {
+            attachment.doc.applyStatus(.detached)
+            try self.detachInternal(key)
         }
 
         self.status = .deactivated
@@ -336,9 +337,7 @@ public class Client {
                 doc.applyStatus(.detached)
             }
 
-            try self.stopWatchLoop(doc.getKey())
-
-            self.attachmentMap.removeValue(forKey: doc.getKey())
+            try self.detachInternal(doc.getKey())
 
             Logger.info("[DD] c:\"\(self.key)\" detaches d:\"\(doc.getKey())\"")
 
@@ -681,6 +680,16 @@ public class Client {
         if let watchLoopReconnectTimer = self.attachmentMap[docKey]?.watchLoopReconnectTimer {
             RunLoop.main.add(watchLoopReconnectTimer, forMode: .common)
         }
+    }
+
+    private func detachInternal(_ docKey: DocumentKey) throws {
+        guard self.attachmentMap[docKey] != nil else {
+            return
+        }
+
+        try self.stopWatchLoop(docKey)
+
+        self.attachmentMap.removeValue(forKey: docKey)
     }
 
     @discardableResult
