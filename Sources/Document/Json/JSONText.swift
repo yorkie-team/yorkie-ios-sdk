@@ -247,11 +247,17 @@ public class JSONText {
     }
 
     /**
-     * `checkWeight` returns false when there is an incorrect weight node.
-     * for debugging purpose.
+     * `getTreeByIndex` returns the tree by index for debugging.
      */
-    public func checkWeight() -> Bool {
-        self.text?.checkWeight() ?? false
+    func getTreeByIndex() -> SplayTree<CRDTTextValue>? {
+        return self.text?.getTreeByIndex()
+    }
+
+    /**
+     * `getTreeByID` returns the tree by ID for debugging.
+     */
+    func getTreeByID() -> LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<CRDTTextValue>>? {
+        return self.text?.getTreeByID()
     }
 
     /**

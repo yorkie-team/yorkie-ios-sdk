@@ -238,8 +238,8 @@ final class TextIntegrationTests: XCTestCase {
             try await c2.sync()
             try await c1.sync()
 
-            let d1Check = await(d1.getRoot().k1 as? JSONText)?.checkWeight() ?? false
-            let d2Check = await(d2.getRoot().k1 as? JSONText)?.checkWeight() ?? false
+            let d1Check = await(d1.getRoot().k1 as? JSONText)?.getTreeByIndex()?.checkWeight() ?? false
+            let d2Check = await(d2.getRoot().k1 as? JSONText)?.getTreeByIndex()?.checkWeight() ?? false
             XCTAssertTrue(d1Check)
             XCTAssertTrue(d2Check)
         }

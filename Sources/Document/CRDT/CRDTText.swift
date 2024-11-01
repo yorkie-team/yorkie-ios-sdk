@@ -313,11 +313,17 @@ final class CRDTText: CRDTElement {
     }
 
     /**
-     * `checkWeight` returns false when there is an incorrect weight node.
-     * for debugging purpose.
+     * `getTreeByIndex` returns the tree by index for debugging.
      */
-    func checkWeight() -> Bool {
-        self.rgaTreeSplit.checkWeight()
+    func getTreeByIndex() -> SplayTree<CRDTTextValue> {
+        return self.rgaTreeSplit.getTreeByIndex()
+    }
+
+    /**
+     * `getTreeByID` returns the tree by ID for debugging.
+     */
+    func getTreeByID() -> LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<CRDTTextValue>> {
+        return self.rgaTreeSplit.getTreeByID()
     }
 
     /**
