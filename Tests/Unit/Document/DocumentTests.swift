@@ -1056,6 +1056,32 @@ class DocumentTests: XCTestCase {
         XCTAssertEqual(length, 0)
     }
 
+    func test_should_purge_node_from_indexes_during_GC() async throws {
+        let doc = Document(key: "test-doc")
+
+        try await doc.update { root, _ in
+            root.k1 = JSONText()
+        }
+        var size = await(doc.getRoot().k1 as? JSONText)?.getTreeByID()?.size
+        XCTAssertEqual(size, 1)
+
+        try await doc.update { root, _ in
+            (root.k1 as? JSONText)?.edit(0, 0, "ABC")
+        }
+        size = await(doc.getRoot().k1 as? JSONText)?.getTreeByID()?.size
+        XCTAssertEqual(size, 2)
+
+        try await doc.update { root, _ in
+            (root.k1 as? JSONText)?.edit(1, 3, "")
+        }
+        size = await(doc.getRoot().k1 as? JSONText)?.getTreeByID()?.size
+        XCTAssertEqual(size, 3)
+
+        await doc.garbageCollect(TimeTicket.max)
+        size = await(doc.getRoot().k1 as? JSONText)?.getTreeByID()?.size
+        XCTAssertEqual(size, 2)
+    }
+
     func test_escapes_string_for_object() async throws {
         let target = Document(key: "test-doc")
         try await target.update { root, _ in

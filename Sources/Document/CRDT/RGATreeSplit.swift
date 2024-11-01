@@ -535,11 +535,17 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     }
 
     /**
-     * `checkWeight` returns false when there is an incorrect weight node.
-     * for debugging purpose.
+     * `getTreeByIndex` returns the tree by index for debugging purpose.
      */
-    public func checkWeight() -> Bool {
-        self.treeByIndex.checkWeight()
+    public func getTreeByIndex() -> SplayTree<T> {
+        return self.treeByIndex
+    }
+
+    /**
+     * `getTreeByID` returns the tree by ID for debugging purpose.
+     */
+    public func getTreeByID() -> LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>> {
+        return self.treeByID
     }
 
     /**
