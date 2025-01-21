@@ -133,7 +133,7 @@ public class Client {
     private let reconnectStreamDelay: Int
     private let maximumAttachmentTimeout: Int
 
-    private var rpcClient: YorkieServiceClient
+    private var yorkieService: YorkieService
     private var authHeader: AuthHeader
     private var semaphoresForInitialzation = [DocumentKey: DispatchSemaphore]()
     private let syncSemaphore = AsyncSemaphore(value: 1)
@@ -148,7 +148,7 @@ public class Client {
      * @param rpcAddr - the address of the RPC server.
      * @param opts - the options of the client.
      */
-    public nonisolated init(_ urlString: String, _ options: ClientOptions = ClientOptions()) {
+    public nonisolated init(_ urlString: String, _ options: ClientOptions = ClientOptions(), isMockingEnabled: Bool = false) {
         self.key = options.key ?? UUID().uuidString
         self.syncLoopDuration = options.syncLoopDuration
         self.reconnectStreamDelay = options.reconnectStreamDelay
@@ -159,7 +159,7 @@ public class Client {
                                                                          networkProtocol: .connect,
                                                                          codec: ProtoCodec()))
 
-        self.rpcClient = YorkieServiceClient(client: protocolClient)
+        self.yorkieService = YorkieService(rpcClient: YorkieServiceClient(client: protocolClient), isMockingEnabled: isMockingEnabled)
         self.authHeader = AuthHeader(apiKey: options.apiKey, token: options.token)
     }
 
@@ -183,7 +183,7 @@ public class Client {
 
         let activateRequest = ActivateClientRequest.with { $0.clientKey = self.key }
 
-        let activateResponse = await self.rpcClient.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
+        let activateResponse = await self.yorkieService.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
 
         guard activateResponse.error == nil, let message = activateResponse.message else {
             Logger.error("Failed to request activate client(\(self.key)).")
@@ -208,7 +208,7 @@ public class Client {
 
         let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
-        let deactivateResponse = await self.rpcClient.deactivateClient(request: deactivateRequest)
+        let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest)
 
         guard deactivateResponse.error == nil else {
             Logger.error("Failed to request deactivate client(\(self.key)).")
@@ -258,7 +258,7 @@ public class Client {
 
             self.semaphoresForInitialzation[docKey] = semaphore
 
-            let attachResponse = await self.rpcClient.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
+            let attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw YorkieError.rpcError(message: attachResponse.error.debugDescription)
@@ -323,7 +323,7 @@ public class Client {
         detachDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
 
         do {
-            let detachDocumentResponse = await self.rpcClient.detachDocument(request: detachDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
+            let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
                 throw YorkieError.rpcError(message: detachDocumentResponse.error.debugDescription)
@@ -371,7 +371,7 @@ public class Client {
         removeDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack(true))
 
         do {
-            let removeDocumentResponse = await self.rpcClient.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
+            let removeDocumentResponse = await self.yorkieService.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
                 throw YorkieError.rpcError(message: removeDocumentResponse.error.debugDescription)
@@ -545,7 +545,7 @@ public class Client {
             return
         }
 
-        let stream = self.rpcClient.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
+        let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
             Task {
                 switch result {
                 case .headers:
@@ -712,7 +712,7 @@ public class Client {
         do {
             let docKey = doc.getKey()
 
-            let pushpullResponse = await self.rpcClient.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
+            let pushpullResponse = await self.yorkieService.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
 
             guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
                 throw YorkieError.rpcError(message: pushpullResponse.error.debugDescription)
@@ -745,5 +745,14 @@ public class Client {
 
             throw error
         }
+    }
+}
+
+public extension Client {
+    /**
+     * `setMockError` sets a mock error for a specific method.
+     */
+    func setMockError(for method: Connect.MethodSpec, error: ConnectError) {
+        self.yorkieService.setMockError(for: method, error: error)
     }
 }
