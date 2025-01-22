@@ -618,6 +618,7 @@ public class Client {
                         try await self.onStreamDisconnect(docKey)
                     } else {
                         await self.setCondition(.watchLoop, value: false)
+                        try await self.onStreamDisconnect(docKey)
                     }
                 }
             }
@@ -718,22 +719,28 @@ public class Client {
     }
 
     private func disconnectWatchStream(_ docKey: DocumentKey) throws {
-        guard self.attachmentMap[docKey] != nil else {
+        guard let attachment = self.attachmentMap[docKey] else {
             return
         }
-        guard !(self.attachmentMap[docKey]!.isDisconnectedStream) else {
+        guard !attachment.isDisconnectedStream else {
             return
         }
+        attachment.disconnectStream()
+        attachment.resetWatchLoopTimer()
 
-        self.attachmentMap[docKey]?.disconnectStream()
-        self.attachmentMap[docKey]?.resetWatchLoopTimer()
+        Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
     private func onStreamDisconnect(_ docKey: DocumentKey) throws {
         try self.disconnectWatchStream(docKey)
 
-        self.attachmentMap[docKey]?.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+        guard let attachment = self.attachmentMap[docKey], attachment.syncMode != .manual else {
+            return
+        }
+
+        attachment.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
             Task {
+                Logger.debug("[WL] c:\"\(self.key)\" reconnect timer fired. do watch loop")
                 try await self.doWatchLoop(docKey)
             }
         }
