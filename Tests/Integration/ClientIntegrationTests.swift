@@ -15,6 +15,7 @@
  */
 
 import Combine
+import Connect
 import XCTest
 @testable import Yorkie
 
@@ -55,6 +56,38 @@ final class ClientIntegrationTests: XCTestCase {
         try await clientWithoutKey.deactivate()
         boolResult = await clientWithoutKey.isActive
         XCTAssertFalse(boolResult)
+    }
+
+    func test_can_attach_detach_document() async throws {
+        let client = Client(rpcAddress)
+        try await client.activate()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+        let doc = Document(key: docKey)
+
+        try await client.attach(doc)
+        do {
+            try await client.attach(doc)
+        } catch {
+            guard let code = toYorkieErrorCode(from: error) else {
+                XCTFail("error should be ConnectError, but \(type(of: error))")
+                return
+            }
+            XCTAssert(code == YorkieError.Code.errDocumentNotDetached)
+        }
+
+        try await client.detach(doc)
+        do {
+            try await client.detach(doc)
+        } catch {
+            guard let code = toYorkieErrorCode(from: error) else {
+                XCTFail("error should be ConnectError, but \(type(of: error))")
+                return
+            }
+            XCTAssert(code == YorkieError.Code.errDocumentNotAttached)
+        }
+
+        try await client.deactivate()
+        try await client.deactivate()
     }
 
     func test_can_handle_sync() async throws {
@@ -746,6 +779,23 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    func test_should_handle_each_request_one_by_one() async throws {
+        for index in 0 ..< 10 {
+            let client = Client(rpcAddress)
+            try await client.activate()
+
+            let docKey = "\(Date().description)-\(self.description)-\(index)".toDocKey
+            let doc = Document(key: docKey)
+
+            do {
+                try await client.attach(doc)
+                try await client.deactivate()
+            } catch {
+                XCTFail("\(error.localizedDescription)")
+            }
+        }
+    }
+
     func test_duplicated_local_changes_not_sent_to_server() async throws {
         try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -812,5 +862,32 @@ final class ClientIntegrationTests: XCTestCase {
             let d2JSON = await d2.toSortedJSON()
             XCTAssertEqual(d1JSON, d2JSON)
         }
+    }
+
+    @MainActor
+    func test_should_retry_on_network_failure_and_eventually_succeed() async throws {
+        let c1 = Client(rpcAddress, isMockingEnabled: true)
+        try await c1.activate()
+
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+        try await c1.attach(d1)
+
+        c1.setMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges,
+                        error: connectError(from: .unknown))
+
+        try d1.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+        }
+
+        XCTAssertTrue(c1.getCondition(.syncLoop))
+
+        c1.setMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges,
+                        error: connectError(from: .failedPrecondition))
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+
+        XCTAssertFalse(c1.getCondition(.syncLoop))
     }
 }

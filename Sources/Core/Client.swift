@@ -64,6 +64,21 @@ public enum SyncMode {
 }
 
 /**
+ * `ClientCondition` represents the condition of the client.
+ */
+public enum ClientCondition: String {
+    /**
+     * `SyncLoop` is a key of the sync loop condition.
+     */
+    case syncLoop = "SyncLoop"
+    
+    /**
+     * `WatchLoop` is a key of the watch loop condition.
+     */
+    case watchLoop = "WatchLoop"
+}
+
+/**
  * `ClientOptions` are user-settable options used when defining clients.
  */
 public struct ClientOptions {
@@ -129,6 +144,11 @@ public struct ClientOptions {
 @MainActor
 public class Client {
     private var attachmentMap = [DocumentKey: Attachment]()
+    private var conditions: [ClientCondition: Bool] = [
+        ClientCondition.syncLoop: false,
+        ClientCondition.watchLoop: false
+    ]
+    
     private let syncLoopDuration: Int
     private let reconnectStreamDelay: Int
     private let maximumAttachmentTimeout: Int
@@ -181,23 +201,27 @@ public class Client {
             return
         }
 
-        let activateRequest = ActivateClientRequest.with { $0.clientKey = self.key }
+        do {
+            let activateRequest = ActivateClientRequest.with { $0.clientKey = self.key }
+            let activateResponse = await self.yorkieService.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
 
-        let activateResponse = await self.yorkieService.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
+            guard activateResponse.error == nil, let message = activateResponse.message else {
+                throw activateResponse.error ?? YorkieError.rpcError(message: activateResponse.error.debugDescription)
+            }
 
-        guard activateResponse.error == nil, let message = activateResponse.message else {
+            self.id = message.clientID
+
+            self.status = .activated
+            await self.runSyncLoop()
+
+            Logger.debug("Client(\(self.key)) activated")
+        } catch {
             Logger.error("Failed to request activate client(\(self.key)).")
-            throw YorkieError.rpcError(message: activateResponse.error.debugDescription)
+            self.handleConnectError(error)
+            throw error
         }
-
-        self.id = message.clientID
-
-        self.status = .activated
-        await self.runSyncLoop()
-
-        Logger.debug("Client(\(self.key)) activated")
     }
-
+    
     /**
      * `deactivate` deactivates this client.
      */
@@ -206,23 +230,23 @@ public class Client {
             return
         }
 
-        let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
+        do {
+            let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
-        let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest)
+            let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest)
 
-        guard deactivateResponse.error == nil else {
+            guard deactivateResponse.error == nil else {
+                throw deactivateResponse.error ?? YorkieError.rpcError(message: deactivateResponse.error.debugDescription)
+            }
+
+            try self.deactivateInternal()
+
+            Logger.info("Client(\(self.key) deactivated.")
+        } catch {
             Logger.error("Failed to request deactivate client(\(self.key)).")
-            throw YorkieError.rpcError(message: deactivateResponse.error.debugDescription)
+            self.handleConnectError(error)
+            throw error
         }
-
-        for (key, attachment) in self.attachmentMap {
-            attachment.doc.applyStatus(.detached)
-            try self.detachInternal(key)
-        }
-
-        self.status = .deactivated
-
-        Logger.info("Client(\(self.key) deactivated.")
     }
 
     /**
@@ -232,7 +256,7 @@ public class Client {
     @discardableResult
     public func attach(_ doc: Document, _ initialPresence: PresenceData = [:], _ syncMode: SyncMode = .realtime) async throws -> Document {
         guard self.isActive else {
-            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
         }
 
         guard let clientID = self.id else {
@@ -259,9 +283,10 @@ public class Client {
             self.semaphoresForInitialzation[docKey] = semaphore
 
             let attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
+            
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
-                throw YorkieError.rpcError(message: attachResponse.error.debugDescription)
+                throw attachResponse.error ?? YorkieError.rpcError(message: attachResponse.error.debugDescription)
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
@@ -287,6 +312,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
+            self.handleConnectError(error)
             throw error
         }
     }
@@ -302,7 +328,7 @@ public class Client {
     @discardableResult
     public func detach(_ doc: Document) async throws -> Document {
         guard self.isActive else {
-            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
         }
 
         guard let clientID = self.id else {
@@ -326,7 +352,7 @@ public class Client {
             let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
-                throw YorkieError.rpcError(message: detachDocumentResponse.error.debugDescription)
+                throw detachDocumentResponse.error ?? YorkieError.rpcError(message: detachDocumentResponse.error.debugDescription)
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
@@ -344,6 +370,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request detach document(\(self.key)).", error: error)
+            self.handleConnectError(error)
             throw error
         }
     }
@@ -354,7 +381,7 @@ public class Client {
     @discardableResult
     public func remove(_ doc: Document) async throws -> Document {
         guard self.isActive else {
-            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
         }
 
         guard let clientID = self.id else {
@@ -374,13 +401,13 @@ public class Client {
             let removeDocumentResponse = await self.yorkieService.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
-                throw YorkieError.rpcError(message: removeDocumentResponse.error.debugDescription)
+                throw removeDocumentResponse.error ?? YorkieError.rpcError(message: removeDocumentResponse.error.debugDescription)
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
             try doc.applyChangePack(pack)
 
-            try self.stopWatchLoop(doc.getKey())
+            try self.detachInternal(doc.getKey())
 
             self.attachmentMap.removeValue(forKey: doc.getKey())
 
@@ -389,19 +416,39 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request remove document(\(self.key)).", error: error)
+            self.handleConnectError(error)
             throw error
         }
     }
-
+    
+    /**
+     * `getCondition` returns the condition of this client.
+     */
+    public func getCondition(_ condition: ClientCondition) -> Bool {
+        return self.conditions[condition] ?? false
+    }
+    
+    /**
+     * `setCondition` set the condition of this client.
+     */
+    public func setCondition(_ condition: ClientCondition, value: Bool) {
+        self.conditions[condition] = value
+    }
+    
     /**
      * `changeSyncMode` changes the synchronization mode of the given document.
      */
     @discardableResult
     public func changeSyncMode(_ doc: Document, _ syncMode: SyncMode) throws -> Document {
         let docKey = doc.getKey()
+        
+
+        guard self.isActive else {
+            throw YorkieError.clientNotActivated(message: "\(docKey) is not active")
+        }
 
         guard let attachment = self.attachmentMap[docKey] else {
-            throw YorkieError.unexpected(message: "Can't find attachment by docKey! [\(docKey)]")
+            throw YorkieError.documentNotAttached(message: "Can't find attachment by docKey! [\(docKey)]")
         }
 
         let prevSyncMode = attachment.syncMode
@@ -441,7 +488,7 @@ public class Client {
     @discardableResult
     public func sync(_ doc: Document? = nil) async throws -> [Document] {
         guard self.isActive else {
-            throw YorkieError.clientNotActive(message: "\(self.key) is not active")
+            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
         }
 
         var attachment: Attachment?
@@ -456,6 +503,7 @@ public class Client {
         do {
             return try await self.performSyncInternal(false, attachment)
         } catch {
+            self.handleConnectError(error)
             throw error
         }
     }
@@ -515,6 +563,7 @@ public class Client {
     private func doSyncLoop() async {
         guard self.isActive else {
             Logger.debug("[SL] c:\"\(self.key)\" exit sync loop")
+            self.setCondition(.syncLoop, value: false)
             return
         }
 
@@ -523,28 +572,33 @@ public class Client {
 
             self.setSyncTimer(false)
         } catch {
-            self.setSyncTimer(true)
+            if self.handleConnectError(error) {
+                self.setSyncTimer(true)
+            } else {
+                self.setCondition(.syncLoop, value: false)
+            }
         }
     }
-
+    
+    /**
+     * `runSyncLoop` runs the sync loop. The sync loop pushes local changes to
+     * the server and pulls remote changes from the server.
+     */
     private func runSyncLoop() async {
         Logger.debug("[SL] c:\"\(self.key)\" run sync loop")
+        self.setCondition(.syncLoop, value: true)
         await self.doSyncLoop()
     }
-
+    
     private func doWatchLoop(_ docKey: DocumentKey) throws {
         self.attachmentMap[docKey]?.resetWatchLoopTimer()
-
-        guard self.isActive, let id = self.id else {
+        
+        guard self.isActive, let id = self.id, let docID = self.attachmentMap[docKey]?.docID else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
-            return
+            self.setCondition(.watchLoop, value: false)
+            throw YorkieError.clientNotActivated(message: "$\(docKey) is not active")
         }
-
-        guard let docID = self.attachmentMap[docKey]?.docID else {
-            Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
-            return
-        }
-
+        
         let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
             Task {
                 switch result {
@@ -556,15 +610,14 @@ public class Client {
                     await self.attachmentMap[docKey]?.doc.resetOnlineClients()
                     await self.attachmentMap[docKey]?.doc.publishInitializedEvent()
                     await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.disconnected)
-
+                    
                     Logger.debug("[WD] c:\"\(self.key)\" unwatches")
-
-                    if code == .canceled {
-                        // Canceled by Client by detach. so there is No need to reconnect.
-                    } else {
+                    
+                    if await self.handleConnectError(error) {
                         Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
-
                         try await self.onStreamDisconnect(docKey)
+                    } else {
+                        await self.setCondition(.watchLoop, value: false)
                     }
                 }
             }
@@ -581,10 +634,18 @@ public class Client {
 
         self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
     }
-
+    
+    /**
+     * `runWatchLoop` runs the watch loop for the given document. The watch loop
+     * listens to the events of the given document from the server.
+     */
     private func runWatchLoop(_ docKey: DocumentKey) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
-
+        guard let _ = self.attachmentMap[docKey] else {
+            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+        }
+        
+        self.setCondition(.watchLoop, value: true)
         try self.doWatchLoop(docKey)
     }
 
@@ -682,6 +743,15 @@ public class Client {
         }
     }
 
+    private func deactivateInternal() throws {
+        self.status = .deactivated
+
+        for (key, attachment) in self.attachmentMap {
+            try self.detachInternal(key)
+            attachment.doc.applyStatus(.detached)
+        }
+    }
+
     private func detachInternal(_ docKey: DocumentKey) throws {
         guard self.attachmentMap[docKey] != nil else {
             return
@@ -715,7 +785,7 @@ public class Client {
             let pushpullResponse = await self.yorkieService.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
 
             guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
-                throw YorkieError.rpcError(message: pushpullResponse.error.debugDescription)
+                throw pushpullResponse.error ?? YorkieError.rpcError(message: pushpullResponse.error.debugDescription)
             }
 
             let responsePack = try Converter.fromChangePack(message.changePack)
@@ -745,6 +815,42 @@ public class Client {
 
             throw error
         }
+    }
+    
+    /**
+     * `handleConnectError` handles the given error. If the given error can be
+     * retried after handling, it returns true.
+     */
+    @discardableResult
+    private func handleConnectError(_ error: Error?) -> Bool {
+        guard let connectError = error as? ConnectError else {
+            return false
+        }
+        
+        // NOTE(hackerwins): These errors are retryable.
+        // Connect guide indicates that for error codes like `ResourceExhausted` and
+        // `Unavailable`, retries should be attempted following their guidelines.
+        // Additionally, `Unknown` and `Canceled` are added separately as it
+        // typically occurs when the server is stopped.
+        if connectError.code == .canceled ||
+            connectError.code == .unknown ||
+            connectError.code == .resourceExhausted ||
+            connectError.code == .unavailable
+        {
+            return true
+        }
+        
+        // NOTE(hackerwins): Some errors should fix the state of the client.
+        let yorkieErrorCode = YorkieError.Code(rawValue: errorCodeOf(error: connectError))
+        if yorkieErrorCode == YorkieError.Code.errClientNotActivated ||
+            yorkieErrorCode == YorkieError.Code.errClientNotFound
+        {
+            do {
+                try self.deactivateInternal()
+            } catch {}
+        }
+        
+        return false
     }
 }
 
