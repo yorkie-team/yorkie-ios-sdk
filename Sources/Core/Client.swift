@@ -460,7 +460,7 @@ public class Client {
 
         // realtime to manual
         if syncMode == .manual {
-            try self.stopWatchLoop(docKey)
+            try self.stopWatchLoop(docKey, with: attachment)
             return doc
         }
 
@@ -589,11 +589,11 @@ public class Client {
         self.setCondition(.syncLoop, value: true)
         await self.doSyncLoop()
     }
-    
-    private func doWatchLoop(_ docKey: DocumentKey) throws {
-        self.attachmentMap[docKey]?.resetWatchLoopTimer()
-        
-        guard self.isActive, let id = self.id, let docID = self.attachmentMap[docKey]?.docID else {
+
+    private func doWatchLoop(_ docKey: DocumentKey, with attachment: Attachment) throws {
+        attachment.resetWatchLoopTimer()
+
+        guard self.isActive, let id = self.id else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
             self.setCondition(.watchLoop, value: false)
             throw YorkieError.clientNotActivated(message: "$\(docKey) is not active")
@@ -607,18 +607,20 @@ public class Client {
                 case .message(let message):
                     await self.handleWatchDocumentsResponse(docKey: docKey, response: message)
                 case .complete(let code, let error, _):
-                    await self.attachmentMap[docKey]?.doc.resetOnlineClients()
-                    await self.attachmentMap[docKey]?.doc.publishInitializedEvent()
-                    await self.attachmentMap[docKey]?.doc.publishConnectionEvent(.disconnected)
-                    
+                    if error != nil {
+                        await attachment.doc.resetOnlineClients()
+                        await attachment.doc.publishInitializedEvent()
+                        await attachment.doc.publishConnectionEvent(.disconnected)
+                    }
+
                     Logger.debug("[WD] c:\"\(self.key)\" unwatches")
                     
                     if await self.handleConnectError(error) {
                         Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
-                        try await self.onStreamDisconnect(docKey)
+                        try await self.onStreamDisconnect(docKey, with: attachment)
                     } else {
                         await self.setCondition(.watchLoop, value: false)
-                        try await self.onStreamDisconnect(docKey)
+                        try await self.onStreamDisconnect(docKey, with: attachment)
                     }
                 }
             }
@@ -626,32 +628,32 @@ public class Client {
 
         let request = WatchDocumentRequest.with {
             $0.clientID = id
-            $0.documentID = docID
+            $0.documentID = attachment.docID
         }
 
         stream.send(request)
 
-        self.attachmentMap[docKey]?.connectStream(stream)
+        attachment.connectStream(stream)
 
-        self.attachmentMap[docKey]?.doc.publishConnectionEvent(.connected)
+        attachment.doc.publishConnectionEvent(.connected)
     }
-    
+
     /**
      * `runWatchLoop` runs the watch loop for the given document. The watch loop
      * listens to the events of the given document from the server.
      */
     private func runWatchLoop(_ docKey: DocumentKey) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
-        guard let _ = self.attachmentMap[docKey] else {
+        guard let attachment = self.attachmentMap[docKey] else {
             throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
         }
-        
+
         self.setCondition(.watchLoop, value: true)
-        try self.doWatchLoop(docKey)
+        try self.doWatchLoop(docKey, with: attachment)
     }
 
-    private func stopWatchLoop(_ docKey: DocumentKey) throws {
-        try self.disconnectWatchStream(docKey)
+    private func stopWatchLoop(_ docKey: DocumentKey, with attachment: Attachment) throws {
+        try self.disconnectWatchStream(docKey, with: attachment)
     }
 
     private func waitForInitialization(_ semaphore: DispatchSemaphore, _ docKey: String) async throws {
@@ -718,10 +720,7 @@ public class Client {
         }
     }
 
-    private func disconnectWatchStream(_ docKey: DocumentKey) throws {
-        guard let attachment = self.attachmentMap[docKey] else {
-            return
-        }
+    private func disconnectWatchStream(_ docKey: DocumentKey, with attachment: Attachment) throws {
         guard !attachment.isDisconnectedStream else {
             return
         }
@@ -731,21 +730,22 @@ public class Client {
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
-    private func onStreamDisconnect(_ docKey: DocumentKey) throws {
-        try self.disconnectWatchStream(docKey)
+    private func onStreamDisconnect(_ docKey: DocumentKey, with attachment: Attachment) throws {
+        try self.disconnectWatchStream(docKey, with: attachment)
 
-        guard let attachment = self.attachmentMap[docKey], attachment.syncMode != .manual else {
+        // check if watch loop is stopped
+        guard self.attachmentMap[docKey] != nil, attachment.syncMode != .manual else {
             return
         }
 
         attachment.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
             Task {
                 Logger.debug("[WL] c:\"\(self.key)\" reconnect timer fired. do watch loop")
-                try await self.doWatchLoop(docKey)
+                try await self.doWatchLoop(docKey, with: attachment)
             }
         }
 
-        if let watchLoopReconnectTimer = self.attachmentMap[docKey]?.watchLoopReconnectTimer {
+        if let watchLoopReconnectTimer = attachment.watchLoopReconnectTimer {
             RunLoop.main.add(watchLoopReconnectTimer, forMode: .common)
         }
     }
@@ -760,11 +760,11 @@ public class Client {
     }
 
     private func detachInternal(_ docKey: DocumentKey) throws {
-        guard self.attachmentMap[docKey] != nil else {
+        guard let attachment = self.attachmentMap[docKey] else {
             return
         }
 
-        try self.stopWatchLoop(docKey)
+        try self.stopWatchLoop(docKey, with: attachment)
 
         self.attachmentMap.removeValue(forKey: docKey)
     }

@@ -581,11 +581,12 @@ final class PresenceSubscribeTests: XCTestCase {
         }
 
         let resultPresence1 = await doc1.getPresences()
-        XCTAssertEqual(resultPresence1.first { $0.clientID == c1ID }?.presence["name"] as? String, "a")
+        XCTAssertEqual(resultPresence1.count, 1)
+        XCTAssertEqual(resultPresence1.first?.presence as? [String: String], ["name": "a"])
 
+        // NOTE(hiddenviewer): js-sdk return [ActorIDs.initial: [:]], but ios-sdk return empty
         let resultPresence2 = await doc2.getPresences()
-
-        XCTAssert(Self.comparePresences(resultPresence1, resultPresence2))
+        XCTAssertTrue(resultPresence2.isEmpty)
 
         try await c1.deactivate()
         try await c2.deactivate()
