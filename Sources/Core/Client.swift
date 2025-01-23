@@ -71,7 +71,7 @@ public enum ClientCondition: String {
      * `SyncLoop` is a key of the sync loop condition.
      */
     case syncLoop = "SyncLoop"
-    
+
     /**
      * `WatchLoop` is a key of the watch loop condition.
      */
@@ -148,7 +148,7 @@ public class Client {
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
     ]
-    
+
     private let syncLoopDuration: Int
     private let reconnectStreamDelay: Int
     private let maximumAttachmentTimeout: Int
@@ -221,7 +221,7 @@ public class Client {
             throw error
         }
     }
-    
+
     /**
      * `deactivate` deactivates this client.
      */
@@ -283,7 +283,6 @@ public class Client {
             self.semaphoresForInitialzation[docKey] = semaphore
 
             let attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
-            
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw attachResponse.error ?? YorkieError.rpcError(message: attachResponse.error.debugDescription)
@@ -420,28 +419,27 @@ public class Client {
             throw error
         }
     }
-    
+
     /**
      * `getCondition` returns the condition of this client.
      */
     public func getCondition(_ condition: ClientCondition) -> Bool {
         return self.conditions[condition] ?? false
     }
-    
+
     /**
      * `setCondition` set the condition of this client.
      */
     public func setCondition(_ condition: ClientCondition, value: Bool) {
         self.conditions[condition] = value
     }
-    
+
     /**
      * `changeSyncMode` changes the synchronization mode of the given document.
      */
     @discardableResult
     public func changeSyncMode(_ doc: Document, _ syncMode: SyncMode) throws -> Document {
         let docKey = doc.getKey()
-        
 
         guard self.isActive else {
             throw YorkieError.clientNotActivated(message: "\(docKey) is not active")
@@ -579,7 +577,7 @@ public class Client {
             }
         }
     }
-    
+
     /**
      * `runSyncLoop` runs the sync loop. The sync loop pushes local changes to
      * the server and pulls remote changes from the server.
@@ -598,7 +596,7 @@ public class Client {
             self.setCondition(.watchLoop, value: false)
             throw YorkieError.clientNotActivated(message: "$\(docKey) is not active")
         }
-        
+
         let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
             Task {
                 switch result {
@@ -614,7 +612,7 @@ public class Client {
                     }
 
                     Logger.debug("[WD] c:\"\(self.key)\" unwatches")
-                    
+
                     if await self.handleConnectError(error) {
                         Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
                         try await self.onStreamDisconnect(docKey, with: attachment)
@@ -823,7 +821,7 @@ public class Client {
             throw error
         }
     }
-    
+
     /**
      * `handleConnectError` handles the given error. If the given error can be
      * retried after handling, it returns true.
@@ -833,7 +831,7 @@ public class Client {
         guard let connectError = error as? ConnectError else {
             return false
         }
-        
+
         // NOTE(hackerwins): These errors are retryable.
         // Connect guide indicates that for error codes like `ResourceExhausted` and
         // `Unavailable`, retries should be attempted following their guidelines.
@@ -846,7 +844,7 @@ public class Client {
         {
             return true
         }
-        
+
         // NOTE(hackerwins): Some errors should fix the state of the client.
         let yorkieErrorCode = YorkieError.Code(rawValue: errorCodeOf(error: connectError))
         if yorkieErrorCode == YorkieError.Code.errClientNotActivated ||
@@ -856,7 +854,7 @@ public class Client {
                 try self.deactivateInternal()
             } catch {}
         }
-        
+
         return false
     }
 }
