@@ -206,7 +206,7 @@ public class Client {
             let activateResponse = await self.yorkieService.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
 
             guard activateResponse.error == nil, let message = activateResponse.message else {
-                throw activateResponse.error ?? YorkieError.rpcError(message: activateResponse.error.debugDescription)
+                throw self.handleErrorResponse(activateResponse.error, defaultMessage: "Unknown activate error")
             }
 
             self.id = message.clientID
@@ -236,7 +236,7 @@ public class Client {
             let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest)
 
             guard deactivateResponse.error == nil else {
-                throw deactivateResponse.error ?? YorkieError.rpcError(message: deactivateResponse.error.debugDescription)
+                throw self.handleErrorResponse(deactivateResponse.error, defaultMessage: "Unknown deactivate error")
             }
 
             try self.deactivateInternal()
@@ -285,7 +285,7 @@ public class Client {
             let attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
-                throw attachResponse.error ?? YorkieError.rpcError(message: attachResponse.error.debugDescription)
+                throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach error")
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
@@ -351,7 +351,7 @@ public class Client {
             let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
-                throw detachDocumentResponse.error ?? YorkieError.rpcError(message: detachDocumentResponse.error.debugDescription)
+                throw self.handleErrorResponse(detachDocumentResponse.error, defaultMessage: "Unknown detach error")
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
@@ -400,7 +400,7 @@ public class Client {
             let removeDocumentResponse = await self.yorkieService.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
-                throw removeDocumentResponse.error ?? YorkieError.rpcError(message: removeDocumentResponse.error.debugDescription)
+                throw self.handleErrorResponse(removeDocumentResponse.error, defaultMessage: "Unknown remove error")
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
@@ -790,7 +790,7 @@ public class Client {
             let pushpullResponse = await self.yorkieService.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
 
             guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
-                throw pushpullResponse.error ?? YorkieError.rpcError(message: pushpullResponse.error.debugDescription)
+                throw self.handleErrorResponse(pushpullResponse.error, defaultMessage: "Unknown pushpull error")
             }
 
             let responsePack = try Converter.fromChangePack(message.changePack)
@@ -852,10 +852,20 @@ public class Client {
         {
             do {
                 try self.deactivateInternal()
-            } catch {}
+            } catch {
+                Logger.error("Failed deactivateInternal for client (\(self.key)) with error: \(error)")
+            }
         }
 
         return false
+    }
+
+    private func handleErrorResponse(_ error: Error?, defaultMessage: String) -> Error {
+        if let error = error {
+            return error
+        } else {
+            return YorkieError.rpcError(message: defaultMessage)
+        }
     }
 }
 

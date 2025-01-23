@@ -886,7 +886,14 @@ final class ClientIntegrationTests: XCTestCase {
         c1.setMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges,
                         error: connectError(from: .failedPrecondition))
 
-        try await Task.sleep(nanoseconds: 1_000_000_000)
+        let exp = expectation(description: "Sync loop should end")
+        Task {
+            while c1.getCondition(.syncLoop) {
+                try await Task.sleep(nanoseconds: 100_000_000)
+            }
+            exp.fulfill()
+        }
+        await fulfillment(of: [exp], timeout: 5)
 
         XCTAssertFalse(c1.getCondition(.syncLoop))
     }
