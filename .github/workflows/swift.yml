@@ -8,18 +8,22 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
       with:
-        xcode-version: '15.3'
+        xcode-version: '16.1'
     - uses: actions/checkout@v4
     - name: SwiftLint install
       run: brew install swiftlint
     - name: SwiftLint
-      run: swiftlint lint --strict
+      run: |
+        swiftlint --version
+        swiftlint lint --strict
     - name: SwiftFormat
-      run: swiftformat --lint .
+      run: |
+        swiftformat --version
+        swiftformat --lint .
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieUnitTests
     - name: Prepare Code Coverage
