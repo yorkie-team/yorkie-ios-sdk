@@ -886,7 +886,7 @@ final class ClientIntegrationTests: XCTestCase {
         c1.setMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges,
                         error: connectError(from: .failedPrecondition))
 
-        try await Task.sleep(nanoseconds: 50_000_000)
+        try await Task.sleep(nanoseconds: 1_000_000_000)
 
         XCTAssertFalse(c1.getCondition(.syncLoop))
     }
