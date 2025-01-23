@@ -258,13 +258,10 @@ public class Document {
             try self.applyChanges(pack.getChanges())
         }
 
-        // 01. Remove local changes applied to server.
+        // 02. Remove local changes applied to server.
         while let change = self.localChanges.first, change.id.getClientSeq() <= pack.getCheckpoint().getClientSeq() {
             self.localChanges.removeFirst()
         }
-
-        // 02. Update the checkpoint.
-        self.checkpoint.forward(other: pack.getCheckpoint())
 
         // NOTE(hackerwins): If the document has local changes, we need to apply
         // them after applying the snapshot. We need to treat the local changes
@@ -274,12 +271,15 @@ public class Document {
             try self.applyChanges(self.localChanges)
         }
 
-        // 03. Do Garbage collection.
+        // 03. Update the checkpoint.
+        self.checkpoint.forward(other: pack.getCheckpoint())
+
+        // 04. Do Garbage collection.
         if let ticket = pack.getMinSyncedTicket() {
             self.garbageCollect(ticket)
         }
 
-        // 04. Update the status.
+        // 05. Update the status.
         if pack.isRemoved {
             self.applyStatus(.removed)
         }
