@@ -17,7 +17,7 @@
 import Connect
 import Foundation
 
-class Attachment {
+final class Attachment: @unchecked Sendable {
     var doc: Document
     var docID: String
     var syncMode: SyncMode

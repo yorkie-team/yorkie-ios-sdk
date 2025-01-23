@@ -606,7 +606,7 @@ public class Client {
                     break
                 case .message(let message):
                     await self.handleWatchDocumentsResponse(docKey: docKey, response: message)
-                case .complete(let code, let error, _):
+                case .complete(_, let error, _):
                     if error != nil {
                         await attachment.doc.resetOnlineClients()
                         await attachment.doc.publishInitializedEvent()

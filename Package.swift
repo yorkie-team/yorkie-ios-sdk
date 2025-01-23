@@ -27,6 +27,7 @@ let package = Package(
             exclude: ["Info.plist",
                       "API/V1/yorkie/v1/resources.proto",
                       "API/V1/yorkie/v1/yorkie.proto",
+                      "API/V1/googleapis/google/rpc/error_details.proto",
                       "API/V1/buf.gen.yaml",
                       "API/V1/buf.yaml",
                       "API/V1/run_protoc.sh"]
