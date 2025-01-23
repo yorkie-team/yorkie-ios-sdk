@@ -136,8 +136,8 @@ public class JSONArray: CustomDebugStringConvertible {
         return toJSONElement(from: value)
     }
 
-    @discardableResult
     /// - Returns: The number of elements.
+    @discardableResult
     public func append(_ value: Any) -> Int {
         self.push(value)
     }
@@ -162,8 +162,8 @@ public class JSONArray: CustomDebugStringConvertible {
         }
     }
 
-    @discardableResult
     /// - Returns: The number of elements.
+    @discardableResult
     func push(_ value: Any) -> Int {
         if let value = value as? JSONObjectable {
             let length = self.push(JSONObject())
@@ -204,8 +204,8 @@ public class JSONArray: CustomDebugStringConvertible {
     /**
      * `pushInternal` pushes the value to the target array.
      */
-    @discardableResult
     /// - Returns: The number of elements.
+    @discardableResult
     private func pushInternal(_ value: Any) -> Int {
         let appendedElement = try? self.insertAfterInternal(previousCreatedAt: self.target.getLastCreatedAt(), value: value)
         guard appendedElement != nil else {
