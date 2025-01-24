@@ -41,7 +41,7 @@ final class DocumentIntegrationTests: XCTestCase {
         do {
             try await self.c1.remove(self.d1)
         } catch {
-            if case YorkieError.clientNotActive(message:) = error {
+            if case YorkieError.clientNotActivated(message:) = error {
             } else {
                 XCTAssert(false)
             }

@@ -62,3 +62,4 @@ typealias PbTreeNodes = Yorkie_V1_TreeNodes
 typealias PbSnapshot = Yorkie_V1_Snapshot
 typealias PbTreeNodeID = Yorkie_V1_TreeNodeID
 
+typealias ErrorInfo = Google_Rpc_ErrorInfo
