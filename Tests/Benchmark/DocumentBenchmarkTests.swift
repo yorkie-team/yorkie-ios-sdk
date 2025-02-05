@@ -148,9 +148,10 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             let root = try await(doc.getRoot().tree as? JSONTree)?.getIndexTree().root
             let pbTreeNodes = Converter.toTreeNodes(root)
-            _ = try Converter.fromTreeNodes(pbTreeNodes)
+            let convertedTreeNodes = try Converter.fromTreeNodes(pbTreeNodes)
+            XCTAssertNotNil(convertedTreeNodes, "Tree conversion failed")
         } catch {
-            XCTAssert(false, "\(error)")
+            XCTFail("Benchmark failed with error: \(error)")
         }
     }
 
@@ -256,7 +257,7 @@ final class DocumentBenchmarkTests: XCTestCase {
         self.measure {
             let exp = expectation(description: "measure")
 
-            Task {
+            Task { @MainActor in
                 await self.benchmarkTreeConvert(10000)
                 exp.fulfill()
             }
@@ -269,7 +270,7 @@ final class DocumentBenchmarkTests: XCTestCase {
         self.measure {
             let exp = expectation(description: "measure")
 
-            Task {
+            Task { @MainActor in
                 await self.benchmarkTreeConvert(20000)
                 exp.fulfill()
             }
@@ -282,7 +283,7 @@ final class DocumentBenchmarkTests: XCTestCase {
         self.measure {
             let exp = expectation(description: "measure")
 
-            Task {
+            Task { @MainActor in
                 await self.benchmarkTreeConvert(30000)
                 exp.fulfill()
             }
