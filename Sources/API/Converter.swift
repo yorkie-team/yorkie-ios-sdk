@@ -983,18 +983,18 @@ extension Converter {
         
         let nodes = pbTreeNodes.compactMap { fromTreeNode($0) }
         
-        let root = nodes[nodes.count - 1]
+        let rootIndex = nodes.count - 1
+        let root = nodes[rootIndex]
+
+        var depthTable: [Int32: CRDTTreeNode] = [
+            pbTreeNodes[rootIndex].depth: root
+        ]
         
-        for index in stride(from: nodes.count - 2, to: -1, by: -1) {
-            var parent: CRDTTreeNode?
-            for index2 in index + 1 ..< nodes.count {
-                if pbTreeNodes[index].depth - 1 == pbTreeNodes[index2].depth {
-                    parent = nodes[index2]
-                    break
-                }
-            }
-            
-            try parent?.prepend(contentsOf: [nodes[index]])
+        for index in stride(from: rootIndex - 1, to: -1, by: -1) {
+            let node = nodes[index]
+            let parent = depthTable[pbTreeNodes[index].depth - 1]
+            try parent?.prepend(contentsOf: [node])
+            depthTable[pbTreeNodes[index].depth] = node
         }
         
         root.updateDescendantsSize()

@@ -18,7 +18,7 @@ import XCTest
 @testable import Yorkie
 
 final class DocumentBenchmarkTests: XCTestCase {
-    func benchmarkTree(_ size: Int) async {
+    func benchmarkTreeEdit(_ size: Int) async {
         let doc = Document(key: "test-doc")
 
         do {
@@ -130,13 +130,38 @@ final class DocumentBenchmarkTests: XCTestCase {
         }
     }
 
-    func testDocumentTree100() throws {
+    func benchmarkTreeConvert(_ size: Int) async {
+        let doc = Document(key: "test-doc")
+
+        do {
+            try await doc.update { root, _ in
+                var children: [JSONTreeTextNode] = []
+                for _ in 1 ... size {
+                    children.append(JSONTreeTextNode(value: "a"))
+                }
+
+                root.tree = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc",
+                                        children: [JSONTreeElementNode(type: "p", children: children)])
+                )
+            }
+
+            let root = try await(doc.getRoot().tree as? JSONTree)?.getIndexTree().root
+            let pbTreeNodes = Converter.toTreeNodes(root)
+            let convertedTreeNodes = try Converter.fromTreeNodes(pbTreeNodes)
+            XCTAssertNotNil(convertedTreeNodes, "Tree conversion failed")
+        } catch {
+            XCTFail("Benchmark failed with error: \(error)")
+        }
+    }
+
+    func testDocumentTreeEdit100() throws {
         self.measure {
             let exp = expectation(description: "measure")
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await self.benchmarkTree(100)
+                await self.benchmarkTreeEdit(100)
                 exp.fulfill()
             }
 
@@ -144,13 +169,13 @@ final class DocumentBenchmarkTests: XCTestCase {
         }
     }
 
-    func testDocumentTree1000() throws {
+    func testDocumentTreeEdit1000() throws {
         self.measure {
             let exp = expectation(description: "measure")
 
             // Put the code you want to measure the time of here.
             Task { @MainActor in
-                await self.benchmarkTree(1000)
+                await self.benchmarkTreeEdit(1000)
                 exp.fulfill()
             }
 
@@ -221,6 +246,45 @@ final class DocumentBenchmarkTests: XCTestCase {
             // Put the code you want to measure the time of here.
             Task { @MainActor in
                 await self.benchmarkTreeEditGC(1000)
+                exp.fulfill()
+            }
+
+            wait(for: [exp], timeout: 20)
+        }
+    }
+
+    func testDocumentTreeConvert10000() throws {
+        self.measure {
+            let exp = expectation(description: "measure")
+
+            Task { @MainActor in
+                await self.benchmarkTreeConvert(10000)
+                exp.fulfill()
+            }
+
+            wait(for: [exp], timeout: 20)
+        }
+    }
+
+    func testDocumentTreeConvert20000() throws {
+        self.measure {
+            let exp = expectation(description: "measure")
+
+            Task { @MainActor in
+                await self.benchmarkTreeConvert(20000)
+                exp.fulfill()
+            }
+
+            wait(for: [exp], timeout: 20)
+        }
+    }
+
+    func testDocumentTreeConvert30000() throws {
+        self.measure {
+            let exp = expectation(description: "measure")
+
+            Task { @MainActor in
+                await self.benchmarkTreeConvert(30000)
                 exp.fulfill()
             }
 
