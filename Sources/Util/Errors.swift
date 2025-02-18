@@ -17,23 +17,25 @@
 import Connect
 import Foundation
 
-enum YorkieError: Error {
-    case unexpected(message: String)
-    case clientNotActivated(message: String)
-    case clientNotFound(message: String)
-    case unimplemented(message: String)
-    case unsupported(message: String)
-
-    case documentNotAttached(message: String)
-    case documentNotDetached(message: String)
-    case documentRemoved(message: String)
-
-    case invalidObjectKey(message: String)
-    case invalidArgument(message: String)
-
-    case noSuchElement(message: String)
-    case timeout(message: String)
-    case rpcError(message: String)
+struct YorkieError: Error {
+    let code: Code
+    let message: String
+//    case unexpected(message: String)
+//    case clientNotActivated(message: String)
+//    case clientNotFound(message: String)
+//    case unimplemented(message: String)
+//    case unsupported(message: String)
+//
+//    case documentNotAttached(message: String)
+//    case documentNotDetached(message: String)
+//    case documentRemoved(message: String)
+//
+//    case invalidObjectKey(message: String)
+//    case invalidArgument(message: String)
+//
+//    case noSuchElement(message: String)
+//    case timeout(message: String)
+//    case rpcError(message: String)
 
     enum Code: String {
         // Ok is returned when the operation completed successfully.
@@ -48,9 +50,12 @@ enum YorkieError: Error {
         // ErrUnimplemented is returned when the operation is not implemented.
         case errUnimplemented = "ErrUnimplemented"
 
-        // Unsupported is returned when the operation is not supported.
-        case unsupported
-
+        // ErrInvalidType is returned when the type is invalid.
+        case errInvalidType = "ErrInvalidType"
+        
+        // ErrDummy is used to verify errors for testing purposes.
+        case errDummy = "ErrDummy"
+        
         // ErrDocumentNotAttached is returned when the document is not attached.
         case errDocumentNotAttached = "ErrDocumentNotAttached"
 
@@ -65,23 +70,20 @@ enum YorkieError: Error {
 
         // ErrInvalidArgument is returned when the argument is invalid.
         case errInvalidArgument = "ErrInvalidArgument"
+        
+        // ErrNotInitialized is returned when required initialization has not been completed.
+        case errNotInitialized = "ErrNotInitialized"
+        
+        // ErrNotReady is returned when execution of following actions is not ready.
+        case errNotReady = "ErrNotReady"
+        
+        // ErrRefused is returned when the execution is rejected.
+        case errRefused = "ErrRefused"
+           
+        // ErrUnexpected is returned when an unexpected error occurred (iOS only)
+        case errUnexpected = "ErrUnexpected"
     }
 
-    var code: YorkieError.Code? {
-        switch self {
-        case .clientNotActivated: return .errClientNotActivated
-        case .clientNotFound: return .errClientNotFound
-        case .unimplemented: return .errUnimplemented
-        case .unsupported: return .unsupported
-        case .documentNotAttached: return .errDocumentNotAttached
-        case .documentNotDetached: return .errDocumentNotDetached
-        case .documentRemoved: return .errDocumentRemoved
-        case .invalidObjectKey: return .errInvalidObjectKey
-        case .invalidArgument: return .errInvalidArgument
-        default:
-            return nil
-        }
-    }
 }
 
 /**
@@ -98,10 +100,10 @@ func errorCodeOf(error: ConnectError) -> String {
 }
 
 func toYorkieErrorCode(from error: Error) -> YorkieError.Code? {
-    guard let yorkieError = error as? YorkieError, let code = yorkieError.code else {
+    guard let yorkieError = error as? YorkieError else {
         return nil
     }
-    return code
+    return yorkieError.code
 }
 
 func connectError(from code: Code) -> ConnectError {
