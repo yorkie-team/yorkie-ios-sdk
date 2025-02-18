@@ -115,11 +115,11 @@ public class Document {
      */
     public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) throws {
         guard self.status != .removed else {
-            throw YorkieError.documentRemoved(message: "\(self) is removed.")
+            throw YorkieError(code: .errDocumentRemoved, message: "\(self) is removed.")
         }
 
         guard let actorID = self.actorID else {
-            throw YorkieError.unexpected(message: "actor ID is null.")
+            throw YorkieError(code: .errUnexpected, message: "actor ID is null.")
         }
 
         // 01. Update the clone object and create a change.
@@ -458,7 +458,7 @@ public class Document {
             var presenceEvent: DocEvent?
 
             guard let actorID = change.id.getActorID() else {
-                throw YorkieError.unexpected(message: "ActorID is null")
+                throw YorkieError(code: .errUnexpected, message: "ActorID is null")
             }
 
             if let presenceChange = change.presenceChange, self.onlineClients.contains(actorID) {
@@ -483,7 +483,7 @@ public class Document {
                     // Detached user is no longer participating in the document, we remove
                     // them from the online clients and trigger the 'unwatched' event.
                     guard let presence = self.getPresence(actorID) else {
-                        throw YorkieError.unexpected(message: "No presence!")
+                        throw YorkieError(code: .errUnexpected, message: "No presence!")
                     }
 
                     presenceEvent = UnwatchedEvent(value: (actorID, presence))
@@ -532,7 +532,7 @@ public class Document {
      */
     public func getValueByPath(_ path: String) throws -> Any? {
         guard path.starts(with: JSONObject.rootKey) else {
-            throw YorkieError.unexpected(message: "The path must start with \(JSONObject.rootKey)")
+            throw YorkieError(code: .errInvalidArgument, message: "The path must start with \(JSONObject.rootKey)")
         }
 
         let rootObject = self.getRoot()
@@ -547,7 +547,7 @@ public class Document {
         let keySeparator = JSONObject.keySeparator
 
         guard subPath.starts(with: keySeparator) else {
-            throw YorkieError.unexpected(message: "Invalid path.")
+            throw YorkieError(code: .errUnexpected, message: "Invalid path.")
         }
 
         subPath.removeFirst(keySeparator.count)
