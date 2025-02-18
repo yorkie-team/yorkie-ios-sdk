@@ -52,8 +52,7 @@ class CRDTArray: CRDTContainer {
     func get(createdAt: TimeTicket) throws -> CRDTElement {
         guard let node = try? self.elements.get(createdAt: createdAt), node.isRemoved == false else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         return node

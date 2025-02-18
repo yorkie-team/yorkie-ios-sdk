@@ -85,7 +85,7 @@ class ElementRHT {
     @discardableResult
     func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
         guard let node = nodeMapByCreatedAt[createdAt.toIDString] else {
-            throw YorkieError.noSuchElement(message: "Can't find node of given createdAt [\(createdAt)] or executedAt [\(executedAt)]")
+            throw YorkieError(code: .errInvalidArgument, message: "Can't find node of given createdAt [\(createdAt)] or executedAt [\(executedAt)]")
         }
 
         node.remove(removedAt: executedAt)
@@ -98,8 +98,8 @@ class ElementRHT {
     func subPath(createdAt: TimeTicket) throws -> String {
         guard let node = self.nodeMapByCreatedAt[createdAt.toIDString] else {
             let log = "can't find the given node: \(createdAt)"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         return node.key
@@ -108,10 +108,9 @@ class ElementRHT {
     /**
      * purge physically purge child element.
      */
-    func purge(element: CRDTElement) {
+    func purge(element: CRDTElement) throws {
         guard let node = nodeMapByCreatedAt[element.createdAt.toIDString] else {
-            Logger.critical("fail to find: \(element.createdAt)")
-            return
+            throw YorkieError(code: .errInvalidArgument, message: "fail to find: \(element.createdAt)")
         }
 
         if node == self.nodeMapByKey[node.key] {
@@ -127,7 +126,7 @@ class ElementRHT {
     @discardableResult
     func deleteByKey(key: String, executedAt: TimeTicket) throws -> CRDTElement {
         guard let node = nodeMapByKey[key] else {
-            throw YorkieError.noSuchElement(message: "Can't find node of given key [\(key)] or executedAt [\(executedAt)]")
+            throw YorkieError(code: .errInvalidArgument, message: "Can't find node of given key [\(key)] or executedAt [\(executedAt)]")
         }
 
         node.remove(removedAt: executedAt)

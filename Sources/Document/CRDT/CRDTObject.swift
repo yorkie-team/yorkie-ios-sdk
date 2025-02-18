@@ -129,8 +129,8 @@ extension CRDTObject {
     /**
      * `delete` physically deletes the given element.
      */
-    func purge(element: CRDTElement) {
-        self.memberNodes.purge(element: element)
+    func purge(element: CRDTElement) throws {
+        try self.memberNodes.purge(element: element)
     }
 
     /**

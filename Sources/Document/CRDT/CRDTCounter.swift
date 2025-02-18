@@ -64,7 +64,7 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
         case .long(let int64Value):
             self.value &+= T(int64Value)
         default:
-            throw YorkieError.unimplemented(message: "unimplemented type: \(type(of: primitive.value))")
+            throw YorkieError(code: .errUnimplemented, message: "Unsupported type of value: \(type(of: primitive.value))")
         }
 
         return self

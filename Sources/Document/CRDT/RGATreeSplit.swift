@@ -490,7 +490,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     public func indexToPos(_ idx: Int) throws -> RGATreeSplitPos {
         let (node, offset) = self.treeByIndex.find(idx)
         guard let splitNode = node as? RGATreeSplitNode<T> else {
-            throw YorkieError.noSuchElement(message: "no element for index \(idx)")
+            throw YorkieError(code: .errInvalidArgument, message: "no element for index \(idx)")
         }
 
         return RGATreeSplitPos(splitNode.id, Int32(offset))
@@ -511,8 +511,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         let absoluteID = pos.absoluteID
         guard let node = preferToLeft ? try? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
             let message = "the node of the given id should be found: \(absoluteID.toTestString)"
-            Logger.critical(message)
-            throw YorkieError.noSuchElement(message: message)
+            throw YorkieError(code: .errInvalidArgument, message: message)
         }
         let index = self.treeByIndex.indexOf(node)
         let offset = node.isRemoved ? 0 : absoluteID.offset - node.id.offset
@@ -628,7 +627,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var node = try self.findFloorNodePreferToLeft(absoluteID)
         let relativeOffset = absoluteID.offset - node.id.offset
 
-        self.splitNode(node, relativeOffset)
+        try self.splitNode(node, relativeOffset)
 
         while let next = node.next, next.createdAt.after(editedAt) {
             node = next
@@ -640,8 +639,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     private func findFloorNodePreferToLeft(_ id: RGATreeSplitNodeID) throws -> RGATreeSplitNode<T> {
         guard let node = self.findFloorNode(id) else {
             let message = "the node of the given id should be found: \(id.toTestString)"
-            Logger.critical(message)
-            throw YorkieError.noSuchElement(message: message)
+            throw YorkieError(code: .errInvalidArgument, message: message)
         }
 
         if id.offset > 0, node.id.offset == id.offset {
@@ -682,11 +680,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     }
 
     @discardableResult
-    private func splitNode(_ node: RGATreeSplitNode<T>, _ offset: Int32) -> RGATreeSplitNode<T>? {
+    private func splitNode(_ node: RGATreeSplitNode<T>, _ offset: Int32) throws -> RGATreeSplitNode<T>? {
         guard offset <= node.contentLength else {
-            Logger.critical("offset should be less than or equal to length")
-
-            return nil
+            let message = "offset should be less than or equal to length"
+            throw YorkieError(code: .errInvalidArgument, message: message)
         }
 
         if offset == 0 {
@@ -787,7 +784,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      */
     private func findEdgesOfCandidates(_ candidates: [RGATreeSplitNode<T>]) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
         guard let prev = candidates[0].prev else {
-            throw YorkieError.noSuchElement(message: "prev must not nil!")
+            throw YorkieError(code : .errInvalidArgument, message: "prev must not nil!")
         }
 
         return (prev, candidates[safe: candidates.count - 1]?.next)
@@ -809,13 +806,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             }
 
             guard let range = leftBoundary.next?.createPosRange else {
-                throw YorkieError.noSuchElement(message: "The next node of leftBoundary is nil")
+                throw YorkieError(code: .errUnexpected, message: "The next node of leftBoundary is nil")
             }
 
             fromIdx = try self.findIndexesFromRange(range).0
             if rightBoundary != nil {
                 guard let range = rightBoundary!.prev?.createPosRange else {
-                    throw YorkieError.noSuchElement(message: "The prev node of rightBoundary is nil")
+                    throw YorkieError(code: .errUnexpected, message: "The prev node of rightBoundary is nil")
                 }
 
                 toIdx = try self.findIndexesFromRange(range).1

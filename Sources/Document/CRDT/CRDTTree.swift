@@ -109,7 +109,7 @@ extension CRDTTreePos {
         let parentNode = tree.findFloorNode(parentID)
         let leftNode = tree.findFloorNode(leftSiblingID)
         guard let parentNode, var leftNode else {
-            throw YorkieError.unexpected(message: "cannot find node of CRDTTreePos(\(parentID.toTestString), \(leftSiblingID.toTestString))")
+            throw YorkieError(code: .errRefused, message: "cannot find node of CRDTTreePos(\(parentID.toTestString), \(leftSiblingID.toTestString))")
         }
 
         /**
@@ -379,7 +379,7 @@ final class CRDTTreeNode: IndexTreeNode {
     @discardableResult
     func split(_ tree: CRDTTree, _ offset: Int32, _ issueTimeTicket: TimeTicket? = nil) throws -> CRDTTreeNode? {
         if self.isText == false, issueTimeTicket == nil {
-            throw YorkieError.unexpected(message: "The issueTimeTicket for Text Node have to nil!")
+            throw YorkieError(code: .errInvalidArgument, message: "The issueTimeTicket for Text Node have to nil!")
         }
 
         let split = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!)
@@ -903,7 +903,7 @@ class CRDTTree: CRDTElement {
      */
     func move(_ target: (Int, Int), _ source: (Int, Int), _ ticket: TimeTicket) throws {
         // TODO(hackerwins, easylogic): Implement this with keeping references of the nodes.
-        throw YorkieError.unimplemented(message: "not implemented, \(target), \(source) \(ticket)")
+        throw YorkieError(code: .errInvalidArgument, message: "not implemented, \(target), \(source) \(ticket)")
     }
 
     /**
@@ -1204,7 +1204,7 @@ class CRDTTree: CRDTElement {
         let siblings = parent!.innerChildren
 
         guard let offset = siblings.firstIndex(where: { $0 === node }) else {
-            throw YorkieError.unexpected(message: "Can't find index of node \(node)")
+            throw YorkieError(code: .errUnexpected, message: "Can't find index of node \(node)")
         }
 
         if parent != nil, offset == siblings.count - 1 {
@@ -1234,7 +1234,7 @@ class CRDTTree: CRDTElement {
         let siblings = parent!.innerChildren
 
         guard let offset = siblings.firstIndex(where: { $0 === node }) else {
-            throw YorkieError.unexpected(message: "Can't find index of node \(node)")
+            throw YorkieError(code: .errUnexpected, message: "Can't find index of node \(node)")
         }
 
         if parent != nil, offset == 0 {
