@@ -17,25 +17,13 @@
 import Connect
 import Foundation
 
-struct YorkieError: Error {
+struct YorkieError: Error, CustomStringConvertible {
     let code: Code
     let message: String
-//    case unexpected(message: String)
-//    case clientNotActivated(message: String)
-//    case clientNotFound(message: String)
-//    case unimplemented(message: String)
-//    case unsupported(message: String)
-//
-//    case documentNotAttached(message: String)
-//    case documentNotDetached(message: String)
-//    case documentRemoved(message: String)
-//
-//    case invalidObjectKey(message: String)
-//    case invalidArgument(message: String)
-//
-//    case noSuchElement(message: String)
-//    case timeout(message: String)
-//    case rpcError(message: String)
+
+    var description: String {
+        return "[code=\(code.rawValue)]: \(message)"
+    }
 
     enum Code: String {
         // Ok is returned when the operation completed successfully.
