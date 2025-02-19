@@ -46,23 +46,20 @@ struct MoveOperation: Operation {
             } else {
                 log = "fail to execute, only array can execute move"
             }
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let previousIndex = try? Int(array.subPath(createdAt: self.createdAt))
+        guard let previousIndex = try Int(array.subPath(createdAt: self.createdAt)) else {
+            throw YorkieError(code: .errUnexpected, message: "fail to get previousIndex")
+        }
 
         try array.move(createdAt: self.createdAt, afterCreatedAt: self.previousCreatedAt, executedAt: self.executedAt)
 
-        let index = try? Int(array.subPath(createdAt: self.createdAt))
-
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
+        guard let index = try Int(array.subPath(createdAt: self.createdAt)) else {
+            throw YorkieError(code: .errUnexpected, message: "fail to get index")
         }
 
-        guard let previousIndex, let index else {
-            throw YorkieError.unexpected(message: "fail to get indexes")
-        }
+        let path = try root.createPath(createdAt: parentCreatedAt)
 
         return [MoveOpInfo(path: path, previousIndex: previousIndex, index: index)]
     }

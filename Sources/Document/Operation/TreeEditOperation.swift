@@ -55,13 +55,12 @@ struct TreeEditOperation: Operation {
     public func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         var editedAt = self.executedAt
         guard let tree = parentObject as? CRDTTree else {
-            fatalError("fail to execute, only Tree can execute edit")
+            throw YorkieError(code: .errInvalidArgument, message: "fail to execute, only Tree can execute edit")
         }
 
         /**
@@ -87,9 +86,7 @@ struct TreeEditOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: parentCreatedAt)
 
         return changes.compactMap { change in
             let value: [CRDTTreeNode] = {

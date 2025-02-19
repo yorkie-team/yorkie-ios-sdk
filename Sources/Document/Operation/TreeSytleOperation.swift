@@ -56,12 +56,11 @@ class TreeStyleOperation: Operation {
     public func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         guard let tree = parentObject as? CRDTTree else {
-            fatalError("fail to execute, only Tree can execute edit")
+            throw YorkieError(code: .errInvalidArgument, message: "fail to execute, only Tree can execute edit")
         }
 
         let changes: [TreeChange]
@@ -73,9 +72,7 @@ class TreeStyleOperation: Operation {
             (_, pairs, changes) = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt, self.maxCreatedAtMapByActor)
         }
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: parentCreatedAt)
 
         for pair in pairs {
             root.registerGCPair(pair)

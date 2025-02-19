@@ -45,13 +45,10 @@ struct SetOperation: Operation {
             let log: String
             if parent == nil {
                 log = "failed to find \(self.parentCreatedAt)"
-
             } else {
                 log = "fail to execute, only object can execute set"
             }
-
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         let value = self.value.deepcopy()
@@ -62,7 +59,7 @@ struct SetOperation: Operation {
         }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
+            throw YorkieError(code: .errUnexpected, message: "fail to get path")
         }
 
         return [SetOpInfo(path: path, key: self.key)]

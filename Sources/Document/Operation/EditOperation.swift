@@ -68,9 +68,7 @@ struct EditOperation: Operation {
             } else {
                 log = "fail to find \(self.parentCreatedAt)"
             }
-
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         let (_, changes, pairs, _) = try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor)
@@ -79,9 +77,7 @@ struct EditOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: parentCreatedAt)
 
         return changes.compactMap {
             EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)
