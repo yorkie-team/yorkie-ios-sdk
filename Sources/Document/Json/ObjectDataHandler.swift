@@ -160,7 +160,7 @@ class ObjectDataHandler {
         } else {
             let log = "The value does not exist. - key: \(key)"
             Logger.error(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidObjectKey, message: log)
         }
     }
 

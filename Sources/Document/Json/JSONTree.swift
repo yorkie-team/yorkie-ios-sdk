@@ -211,7 +211,7 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
  */
 func validateTextNode(_ textNode: JSONTreeTextNode) throws {
     if textNode.value.length == 0 {
-        throw YorkieError.unexpected(message: "text node cannot have empty value")
+        throw YorkieError(code: .errInvalidArgument, message: "text node cannot have empty value")
     }
 }
 
@@ -228,12 +228,12 @@ func validateTreeNodes(_ treeNodes: [any JSONTreeNode]) throws {
             if let node = node as? JSONTreeTextNode {
                 try validateTextNode(node)
             } else {
-                throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
+                throw YorkieError(code: .errInvalidArgument, message: "element node and text node cannot be passed together")
             }
         }
     } else {
         if treeNodes.first(where: { !($0 is JSONTreeElementNode) }) != nil {
-            throw YorkieError.unexpected(message: "element node and text node cannot be passed together")
+            throw YorkieError(code: .errInvalidArgument, message: "element node and text node cannot be passed together")
         }
     }
 }
@@ -298,7 +298,7 @@ public class JSONTree {
      */
     public func getSize() throws -> Int {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return tree.size
@@ -309,7 +309,7 @@ public class JSONTree {
      */
     public func getNodeSize() throws -> Int {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return tree.nodeSize
@@ -320,7 +320,7 @@ public class JSONTree {
      */
     func getIndexTree() throws -> IndexTree<CRDTTreeNode> {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return tree.indexTree
@@ -339,11 +339,11 @@ public class JSONTree {
 
     public func styleByPathInternal(_ path: [Int], _ stringAttrs: [String: String]) throws {
         guard let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if path.isEmpty {
-            throw YorkieError.unexpected(message: "path should not be empty")
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
 
         let (fromPos, toPos) = try tree.pathToPosRange(path)
@@ -364,11 +364,11 @@ public class JSONTree {
 
     func styleByIndexInternal(_ fromIdx: Int, _ toIdx: Int, _ stringAttrs: [String: String]) throws {
         guard let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if fromIdx > toIdx {
-            throw YorkieError.unexpected(message: "from should be less than or equal to to")
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
         let fromPos = try tree.findPos(fromIdx)
@@ -379,7 +379,7 @@ public class JSONTree {
 
     func styleInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ stringAttrs: [String: String]) throws {
         guard let context, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let ticket = context.issueTimeTicket
@@ -405,11 +405,11 @@ public class JSONTree {
      */
     public func removeStyleByPath(_ path: [Int], _ attributesToRemove: [String]) throws {
         guard let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if path.isEmpty {
-            throw YorkieError.unexpected(message: "path should not be empty")
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
 
         let (fromPos, toPos) = try tree.pathToPosRange(path)
@@ -422,11 +422,11 @@ public class JSONTree {
      */
     public func removeStyle(_ fromIdx: Int, _ toIdx: Int, _ attributesToRemove: [String]) throws {
         guard let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if fromIdx > toIdx {
-            throw YorkieError.unexpected(message: "from should be less than or equal to to")
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
         let fromPos = try tree.findPos(fromIdx)
@@ -437,7 +437,7 @@ public class JSONTree {
 
     private func removeStyleInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ attributesToRemove: [String]) throws {
         guard let context, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let ticket = context.issueTimeTicket
@@ -460,7 +460,7 @@ public class JSONTree {
 
     private func editInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ contents: [any JSONTreeNode]?, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let context, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if let contents, contents.isEmpty == false {
@@ -523,15 +523,15 @@ public class JSONTree {
     @discardableResult
     public func editBulkByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if fromPath.count != toPath.count {
-            throw YorkieError.unexpected(message: "path length should be equal")
+            throw YorkieError(code: .errInvalidArgument, message: "path length should be equal")
         }
 
         if fromPath.isEmpty || toPath.isEmpty {
-            throw YorkieError.unexpected(message: "path should not be empty")
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
 
         let fromPos = try tree.pathToPos(fromPath)
@@ -554,11 +554,11 @@ public class JSONTree {
     @discardableResult
     public func editBulk(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
         guard let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if fromIdx > toIdx {
-            throw YorkieError.unexpected(message: "from should be less than or equal to to")
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
         let fromPos = try tree.findPos(fromIdx)
@@ -570,10 +570,9 @@ public class JSONTree {
     /**
      * `toXML` returns the XML string of this tree.
      */
-    public func toXML() -> String {
+    public func toXML() throws -> String {
         guard self.context != nil, let tree else {
-            Logger.critical("it is not initialized yet")
-            return ""
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return tree.toXML()
@@ -582,10 +581,9 @@ public class JSONTree {
     /**
      * `toJSON` returns the JSON string of this tree.
      */
-    public func toJSON() -> String {
+    public func toJSON() throws -> String {
         guard self.context != nil, let tree else {
-            Logger.critical("it is not initialized yet")
-            return ""
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return tree.toJSON()
@@ -596,7 +594,7 @@ public class JSONTree {
      */
     public func getRootTreeNode() throws -> (any JSONTreeNode)? {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return tree.root.toJSONTreeNode
@@ -607,7 +605,7 @@ public class JSONTree {
      */
     public func indexToPath(_ index: Int) throws -> [Int] {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return try tree.indexToPath(index)
@@ -618,7 +616,7 @@ public class JSONTree {
      */
     public func pathToIndex(_ path: [Int]) throws -> Int {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return try tree.pathToIndex(path)
@@ -629,7 +627,7 @@ public class JSONTree {
      */
     public func pathRangeToPosRange(_ range: ([Int], [Int])) throws -> TreePosStructRange {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let indexRange = try (tree.pathToIndex(range.0), tree.pathToIndex(range.1))
@@ -643,7 +641,7 @@ public class JSONTree {
      */
     public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TreePosStructRange {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         return try tree.indexRangeToPosStructRange(range)
@@ -654,7 +652,7 @@ public class JSONTree {
      */
     public func posRangeToIndexRange(_ range: TreePosStructRange) throws -> (Int, Int) {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let posRange = try (CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1))
@@ -667,7 +665,7 @@ public class JSONTree {
      */
     public func posRangeToPathRange(_ range: TreePosStructRange) throws -> ([Int], [Int]) {
         guard self.context != nil, let tree else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let posRange = try (CRDTTreePos.fromStruct(range.0), CRDTTreePos.fromStruct(range.1))
@@ -700,7 +698,7 @@ extension TimeTicket {
      */
     static func fromStruct(_ value: TimeTicketStruct) throws -> TimeTicket {
         guard let lamport = Int64(value.lamport) else {
-            throw YorkieError.unexpected(message: "Lamport is not a valid string representing Int64")
+            throw YorkieError(code: .errUnexpected, message: "Lamport is not a valid string representing Int64")
         }
 
         return TimeTicket(lamport: lamport, delimiter: value.delimiter, actorID: value.actorID)

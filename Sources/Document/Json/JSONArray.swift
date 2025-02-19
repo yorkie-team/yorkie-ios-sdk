@@ -282,7 +282,7 @@ public class JSONArray: CustomDebugStringConvertible {
         } else if let array = value as? [Any] {
             let crdtArray = CRDTArray(createdAt: ticket)
             guard let clone = crdtArray.deepcopy() as? CRDTArray else {
-                throw YorkieError.unexpected(message: "Failed to cast array.deepcopy() to CRDTArray")
+                throw YorkieError(code: .errUnexpected, message: "Failed to cast array.deepcopy() to CRDTArray")
             }
 
             try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
@@ -299,7 +299,7 @@ public class JSONArray: CustomDebugStringConvertible {
         } else if value is JSONArray {
             let crdtArray = CRDTArray(createdAt: ticket)
             guard let clone = crdtArray.deepcopy() as? CRDTArray else {
-                throw YorkieError.unexpected(message: "Failed to cast array.deepcopy() to CRDTArray")
+                throw YorkieError(code: .errUnexpected, message: "Failed to cast array.deepcopy() to CRDTArray")
             }
 
             try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
@@ -359,7 +359,7 @@ public class JSONArray: CustomDebugStringConvertible {
             return text
         } else if let element = value as? JSONTree {
             guard let root = try? element.buildRoot(context) else {
-                throw YorkieError.unexpected(message: "Can't build root!")
+                throw YorkieError(code: .errUnexpected, message: "Can't build root!")
             }
             let tree = CRDTTree(root: root, createdAt: ticket)
             element.initialize(context: self.context, tree: tree)
@@ -375,7 +375,7 @@ public class JSONArray: CustomDebugStringConvertible {
             return tree
         }
 
-        throw YorkieError.unimplemented(message: "Unsupported type of value: \(type(of: value))")
+        throw YorkieError(code: .errUnimplemented, message: "Unsupported type of value: \(type(of: value))")
     }
 
     /**

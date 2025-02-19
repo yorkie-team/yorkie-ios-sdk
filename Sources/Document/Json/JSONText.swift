@@ -61,21 +61,16 @@ public class JSONText {
      * `edit` edits this text with the given content.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) -> (Int, Int)? {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) throws -> (Int, Int)? {
         guard let context, let text else {
-            Logger.critical("it is not initialized yet")
-            return nil
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if fromIdx > toIdx {
-            Logger.critical("from should be less than or equal to to")
-            return nil
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
-        guard let range = try? text.indexRangeToPosRange(fromIdx, toIdx) else {
-            Logger.critical("can't create range")
-            return nil
-        }
+        let range = try text.indexRangeToPosRange(fromIdx, toIdx)
 
         Logger.debug("EDIT: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) c:\(content)")
 
@@ -86,10 +81,7 @@ public class JSONText {
             attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
-        guard let (maxCreatedAtMapByActor, _, pairs, rangeAfterEdit) = try? text.edit(range, content, ticket, attrs) else {
-            Logger.critical("can't edit Text")
-            return nil
-        }
+        let (maxCreatedAtMapByActor, _, pairs, rangeAfterEdit) = try text.edit(range, content, ticket, attrs)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
@@ -112,37 +104,32 @@ public class JSONText {
      * `delete` deletes the text in the given range.
      */
     @discardableResult
-    public func delete(_ fromIdx: Int, _ toIdx: Int) -> (Int, Int)? {
-        self.edit(fromIdx, toIdx, "")
+    public func delete(_ fromIdx: Int, _ toIdx: Int) throws -> (Int, Int)? {
+        return try self.edit(fromIdx, toIdx, "")
     }
 
     /**
      * `empty` makes the text empty.
      */
     @discardableResult
-    public func empty() -> (Int, Int)? {
-        self.edit(0, self.length, "")
+    public func empty() throws -> (Int, Int)? {
+        return try self.edit(0, self.length, "")
     }
 
     /**
      * `setStyle` styles this text with the given attributes.
      */
     @discardableResult
-    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) -> Bool {
+    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws -> Bool {
         guard let context, let text else {
-            Logger.critical("it is not initialized yet")
-            return false
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         if fromIdx > toIdx {
-            Logger.critical("from should be less than or equal to to")
-            return false
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
-        guard let range = try? text.indexRangeToPosRange(fromIdx, toIdx) else {
-            Logger.critical("can't create range")
-            return false
-        }
+        let range = try text.indexRangeToPosRange(fromIdx, toIdx)
 
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
@@ -150,12 +137,8 @@ public class JSONText {
         let maxCreatedAtMapByActor: [String: TimeTicket]
         let pairs: [GCPair]
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
-        do {
-            (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(range, stringAttrs, ticket)
-        } catch {
-            Logger.critical("can't set Style")
-            return false
-        }
+        
+        (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(range, stringAttrs, ticket)
 
         context.push(operation: StyleOperation(parentCreatedAt: text.createdAt,
                                                fromPos: range.0,
@@ -176,7 +159,7 @@ public class JSONText {
      */
     public func indexRangeToPosRange(_ range: (Int, Int)) throws -> TextPosStructRange {
         guard self.context != nil, let text else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let textRange = try text.indexRangeToPosRange(range.0, range.1)
@@ -188,7 +171,7 @@ public class JSONText {
      */
     public func posRangeToIndexRange(_ range: TextPosStructRange) throws -> (Int, Int) {
         guard self.context != nil, let text else {
-            throw YorkieError.unexpected(message: "it is not initialized yet")
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
 
         let textRange = try text.findIndexesFromRange((RGATreeSplitPos.fromStruct(range.0), RGATreeSplitPos.fromStruct(range.1)))
@@ -201,7 +184,7 @@ public class JSONText {
      */
     public var toTestString: String {
         guard self.context != nil, let text else {
-            Logger.critical("it is not initialized yet")
+            Logger.critical("\(type(of: self)) is not initialized yet")
             return ""
         }
 
@@ -220,7 +203,7 @@ public class JSONText {
      */
     public func toSortedJSON() -> String {
         guard self.context != nil, let text else {
-            Logger.critical("it is not initialized yet")
+            Logger.critical("\(type(of: self)) is not initialized yet")
             return ""
         }
 
@@ -232,7 +215,7 @@ public class JSONText {
      */
     public var values: [CRDTTextValue]? {
         guard self.context != nil, let text else {
-            Logger.critical("it is not initialized yet")
+            Logger.critical("\(type(of: self)) is not initialized yet")
             return nil
         }
 
@@ -266,7 +249,7 @@ public class JSONText {
      */
     func createRangeForTest(_ fromIdx: Int, _ toIdx: Int) -> RGATreeSplitPosRange? {
         guard self.context != nil, let text else {
-            Logger.critical("it is not initialized yet")
+            Logger.critical("\(type(of: self)) is not initialized yet")
             return nil
         }
 
