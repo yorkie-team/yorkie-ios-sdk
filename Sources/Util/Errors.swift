@@ -22,7 +22,7 @@ struct YorkieError: Error, CustomStringConvertible {
     let message: String
 
     var description: String {
-        return "[code=\(code.rawValue)]: \(message)"
+        return "[code=\(self.code.rawValue)]: \(self.message)"
     }
 
     enum Code: String {
@@ -70,8 +70,10 @@ struct YorkieError: Error, CustomStringConvertible {
            
         // ErrUnexpected is returned when an unexpected error occurred (iOS only)
         case errUnexpected = "ErrUnexpected"
-    }
 
+        // ErrRPC is returned when an error occurred in the RPC Request
+        case errRPC = "ErrRPC"
+    }
 }
 
 /**

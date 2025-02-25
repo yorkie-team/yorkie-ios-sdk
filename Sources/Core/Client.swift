@@ -256,15 +256,15 @@ public class Client {
     @discardableResult
     public func attach(_ doc: Document, _ initialPresence: PresenceData = [:], _ syncMode: SyncMode = .realtime) async throws -> Document {
         guard self.isActive else {
-            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
         guard let clientID = self.id else {
-            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
         guard doc.status == .detached else {
-            throw YorkieError.documentNotDetached(message: "\(doc) is not detached.")
+            throw YorkieError(code: .errDocumentNotDetached, message: "\(self.key) is not detached.")
         }
 
         doc.setActor(clientID)
@@ -292,7 +292,7 @@ public class Client {
             try doc.applyChangePack(pack)
 
             if doc.status == .removed {
-                throw YorkieError.documentRemoved(message: "\(doc) is removed.")
+                throw YorkieError(code: .errDocumentRemoved, message: "\(doc) is removed.")
             }
 
             doc.applyStatus(.attached)
@@ -327,15 +327,15 @@ public class Client {
     @discardableResult
     public func detach(_ doc: Document) async throws -> Document {
         guard self.isActive else {
-            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
         guard let clientID = self.id else {
-            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
         guard let attachment = attachmentMap[doc.getKey()] else {
-            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         try doc.update { _, presence in
@@ -380,15 +380,15 @@ public class Client {
     @discardableResult
     public func remove(_ doc: Document) async throws -> Document {
         guard self.isActive else {
-            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
         guard let clientID = self.id else {
-            throw YorkieError.unexpected(message: "Invalid client ID! [\(self.id ?? "nil")]")
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
         guard let attachment = attachmentMap[doc.getKey()] else {
-            throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         var removeDocumentRequest = RemoveDocumentRequest()
@@ -442,11 +442,11 @@ public class Client {
         let docKey = doc.getKey()
 
         guard self.isActive else {
-            throw YorkieError.clientNotActivated(message: "\(docKey) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "\(docKey) is not active")
         }
 
         guard let attachment = self.attachmentMap[docKey] else {
-            throw YorkieError.documentNotAttached(message: "Can't find attachment by docKey! [\(docKey)]")
+            throw YorkieError(code: .errDocumentNotAttached, message: "Can't find attachment by docKey! [\(docKey)]")
         }
 
         let prevSyncMode = attachment.syncMode
@@ -486,7 +486,7 @@ public class Client {
     @discardableResult
     public func sync(_ doc: Document? = nil) async throws -> [Document] {
         guard self.isActive else {
-            throw YorkieError.clientNotActivated(message: "\(self.key) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
         var attachment: Attachment?
@@ -494,7 +494,7 @@ public class Client {
         if let doc {
             attachment = self.attachmentMap[doc.getKey()]
             guard attachment != nil else {
-                throw YorkieError.documentNotAttached(message: "\(doc.getKey()) is not attached when \(#function).")
+                throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
             }
         }
 
@@ -594,7 +594,7 @@ public class Client {
         guard self.isActive, let id = self.id else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
             self.setCondition(.watchLoop, value: false)
-            throw YorkieError.clientNotActivated(message: "$\(docKey) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "$\(docKey) is not active")
         }
 
         let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
@@ -643,7 +643,7 @@ public class Client {
     private func runWatchLoop(_ docKey: DocumentKey) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
         guard let attachment = self.attachmentMap[docKey] else {
-            throw YorkieError.documentNotAttached(message: "\(docKey) is not attached")
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(docKey) is not attached")
         }
 
         self.setCondition(.watchLoop, value: true)
@@ -660,7 +660,7 @@ public class Client {
                 if semaphore.wait(timeout: DispatchTime.now() + DispatchTimeInterval.milliseconds(self.maximumAttachmentTimeout)) == .timedOut {
                     let message = "[AD] Time out for Initialization. d:\"\(docKey)\""
                     Logger.warning(message)
-                    continuation.resume(throwing: YorkieError.timeout(message: message))
+                    continuation.resume(throwing: YorkieError(code: .errUnexpected, message: message))
                 } else {
                     Logger.info("[AD] got Initialization. d:\"\(docKey)\"")
                     continuation.resume(returning: docKey)
@@ -770,7 +770,7 @@ public class Client {
     @discardableResult
     private func syncInternal(_ attachment: Attachment, _ syncMode: SyncMode) async throws -> Document {
         guard let clientID = self.id else {
-            throw YorkieError.unexpected(message: "Invalid Client ID!")
+            throw YorkieError(code: .errUnexpected, message: "Invalid Client ID!")
         }
 
         var pushPullRequest = PushPullChangeRequest()
@@ -864,7 +864,7 @@ public class Client {
         if let error = error {
             return error
         } else {
-            return YorkieError.rpcError(message: defaultMessage)
+            return YorkieError(code: .errRPC, message: defaultMessage)
         }
     }
 }
