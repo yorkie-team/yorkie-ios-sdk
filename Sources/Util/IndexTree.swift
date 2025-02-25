@@ -271,7 +271,7 @@ extension IndexTreeNode {
      */
     func append(contentsOf newNode: [Self]) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         self.innerChildren.append(contentsOf: newNode)
@@ -288,7 +288,7 @@ extension IndexTreeNode {
      */
     func prepend(contentsOf newNode: [Self]) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         self.innerChildren.insert(contentsOf: newNode, at: 0)
@@ -303,11 +303,11 @@ extension IndexTreeNode {
      */
     func insertBefore(_ newNode: Self, _ referenceNode: Self) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         guard let offset = self.innerChildren.firstIndex(where: { $0 === referenceNode }) else {
-            throw YorkieError.unexpected(message: "child not found")
+            throw YorkieError(code: .errInvalidArgument, message: "child not found")
         }
 
         try self.insertAtInternal(newNode: newNode, offset: offset)
@@ -319,11 +319,11 @@ extension IndexTreeNode {
      */
     func insertAfter(_ newNode: Self, _ referenceNode: Self) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         guard let offset = self.innerChildren.firstIndex(where: { $0 === referenceNode }) else {
-            throw YorkieError.unexpected(message: "child not found")
+            throw YorkieError(code: .errInvalidArgument, message: "child not found")
         }
 
         try self.insertAtInternal(newNode: newNode, offset: offset + 1)
@@ -335,7 +335,7 @@ extension IndexTreeNode {
      */
     func insertAt(_ newNode: Self, _ offset: Int) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         try self.insertAtInternal(newNode: newNode, offset: offset)
@@ -347,11 +347,11 @@ extension IndexTreeNode {
      */
     func removeChild(child: Self) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         guard let offset = self.innerChildren.firstIndex(where: { $0 === child }) else {
-            throw YorkieError.unexpected(message: "child not found")
+            throw YorkieError(code: .errInvalidArgument, message: "child not found")
         }
 
         self.innerChildren.splice(offset, 1, with: [])
@@ -398,11 +398,11 @@ extension IndexTreeNode {
      */
     func insertAfterInternal(newNode: Self, referenceNode: Self) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         guard let offset = self.innerChildren.firstIndex(where: { $0 === referenceNode }) else {
-            throw YorkieError.unexpected(message: "child not found")
+            throw YorkieError(code: .errInvalidArgument, message: "child not found")
         }
 
         try self.insertAtInternal(newNode: newNode, offset: offset + 1)
@@ -414,7 +414,7 @@ extension IndexTreeNode {
      */
     func insertAtInternal(newNode: Self, offset: Int) throws {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         self.innerChildren.splice(offset, 0, with: [newNode])
@@ -427,7 +427,7 @@ extension IndexTreeNode {
      */
     func findOffset(node: Self) throws -> Int {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         if node.isRemoved {
@@ -450,7 +450,7 @@ extension IndexTreeNode {
      */
     func findBranchOffset(node: Self) throws -> Int {
         guard self.isText == false else {
-            throw YorkieError.unexpected(message: "Text node cannot have children")
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
         var current: Self? = node
@@ -565,15 +565,15 @@ func tokensBetween<T: IndexTreeNode>(root: T,
                                      callback: @escaping (TreeToken<T>, Bool) throws -> Void) throws
 {
     if from > to {
-        throw YorkieError.unexpected(message: "from is greater than to: \(from) > \(to)")
+        throw YorkieError(code: .errInvalidArgument, message: "from is greater than to: \(from) > \(to)")
     }
 
     if from > root.size {
-        throw YorkieError.unexpected(message: "from is out of range: \(from) > \(root.size)")
+        throw YorkieError(code: .errInvalidArgument, message: "from is out of range: \(from) > \(root.size)")
     }
 
     if to > root.size {
-        throw YorkieError.unexpected(message: "to is out of range: \(to) > \(root.size)")
+        throw YorkieError(code: .errInvalidArgument, message: "to is out of range: \(to) > \(root.size)")
     }
 
     if from == to {
@@ -644,7 +644,7 @@ func findTreePos<T: IndexTreeNode>(node: T,
                                    preferText: Bool = true) throws -> TreePos<T>
 {
     if index > node.size {
-        throw YorkieError.unexpected(message: "index is out of range: \(index) > \(node.size)")
+        throw YorkieError(code: .errInvalidArgument, message: "index is out of range: \(index) > \(node.size)")
     }
 
     if node.isText {
@@ -745,7 +745,7 @@ func findTextPos<T: IndexTreeNode>(node: T, pathElement: Int) throws -> TreePos<
     var pathElement = pathElement
 
     if node.size < pathElement {
-        throw YorkieError.unexpected(message: "unacceptable path")
+        throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
     }
 
     for child in node.children {
@@ -809,7 +809,7 @@ class IndexTree<T: IndexTreeNode> {
         if node.isText {
             let offset = try node.parent!.findOffset(node: node)
             if offset == -1 {
-                throw YorkieError.unexpected(message: "invalid treePos")
+                throw YorkieError(code: .errInvalidArgument, message: "invalid treePos")
             }
 
             let sizeOfLeftSiblings = addSizeOfLeftSiblings(parent: node.parent!, offset: offset)
@@ -827,7 +827,7 @@ class IndexTree<T: IndexTreeNode> {
         while node.parent != nil {
             let offset = try node.parent!.findOffset(node: node)
             if offset == -1 {
-                throw YorkieError.unexpected(message: "invalid treePos")
+                throw YorkieError(code: .errInvalidArgument, message: "invalid treePos")
             }
 
             path.append(offset)
@@ -851,13 +851,13 @@ class IndexTree<T: IndexTreeNode> {
      */
     public func pathToTreePos(_ path: [Int]) throws -> TreePos<T> {
         guard path.isEmpty != true else {
-            throw YorkieError.unexpected(message: "unacceptable path")
+            throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
         }
 
         var node = self.root
         for pathElement in path.dropLast() {
             guard let child = node.children[safe: pathElement] else {
-                throw YorkieError.unexpected(message: "unacceptable path")
+                throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
             }
             node = child
         }
@@ -867,7 +867,7 @@ class IndexTree<T: IndexTreeNode> {
         }
 
         if node.children.count < path[path.count - 1] {
-            throw YorkieError.unexpected(message: "unacceptable path")
+            throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
         }
 
         return TreePos(node: node, offset: Int32(path[path.count - 1]))
@@ -922,7 +922,7 @@ class IndexTree<T: IndexTreeNode> {
             let parent = node.parent!
             let offsetOfNode = try parent.findOffset(node: node)
             if offsetOfNode == -1 {
-                throw YorkieError.unexpected(message: "invalid pos")
+                throw YorkieError(code: .errInvalidArgument, message: "invalid pos")
             }
 
             size += addSizeOfLeftSiblings(parent: parent, offset: offsetOfNode)
@@ -936,7 +936,7 @@ class IndexTree<T: IndexTreeNode> {
             let parent = node.parent!
             let offsetOfNode = try parent.findOffset(node: node)
             if offsetOfNode == -1 {
-                throw YorkieError.unexpected(message: "invalid pos")
+                throw YorkieError(code: .errInvalidArgument, message: "invalid pos")
             }
 
             size += addSizeOfLeftSiblings(parent: parent, offset: offsetOfNode)

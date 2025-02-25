@@ -140,7 +140,7 @@ class SplayTree<V> {
     /**
      * `find` returns the Node and offset of the given index.
      */
-    func find(_ position: Int) -> (node: SplayNode<V>?, offset: Int) {
+    func find(_ position: Int) throws -> (node: SplayNode<V>?, offset: Int) {
         guard let root = self.root, position >= 0 else {
             return (nil, 0)
         }
@@ -159,7 +159,8 @@ class SplayTree<V> {
             }
         }
         if offset > node.length {
-            Logger.error("out of index range: pos: \(offset) > node.length: \(node.length)")
+            let message = "out of index range: pos: \(offset) > node.length: \(node.length)"
+            throw YorkieError(code: .errInvalidArgument, message: message)
         }
         return (node, offset)
     }

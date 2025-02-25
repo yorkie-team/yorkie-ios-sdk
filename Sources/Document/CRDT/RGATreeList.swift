@@ -262,7 +262,7 @@ class RGATreeList {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (node, offset) = self.nodeMapByIndex.find(index)
+        let (node, offset) = try self.nodeMapByIndex.find(index)
         guard let rgaNode = node as? RGATreeListNode else {
             let log = "failed to find the given index: \(index)"
             throw YorkieError(code: .errInvalidArgument, message: log)

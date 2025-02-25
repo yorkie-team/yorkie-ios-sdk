@@ -488,7 +488,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * `findNodePos` finds RGATreeSplitNodePos of given offset.
      */
     public func indexToPos(_ idx: Int) throws -> RGATreeSplitPos {
-        let (node, offset) = self.treeByIndex.find(idx)
+        let (node, offset) = try self.treeByIndex.find(idx)
         guard let splitNode = node as? RGATreeSplitNode<T> else {
             throw YorkieError(code: .errInvalidArgument, message: "no element for index \(idx)")
         }
@@ -784,7 +784,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      */
     private func findEdgesOfCandidates(_ candidates: [RGATreeSplitNode<T>]) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
         guard let prev = candidates[0].prev else {
-            throw YorkieError(code : .errInvalidArgument, message: "prev must not nil!")
+            throw YorkieError(code: .errInvalidArgument, message: "prev must not nil!")
         }
 
         return (prev, candidates[safe: candidates.count - 1]?.next)
