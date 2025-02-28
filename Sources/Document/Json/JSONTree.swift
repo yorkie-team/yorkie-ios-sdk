@@ -570,7 +570,16 @@ public class JSONTree {
     /**
      * `toXML` returns the XML string of this tree.
      */
-    public func toXML() throws -> String {
+    public func toXML() -> String {
+        do {
+            return try self.toXMLThrows()
+        } catch {
+            Logger.critical(String(describing: error))
+            return ""
+        }
+    }
+
+    private func toXMLThrows() throws -> String {
         guard self.context != nil, let tree else {
             throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }

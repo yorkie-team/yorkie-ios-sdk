@@ -40,8 +40,8 @@ final class DocumentIntegrationTests: XCTestCase {
         // 01. client is not activated.
         do {
             try await self.c1.remove(self.d1)
-        } catch {
-            if case YorkieError.clientNotActivated(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errClientNotActivated = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -51,8 +51,8 @@ final class DocumentIntegrationTests: XCTestCase {
         do {
             try await self.c1.activate()
             try await self.c1.remove(self.d1)
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -75,8 +75,8 @@ final class DocumentIntegrationTests: XCTestCase {
             try await self.d1.update { root, _ in
                 root.k1 = String("v1")
             }
-        } catch {
-            if case YorkieError.documentRemoved = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentRemoved = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -85,8 +85,8 @@ final class DocumentIntegrationTests: XCTestCase {
         // 05. try to attach a removed document.
         do {
             try await self.c1.attach(self.d1)
-        } catch {
-            if case YorkieError.documentNotDetached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotDetached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -291,8 +291,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.detach(self.d1)
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -300,8 +300,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.sync()
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -309,8 +309,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.remove(self.d1)
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -321,8 +321,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.attach(self.d1)
-        } catch {
-            if case YorkieError.documentNotDetached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotDetached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -333,8 +333,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.remove(self.d1)
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -342,8 +342,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.sync()
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }
@@ -351,8 +351,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         do {
             try await self.c1.detach(self.d1)
-        } catch {
-            if case YorkieError.documentNotAttached(message:) = error {
+        } catch let error as YorkieError {
+            if case YorkieError.Code.errDocumentNotAttached = error.code {
             } else {
                 XCTAssert(false)
             }

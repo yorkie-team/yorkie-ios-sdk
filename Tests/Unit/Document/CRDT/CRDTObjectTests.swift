@@ -72,7 +72,7 @@ class CRDTObjectTests: XCTestCase {
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
         target.set(key: "K3", value: a3)
 
-        target.purge(element: a2)
+        try target.purge(element: a2)
 
         XCTAssertFalse(target.has(key: targetKey))
     }

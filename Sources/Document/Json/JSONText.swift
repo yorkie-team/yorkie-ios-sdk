@@ -61,7 +61,17 @@ public class JSONText {
      * `edit` edits this text with the given content.
      */
     @discardableResult
-    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) throws -> (Int, Int)? {
+    public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) -> (Int, Int)? {
+        do {
+            return try self.editThrows(fromIdx, toIdx, content, attributes)
+        } catch {
+            Logger.critical(String(describing: error))
+            return nil
+        }
+    }
+
+    @discardableResult
+    private func editThrows(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) throws -> (Int, Int)? {
         guard let context, let text else {
             throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
@@ -104,23 +114,33 @@ public class JSONText {
      * `delete` deletes the text in the given range.
      */
     @discardableResult
-    public func delete(_ fromIdx: Int, _ toIdx: Int) throws -> (Int, Int)? {
-        return try self.edit(fromIdx, toIdx, "")
+    public func delete(_ fromIdx: Int, _ toIdx: Int) -> (Int, Int)? {
+        return self.edit(fromIdx, toIdx, "")
     }
 
     /**
      * `empty` makes the text empty.
      */
     @discardableResult
-    public func empty() throws -> (Int, Int)? {
-        return try self.edit(0, self.length, "")
+    public func empty() -> (Int, Int)? {
+        return self.edit(0, self.length, "")
     }
-
+    
     /**
      * `setStyle` styles this text with the given attributes.
      */
     @discardableResult
-    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws -> Bool {
+    public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) -> Bool {
+        do {
+            return try self.setStyleThrows(fromIdx, toIdx, attributes)
+        } catch {
+            Logger.critical(String(describing: error))
+            return false
+        }
+    }
+
+    @discardableResult
+    private func setStyleThrows(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws -> Bool {
         guard let context, let text else {
             throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }

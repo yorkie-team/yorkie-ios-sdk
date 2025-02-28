@@ -108,7 +108,7 @@ class ElementRHTTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        target.purge(element: a2)
+        try target.purge(element: a2)
 
         let result = target.get(key: "a2")
         XCTAssertNil(result)
@@ -123,7 +123,7 @@ class ElementRHTTests: XCTestCase {
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         target.set(key: "a2", value: a2)
 
-        target.purge(element: a2)
+        try target.purge(element: a2)
 
         XCTAssertTrue(target.has(key: "a1"))
         XCTAssertFalse(target.has(key: "a2"))

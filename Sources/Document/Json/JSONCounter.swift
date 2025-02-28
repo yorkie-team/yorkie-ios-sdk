@@ -59,7 +59,17 @@ public class JSONCounter<T: YorkieCountable> {
      * `increase` increases numeric data.
      */
     @discardableResult
-    public func increase(value: any BinaryInteger) throws -> Self {
+    public func increase(value: any BinaryInteger) -> Self {
+        do {
+            return try self.increaseThrows(value: value)
+        } catch {
+            Logger.critical(String(describing: error))
+            return self
+        }
+    }
+
+    @discardableResult
+    private func increaseThrows(value: any BinaryInteger) throws -> Self {
         guard let context, let counter else {
             let log = "Counter is not initialized yet"
             throw YorkieError(code: .errNotInitialized, message: log)
@@ -86,8 +96,8 @@ public class JSONCounter<T: YorkieCountable> {
     }
 
     @discardableResult
-    public func increase(value: any BinaryFloatingPoint) throws -> Self {
-        try self.increase(value: T(value))
+    public func increase(value: any BinaryFloatingPoint) -> Self {
+        self.increase(value: T(value))
     }
 }
 
