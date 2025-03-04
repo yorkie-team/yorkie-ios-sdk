@@ -77,7 +77,7 @@ struct EditOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         return changes.compactMap {
             EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)

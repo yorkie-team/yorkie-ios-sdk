@@ -52,7 +52,7 @@ struct AddOperation: Operation {
         try array.insert(value: value, afterCreatedAt: self.previousCreatedAt)
         root.registerElement(value, parent: array)
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         guard let index = try Int(array.subPath(createdAt: self.effectedCreatedAt)) else {
             throw YorkieError(code: .errUnexpected, message: "fail to get index")

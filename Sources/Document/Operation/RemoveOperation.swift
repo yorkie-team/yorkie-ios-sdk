@@ -50,10 +50,10 @@ struct RemoveOperation: Operation {
         let element = try object.delete(createdAt: self.createdAt, executedAt: self.executedAt)
         root.registerRemovedElement(element)
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         let key = try object.subPath(createdAt: self.createdAt)
-        
+
         guard let index = Int(key) else {
             throw YorkieError(code: .errUnexpected, message: "fail to convert \(key) to Int")
         }

@@ -71,7 +71,7 @@ struct StyleOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         return changes.compactMap {
             StyleOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary)

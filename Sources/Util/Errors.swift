@@ -40,10 +40,10 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrInvalidType is returned when the type is invalid.
         case errInvalidType = "ErrInvalidType"
-        
+
         // ErrDummy is used to verify errors for testing purposes.
         case errDummy = "ErrDummy"
-        
+
         // ErrDocumentNotAttached is returned when the document is not attached.
         case errDocumentNotAttached = "ErrDocumentNotAttached"
 
@@ -58,16 +58,16 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrInvalidArgument is returned when the argument is invalid.
         case errInvalidArgument = "ErrInvalidArgument"
-        
+
         // ErrNotInitialized is returned when required initialization has not been completed.
         case errNotInitialized = "ErrNotInitialized"
-        
+
         // ErrNotReady is returned when execution of following actions is not ready.
         case errNotReady = "ErrNotReady"
-        
+
         // ErrRefused is returned when the execution is rejected.
         case errRefused = "ErrRefused"
-           
+
         // ErrUnexpected is returned when an unexpected error occurred (iOS only)
         case errUnexpected = "ErrUnexpected"
 

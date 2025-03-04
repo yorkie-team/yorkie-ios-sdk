@@ -59,7 +59,7 @@ struct MoveOperation: Operation {
             throw YorkieError(code: .errUnexpected, message: "fail to get index")
         }
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         return [MoveOpInfo(path: path, previousIndex: previousIndex, index: index)]
     }

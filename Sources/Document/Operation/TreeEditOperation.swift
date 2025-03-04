@@ -86,7 +86,7 @@ struct TreeEditOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         return changes.compactMap { change in
             let value: [CRDTTreeNode] = {

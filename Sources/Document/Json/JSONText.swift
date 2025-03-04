@@ -125,7 +125,7 @@ public class JSONText {
     public func empty() -> (Int, Int)? {
         return self.edit(0, self.length, "")
     }
-    
+
     /**
      * `setStyle` styles this text with the given attributes.
      */
@@ -157,7 +157,7 @@ public class JSONText {
         let maxCreatedAtMapByActor: [String: TimeTicket]
         let pairs: [GCPair]
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
-        
+
         (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(range, stringAttrs, ticket)
 
         context.push(operation: StyleOperation(parentCreatedAt: text.createdAt,

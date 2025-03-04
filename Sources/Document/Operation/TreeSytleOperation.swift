@@ -72,7 +72,7 @@ class TreeStyleOperation: Operation {
             (_, pairs, changes) = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt, self.maxCreatedAtMapByActor)
         }
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         for pair in pairs {
             root.registerGCPair(pair)

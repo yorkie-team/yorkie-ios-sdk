@@ -63,8 +63,8 @@ struct IncreaseOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let path = try root.createPath(createdAt: parentCreatedAt)
-        
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
+
         guard let value = Int((value as? Primitive)?.toJSON() ?? "") else {
             throw YorkieError(code: .errUnexpected, message: "fail to get counter value")
         }
