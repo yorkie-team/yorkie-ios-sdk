@@ -56,6 +56,7 @@ class TreeStyleOperation: Operation {
     public func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
+            Logger.critical(log)
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 

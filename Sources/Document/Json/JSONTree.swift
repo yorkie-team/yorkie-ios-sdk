@@ -590,7 +590,16 @@ public class JSONTree {
     /**
      * `toJSON` returns the JSON string of this tree.
      */
-    public func toJSON() throws -> String {
+    public func toJSON() -> String {
+        do {
+            return try self.toJSONThrows()
+        } catch {
+            Logger.critical(String(describing: error))
+            return ""
+        }
+    }
+
+    private func toJSONThrows() throws -> String {
         guard self.context != nil, let tree else {
             throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }

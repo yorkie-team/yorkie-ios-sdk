@@ -17,6 +17,9 @@
 import Connect
 import Foundation
 
+/**
+ * `YorkieError` is an error returned by a Yorkie operation.
+ */
 struct YorkieError: Error, CustomStringConvertible {
     let code: Code
     let message: String
@@ -26,52 +29,52 @@ struct YorkieError: Error, CustomStringConvertible {
     }
 
     enum Code: String {
-        // Ok is returned when the operation completed successfully.
+        /// Ok is returned when the operation completed successfully.
         case ok
 
-        // ErrClientNotActivated is returned when the client is not active.
+        /// ErrClientNotActivated is returned when the client is not active.
         case errClientNotActivated = "ErrClientNotActivated"
 
-        // ErrClientNotFound is returned when the client is not found.
+        /// ErrClientNotFound is returned when the client is not found.
         case errClientNotFound = "ErrClientNotFound"
 
-        // ErrUnimplemented is returned when the operation is not implemented.
+        /// ErrUnimplemented is returned when the operation is not implemented.
         case errUnimplemented = "ErrUnimplemented"
 
-        // ErrInvalidType is returned when the type is invalid.
+        /// ErrInvalidType is returned when the type is invalid.
         case errInvalidType = "ErrInvalidType"
 
-        // ErrDummy is used to verify errors for testing purposes.
+        /// ErrDummy is used to verify errors for testing purposes.
         case errDummy = "ErrDummy"
 
-        // ErrDocumentNotAttached is returned when the document is not attached.
+        /// ErrDocumentNotAttached is returned when the document is not attached.
         case errDocumentNotAttached = "ErrDocumentNotAttached"
 
-        // ErrDocumentNotDetached is returned when the document is not detached.
+        /// ErrDocumentNotDetached is returned when the document is not detached.
         case errDocumentNotDetached = "ErrDocumentNotDetached"
 
-        // ErrDocumentRemoved is returned when the document is removed.
+        /// ErrDocumentRemoved is returned when the document is removed.
         case errDocumentRemoved = "ErrDocumentRemoved"
 
-        // InvalidObjectKey is returned when the object key is invalid.
+        /// InvalidObjectKey is returned when the object key is invalid.
         case errInvalidObjectKey = "ErrInvalidObjectKey"
 
-        // ErrInvalidArgument is returned when the argument is invalid.
+        /// ErrInvalidArgument is returned when the argument is invalid.
         case errInvalidArgument = "ErrInvalidArgument"
 
-        // ErrNotInitialized is returned when required initialization has not been completed.
+        /// ErrNotInitialized is returned when required initialization has not been completed.
         case errNotInitialized = "ErrNotInitialized"
 
-        // ErrNotReady is returned when execution of following actions is not ready.
+        /// ErrNotReady is returned when execution of following actions is not ready.
         case errNotReady = "ErrNotReady"
 
-        // ErrRefused is returned when the execution is rejected.
+        /// ErrRefused is returned when the execution is rejected.
         case errRefused = "ErrRefused"
 
-        // ErrUnexpected is returned when an unexpected error occurred (iOS only)
+        /// ErrUnexpected is returned when an unexpected error occurred (iOS only)
         case errUnexpected = "ErrUnexpected"
 
-        // ErrRPC is returned when an error occurred in the RPC Request
+        /// ErrRPC is returned when an error occurred in the RPC Request
         case errRPC = "ErrRPC"
     }
 }
