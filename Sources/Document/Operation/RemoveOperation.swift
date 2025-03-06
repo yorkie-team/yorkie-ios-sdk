@@ -54,9 +54,7 @@ struct RemoveOperation: Operation {
 
         let key = try object.subPath(createdAt: self.createdAt)
 
-        guard let index = Int(key) else {
-            throw YorkieError(code: .errUnexpected, message: "fail to convert \(key) to Int")
-        }
+        let index = Int(key)
 
         return [parent is CRDTArray ? RemoveOpInfo(path: path, key: nil, index: index) : RemoveOpInfo(path: path, key: key, index: nil)]
     }
