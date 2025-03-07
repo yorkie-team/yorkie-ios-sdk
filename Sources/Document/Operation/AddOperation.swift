@@ -45,20 +45,17 @@ struct AddOperation: Operation {
             } else {
                 log = "fail to execute, only array can execute add"
             }
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         let value = self.value.deepcopy()
         try array.insert(value: value, afterCreatedAt: self.previousCreatedAt)
         root.registerElement(value, parent: array)
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         guard let index = try Int(array.subPath(createdAt: self.effectedCreatedAt)) else {
-            throw YorkieError.unexpected(message: "fail to get index")
+            throw YorkieError(code: .errUnexpected, message: "fail to get index")
         }
 
         return [AddOpInfo(path: path, index: index)]

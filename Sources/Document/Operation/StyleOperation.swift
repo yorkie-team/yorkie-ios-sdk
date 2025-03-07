@@ -62,9 +62,7 @@ struct StyleOperation: Operation {
             } else {
                 log = "fail to find \(self.parentCreatedAt)"
             }
-
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         let (_, pairs, changes) = try text.setStyle((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
@@ -73,9 +71,7 @@ struct StyleOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         return changes.compactMap {
             StyleOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary)

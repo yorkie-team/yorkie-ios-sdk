@@ -60,18 +60,24 @@ public class JSONCounter<T: YorkieCountable> {
      */
     @discardableResult
     public func increase(value: any BinaryInteger) -> Self {
-        guard let context, let counter else {
-            let log = "it is not initialized yet"
-            Logger.critical(log)
-
+        do {
+            return try self.increaseThrows(value: value)
+        } catch {
+            Logger.critical(String(describing: error))
             return self
+        }
+    }
+
+    @discardableResult
+    private func increaseThrows(value: any BinaryInteger) throws -> Self {
+        guard let context, let counter else {
+            let log = "Counter is not initialized yet"
+            throw YorkieError(code: .errNotInitialized, message: log)
         }
 
         guard let primitiveValue = Primitive.type(of: value) else {
             let log = "Unsupported type of value: \(type(of: T.self))"
-            Logger.critical(log)
-
-            return self
+            throw YorkieError(code: .errInvalidType, message: log)
         }
 
         let ticket = context.issueTimeTicket
@@ -79,19 +85,10 @@ public class JSONCounter<T: YorkieCountable> {
 
         guard primitive.isNumericType else {
             let log = "Unsupported type of value: \(type(of: T.self))"
-            Logger.critical(log)
-
-            return self
+            throw YorkieError(code: .errInvalidType, message: log)
         }
 
-        do {
-            try counter.increase(primitive)
-        } catch {
-            let log = "catch error when increase counter: [\(error)]"
-            Logger.critical(log)
-
-            return self
-        }
+        try counter.increase(primitive)
 
         context.push(operation: IncreaseOperation(parentCreatedAt: counter.createdAt, value: primitive, executedAt: ticket))
 

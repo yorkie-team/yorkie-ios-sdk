@@ -35,7 +35,7 @@ enum Converter {
             return .double(result)
         case .string:
             guard let stringValue = String(data: data, encoding: .utf8) else {
-                throw YorkieError.unimplemented(message: String(describing: valueType))
+                throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
             }
             return .string(stringValue)
         case .long:
@@ -47,7 +47,7 @@ enum Converter {
             let milliseconds = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
             return .date(Date(timeIntervalSince1970: TimeInterval(Double(milliseconds) / 1000)))
         default:
-            throw YorkieError.unimplemented(message: String(describing: valueType))
+            throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
         }
     }
 
@@ -58,7 +58,7 @@ enum Converter {
         case .longCnt:
             return Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
         default:
-            throw YorkieError.unimplemented(message: String(describing: valueType))
+            throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
         }
     }
 
@@ -142,7 +142,7 @@ extension Converter {
         case .clear:
             return .clear
         default:
-            throw YorkieError.unimplemented(message: "Unknown type: \(pbPresenceChange.type)")
+            throw YorkieError(code: .errInvalidType, message: "unsupported type: \(pbPresenceChange.type)")
         }
     }
     
@@ -288,20 +288,20 @@ extension Converter {
             return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .integerCnt:
             guard let value = try countValueFrom(pbElementSimple.type, data: pbElementSimple.value) as? Int32 else {
-                throw YorkieError.unexpected(message: "unexpected counter value type")
+                throw YorkieError(code: .errInvalidType, message: "unexpected counter value type")
             }
 
             return CRDTCounter<Int32>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .longCnt:
             guard let value = try countValueFrom(pbElementSimple.type, data: pbElementSimple.value) as? Int64 else {
-                throw YorkieError.unexpected(message: "unexpected counter value type")
+                throw YorkieError(code: .errInvalidType, message: "unexpected counter value type")
             }
 
             return CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .tree:
             return try bytesToTree(bytes: pbElementSimple.value)
         default:
-            throw YorkieError.unimplemented(message: "unimplemented element: \(pbElementSimple)")
+            throw YorkieError(code: .errUnimplemented, message: "unimplemented element: \(pbElementSimple)")
         }
     }
 }
@@ -441,7 +441,7 @@ extension Converter {
             pbTreeStyleOperation.executedAt = toTimeTicket(treeStyleOperation.executedAt)
             pbOperation.treeStyle = pbTreeStyleOperation
         } else {
-            throw YorkieError.unimplemented(message: "unimplemented operation \(operation)")
+            throw YorkieError(code: .errUnimplemented, message: "unimplemented operation \(operation)")
         }
 
         return pbOperation
@@ -536,7 +536,7 @@ extension Converter {
                                               executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
                 }
             } else {
-                throw YorkieError.unimplemented(message: "unimplemented operation \(pbOperation)")
+                throw YorkieError(code: .errUnimplemented, message: "unimplemented operation \(pbOperation)")
             }
         }
     }
@@ -766,7 +766,7 @@ extension Converter {
         switch pbCounter.type {
         case .integerCnt:
             guard let value = value as? Int32 else {
-                throw YorkieError.unexpected(message: "[\(pbCounter.type)] value is not Int32.")
+                throw YorkieError(code: .errInvalidType, message: "[\(pbCounter.type)] value is not Int32.")
             }
             let counter = CRDTCounter<Int32>(value: value, createdAt: fromTimeTicket(pbCounter.createdAt))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
@@ -775,7 +775,7 @@ extension Converter {
             return counter
         case .longCnt:
             guard let value = value as? Int64 else {
-                throw YorkieError.unexpected(message: "[\(pbCounter.type)] value is not Int64.")
+                throw YorkieError(code: .errInvalidType, message: "[\(pbCounter.type)] value is not Int64.")
             }
             let counter = CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbCounter.createdAt))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
@@ -783,7 +783,7 @@ extension Converter {
 
             return counter
         default:
-            throw YorkieError.unimplemented(message: "\(pbCounter.type) is not implemented.")
+            throw YorkieError(code: .errUnimplemented, message: "\(pbCounter.type) is not implemented.")
         }
     }
 
@@ -792,7 +792,7 @@ extension Converter {
      */
     static func fromTree(_ pbTree: PbJSONElement.Tree) throws -> CRDTTree {
         guard let tree = try fromTreeNodes(pbTree.nodes, fromTimeTicket(pbTree.createdAt)) else {
-            throw YorkieError.unexpected(message: "Can't get root from PbJSONElement.Tree")
+            throw YorkieError(code: .errUnexpected, message: "Can't get root from PbJSONElement.Tree")
         }
         return tree
     }
@@ -839,7 +839,7 @@ extension Converter {
         } else if let element = element as? CRDTTree {
             return toTree(element)
         } else {
-            throw YorkieError.unimplemented(message: "unimplemented element: \(element)")
+            throw YorkieError(code: .errUnimplemented, message: "unimplemented element: \(element)")
         }
     }
 
@@ -860,7 +860,7 @@ extension Converter {
         } else if case let .tree(element) = pbElement.body {
             return try fromTree(element)
         } else {
-            throw YorkieError.unimplemented(message: "unimplemented element: \(pbElement)")
+            throw YorkieError(code: .errUnimplemented, message: "unimplemented element: \(pbElement)")
         }
     }
 }
@@ -1151,7 +1151,7 @@ extension Converter {
      */
     static func bytesToTree(bytes: Data) throws -> CRDTTree {
         guard bytes.isEmpty == false else {
-            return CRDTTree(root: CRDTTreeNode(id: CRDTTreeNodeID.initial, type: DefaultTreeNodeType.root.rawValue), createdAt: TimeTicket.initial)
+            throw YorkieError(code: .errInvalidArgument, message: "bytes is empty")
         }
         
         let pbElement = try PbJSONElement(serializedData: bytes)
@@ -1182,7 +1182,7 @@ extension Converter {
      */
     static func bytesToObject(bytes: Data) throws -> CRDTObject {
         guard bytes.isEmpty == false else {
-            return CRDTObject(createdAt: TimeTicket.initial)
+            throw YorkieError(code: .errInvalidArgument, message: "bytes is empty")
         }
 
         let pbElement = try PbJSONElement(serializedData: bytes)

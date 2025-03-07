@@ -36,7 +36,7 @@ private class StringNode: SplayNode<String> {
 }
 
 class SplayTreeTests: XCTestCase {
-    func test_can_insert_values_and_splay_them() {
+    func test_can_insert_values_and_splay_them() throws {
         let tree = SplayTree<String>()
 
         let nodeA = tree.insert(StringNode.create("A2"))
@@ -57,35 +57,35 @@ class SplayTreeTests: XCTestCase {
         XCTAssertEqual(tree.indexOf(nodeC), 5)
         XCTAssertEqual(tree.indexOf(nodeD), 9)
 
-        var result = tree.find(-1)
+        var result = try tree.find(-1)
         XCTAssertNil(result.node)
         XCTAssertEqual(result.offset, 0)
 
-        result = tree.find(0)
+        result = try tree.find(0)
         XCTAssertEqual(result.node?.value, "A2")
         XCTAssertEqual(result.offset, 0)
 
-        result = tree.find(1)
+        result = try tree.find(1)
         XCTAssertEqual(result.node?.value, "A2")
         XCTAssertEqual(result.offset, 1)
 
-        result = tree.find(2)
+        result = try tree.find(2)
         XCTAssertEqual(result.node?.value, "A2")
         XCTAssertEqual(result.offset, 2)
 
-        result = tree.find(3)
+        result = try tree.find(3)
         XCTAssertEqual(result.node?.value, "B23")
         XCTAssertEqual(result.offset, 1)
 
-        result = tree.find(4)
+        result = try tree.find(4)
         XCTAssertEqual(result.node?.value, "B23")
         XCTAssertEqual(result.offset, 2)
 
-        result = tree.find(5)
+        result = try tree.find(5)
         XCTAssertEqual(result.node?.value, "B23")
         XCTAssertEqual(result.offset, 3)
 
-        result = tree.find(6)
+        result = try tree.find(6)
         XCTAssertEqual(result.node?.value, "C234")
         XCTAssertEqual(result.offset, 1)
     }
@@ -176,7 +176,7 @@ class SplayTreeTests: XCTestCase {
         XCTAssertEqual(self.sumOfWeight(testTree.nodes, from: 3, to: 7), 0)
     }
 
-    func test_splay() {
+    func test_splay() throws {
         let tree = SplayTree<String>()
 
         tree.insert(StringNode.create("A2"))
@@ -195,7 +195,7 @@ class SplayTreeTests: XCTestCase {
         tree.splayNode(nodeB)
         XCTAssertEqual(tree.toTestString, "[2,2]A2[14,3]B23[9,4]C234[5,5]D2345")
 
-        let (node, _) = tree.find(6)
+        let (node, _) = try tree.find(6)
         XCTAssertEqual(node?.value, "C234")
     }
 

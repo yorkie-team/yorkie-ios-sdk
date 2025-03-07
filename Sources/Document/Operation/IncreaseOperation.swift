@@ -47,8 +47,7 @@ struct IncreaseOperation: Operation {
     func execute(root: CRDTRoot) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         if let counter = parentObject as? CRDTCounter<Int32> {
@@ -61,16 +60,13 @@ struct IncreaseOperation: Operation {
             }
         } else {
             let log = "fail to execute, only Counter can execute increase"
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
         guard let value = Int((value as? Primitive)?.toJSON() ?? "") else {
-            throw YorkieError.unexpected(message: "fail to get counter value")
+            throw YorkieError(code: .errUnexpected, message: "fail to get counter value")
         }
 
         return [IncreaseOpInfo(path: path, value: value)]

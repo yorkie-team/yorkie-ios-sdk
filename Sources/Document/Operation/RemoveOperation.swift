@@ -44,21 +44,19 @@ struct RemoveOperation: Operation {
             } else {
                 log = "fail to find \(self.parentCreatedAt)"
             }
-
-            Logger.critical(log)
-            throw YorkieError.unexpected(message: log)
+            throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         let element = try object.delete(createdAt: self.createdAt, executedAt: self.executedAt)
         root.registerRemovedElement(element)
 
-        guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
-            throw YorkieError.unexpected(message: "fail to get path")
-        }
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
 
-        let key = try? object.subPath(createdAt: self.createdAt)
+        let key = try object.subPath(createdAt: self.createdAt)
 
-        return [parent is CRDTArray ? RemoveOpInfo(path: path, key: nil, index: Int(key ?? "")) : RemoveOpInfo(path: path, key: key, index: nil)]
+        let index = Int(key)
+
+        return [parent is CRDTArray ? RemoveOpInfo(path: path, key: nil, index: index) : RemoveOpInfo(path: path, key: key, index: nil)]
     }
 
     /**
