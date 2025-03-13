@@ -113,6 +113,8 @@
 		CEA2DA4D28F6944000431B61 /* StringExtensionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4B28F693F500431B61 /* StringExtensionsTests.swift */; };
 		CEA2DA4F28F6967500431B61 /* Checkpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA4E28F6967500431B61 /* Checkpoint.swift */; };
 		CEA2DA5128F69D3800431B61 /* ChangeContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEA2DA5028F69D3800431B61 /* ChangeContext.swift */; };
+		CEB14CE72D7FCD49001232B3 /* Payload.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB14CE62D7FCD49001232B3 /* Payload.swift */; };
+		CEB14CEB2D82C37D001232B3 /* PayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEB14CEA2D82C37D001232B3 /* PayloadTests.swift */; };
 		CEBC84072909130900781AE9 /* JSONArrayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEBC84062909130900781AE9 /* JSONArrayTests.swift */; };
 		CEBC840A2909252000781AE9 /* ElementConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEBC8408290924F700781AE9 /* ElementConverter.swift */; };
 		CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */; };
@@ -248,6 +250,8 @@
 		CEA2DA4B28F693F500431B61 /* StringExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringExtensionsTests.swift; sourceTree = "<group>"; };
 		CEA2DA4E28F6967500431B61 /* Checkpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Checkpoint.swift; sourceTree = "<group>"; };
 		CEA2DA5028F69D3800431B61 /* ChangeContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeContext.swift; sourceTree = "<group>"; };
+		CEB14CE62D7FCD49001232B3 /* Payload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Payload.swift; sourceTree = "<group>"; };
+		CEB14CEA2D82C37D001232B3 /* PayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PayloadTests.swift; sourceTree = "<group>"; };
 		CEBC84062909130900781AE9 /* JSONArrayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONArrayTests.swift; sourceTree = "<group>"; };
 		CEBC8408290924F700781AE9 /* ElementConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementConverter.swift; sourceTree = "<group>"; };
 		CEC631D628EFFE6A00915A85 /* CRDTRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTRoot.swift; sourceTree = "<group>"; };
@@ -730,6 +734,7 @@
 			children = (
 				CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */,
 				9A4DC744292DD82500C89478 /* YorkieCountable.swift */,
+				CEB14CE62D7FCD49001232B3 /* Payload.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -739,6 +744,7 @@
 			children = (
 				CEC631DC28F4F15900915A85 /* StringEscapingTests.swift */,
 				CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */,
+				CEB14CEA2D82C37D001232B3 /* PayloadTests.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -924,6 +930,7 @@
 				9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */,
 				9A7E88C02A4962A700AF8997 /* IndexTree.swift in Sources */,
 				CE7B997A28E2820200D56198 /* RGATreeList.swift in Sources */,
+				CEB14CE72D7FCD49001232B3 /* Payload.swift in Sources */,
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */,
 				9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */,
@@ -1020,6 +1027,7 @@
 				CE9557C02902025600DF4DFA /* JSONObjectTests.swift in Sources */,
 				CE3EC96E28D3FFF0009471BC /* TimeTicketTests.swift in Sources */,
 				CE7B998628E520D600D56198 /* CRDTArrayTests.swift in Sources */,
+				CEB14CEB2D82C37D001232B3 /* PayloadTests.swift in Sources */,
 				9AB38FD42A9337DF006FA879 /* PresenceTests.swift in Sources */,
 				CEA2DA4328F672AD00431B61 /* MoveOperationTests.swift in Sources */,
 				9AFB4EBD2A94DA0600494401 /* ClientIntegrationTests.swift in Sources */,

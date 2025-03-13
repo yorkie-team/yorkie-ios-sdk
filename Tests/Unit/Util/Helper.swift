@@ -83,3 +83,24 @@ func posT(_ offset: Int32 = 0) -> CRDTTreeNodeID {
 func timeT() -> TimeTicket {
     dummyContext.issueTimeTicket
 }
+
+extension Task where Success == Never, Failure == Never {
+    /**
+     * `sleep` is a helper function that suspends the current task for the given milliseconds.
+     */
+    static func sleep(miliseconds: UInt64) async throws {
+        try await self.sleep(nanoseconds: miliseconds * 1_000_000)
+    }
+}
+
+/**
+ * `BroadcastExpectValue` is a helper struct for easy equality comparison in test functions.
+ */
+struct BroadcastExpectValue: Equatable {
+    let topic: String
+    let payload: Payload
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.topic == rhs.topic && lhs.payload == rhs.payload
+    }
+}

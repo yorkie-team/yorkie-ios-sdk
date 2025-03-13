@@ -70,6 +70,16 @@ public enum DocEventType: String {
      * `presenceChanged` means that the presences of the client has updated.
      */
     case presenceChanged = "presence-changed"
+
+    /**
+     * `broadcast` means that the broadcast event is received from the remote client.
+     */
+    case broadcast
+
+    /**
+     * `localBroadcast` means that the broadcast event is sent from the local client.
+     */
+    case localBroadcast = "local-broadcast"
 }
 
 /**
@@ -259,4 +269,41 @@ public struct PresenceChangedEvent: DocEvent {
      * PresenceChangedEvent type
      */
     public var value: PeerElement
+}
+
+public typealias ErrorFn = (Error) -> Void
+
+public struct LocalBroadcastValue {
+    let topic: String
+    let payload: Payload
+}
+
+public struct BroadcastValue {
+    let clientID: ActorID
+    let topic: String
+    let payload: Payload
+}
+
+public struct BroadcastEvent: DocEvent {
+    /**
+     * ``DocEventType/broadcast``
+     */
+    public let type: DocEventType = .broadcast
+    /**
+     * BroadcastEvent type
+     */
+    public let value: BroadcastValue
+    public let error: ErrorFn?
+}
+
+public struct LocalBroadcastEvent: DocEvent {
+    /**
+     * ``DocEventType/localBroadcast``
+     */
+    public let type: DocEventType = .localBroadcast
+    /**
+     * LocalBroadcastEvent type
+     */
+    public let value: LocalBroadcastValue
+    public let error: ErrorFn?
 }

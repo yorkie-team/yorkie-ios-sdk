@@ -17,7 +17,11 @@
 import XCTest
 @testable import Yorkie
 
-func withTwoClientsAndDocuments(_ title: String, detachDocuments: Bool = true, _ callback: (Client, Document, Client, Document) async throws -> Void) async throws {
+func withTwoClientsAndDocuments(_ title: String,
+                                syncMode: SyncMode = .manual,
+                                detachDocuments: Bool = true,
+                                callback: (Client, Document, Client, Document) async throws -> Void) async throws
+{
     let rpcAddress = "http://localhost:8080"
 
     let docKey = "\(Date().description)-\(title)".toDocKey
@@ -31,8 +35,8 @@ func withTwoClientsAndDocuments(_ title: String, detachDocuments: Bool = true, _
     let d1 = Document(key: docKey)
     let d2 = Document(key: docKey)
 
-    try await c1.attach(d1, [:], .manual)
-    try await c2.attach(d2, [:], .manual)
+    try await c1.attach(d1, [:], syncMode)
+    try await c2.attach(d2, [:], syncMode)
 
     try await callback(c1, d1, c2, d2)
 

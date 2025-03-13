@@ -90,6 +90,8 @@ public class Document {
     private var connectionSubscribeCallback: SubscribeCallback?
     private var statusSubscribeCallback: SubscribeCallback?
     private var syncSubscribeCallback: SubscribeCallback?
+    private var broadcastSubscribeCallback: SubscribeCallback?
+    private var localBroadcastSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -212,6 +214,22 @@ public class Document {
     }
 
     /**
+     * `subscribeBroadcast` registers a callback to subscribe to events on the document.
+     * The callback will be called when the broadcast event is received from the remote client.
+     */
+    public func subscribeBroadcast(_ callback: @escaping SubscribeCallback) {
+        self.broadcastSubscribeCallback = callback
+    }
+
+    /**
+     * `subscribeLocalBroadcast` registers a callback to subscribe to events on the document.
+     * The callback will be called when the local client sends a broadcast event.
+     */
+    public func subscribeLocalBroadcast(_ callback: @escaping SubscribeCallback) {
+        self.localBroadcastSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -241,6 +259,20 @@ public class Document {
      */
     public func unsubscribeSync() {
         self.syncSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeBroadcast` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribeBroadcast() {
+        self.broadcastSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeLocalBroadcast` unregisters a callback to subscribe to events on the document.
+     */
+    func unsubscribeLocalBroadcast() {
+        self.localBroadcastSubscribeCallback = nil
     }
 
     /**
@@ -604,6 +636,12 @@ public class Document {
         self.publish(InitializedEvent(value: self.getPresences()))
     }
 
+    func publishBroadcastEvent(clientID: ActorID, topic: String, payload: Payload, error: ErrorFn? = nil) {
+        let value = BroadcastValue(clientID: clientID, topic: topic, payload: payload)
+        let broadcastEvent = BroadcastEvent(value: value, error: error)
+        self.publish(broadcastEvent)
+    }
+
     /**
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
@@ -654,6 +692,10 @@ public class Document {
             self.syncSubscribeCallback?(event, self)
         } else if event.type == .snapshot {
             self.subscribeCallbacks["$"]?(event, self)
+        } else if let localBroadcastEvent = event as? LocalBroadcastEvent {
+            self.localBroadcastSubscribeCallback?(localBroadcastEvent, self)
+        } else if let broadcastEvent = event as? BroadcastEvent {
+            self.broadcastSubscribeCallback?(broadcastEvent, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
 
@@ -787,5 +829,14 @@ public class Document {
         }
 
         return presences
+    }
+
+    /**
+     * `broadcast` the payload to the given topic.
+     */
+    public func broadcast(topic: String, payload: Payload, error: ErrorFn? = nil) {
+        let value = LocalBroadcastValue(topic: topic, payload: payload)
+        let localBroadcastEvent = LocalBroadcastEvent(value: value, error: error)
+        self.publish(localBroadcastEvent)
     }
 }

@@ -272,6 +272,24 @@ public class Client {
             presence.set(initialPresence)
         }
 
+        doc.subscribeLocalBroadcast { [weak self] event, doc in
+            guard let self else { return }
+            guard let broadcastEvent = event as? LocalBroadcastEvent else {
+                return
+            }
+            let topic = broadcastEvent.value.topic
+            let payload = broadcastEvent.value.payload
+            let errorFn = broadcastEvent.error
+
+            Task {
+                do {
+                    try await self.broadcast(doc.getKey(), topic: topic, payload: payload)
+                } catch {
+                    errorFn?(error)
+                }
+            }
+        }
+
         var attachRequest = AttachDocumentRequest()
         attachRequest.clientID = clientID
         attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
@@ -297,7 +315,10 @@ public class Client {
 
             doc.applyStatus(.attached)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc, docID: message.documentID, syncMode: syncMode, remoteChangeEventReceived: false)
+            self.attachmentMap[doc.getKey()] = Attachment(doc: doc,
+                                                          docID: message.documentID,
+                                                          syncMode: syncMode,
+                                                          remoteChangeEventReceived: false)
 
             if syncMode != .manual {
                 try self.runWatchLoop(docKey)
@@ -432,6 +453,44 @@ public class Client {
      */
     public func setCondition(_ condition: ClientCondition, value: Bool) {
         self.conditions[condition] = value
+    }
+
+    /**
+     * `broadcast` broadcasts the given payload to the given topic.
+     */
+    public func broadcast(_ docKey: DocumentKey, topic: String, payload: Payload) async throws {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let attachment = self.attachmentMap[docKey] else {
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(docKey) is not attached when \(#function).")
+        }
+
+        guard let clientID = self.id else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID: \(String(describing: self.id))")
+        }
+
+        guard let payloadData = try? payload.toJSONData() else {
+            throw YorkieError(code: .errInvalidArgument, message: "payload is not serializable")
+        }
+
+        var request = BroadcastRequest()
+        request.clientID = clientID
+        request.documentID = attachment.docID
+        request.topic = topic
+        request.payload = payloadData
+
+        let message = await self.yorkieService.broadcast(request: request)
+
+        switch message.result {
+        case .success:
+            Logger.info("[BC] c:\(self.key) broadcasted to d: \(docKey) t: \(topic)")
+        case .failure(let error):
+            Logger.error("[BC] c:\(self.key)", error: error)
+            self.handleConnectError(error)
+            throw error
+        }
     }
 
     /**
@@ -712,6 +771,11 @@ public class Client {
                 if let presence {
                     self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
                 }
+            case .documentBroadcast:
+                let topic = pbWatchEvent.body.topic
+                let payloadData = pbWatchEvent.body.payload
+                let payload = Payload(data: payloadData)
+                self.attachmentMap[docKey]?.doc.publishBroadcastEvent(clientID: publisher, topic: topic, payload: payload)
             default:
                 break
             }
@@ -761,6 +825,8 @@ public class Client {
         guard let attachment = self.attachmentMap[docKey] else {
             return
         }
+
+        attachment.unsubscribeBroadcastEvent()
 
         try self.stopWatchLoop(docKey, with: attachment)
 
