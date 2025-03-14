@@ -234,7 +234,7 @@ extension Task where Success == Never, Failure == Never {
 struct BroadcastExpectValue: Equatable {
     let topic: String
     let payload: Payload
-    
+
     static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.topic == rhs.topic && lhs.payload == rhs.payload
     }
