@@ -76,4 +76,8 @@ final class Attachment: @unchecked Sendable {
             return self.isDisconnected
         }
     }
+
+    @MainActor func unsubscribeBroadcastEvent() {
+        self.doc.unsubscribeLocalBroadcast()
+    }
 }

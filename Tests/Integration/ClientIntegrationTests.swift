@@ -897,4 +897,222 @@ final class ClientIntegrationTests: XCTestCase {
 
         XCTAssertFalse(c1.getCondition(.syncLoop))
     }
+
+    func test_should_successfully_broadcast_serializeable_payload() async throws {
+        let c1 = Client(rpcAddress)
+        try await c1.activate()
+
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+        try await c1.attach(d1)
+
+        let topic = "test"
+        let payload = Payload([
+            "a": 1,
+            "b": "2"
+        ])
+
+        let errorHandler = { (error: Error) in
+            XCTFail("broadcast failed \(error)")
+        }
+
+        await d1.broadcast(topic: topic, payload: payload, error: errorHandler)
+
+        try await Task.sleep(milliseconds: 300)
+
+        try await c1.deactivate()
+    }
+
+    func test_should_throw_error_when_broadcasting_unserializeable_payload() async throws {
+        let c1 = Client(rpcAddress)
+        try await c1.activate()
+
+        let docKey = "\(Date().description)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+        try await c1.attach(d1)
+
+        let eventCollector = EventCollector<String>(doc: d1)
+
+        // broadcast unserializable payload
+        let topic = "test"
+        struct UnserializablePayload: Codable {
+            let data: String
+        }
+
+        let payload = Payload([
+            "a": UnserializablePayload(data: "")
+        ])
+
+        let errorHandler = { (error: Error) in
+            guard let yorkieError = error as? YorkieError else {
+                XCTFail("error should be YorkieError, but \(type(of: error))")
+                return
+            }
+            eventCollector.add(event: yorkieError.message)
+        }
+
+        await d1.broadcast(topic: topic, payload: payload, error: errorHandler)
+
+        try await Task.sleep(milliseconds: 300)
+
+        await eventCollector.verifyNthValue(at: 1, isEqualTo: "payload is not serializable")
+
+        try await c1.deactivate()
+    }
+
+    func test_should_trigger_the_handler_for_a_subscribed_broadcast_event() async throws {
+        try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
+            let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
+            let expectValue = BroadcastExpectValue(topic: "test", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+
+            await d2.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue.topic {
+                    eventCollector.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
+
+            try await Task.sleep(milliseconds: 300)
+
+            await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue)
+
+            XCTAssertEqual(eventCollector.count, 1)
+
+            await d2.unsubscribeBroadcast()
+        }
+    }
+
+    // Renamed from `test_should_not_trigger_the_handler_for_an_unsubscribed_broadcast_event`
+    func test_should_not_be_received_broadcast_event_when_not_subscribed() async throws {
+        try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
+            let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
+            let expectValue1 = BroadcastExpectValue(topic: "test1", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+            let expectValue2 = BroadcastExpectValue(topic: "test2", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+
+            await d2.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue1.topic {
+                    eventCollector.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                } else if topic == expectValue2.topic {
+                    eventCollector.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            await d1.broadcast(topic: expectValue1.topic, payload: expectValue1.payload)
+
+            try await Task.sleep(milliseconds: 300)
+
+            await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue1)
+
+            XCTAssertEqual(eventCollector.values.count, 1)
+
+            await d2.unsubscribeBroadcast()
+        }
+    }
+
+    func test_should_not_trigger_the_handler_for_a_broadcast_event_after_unsubscribing() async throws {
+        try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
+            let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
+            let expectValue = BroadcastExpectValue(topic: "test1", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+
+            await d2.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue.topic {
+                    eventCollector.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
+
+            try await Task.sleep(milliseconds: 300)
+
+            await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue)
+
+            await d2.unsubscribeBroadcast()
+
+            await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
+
+            try await Task.sleep(milliseconds: 300)
+
+            XCTAssertEqual(eventCollector.values.count, 1)
+        }
+    }
+
+    func test_should_not_trigger_the_handler_for_a_broadcast_event_sent_by_the_publisher_to_itself() async throws {
+        try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
+            let eventCollector1 = EventCollector<BroadcastExpectValue>(doc: d1)
+            let eventCollector2 = EventCollector<BroadcastExpectValue>(doc: d2)
+            let expectValue = BroadcastExpectValue(topic: "test", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+
+            await d1.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue.topic {
+                    eventCollector1.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            await d2.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue.topic {
+                    eventCollector2.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
+
+            // Assuming that D2 takes longer to receive the broadcast event compared to D1
+            try await Task.sleep(milliseconds: 300)
+
+            await eventCollector2.verifyNthValue(at: 1, isEqualTo: expectValue)
+
+            await d1.unsubscribeBroadcast()
+            await d2.unsubscribeBroadcast()
+
+            XCTAssertEqual(eventCollector1.count, 0)
+            XCTAssertEqual(eventCollector2.count, 1)
+        }
+    }
 }
