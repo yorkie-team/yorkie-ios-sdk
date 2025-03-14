@@ -992,7 +992,8 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
-    func test_should_not_trigger_the_handler_for_an_unsubscribed_broadcast_event() async throws {
+    // Renamed from `test_should_not_trigger_the_handler_for_an_unsubscribed_broadcast_event`
+    func test_should_not_be_received_broadcast_event_when_not_subscribed() async throws {
         try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
             let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
             let expectValue1 = BroadcastExpectValue(topic: "test1", payload: Payload([

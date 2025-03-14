@@ -36,14 +36,14 @@ public struct Payload: Equatable, CustomStringConvertible {
         return try JSONSerialization.data(withJSONObject: self.dictionary, options: .sortedKeys)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.description == rhs.description
-    }
-
     public var description: String {
         guard let jsonData = try? self.toJSONData(), let jsonString = String(data: jsonData, encoding: .utf8) else {
             return ""
         }
         return jsonString
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return NSDictionary(dictionary: lhs.dictionary).isEqual(to: rhs.dictionary)
     }
 }
