@@ -218,3 +218,24 @@ class EventCollector<T: Equatable> {
         }
     }
 }
+
+extension Task where Success == Never, Failure == Never {
+    /**
+     * `sleep` is a helper function that suspends the current task for the given milliseconds.
+     */
+    static func sleep(milliseconds: UInt64) async throws {
+        try await self.sleep(nanoseconds: milliseconds * 1_000_000)
+    }
+}
+
+/**
+ * `BroadcastExpectValue` is a helper struct for easy equality comparison in test functions.
+ */
+struct BroadcastExpectValue: Equatable {
+    let topic: String
+    let payload: Payload
+    
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.topic == rhs.topic && lhs.payload == rhs.payload
+    }
+}

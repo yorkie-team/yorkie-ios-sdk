@@ -918,7 +918,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         await d1.broadcast(topic: topic, payload: payload, error: errorHandler)
 
-        try await sleep(milliseconds: 300)
+        try await Task.sleep(milliseconds: 300)
 
         try await c1.deactivate()
     }
@@ -953,7 +953,7 @@ final class ClientIntegrationTests: XCTestCase {
 
         await d1.broadcast(topic: topic, payload: payload, error: errorHandler)
 
-        try await sleep(milliseconds: 300)
+        try await Task.sleep(milliseconds: 300)
 
         await eventCollector.verifyNthValue(at: 1, isEqualTo: "payload is not serializable")
 
@@ -982,7 +982,7 @@ final class ClientIntegrationTests: XCTestCase {
 
             await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
 
-            try await sleep(milliseconds: 300)
+            try await Task.sleep(milliseconds: 300)
 
             await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue)
 
@@ -1020,7 +1020,7 @@ final class ClientIntegrationTests: XCTestCase {
 
             await d1.broadcast(topic: expectValue1.topic, payload: expectValue1.payload)
 
-            try await sleep(milliseconds: 300)
+            try await Task.sleep(milliseconds: 300)
 
             await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue1)
 
@@ -1052,7 +1052,7 @@ final class ClientIntegrationTests: XCTestCase {
 
             await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
 
-            try await sleep(milliseconds: 300)
+            try await Task.sleep(milliseconds: 300)
 
             await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue)
 
@@ -1060,7 +1060,7 @@ final class ClientIntegrationTests: XCTestCase {
 
             await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
 
-            try await sleep(milliseconds: 300)
+            try await Task.sleep(milliseconds: 300)
 
             XCTAssertEqual(eventCollector.values.count, 1)
         }
@@ -1103,7 +1103,7 @@ final class ClientIntegrationTests: XCTestCase {
             await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
 
             // Assuming that D2 takes longer to receive the broadcast event compared to D1
-            try await sleep(milliseconds: 300)
+            try await Task.sleep(milliseconds: 300)
 
             await eventCollector2.verifyNthValue(at: 1, isEqualTo: expectValue)
 
