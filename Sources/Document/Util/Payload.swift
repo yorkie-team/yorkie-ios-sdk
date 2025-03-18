@@ -8,22 +8,38 @@
 import Foundation
 
 /**
+ * `JsonPrimitive`
+ *
+ * A protocol representing primitive data types allowed in JSON.
+ * Only types conforming to this protocol can be serialized into JSON.
+ */
+public protocol JsonPrimitive: Codable {}
+
+extension String: JsonPrimitive {}
+extension Int: JsonPrimitive {}
+extension Int64: JsonPrimitive {}
+extension Double: JsonPrimitive {}
+extension Bool: JsonPrimitive {}
+extension Array: JsonPrimitive where Element: JsonPrimitive {}
+extension Dictionary: JsonPrimitive where Key == String, Value: JsonPrimitive {}
+
+/**
  * `Payload` is a container structure that stores values of type `Codable` using `AnyCodable`.
  * It provides convenient access and serialization to JSON format.
  */
 public struct Payload: Equatable, CustomStringConvertible {
     let dictionary: [String: Any]
 
-    public init(_ dictionary: [String: Any]) {
+    public init(_ dictionary: [String: JsonPrimitive]) {
         self.dictionary = dictionary
     }
 
-    public init(data: Data) {
-        self.dictionary = (try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]) ?? [:]
+    public init(jsonData: Data) {
+        self.dictionary = (try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any]) ?? [:]
     }
 
-    public subscript(key: String) -> Any? {
-        return self.dictionary[key]
+    public subscript<T: Codable>(key: String) -> T? {
+        return self.dictionary[key] as? T
     }
 
     public func toJSONData() throws -> Data {
@@ -33,7 +49,7 @@ public struct Payload: Equatable, CustomStringConvertible {
                 debugDescription: "Invalid JSON object: \(self.dictionary)"
             ))
         }
-        return try JSONSerialization.data(withJSONObject: self.dictionary, options: .sortedKeys)
+        return try JSONSerialization.data(withJSONObject: self.dictionary, options: [.sortedKeys])
     }
 
     public var description: String {

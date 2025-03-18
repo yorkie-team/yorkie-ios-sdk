@@ -774,7 +774,7 @@ public class Client {
             case .documentBroadcast:
                 let topic = pbWatchEvent.body.topic
                 let payloadData = pbWatchEvent.body.payload
-                let payload = Payload(data: payloadData)
+                let payload = Payload(jsonData: payloadData)
                 self.attachmentMap[docKey]?.doc.publishBroadcastEvent(clientID: publisher, topic: topic, payload: payload)
             default:
                 break

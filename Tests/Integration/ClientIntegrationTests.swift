@@ -935,12 +935,16 @@ final class ClientIntegrationTests: XCTestCase {
 
         // broadcast unserializable payload
         let topic = "test"
-        struct UnserializablePayload: Codable {
+        struct UnserializablePayload: JsonPrimitive {
             let data: String
+
+            func encode(to encoder: any Encoder) throws {
+                throw EncodingError.invalidValue(self.data, .init(codingPath: [], debugDescription: "test encoding error"))
+            }
         }
 
         let payload = Payload([
-            "a": UnserializablePayload(data: "")
+            "key": UnserializablePayload(data: "value")
         ])
 
         let errorHandler = { (error: Error) in
