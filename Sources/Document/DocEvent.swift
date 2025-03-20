@@ -293,7 +293,7 @@ public struct BroadcastEvent: DocEvent {
      * BroadcastEvent type
      */
     public let value: BroadcastValue
-    public let error: ErrorFn?
+    public let options: BroadcastOptions?
 }
 
 public struct LocalBroadcastEvent: DocEvent {
@@ -305,5 +305,5 @@ public struct LocalBroadcastEvent: DocEvent {
      * LocalBroadcastEvent type
      */
     public let value: LocalBroadcastValue
-    public let error: ErrorFn?
+    public let options: BroadcastOptions?
 }

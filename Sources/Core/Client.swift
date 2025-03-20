@@ -137,6 +137,15 @@ public struct ClientOptions {
 }
 
 /**
+ * `DefaultBroadcastOptions` is the default options for broadcast.
+ */
+enum DefaultBroadcastOptions {
+    static let maxRetries: Int = .max
+    static let initialRetryInterval: Double = 1000 // milliseconds
+    static let maxBackoff: Double = 20000 // milliseconds
+}
+
+/**
  * `Client` is a normal client that can communicate with the server.
  * It has documents and sends changes of the documents in local
  * to the server to synchronize with other replicas in remote.
@@ -279,11 +288,11 @@ public class Client {
             }
             let topic = broadcastEvent.value.topic
             let payload = broadcastEvent.value.payload
-            let errorFn = broadcastEvent.error
+            let errorFn = broadcastEvent.options?.error
 
             Task {
                 do {
-                    try await self.broadcast(doc.getKey(), topic: topic, payload: payload)
+                    try await self.broadcast(doc.getKey(), topic: topic, payload: payload, options: broadcastEvent.options)
                 } catch {
                     errorFn?(error)
                 }
@@ -458,7 +467,7 @@ public class Client {
     /**
      * `broadcast` broadcasts the given payload to the given topic.
      */
-    public func broadcast(_ docKey: DocumentKey, topic: String, payload: Payload) async throws {
+    public func broadcast(_ docKey: DocumentKey, topic: String, payload: Payload, options: BroadcastOptions?) async throws {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -475,22 +484,15 @@ public class Client {
             throw YorkieError(code: .errInvalidArgument, message: "payload is not serializable")
         }
 
+        let maxRetries = options?.maxRetries ?? DefaultBroadcastOptions.maxRetries
+
         var request = BroadcastRequest()
         request.clientID = clientID
         request.documentID = attachment.docID
         request.topic = topic
         request.payload = payloadData
 
-        let message = await self.yorkieService.broadcast(request: request)
-
-        switch message.result {
-        case .success:
-            Logger.info("[BC] c:\(self.key) broadcasted to d: \(docKey) t: \(topic)")
-        case .failure(let error):
-            Logger.error("[BC] c:\(self.key)", error: error)
-            self.handleConnectError(error)
-            throw error
-        }
+        try await self.broadcast(request: request, maxRetries: maxRetries)
     }
 
     /**
@@ -941,5 +943,36 @@ public extension Client {
      */
     func setMockError(for method: Connect.MethodSpec, error: ConnectError) {
         self.yorkieService.setMockError(for: method, error: error)
+    }
+
+    /**
+     * Calculates an exponential backoff interval based on the retry count
+     */
+    func exponentialBackoff(retryCount: Int) -> Double {
+        return min(DefaultBroadcastOptions.initialRetryInterval * pow(2, Double(retryCount)), DefaultBroadcastOptions.maxBackoff)
+    }
+
+    private func broadcast(request: BroadcastRequest, maxRetries: Int) async throws {
+        var retryCount = 0
+
+        while retryCount <= maxRetries {
+            let message = await self.yorkieService.broadcast(request: request)
+
+            switch message.result {
+            case .success:
+                Logger.info("[BC] c:\(self.key) broadcasted to d: \(request.documentID) t: \(request.topic)")
+                return
+            case .failure(let error):
+                Logger.error("[BC] c:\(self.key)", error: error)
+
+                if !self.handleConnectError(error) || retryCount >= maxRetries {
+                    throw error
+                }
+
+                let retryInterval = self.exponentialBackoff(retryCount: retryCount)
+                try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000))
+                retryCount += 1
+            }
+        }
     }
 }

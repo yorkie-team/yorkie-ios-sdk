@@ -916,7 +916,7 @@ final class ClientIntegrationTests: XCTestCase {
             XCTFail("broadcast failed \(error)")
         }
 
-        await d1.broadcast(topic: topic, payload: payload, error: errorHandler)
+        await d1.broadcast(topic: topic, payload: payload, options: BroadcastOptions(error: errorHandler, maxRetries: nil))
 
         try await Task.sleep(milliseconds: 300)
 
@@ -955,7 +955,7 @@ final class ClientIntegrationTests: XCTestCase {
             eventCollector.add(event: yorkieError.message)
         }
 
-        await d1.broadcast(topic: topic, payload: payload, error: errorHandler)
+        await d1.broadcast(topic: topic, payload: payload, options: BroadcastOptions(error: errorHandler, maxRetries: nil))
 
         try await Task.sleep(milliseconds: 300)
 
@@ -1117,6 +1117,88 @@ final class ClientIntegrationTests: XCTestCase {
 
             XCTAssertEqual(eventCollector1.count, 0)
             XCTAssertEqual(eventCollector2.count, 1)
+        }
+    }
+
+    func test_should_retry_broadcasting_on_network_failure_with_retry_option_and_succeeds_when_network_is_restored() async throws {
+        try await withTwoClientsAndDocuments(self.description, mockingEnabled: true, syncMode: .realtime) { c1, d1, _, d2 in
+            let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
+            let expectValue = BroadcastExpectValue(topic: "test", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+
+            await d2.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue.topic {
+                    eventCollector.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            await c1.setMockError(for: YorkieServiceClient.Metadata.Methods.broadcast,
+                                  error: connectError(from: .unknown))
+
+            await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
+
+            let retryInterval = await c1.exponentialBackoff(retryCount: 1)
+
+            try await Task.sleep(milliseconds: UInt64(retryInterval))
+
+            await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue)
+
+            await d1.unsubscribeBroadcast()
+            await d2.unsubscribeBroadcast()
+        }
+    }
+
+    func test_should_not_retry_broadcasting_on_network_failure_when_maxRetries_is_set_to_zero() async throws {
+        try await withTwoClientsAndDocuments(self.description, mockingEnabled: true, syncMode: .realtime) { c1, d1, _, d2 in
+            let eventCollector1 = EventCollector<BroadcastExpectValue>(doc: d2)
+            let eventCollector2 = EventCollector<Code>(doc: d2)
+            let expectValue = BroadcastExpectValue(topic: "test", payload: Payload([
+                "a": 1,
+                "b": "2"
+            ]))
+
+            await d2.subscribeBroadcast { event, _ in
+                guard let broadcastEvent = event as? BroadcastEvent else {
+                    return
+                }
+                let topic = broadcastEvent.value.topic
+                let payload = broadcastEvent.value.payload
+
+                if topic == expectValue.topic {
+                    eventCollector1.add(event: BroadcastExpectValue(topic: topic, payload: payload))
+                }
+            }
+
+            let errorHandler = { (error: Error) in
+                guard let connectError = error as? ConnectError else {
+                    XCTFail("error should be ConnectError, but \(type(of: error))")
+                    return
+                }
+                eventCollector2.add(event: connectError.code)
+            }
+
+            await c1.setMockError(for: YorkieServiceClient.Metadata.Methods.broadcast,
+                                  error: connectError(from: .unknown))
+
+            await d1.broadcast(topic: expectValue.topic,
+                               payload: expectValue.payload,
+                               options: BroadcastOptions(error: errorHandler, maxRetries: 0))
+
+            try await Task.sleep(milliseconds: 300)
+
+            XCTAssertEqual(eventCollector1.count, 0)
+            await eventCollector2.verifyNthValue(at: 1, isEqualTo: .unknown)
+
+            await d1.unsubscribeBroadcast()
+            await d2.unsubscribeBroadcast()
         }
     }
 }

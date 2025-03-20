@@ -18,6 +18,7 @@ import XCTest
 @testable import Yorkie
 
 func withTwoClientsAndDocuments(_ title: String,
+                                mockingEnabled: Bool = false,
                                 syncMode: SyncMode = .manual,
                                 detachDocuments: Bool = true,
                                 callback: (Client, Document, Client, Document) async throws -> Void) async throws
@@ -26,8 +27,8 @@ func withTwoClientsAndDocuments(_ title: String,
 
     let docKey = "\(Date().description)-\(title)".toDocKey
 
-    let c1 = Client(rpcAddress)
-    let c2 = Client(rpcAddress)
+    let c1 = Client(rpcAddress, isMockingEnabled: mockingEnabled)
+    let c2 = Client(rpcAddress, isMockingEnabled: mockingEnabled)
 
     try await c1.activate()
     try await c2.activate()
