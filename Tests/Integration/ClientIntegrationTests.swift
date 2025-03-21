@@ -1141,13 +1141,15 @@ final class ClientIntegrationTests: XCTestCase {
             }
 
             await c1.setMockError(for: YorkieServiceClient.Metadata.Methods.broadcast,
-                                  error: connectError(from: .unknown))
+                                  error: connectError(from: .unknown),
+                                  count: 2)
 
             await d1.broadcast(topic: expectValue.topic, payload: expectValue.payload)
 
-            let retryInterval = await c1.exponentialBackoff(retryCount: 1)
+            let firstTry = await c1.exponentialBackoff(retryCount: 1)
+            let secondTry = await c1.exponentialBackoff(retryCount: 2)
 
-            try await Task.sleep(milliseconds: UInt64(retryInterval))
+            try await Task.sleep(milliseconds: UInt64(firstTry + secondTry))
 
             await eventCollector.verifyNthValue(at: 1, isEqualTo: expectValue)
 

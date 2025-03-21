@@ -18,7 +18,7 @@ import Combine
 import Foundation
 
 /**
- * `BroadcastOptions` are the options to create a new document.
+ * `BroadcastOptions` are the options for configuring broadcast behavior.
  *
  * @public
  */

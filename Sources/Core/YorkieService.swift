@@ -26,6 +26,7 @@ import Foundation
 public final class YorkieService {
     private let rpcClient: YorkieServiceClient
     private var mockErrors: [String: ConnectError] = [:]
+    private var mockErrorCounts: [String: Int] = [:]
     private let isMockingEnabled: Bool
 
     init(rpcClient: YorkieServiceClient, isMockingEnabled: Bool = false) {
@@ -100,15 +101,28 @@ extension YorkieService {
      * If mocking is enabled, this error will be returned the next time the
      * corresponding method is called.
      */
-    public func setMockError(for method: Connect.MethodSpec, error: ConnectError) {
+    public func setMockError(for method: Connect.MethodSpec, error: ConnectError, count: Int = 1) {
         self.mockErrors[method.name] = error
+        self.mockErrorCounts[method.name] = count
     }
 
     /**
      * `getMockError` retrieves and removes the mock error for a specific method.
      */
     private func getMockError(for method: Connect.MethodSpec) -> ConnectError? {
-        guard self.isMockingEnabled else { return nil }
-        return self.mockErrors.removeValue(forKey: method.name)
+        guard self.isMockingEnabled, let error = mockErrors[method.name], var count = mockErrorCounts[method.name] else {
+            return nil
+        }
+
+        count -= 1
+        self.mockErrorCounts[method.name] = count
+
+        // swiftlint:disable:next empty_count
+        if count <= 0 {
+            self.mockErrorCounts.removeValue(forKey: method.name)
+            return self.mockErrors.removeValue(forKey: method.name)
+        }
+
+        return error
     }
 }

@@ -941,8 +941,8 @@ public extension Client {
     /**
      * `setMockError` sets a mock error for a specific method.
      */
-    func setMockError(for method: Connect.MethodSpec, error: ConnectError) {
-        self.yorkieService.setMockError(for: method, error: error)
+    func setMockError(for method: Connect.MethodSpec, error: ConnectError, count: Int = 1) {
+        self.yorkieService.setMockError(for: method, error: error, count: count)
     }
 
     /**
