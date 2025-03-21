@@ -175,17 +175,13 @@ class SplayTree<V> {
      * - Returns: the index of given node
      */
     func indexOf(_ node: SplayNode<V>) -> Int {
-        guard let root = self.root else {
-            return -1
-        }
-
-        if node !== root, !node.hasLinks {
+        if node !== self.root, !node.hasLinks {
             return -1
         }
 
         self.splayNode(node)
 
-        return root.leftWeight
+        return self.root?.leftWeight ?? -1
     }
 
     /**
