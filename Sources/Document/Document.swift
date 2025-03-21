@@ -18,6 +18,22 @@ import Combine
 import Foundation
 
 /**
+ * `BroadcastOptions` are the options for configuring broadcast behavior.
+ *
+ * @public
+ */
+public struct BroadcastOptions {
+    /**
+     * `error` is called when an error occurs.
+     */
+    let error: ErrorFn?
+    /**
+     * `maxRetries` is the maximum number of retries.
+     */
+    let maxRetries: Int?
+}
+
+/**
  * `DocumentOptions` are the options to create a new document.
  *
  * @public
@@ -636,9 +652,9 @@ public class Document {
         self.publish(InitializedEvent(value: self.getPresences()))
     }
 
-    func publishBroadcastEvent(clientID: ActorID, topic: String, payload: Payload, error: ErrorFn? = nil) {
+    func publishBroadcastEvent(clientID: ActorID, topic: String, payload: Payload) {
         let value = BroadcastValue(clientID: clientID, topic: topic, payload: payload)
-        let broadcastEvent = BroadcastEvent(value: value, error: error)
+        let broadcastEvent = BroadcastEvent(value: value, options: nil)
         self.publish(broadcastEvent)
     }
 
@@ -834,9 +850,9 @@ public class Document {
     /**
      * `broadcast` the payload to the given topic.
      */
-    public func broadcast(topic: String, payload: Payload, error: ErrorFn? = nil) {
+    public func broadcast(topic: String, payload: Payload, options: BroadcastOptions? = nil) {
         let value = LocalBroadcastValue(topic: topic, payload: payload)
-        let localBroadcastEvent = LocalBroadcastEvent(value: value, error: error)
+        let localBroadcastEvent = LocalBroadcastEvent(value: value, options: options)
         self.publish(localBroadcastEvent)
     }
 }

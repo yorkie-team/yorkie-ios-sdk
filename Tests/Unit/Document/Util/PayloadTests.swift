@@ -1,9 +1,18 @@
-//
-//  PayloadTests.swift
-//  YorkieTests
-//
-//  Created by hiddenviewer on 3/13/25.
-//
+/*
+ * Copyright 2022 The Yorkie Authors. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License")
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 import XCTest
 @testable import Yorkie
@@ -13,28 +22,25 @@ final class PayloadTests: XCTestCase {
         let value = "Hello, world!"
         let originalPayload = Payload(["string": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
+        let restoredValue: String? = restoredPayload["string"]
 
-        XCTAssertEqual(restoredPayload["string"] as? String, value)
+        XCTAssertEqual(restoredValue, value)
     }
 
     func test_can_store_and_restore_int() throws {
         let value = 42
         let originalPayload = Payload(["int": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
+        let restoreValue: Int? = restoredPayload["int"]
 
-        XCTAssertEqual(restoredPayload["int"] as? Int, value)
+        XCTAssertEqual(restoreValue, value)
     }
 
     func test_can_store_and_restore_int64() throws {
         let value: Int64 = 9_007_199_254_740_991
         let originalPayload = Payload(["int64": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
-
-        // restoredValue is not Int64, but Int
-        guard let restoredValue = restoredPayload["int64"] as? Int else {
-            XCTFail("restore failed")
-            return
-        }
+        let restoredValue: Int64? = restoredPayload["int64"]
 
         XCTAssert(restoredValue == value)
     }
@@ -43,32 +49,36 @@ final class PayloadTests: XCTestCase {
         let value = 3.14
         let originalPayload = Payload(["double": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
+        let restoreValue: Double? = restoredPayload["double"]
 
-        XCTAssertEqual(restoredPayload["double"] as? Double, value)
+        XCTAssertEqual(restoreValue, value)
     }
 
     func test_can_store_and_restore_bool() throws {
         let value = true
         let originalPayload = Payload(["bool": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
+        let restoredValue: Bool? = restoredPayload["bool"]
 
-        XCTAssertEqual(restoredPayload["bool"] as? Bool, value)
+        XCTAssertEqual(restoredValue, value)
     }
 
     func test_can_store_and_restore_array() throws {
         let value = [1, 2, 3]
         let originalPayload = Payload(["array": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
+        let restoredValue: [Int]? = restoredPayload["array"]
 
-        XCTAssertEqual(restoredPayload["array"] as? [Int], value)
+        XCTAssertEqual(restoredValue, value)
     }
 
     func test_can_store_and_restore_dictionary() throws {
         let value = ["key": "value"]
         let originalPayload = Payload(["dictionary": value])
         let restoredPayload = try encodeAndDecode(originalPayload)
+        let restoredValue: [String: String]? = restoredPayload["dictionary"]
 
-        XCTAssertEqual(restoredPayload["dictionary"] as? [String: String], value)
+        XCTAssertEqual(restoredValue, value)
     }
 
     func test_can_store_and_restore_nested_dictionary() throws {
@@ -84,12 +94,12 @@ final class PayloadTests: XCTestCase {
     }
 
     func test_cannot_store_struct_and_throw_error() throws {
-        struct User: Codable, Equatable {
+        struct User: JsonPrimitive {
             let name: String
-            let age: Int
+            let age: Data
         }
 
-        let user = User(name: "Alice", age: 30)
+        let user = User(name: "Alice", age: Data())
         let payload = Payload(["user": user])
 
         XCTAssertThrowsError(try self.encodeAndDecode(payload)) { error in
@@ -99,6 +109,6 @@ final class PayloadTests: XCTestCase {
 
     private func encodeAndDecode(_ payload: Payload) throws -> Payload {
         let jsonData = try payload.toJSONData()
-        return Payload(data: jsonData)
+        return Payload(jsonData: jsonData)
     }
 }

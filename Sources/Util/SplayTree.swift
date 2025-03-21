@@ -162,6 +162,9 @@ class SplayTree<V> {
             let message = "out of index range: pos: \(offset) > node.length: \(node.length)"
             throw YorkieError(code: .errInvalidArgument, message: message)
         }
+
+        self.splayNode(node)
+
         return (node, offset)
     }
 
@@ -172,25 +175,13 @@ class SplayTree<V> {
      * - Returns: the index of given node
      */
     func indexOf(_ node: SplayNode<V>) -> Int {
-        if node !== self.root, node.hasLinks == false {
+        if node !== self.root, !node.hasLinks {
             return -1
         }
 
-        var index = 0
-        var tempCurrent: SplayNode<V>? = node
-        var previousNode: SplayNode<V>?
-        while true {
-            guard let current = tempCurrent else {
-                break
-            }
+        self.splayNode(node)
 
-            if previousNode == nil || previousNode === current.right {
-                index += current.length + (current.hasLeft ? current.leftWeight : 0)
-            }
-            previousNode = current
-            tempCurrent = current.parent
-        }
-        return index - node.length
+        return self.root?.leftWeight ?? -1
     }
 
     /**
