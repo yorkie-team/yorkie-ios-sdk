@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      # yorkie server v0.5.0
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/120a83affa75e66a12ee4615ecfbd07dd80dcfd9/Formula/y/yorkie.rb"
+      # yorkie server v0.5.2
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/2ebc9a9807de76e95ae53fd115ce3c1e848c3afa/Formula/y/yorkie.rb"
         
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
