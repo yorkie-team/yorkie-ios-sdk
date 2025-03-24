@@ -7,7 +7,7 @@ import Connect
 import Foundation
 import SwiftProtobuf
 
-/// Yorkie is a service that provides a API for SDKs.
+/// Yorkie is a service that provides an API for SDKs.
 public protocol Yorkie_V1_YorkieServiceClientInterface: Sendable {
 
     @discardableResult
