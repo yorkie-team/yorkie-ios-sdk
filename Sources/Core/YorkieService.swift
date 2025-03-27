@@ -34,7 +34,7 @@ public final class YorkieService {
         self.isMockingEnabled = isMockingEnabled
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func activateClient(request: Yorkie_V1_ActivateClientRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_ActivateClientResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.activateClient) {
             return .init(result: .failure(error))
@@ -42,7 +42,7 @@ public final class YorkieService {
         return await self.rpcClient.activateClient(request: request, headers: headers)
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func deactivateClient(request: Yorkie_V1_DeactivateClientRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_DeactivateClientResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.deactivateClient) {
             return .init(result: .failure(error))
@@ -50,7 +50,7 @@ public final class YorkieService {
         return await self.rpcClient.deactivateClient(request: request, headers: headers)
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func attachDocument(request: Yorkie_V1_AttachDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_AttachDocumentResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.attachDocument) {
             return .init(result: .failure(error))
@@ -58,7 +58,7 @@ public final class YorkieService {
         return await self.rpcClient.attachDocument(request: request, headers: headers)
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func detachDocument(request: Yorkie_V1_DetachDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_DetachDocumentResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.detachDocument) {
             return .init(result: .failure(error))
@@ -66,7 +66,7 @@ public final class YorkieService {
         return await self.rpcClient.detachDocument(request: request, headers: headers)
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func removeDocument(request: Yorkie_V1_RemoveDocumentRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_RemoveDocumentResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.removeDocument) {
             return .init(result: .failure(error))
@@ -74,7 +74,7 @@ public final class YorkieService {
         return await self.rpcClient.removeDocument(request: request, headers: headers)
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func pushPullChanges(request: Yorkie_V1_PushPullChangesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_PushPullChangesResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges) {
             return .init(result: .failure(error))
@@ -86,7 +86,7 @@ public final class YorkieService {
         return self.rpcClient.watchDocument(headers: headers, onResult: onResult)
     }
 
-    @available(iOS 13, *)
+    @available(iOS 15, *)
     public func broadcast(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_BroadcastResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.broadcast) {
             return .init(result: .failure(error))
