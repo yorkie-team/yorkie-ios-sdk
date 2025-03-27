@@ -1154,7 +1154,7 @@ extension Converter {
             throw YorkieError(code: .errInvalidArgument, message: "bytes is empty")
         }
         
-        let pbElement = try PbJSONElement(serializedData: bytes)
+        let pbElement = try PbJSONElement(serializedBytes: bytes)
         return try fromTree(pbElement.tree)
     }
 
@@ -1173,7 +1173,7 @@ extension Converter {
             return (CRDTObject(createdAt: TimeTicket.initial), [:])
         }
         
-        let snapshot = try PbSnapshot(serializedData: bytes)
+        let snapshot = try PbSnapshot(serializedBytes: bytes)
         return (try fromObject(snapshot.root.jsonObject), fromPresences(snapshot.presences))
     }
     
@@ -1185,7 +1185,7 @@ extension Converter {
             throw YorkieError(code: .errInvalidArgument, message: "bytes is empty")
         }
 
-        let pbElement = try PbJSONElement(serializedData: bytes)
+        let pbElement = try PbJSONElement(serializedBytes: bytes)
         return try fromObject(pbElement.jsonObject)
     }
 
