@@ -3,7 +3,13 @@ name: Publish API reference
 on:
   push:
     tags:
-    - '*'
+      - '*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to deploy (e.g. 0.4.26)'
+        required: true
+        type: string
 
 env:
   OUTPUT_PATH: ../docs-temp
@@ -14,6 +20,20 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Determine tag name
+      id: get-tag
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          git fetch origin tag ${{ github.event.inputs.tag }} --depth=1
+          git checkout tags/${{ github.event.inputs.tag }}
+        else
+          echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Generate API reference doc
       run: |
         swift package --allow-writing-to-directory $OUTPUT_PATH \
@@ -22,13 +42,15 @@ jobs:
             --output-path $OUTPUT_PATH  \
             --transform-for-static-hosting \
             --hosting-base-path $HOSTING_BASE_PATH
+
     - uses: actions/checkout@v3
       with:
         ref: gh-pages
+
     - name: Push API reference doc
       run: |
         rm -rf docs
         mv $OUTPUT_PATH docs
         git add docs
-        git commit -m "Updates for version $GITHUB_REF_NAME"
+        git commit -m "Updates for version ${{ steps.get-tag.outputs.tag }}"
         git push
