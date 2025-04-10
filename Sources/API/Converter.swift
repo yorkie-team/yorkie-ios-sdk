@@ -184,6 +184,7 @@ extension Converter {
         pbChangeID.clientSeq = changeID.getClientSeq()
         pbChangeID.lamport = changeID.getLamport()
         pbChangeID.actorID = changeID.getActorID()?.toData ?? Data()
+        pbChangeID.versionVector = toVersionVector(changeID.getVersionVector())
         return pbChangeID
     }
 
@@ -194,6 +195,7 @@ extension Converter {
         ChangeID(clientSeq: pbChangeID.clientSeq,
                  lamport: pbChangeID.lamport,
                  actor: pbChangeID.actorID.toHexString,
+                 versionVector: fromVersionVector(pbChangeID.versionVector),
                  serverSeq: pbChangeID.serverSeq)
     }
 }
@@ -218,6 +220,33 @@ extension Converter {
         TimeTicket(lamport: pbTimeTicket.lamport,
                    delimiter: pbTimeTicket.delimiter,
                    actorID: pbTimeTicket.actorID.toHexString)
+    }
+}
+
+// MARK: VersionVector
+extension Converter {
+    /**
+     * `toVersionVector` converts the given model to Protobuf format.
+     */
+    static func toVersionVector(_ vector: VersionVector) -> PbVersionVector {
+        var pbVector = PbVersionVector()
+        for (actorID, lamport) in vector {
+            pbVector.vector[actorID] = lamport
+        }
+        
+        return pbVector
+    }
+    
+    /**
+     * `fromVersionVector` converts the given Protobuf format to model format.
+     */
+    static func fromVersionVector(_ pbVersionVector: PbVersionVector) -> VersionVector {
+        var vector = VersionVector()
+        for (actorID, lamport) in pbVersionVector.vector {
+            vector.set(actorID: actorID, lamport: lamport)
+        }
+        
+        return vector
     }
 }
 
@@ -1096,8 +1125,10 @@ extension Converter {
     static func fromChangePack(_ pbPack: PbChangePack) throws -> ChangePack {
         ChangePack(key: pbPack.documentKey,
                    checkpoint: fromCheckpoint(pbPack.checkpoint),
-                   isRemoved: pbPack.isRemoved, changes: try fromChanges(pbPack.changes),
+                   isRemoved: pbPack.isRemoved,
+                   changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
+                   versionVector: fromVersionVector(pbPack.versionVector),
                    minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil)
     }
 
@@ -1175,6 +1206,30 @@ extension Converter {
         
         let snapshot = try PbSnapshot(serializedBytes: bytes)
         return (try fromObject(snapshot.root.jsonObject), fromPresences(snapshot.presences))
+    }
+    
+    /**
+     * `versionVectorToHex` converts the given VersionVector to bytes.
+     */
+    static func versionVectorToHex(vector: VersionVector) throws -> String {
+        let pbVersionVector = toVersionVector(vector)
+        
+        let serializedBytes: Data = try pbVersionVector.serializedBytes()
+        
+        return serializedBytes.toHexString
+    }
+    
+    
+    /**
+     * `hexToVersionVector` creates a VersionVector from the given bytes.
+     */
+    static func hexToVersionVector(hex: String) throws -> VersionVector {
+        guard let serializedBytes = hex.toData else {
+            throw YorkieError(code: .errInvalidArgument, message: "hex is invalid")
+        }
+        let pbVersionVector = try PbVersionVector(serializedBytes: serializedBytes)
+        
+        return fromVersionVector(pbVersionVector)
     }
     
     /**
