@@ -22,7 +22,7 @@ import Foundation
  * similar to vector clocks, but it is synced with lamport timestamp of the
  * change.
  */
-struct VersionVector: Sendable {
+public struct VersionVector: Sendable {
     /**
      * `initial` is the initial version vector.
      */
@@ -135,7 +135,7 @@ struct VersionVector: Sendable {
 }
 
 extension VersionVector: Sequence {
-    func makeIterator() -> [String: Int64].Iterator {
+    public func makeIterator() -> [String: Int64].Iterator {
         return self.vector.makeIterator()
     }
 }
