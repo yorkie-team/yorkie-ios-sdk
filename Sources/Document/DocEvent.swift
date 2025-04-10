@@ -162,16 +162,29 @@ public struct SyncStatusChangedEvent: DocEvent {
 /**
  * `SnapshotEvent` is an event that occurs when a snapshot is received from
  * the server.
- *
  */
 public struct SnapshotEvent: DocEvent {
     public let type: DocEventType = .snapshot
     /**
      * SnapshotEvent type
      */
-    public var value: Data
+    public var value: SnapshotInfo
 }
 
+/**
+ * `SnapshotInfo` contains the full snapshot data of a document received from the server
+ * at a given server sequence, along with the corresponding vector clock for synchronization.
+ */
+public struct SnapshotInfo {
+    public let serverSeq: Int64
+    public let snapshot: Data?
+    public let snapshotVector: String
+}
+
+/**
+ * `ChangeEvent` is an event that occurs when the document is changed
+ * by local or remote changes.
+ */
 protocol ChangeEvent: DocEvent {
     var type: DocEventType { get }
     var value: ChangeInfo { get }
