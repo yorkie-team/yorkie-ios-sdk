@@ -32,19 +32,24 @@ let package = Package(
                       "API/V1/buf.yaml",
                       "API/V1/run_protoc.sh"]
         ),
+        .target(
+            name: "YorkieTestHelper",
+            dependencies: ["Yorkie"],
+            path: "Tests/Helper"
+        ),
         .testTarget(
             name: "YorkieUnitTests",
-            dependencies: ["Yorkie"],
+            dependencies: ["Yorkie", "YorkieTestHelper"],
             path: "Tests/Unit"
         ),
         .testTarget(
             name: "YorkieIntegrationTests",
-            dependencies: ["Yorkie"],
+            dependencies: ["Yorkie", "YorkieTestHelper"],
             path: "Tests/Integration"
         ),
         .testTarget(
             name: "YorkieBenchmarkTests",
-            dependencies: ["Yorkie"],
+            dependencies: ["Yorkie", "YorkieTestHelper"],
             path: "Tests/Benchmark"
         )
     ]
