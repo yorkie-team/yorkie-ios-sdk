@@ -93,7 +93,7 @@ public class Document {
     private let key: DocumentKey
     private(set) var status: DocumentStatus = .detached
     private let disableGC: Bool
-    private var changeID: ChangeID = .initial
+    private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
 

@@ -69,8 +69,8 @@ class GCIntegrationTests: XCTestCase {
         XCTAssertEqual(doc2Len, gcNodeLen)
 
         // Actual garbage-collected nodes
-        doc1Len = await doc1.garbageCollect(TimeTicket.max)
-        doc2Len = await doc2.garbageCollect(TimeTicket.max)
+        doc1Len = await doc1.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: []))
+        doc2Len = await doc2.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: []))
 
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)

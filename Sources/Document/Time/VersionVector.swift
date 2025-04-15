@@ -54,10 +54,8 @@ public struct VersionVector: Sendable {
     public func maxLamport() -> Int64 {
         var max = Int64(0)
 
-        for (_, lamport) in self {
-            if lamport > max {
-                max = lamport
-            }
+        for (_, lamport) in self where lamport > max {
+            max = lamport
         }
 
         return max
