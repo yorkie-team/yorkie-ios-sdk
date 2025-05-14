@@ -57,19 +57,19 @@ struct ChangeID {
         return ChangeID(clientSeq: self.clientSeq + 1,
                         lamport: self.lamport + 1,
                         actor: self.actor,
-                        versionVector: self.versionVector)
+                        versionVector: vector)
     }
 
     /**
      * `syncClocks` syncs logical clocks with the given ID.
      */
     @discardableResult
-    mutating func syncClocks(with other: ChangeID) -> ChangeID {
+    func syncClocks(with other: ChangeID) -> ChangeID {
         let lamport = other.lamport > self.lamport ? other.lamport + 1 : self.lamport + 1
         let maxVersionVector = self.versionVector.max(other: other.versionVector)
 
         var newID = ChangeID(clientSeq: self.clientSeq,
-                             lamport: self.lamport,
+                             lamport: lamport,
                              actor: self.actor,
                              versionVector: maxVersionVector)
         newID.versionVector.set(actorID: self.actor, lamport: lamport)
@@ -81,9 +81,10 @@ struct ChangeID {
      * is given from the server.
      */
     @discardableResult
-    mutating func setClocks(with otherLamport: Int64, vector: VersionVector) -> ChangeID {
+    func setClocks(with otherLamport: Int64, vector: VersionVector) -> ChangeID {
         let lamport = otherLamport > self.lamport ? otherLamport : self.lamport + 1
-        let maxVersionVector = self.versionVector.max(other: vector)
+        var maxVersionVector = self.versionVector.max(other: vector)
+        maxVersionVector.set(actorID: self.actor, lamport: lamport)
 
         return ChangeID(clientSeq: self.clientSeq,
                         lamport: lamport,

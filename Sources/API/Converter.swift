@@ -1110,6 +1110,9 @@ extension Converter {
         pbChangePack.checkpoint = toCheckpoint(pack.getCheckpoint())
         pbChangePack.changes = toChanges(pack.getChanges())
         pbChangePack.snapshot = pack.getSnapshot() ?? Data()
+        if let versionVector = pack.getVersionVector() {
+            pbChangePack.versionVector = toVersionVector(versionVector)
+        }
         if let minSyncedTicket = pack.getMinSyncedTicket() {
             pbChangePack.minSyncedTicket = toTimeTicket(minSyncedTicket)
         } else {

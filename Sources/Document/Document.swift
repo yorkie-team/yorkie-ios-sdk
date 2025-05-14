@@ -93,7 +93,7 @@ public class Document {
     private let key: DocumentKey
     private(set) var status: DocumentStatus = .detached
     private let disableGC: Bool
-    private var changeID: ChangeID = .initial
+    private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
 
@@ -554,6 +554,7 @@ public class Document {
             }
 
             let opInfos = try change.execute(root: self.root, presences: &self.presences)
+            self.changeID = self.changeID.syncClocks(with: change.id)
 
             if change.hasOperations {
                 changeInfo = ChangeInfo(message: change.message ?? "",
@@ -575,8 +576,6 @@ public class Document {
             if let presenceEvent {
                 self.publish(presenceEvent)
             }
-
-            self.changeID = self.changeID.syncClocks(with: change.id)
         }
 
         Logger.debug(
