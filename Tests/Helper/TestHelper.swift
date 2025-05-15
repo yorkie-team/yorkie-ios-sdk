@@ -37,7 +37,9 @@ struct ActorData {
     let lamport: Int64
 }
 
-func versionVectorHelper(versionVector: VersionVector, actorDatas: [ActorData]) -> Bool {
+func versionVectorHelper(_ versionVector: VersionVector,
+                         actorDatas: [ActorData]) async -> Bool
+{
     guard versionVector.size() == actorDatas.count else {
         return false
     }
@@ -53,4 +55,18 @@ func versionVectorHelper(versionVector: VersionVector, actorDatas: [ActorData]) 
     }
 
     return true
+}
+
+func assertTrue(versionVector: VersionVector, actorDatas: [ActorData]) async {
+    let result = await versionVectorHelper(versionVector, actorDatas: actorDatas)
+    XCTAssertTrue(result)
+}
+
+extension Task where Success == Never, Failure == Never {
+    /**
+     * `sleep` is a helper function that suspends the current task for the given milliseconds.
+     */
+    static func sleep(milliseconds: UInt64) async throws {
+        try await self.sleep(nanoseconds: milliseconds * 1_000_000)
+    }
 }

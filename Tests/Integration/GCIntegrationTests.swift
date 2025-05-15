@@ -17,6 +17,7 @@
 import XCTest
 @testable import Yorkie
 
+// swiftlint:disable function_body_length type_body_length
 class GCIntegrationTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
@@ -69,8 +70,8 @@ class GCIntegrationTests: XCTestCase {
         XCTAssertEqual(doc2Len, gcNodeLen)
 
         // Actual garbage-collected nodes
-        doc1Len = await doc1.garbageCollect(TimeTicket.max)
-        doc2Len = await doc2.garbageCollect(TimeTicket.max)
+        doc1Len = await doc1.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [client1.id, client2.id]))
+        doc2Len = await doc2.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [client1.id, client2.id]))
 
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)
@@ -92,7 +93,15 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
 
         try await doc1.update { root, _ in
             root.t = JSONTree(initialRoot:
@@ -114,16 +123,26 @@ class GCIntegrationTests: XCTestCase {
             )
         }
 
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
         var len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
-        // (0, 0) -> (1, 0): syncedseqs:(0, 0)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
-        // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
 
         try await doc2.update({ root, _ in
             do {
@@ -133,45 +152,65 @@ class GCIntegrationTests: XCTestCase {
             }
         }, "removes 2")
 
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        // (1, 1) -> (1, 2): syncedseqs:(0, 1)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        // (1, 2) -> (2, 2): syncedseqs:(1, 1)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        // (2, 2) -> (2, 2): syncedseqs:(1, 2)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, 2): meet GC condition
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, 2): meet GC condition
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -198,68 +237,105 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
 
         try await doc1.update({ root, _ in
             root["1"] = Int64(1)
             root["2"] = [Int64(1), Int64(2), Int64(3)]
             root["3"] = Int64(3)
         }, "set 1, 2,3")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
 
         var len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
-        // (0, 0) -> (1, 0): syncedseqs:(0, 0)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
-        // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
 
         try await doc2.update({ root, _ in
             root.remove(key: "2")
         }, "removes 2")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        // (1, 1) -> (1, 2): syncedseqs:(0, 1)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        // (1, 2) -> (2, 2): syncedseqs:(1, 1)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        // (2, 2) -> (2, 2): syncedseqs:(1, 2)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, 2): meet GC condition
         try await client1.sync()
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, 2): meet GC condition
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -286,7 +362,15 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
 
         try await doc1.update({ root, _ in
             root.text = JSONText()
@@ -294,17 +378,26 @@ class GCIntegrationTests: XCTestCase {
             root.textWithAttr = JSONText()
             (root.textWithAttr as? JSONText)?.edit(0, 0, "Hello World")
         }, "sets text")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
 
         var len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
-        // (0, 0) -> (1, 0): syncedseqs:(0, 0)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
-        // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
 
         try await doc2.update({ root, _ in
             (root.text as? JSONText)?.edit(0, 1, "a")
@@ -312,46 +405,65 @@ class GCIntegrationTests: XCTestCase {
             (root.textWithAttr as? JSONText)?.edit(0, 1, "a", ["b": "1"])
 
         }, "edit text type elements")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
-        // (1, 1) -> (1, 2): syncedseqs:(0, 1)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
-        // (1, 2) -> (2, 2): syncedseqs:(1, 1)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
-        // (2, 2) -> (2, 2): syncedseqs:(1, 2)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, 2): meet GC condition
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, 2): meet GC condition
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -378,7 +490,15 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
 
         try await doc1.update({ root, _ in
             root["1"] = Int64(1)
@@ -390,30 +510,48 @@ class GCIntegrationTests: XCTestCase {
             (root["5"] as? JSONText)?.edit(0, 0, "hi")
         }, "sets 1, 2, 3, 4, 5")
 
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
         var len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
-        // (0, 0) -> (1, 0): syncedseqs:(0, 0)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
-        // (1, 0) -> (1, 1): syncedseqs:(0, 0)
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
 
         try await doc1.update({ root, _ in
             root.remove(key: "2")
             (root["4"] as? JSONText)?.edit(0, 1, "h")
             (root["5"] as? JSONText)?.edit(0, 1, "h", ["b": "1"])
         }, "removes 2 and edit text type elements")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 6)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
-        // (1, 1) -> (2, 1): syncedseqs:(1, 0)
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 6)
         len = await doc2.getGarbageLength()
@@ -421,15 +559,17 @@ class GCIntegrationTests: XCTestCase {
 
         try await client2.detach(doc2)
 
-        // (2, 1) -> (2, 2): syncedseqs:(1, x)
         try await client2.sync()
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 6)
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 6)
 
-        // (2, 2) -> (2, 2): syncedseqs:(2, x): meet GC condition
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5)
+        ])
+
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = await doc2.getGarbageLength()
@@ -451,23 +591,88 @@ class GCIntegrationTests: XCTestCase {
         try await client.activate()
 
         try await client.attach(doc, [:], .manual)
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 1)
+        ])
 
         try await doc.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
         }
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 2)
+        ])
 
         try await doc.update { root, _ in
             root.point = ["x": Int64(1), "y": Int64(1)]
         }
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 3)
+        ])
 
         try await doc.update { root, _ in
             root.point = ["x": Int64(2), "y": Int64(2)]
         }
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 4)
+        ])
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(len, 6)
         len = await doc.getGarbageLengthFromClone()
         XCTAssertEqual(len, 6)
+    }
+
+    func test_can_collect_removed_elements_from_both_root_and_clone_for_nested_array() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc = Document(key: docKey)
+
+        let client = Client(rpcAddress)
+
+        try await client.activate()
+        try await client.attach(doc, [:], .manual)
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 1)
+        ])
+
+        try await doc.update { root, _ in
+            root.list = [Int(0), Int(1), Int(2)]
+            (root.list as? JSONArray)?.push([Int(3), Int(4), Int(5)])
+        }
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 2)
+        ])
+
+        var expectedJson = await doc.toJSON()
+        XCTAssertEqual("{\"list\":[0,1,2,[3,4,5]]}", expectedJson)
+
+        try await doc.update { root, _ in
+            (root.list as? JSONArray)?.remove(index: 1)
+        }
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 3)
+        ])
+
+        expectedJson = await doc.toJSON()
+        XCTAssertEqual("{\"list\":[0,2,[3,4,5]]}", expectedJson)
+
+        try await doc.update { root, _ in
+            ((root.list as? JSONArray)?[2] as? JSONArray)?.remove(index: 1)
+        }
+        await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
+            ActorData(actor: client.id!, lamport: 4)
+        ])
+
+        expectedJson = await doc.toJSON()
+        XCTAssertEqual("{\"list\":[0,2,[3,5]]}", expectedJson)
+
+        var len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 2)
+
+        len = await doc.getGarbageLengthFromClone()
+        XCTAssertEqual(len, 2)
+
+        try await client.deactivate()
     }
 
     func test_can_purges_removed_elements_after_peers_can_not_access_them() async throws {
@@ -483,21 +688,41 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
 
         try await doc1.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
 
         try await doc1.update { root, _ in
             (root.point as? JSONObject)?.x = Int64(1)
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3)
+        ])
 
         var len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 1)
 
         try await client1.sync()
 
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
 
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 1)
@@ -505,6 +730,10 @@ class GCIntegrationTests: XCTestCase {
         try await doc2.update { root, _ in
             (root.point as? JSONObject)?.x = Int64(2)
         }
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 5)
+        ])
 
         len = await doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
@@ -512,32 +741,88 @@ class GCIntegrationTests: XCTestCase {
         try await doc1.update { root, _ in
             root.point = ["x": Int64(3), "y": Int64(3)]
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4)
+        ])
 
         len = await doc1.getGarbageLength()
-        XCTAssertEqual(len, 4)
-        try await client1.sync()
-        len = await doc1.getGarbageLength()
-        XCTAssertEqual(len, 4)
+        XCTAssertEqual(len, 3)
 
         try await client1.sync()
+        await assertTrue(versionVector: await doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 3)
+
+        try await client1.sync()
+        await assertTrue(versionVector: await doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 3)
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 3)
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 6),
+            ActorData(actor: client2.id!, lamport: 5)
+        ])
+
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client2.sync()
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
-        try await client1.sync()
-        len = await doc1.getGarbageLength()
-        XCTAssertEqual(len, 5)
-        try await client2.sync()
-        len = await doc1.getGarbageLength()
-        XCTAssertEqual(len, 5)
+
         try await client1.sync()
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 
+        try await client2.sync()
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
         try await client1.deactivate()
         try await client2.deactivate()
+    }
+
+    func test_garbage_collection_test_for_nested_object() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc = Document(key: docKey)
+
+        let client = Client(rpcAddress)
+
+        try await client.activate()
+
+        try await doc.update { root, _ in
+            root.shape = JSONObject()
+            (root.shape as? JSONObject)?.point = JSONObject()
+            ((root.shape as? JSONObject)?.point as? JSONObject)?.set(key: "x", value: Int32(0))
+            ((root.shape as? JSONObject)?.point as? JSONObject)?.set(key: "y", value: Int32(0))
+            root.remove(key: "shape")
+        }
+
+        var len = await doc.getGarbageLength()
+        XCTAssertEqual(len, 4)
+
+        let actorID = await doc.changeID.getActorID() ?? ""
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [actorID]))
+        XCTAssertEqual(len, 4) // The number of GC nodes must also be 4.
     }
 
     func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_text_type() async throws {
@@ -553,24 +838,56 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
 
         try await doc1.update { root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "z")
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
         try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 1, "a")
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3)
+        ])
+
         try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(1, 1, "b")
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4)
+        ])
+
         try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "d")
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5)
+        ])
 
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 6),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
 
         var strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
         var strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
@@ -582,10 +899,23 @@ class GCIntegrationTests: XCTestCase {
         try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         try await client2.sync()
-        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 8)
+        ])
+
         strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
         strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc1, "abcd")
@@ -594,18 +924,39 @@ class GCIntegrationTests: XCTestCase {
         try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
 
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc1, "ad")
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 2) // b,c
 
         try await client2.sync()
-        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 9)
+        ])
+
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        try await client2.sync()
         strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc2, "ad")
+
+        try await client1.sync()
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 
@@ -626,7 +977,15 @@ class GCIntegrationTests: XCTestCase {
         try await client2.activate()
 
         try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
         try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
 
         try await doc1.update { root, _ in
             root.t = JSONTree(initialRoot:
@@ -636,17 +995,43 @@ class GCIntegrationTests: XCTestCase {
                                     ])
             )
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
         try await doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([0], [1], JSONTreeTextNode(value: "a"))
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3)
+        ])
+
         try await doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([1], [1], JSONTreeTextNode(value: "b"))
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4)
+        ])
+
         try await doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([2], [2], JSONTreeTextNode(value: "d"))
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5)
+        ])
+
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 6),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
         var strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
         var strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>abd</r>")
@@ -657,9 +1042,23 @@ class GCIntegrationTests: XCTestCase {
         try await doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([2], [2], JSONTreeTextNode(value: "c"))
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         try await client2.sync()
-        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 8)
+        ])
+
         strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
         strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>abcd</r>")
@@ -668,16 +1067,57 @@ class GCIntegrationTests: XCTestCase {
         try await doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([1], [3])
         }
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
         strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>ad</r>")
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 2) // b, c
 
         try await client2.sync()
-        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 9)
+        ])
+
         try await client1.sync()
-        strDoc1 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(strDoc2, "<r>ad</r>")
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 2)
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 9)
+        ])
+
+        strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(strDoc2, "<r>ad</r>")
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>ad</r>")
         len = await doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -685,4 +1125,300 @@ class GCIntegrationTests: XCTestCase {
         try await client1.deactivate()
         try await client2.deactivate()
     }
+
+    func test_concurrent_garbage_collection_test() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
+        try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
+
+        try await doc1.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+            (root.t as? JSONText)?.edit(1, 1, "b")
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "sets text")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "insert c")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
+        try await doc1.update({ root, _ in
+            (root.t as? JSONText)?.edit(1, 3, "")
+        }, "delete bd")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        var len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 5)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 2)
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "1")
+        }, "insert 1")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 0)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.deactivate()
+        try await client2.deactivate()
+    }
+
+    func test_concurrent_garbage_collection_test_with_pushonly() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
+        try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
+
+        try await doc1.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+            (root.t as? JSONText)?.edit(1, 1, "b")
+        }, "insert ab")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "d")
+        }, "insert d")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 5),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "insert c")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 5)
+        ])
+
+        try await doc1.update({ root, _ in
+            (root.t as? JSONText)?.edit(1, 3, "")
+        }, "remove ac")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 6),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
+        // Sync with PushOnly
+        try await client2.changeSyncMode(doc2, .realtimePushOnly)
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 5)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 7),
+            ActorData(actor: client2.id!, lamport: 5)
+        ])
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "1")
+        }, "insert 1 (pushonly)")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 8),
+            ActorData(actor: client2.id!, lamport: 6)
+        ])
+
+        var len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "2")
+        }, "insert 2 (pushonly)")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 7)
+        ])
+
+        try await client2.changeSyncMode(doc2, .manual)
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 6),
+            ActorData(actor: client2.id!, lamport: 8)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 9),
+            ActorData(actor: client2.id!, lamport: 7)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 2)
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 6),
+            ActorData(actor: client2.id!, lamport: 8)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 2)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 9),
+            ActorData(actor: client2.id!, lamport: 7)
+        ])
+
+        len = await doc1.getGarbageLength()
+        XCTAssertEqual(len, 0)
+        len = await doc2.getGarbageLength()
+        XCTAssertEqual(len, 0)
+
+        try await client1.deactivate()
+        try await client2.deactivate()
+    }
 }
+
+// swiftlint:enable function_body_length type_body_length

@@ -177,7 +177,7 @@ class CRDTRootTests: XCTestCase {
         target.registerRemovedElement(a1)
         let garbageLength = target.garbageLength
         XCTAssertEqual(garbageLength, 5)
-        let result = target.garbageCollect(lessThanOrEqualTo: removedAtForGarbage)
+        let result = target.garbageCollect(minSyncedVersionVector: VersionVector(vector: [self.actorId: removedAtForGarbage.lamport]))
 
         // then
         XCTAssertEqual(result, 4)
