@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 // `getNodeLength` returns the number of nodes in the given tree.
 func getNodeLength(_ root: CRDTTreeNode?) -> Int {

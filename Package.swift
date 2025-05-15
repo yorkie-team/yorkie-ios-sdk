@@ -40,17 +40,20 @@ let package = Package(
         .testTarget(
             name: "YorkieUnitTests",
             dependencies: ["Yorkie", "YorkieTestHelper"],
-            path: "Tests/Unit"
+            path: "Tests/Unit",
+            swiftSettings: [.define("SWIFT_TEST")]
         ),
         .testTarget(
             name: "YorkieIntegrationTests",
             dependencies: ["Yorkie", "YorkieTestHelper"],
-            path: "Tests/Integration"
+            path: "Tests/Integration",
+            swiftSettings: [.define("SWIFT_TEST")]
         ),
         .testTarget(
             name: "YorkieBenchmarkTests",
             dependencies: ["Yorkie", "YorkieTestHelper"],
-            path: "Tests/Benchmark"
+            path: "Tests/Benchmark",
+            swiftSettings: [.define("SWIFT_TEST")]
         )
     ]
 )

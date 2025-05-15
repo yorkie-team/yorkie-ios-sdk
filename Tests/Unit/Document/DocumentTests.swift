@@ -17,6 +17,9 @@
 import Combine
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 class DocumentTests: XCTestCase {
     func test_doesnt_return_error_when_trying_to_delete_a_missing_key() async throws {

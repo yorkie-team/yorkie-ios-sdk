@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 // swiftlint:disable function_body_length type_body_length
 class GCIntegrationTests: XCTestCase {

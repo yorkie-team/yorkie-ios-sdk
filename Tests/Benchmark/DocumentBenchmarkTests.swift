@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 final class DocumentBenchmarkTests: XCTestCase {
     func benchmarkTreeEdit(_ size: Int) async {
