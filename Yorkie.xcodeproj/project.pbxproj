@@ -61,6 +61,7 @@
 		CE220A8A2D35328F004BD420 /* error_details.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE220A862D35328F004BD420 /* error_details.pb.swift */; };
 		CE2D57292D41283F00A1ED14 /* SnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE2D57282D41283F00A1ED14 /* SnapshotTests.swift */; };
 		CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE370E5B28EEBFA6008FCABD /* RHTTests.swift */; };
+		CE39CD6D2DA7EBCE00DCF32B /* TestHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE39CD6C2DA7EBCE00DCF32B /* TestHelper.swift */; };
 		CE3EC95228D195E4009471BC /* LLRBTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95028D195E0009471BC /* LLRBTreeTests.swift */; };
 		CE3EC95F28D2AAA1009471BC /* SplayTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */; };
 		CE3EC96128D2D626009471BC /* SplayTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE3EC96028D2D626009471BC /* SplayTree.swift */; };
@@ -74,6 +75,7 @@
 		CE6BD03E28E6E0BA00E97B8C /* CRDTObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE6BD03D28E6E0BA00E97B8C /* CRDTObject.swift */; };
 		CE72E85228EE531C00D1331C /* Collection+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE72E85128EE531C00D1331C /* Collection+Extensions.swift */; };
 		CE72E85628EE6D1600D1331C /* RHT.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE72E85528EE6D1600D1331C /* RHT.swift */; };
+		CE78465D2DA393CA00BEA371 /* VersionVector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE78465C2DA393CA00BEA371 /* VersionVector.swift */; };
 		CE7B996E28E142A300D56198 /* Errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B996D28E142A300D56198 /* Errors.swift */; };
 		CE7B997028E1453E00D56198 /* Strings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B996F28E1453E00D56198 /* Strings.swift */; };
 		CE7B997428E1766F00D56198 /* Converter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7B997328E1766F00D56198 /* Converter.swift */; };
@@ -200,6 +202,7 @@
 		CE220A862D35328F004BD420 /* error_details.pb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = error_details.pb.swift; sourceTree = "<group>"; };
 		CE2D57282D41283F00A1ED14 /* SnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapshotTests.swift; sourceTree = "<group>"; };
 		CE370E5B28EEBFA6008FCABD /* RHTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHTTests.swift; sourceTree = "<group>"; };
+		CE39CD6C2DA7EBCE00DCF32B /* TestHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelper.swift; sourceTree = "<group>"; };
 		CE3EC95028D195E0009471BC /* LLRBTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLRBTreeTests.swift; sourceTree = "<group>"; };
 		CE3EC95D28D2AA9C009471BC /* SplayTreeTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SplayTreeTests.swift; sourceTree = "<group>"; };
 		CE3EC96028D2D626009471BC /* SplayTree.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplayTree.swift; sourceTree = "<group>"; };
@@ -213,6 +216,7 @@
 		CE6BD03D28E6E0BA00E97B8C /* CRDTObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObject.swift; sourceTree = "<group>"; };
 		CE72E85128EE531C00D1331C /* Collection+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Collection+Extensions.swift"; sourceTree = "<group>"; };
 		CE72E85528EE6D1600D1331C /* RHT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RHT.swift; sourceTree = "<group>"; };
+		CE78465C2DA393CA00BEA371 /* VersionVector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionVector.swift; sourceTree = "<group>"; };
 		CE7B996D28E142A300D56198 /* Errors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Errors.swift; sourceTree = "<group>"; };
 		CE7B996F28E1453E00D56198 /* Strings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Strings.swift; sourceTree = "<group>"; };
 		CE7B997128E1750000D56198 /* PrimitiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrimitiveTests.swift; sourceTree = "<group>"; };
@@ -332,6 +336,7 @@
 		96DA808F28C5B7B400E2C1DA /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				CE39CD6B2DA7EAD700DCF32B /* Helper */,
 				9A5A80D62BD0BC8A0047B978 /* Benchmark */,
 				CE0EE07A292CD14100CB81F4 /* Unit */,
 				9ADECA002919FC1A006BA331 /* Integration */,
@@ -487,6 +492,14 @@
 				CE220A882D35328F004BD420 /* google */,
 			);
 			path = googleapis;
+			sourceTree = "<group>";
+		};
+		CE39CD6B2DA7EAD700DCF32B /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+				CE39CD6C2DA7EBCE00DCF32B /* TestHelper.swift */,
+			);
+			path = Helper;
 			sourceTree = "<group>";
 		};
 		CE3EC94928D18720009471BC /* Recovered References */ = {
@@ -695,6 +708,7 @@
 			children = (
 				CE8C22F628C9E89100432DE5 /* TimeTicket.swift */,
 				CE3EC96828D30FEE009471BC /* ActorID.swift */,
+				CE78465C2DA393CA00BEA371 /* VersionVector.swift */,
 			);
 			path = Time;
 			sourceTree = "<group>";
@@ -976,6 +990,7 @@
 				9A7E88BE2A49600B00AF8997 /* JSONTree.swift in Sources */,
 				CE8ED32128F646EA009A5419 /* AddOperation.swift in Sources */,
 				CE7B996E28E142A300D56198 /* Errors.swift in Sources */,
+				CE78465D2DA393CA00BEA371 /* VersionVector.swift in Sources */,
 				9AD11BF32A544353005C84D2 /* TreeEditOperation.swift in Sources */,
 				9A232B772A7D0C0F0041C826 /* Dictionary+Extension.swift in Sources */,
 				CE3EC96728D30E74009471BC /* CRDTElement.swift in Sources */,
@@ -1000,6 +1015,7 @@
 				CE8ED31F28F566DE009A5419 /* RemoveOperationTests.swift in Sources */,
 				9AC481502BFB164900C51338 /* TreeConcurrencyTests.swift in Sources */,
 				CE8BB74128FE2F030020F62A /* CheckpointTests.swift in Sources */,
+				CE39CD6D2DA7EBCE00DCF32B /* TestHelper.swift in Sources */,
 				9A4BC6042AA08D6A00A9D436 /* String+Extensions.swift in Sources */,
 				9A3CF3EF2966A7370024E3DD /* CRDTTextTests.swift in Sources */,
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,

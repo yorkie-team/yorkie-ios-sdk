@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 // `getNodeLength` returns the number of nodes in the given tree.
 func getNodeLength(_ root: CRDTTreeNode?) -> Int {
@@ -61,7 +64,7 @@ final class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(4, len)
-        len = await doc.garbageCollect(TimeTicket.max)
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(4, len)
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
@@ -88,7 +91,8 @@ final class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(4, len)
-        len = await doc.garbageCollect(TimeTicket.max)
+        let actors = await [doc.changeID.getActorID()].compactMap { $0 }
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: actors))
         XCTAssertEqual(0, len)
         len = await doc.getGarbageLength()
         XCTAssertEqual(4, len)
@@ -106,7 +110,7 @@ final class GCTests: XCTestCase {
             root.remove(key: "1")
         }, "deltes the array")
 
-        let len = await doc.garbageCollect(TimeTicket.max)
+        let len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(size + 1, len)
     }
 
@@ -132,7 +136,8 @@ final class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(1, len)
-        len = await doc.garbageCollect(TimeTicket.max)
+        let actors = await [doc.changeID.getActorID()].compactMap { $0 }
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: actors))
         XCTAssertEqual(1, len)
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
@@ -161,7 +166,7 @@ final class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(1, len)
-        await doc.garbageCollect(TimeTicket.max)
+        await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         len = await doc.getGarbageLength()
         XCTAssertEqual(0, len)
 
@@ -207,7 +212,7 @@ final class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(2, len)
-        len = await doc.garbageCollect(TimeTicket.max)
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(2, len)
 
         len = await doc.getGarbageLength()
@@ -255,7 +260,7 @@ final class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(expectedGarbageLen, len)
-        len = await doc.garbageCollect(TimeTicket.max)
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(expectedGarbageLen, len)
 
         len = await doc.getGarbageLength()
@@ -302,7 +307,7 @@ final class GCTests: XCTestCase {
 
         var len = await doc.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc.garbageCollect(TimeTicket.max)
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(len, 2)
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -326,7 +331,7 @@ final class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 1)
-        len = await doc.garbageCollect(TimeTicket.max)
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(len, 1)
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -355,7 +360,7 @@ final class GCTests: XCTestCase {
 
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 5)
-        len = await doc.garbageCollect(TimeTicket.max)
+        len = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(len, 5)
         len = await doc.getGarbageLength()
         XCTAssertEqual(len, 0)
@@ -428,7 +433,7 @@ final class GCTests: XCTestCase {
         let len = await doc.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        let nodeCount = await doc.garbageCollect(TimeTicket.max)
+        let nodeCount = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         XCTAssertEqual(nodeCount, 4)
     }
 }
@@ -546,7 +551,7 @@ final class GCTestsForTree: XCTestCase {
 
             for step in test.steps {
                 if step.op.code == .gc {
-                    await doc.garbageCollect(TimeTicket.max)
+                    await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
                 } else {
                     try await doc.update { root, _ in
                         switch step.op.code {
@@ -569,7 +574,7 @@ final class GCTestsForTree: XCTestCase {
                 XCTAssertEqual(len, step.garbageLen, test.desc)
             }
 
-            await doc.garbageCollect(TimeTicket.max)
+            await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
 
             let len = await doc.getGarbageLength()
             XCTAssertEqual(len, 0)
@@ -640,7 +645,7 @@ final class GCTestsForText: XCTestCase {
 
             for step in test.steps {
                 if step.op.code == .gc {
-                    await doc.garbageCollect(timeT())
+                    await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
                 } else {
                     try await doc.update { root, _ in
                         switch step.op.code {
@@ -661,7 +666,7 @@ final class GCTestsForText: XCTestCase {
                 XCTAssertEqual(len, step.garbageLen)
             }
 
-            await doc.garbageCollect(TimeTicket.max)
+            await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
 
             let len = await doc.getGarbageLength()
             XCTAssertEqual(len, 0)

@@ -40,7 +40,7 @@ class ChangeTests: XCTestCase {
                                         parentCreatedAt: object2.createdAt,
                                         executedAt: TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId))
 
-        let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: self.actorId)
+        let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: self.actorId, versionVector: VersionVector(vector: [actorId: 2]))
 
         var target = Change(id: changeID, operations: [setOperation])
 
@@ -73,7 +73,7 @@ class ChangeTests: XCTestCase {
                                         parentCreatedAt: object2.createdAt,
                                         executedAt: TimeTicket(lamport: 8, delimiter: 0, actorID: self.actorId))
 
-        let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: self.actorId)
+        let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: self.actorId, versionVector: VersionVector(vector: [actorId: 2]))
 
         let target = Change(id: changeID, operations: [setOperation])
 

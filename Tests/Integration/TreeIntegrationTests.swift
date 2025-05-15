@@ -29,14 +29,16 @@ func createChangePack(_ doc: Document) async throws -> ChangePack {
     let resPack = ChangePack(key: reqPack.getDocumentKey(),
                              checkpoint: Checkpoint(serverSeq: reqCP.getServerSeq() + Int64(reqPack.getChangeSize()), clientSeq: reqCP.getClientSeq() + UInt32(reqPack.getChangeSize())),
                              isRemoved: false,
-                             changes: [])
+                             changes: [],
+                             versionVector: nil)
     try await doc.applyChangePack(resPack)
 
     // 02. Create a pack to apply the changes to other replicas.
     return ChangePack(key: reqPack.getDocumentKey(),
                       checkpoint: Checkpoint(serverSeq: reqCP.getServerSeq() + Int64(reqPack.getChangeSize()), clientSeq: 0),
                       isRemoved: false,
-                      changes: reqPack.getChanges())
+                      changes: reqPack.getChanges(),
+                      versionVector: nil)
 }
 
 /**

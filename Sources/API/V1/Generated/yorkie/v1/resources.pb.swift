@@ -219,12 +219,22 @@ public struct Yorkie_V1_ChangePack: @unchecked Sendable {
 
   public var isRemoved: Bool = false
 
+  public var versionVector: Yorkie_V1_VersionVector {
+    get {return _versionVector ?? Yorkie_V1_VersionVector()}
+    set {_versionVector = newValue}
+  }
+  /// Returns true if `versionVector` has been explicitly set.
+  public var hasVersionVector: Bool {return self._versionVector != nil}
+  /// Clears the value of `versionVector`. Subsequent reads from it will return its default value.
+  public mutating func clearVersionVector() {self._versionVector = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _checkpoint: Yorkie_V1_Checkpoint? = nil
   fileprivate var _minSyncedTicket: Yorkie_V1_TimeTicket? = nil
+  fileprivate var _versionVector: Yorkie_V1_VersionVector? = nil
 }
 
 public struct Yorkie_V1_Change: Sendable {
@@ -274,6 +284,29 @@ public struct Yorkie_V1_ChangeID: @unchecked Sendable {
   public var lamport: Int64 = 0
 
   public var actorID: Data = Data()
+
+  public var versionVector: Yorkie_V1_VersionVector {
+    get {return _versionVector ?? Yorkie_V1_VersionVector()}
+    set {_versionVector = newValue}
+  }
+  /// Returns true if `versionVector` has been explicitly set.
+  public var hasVersionVector: Bool {return self._versionVector != nil}
+  /// Clears the value of `versionVector`. Subsequent reads from it will return its default value.
+  public mutating func clearVersionVector() {self._versionVector = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _versionVector: Yorkie_V1_VersionVector? = nil
+}
+
+public struct Yorkie_V1_VersionVector: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var vector: Dictionary<String,Int64> = [:]
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2059,6 +2092,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     4: .same(proto: "changes"),
     5: .standard(proto: "min_synced_ticket"),
     6: .standard(proto: "is_removed"),
+    7: .standard(proto: "version_vector"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2073,6 +2107,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.changes) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._minSyncedTicket) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.isRemoved) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._versionVector) }()
       default: break
       }
     }
@@ -2101,6 +2136,9 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if self.isRemoved != false {
       try visitor.visitSingularBoolField(value: self.isRemoved, fieldNumber: 6)
     }
+    try { if let v = self._versionVector {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2111,6 +2149,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.changes != rhs.changes {return false}
     if lhs._minSyncedTicket != rhs._minSyncedTicket {return false}
     if lhs.isRemoved != rhs.isRemoved {return false}
+    if lhs._versionVector != rhs._versionVector {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2177,6 +2216,7 @@ extension Yorkie_V1_ChangeID: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     2: .standard(proto: "server_seq"),
     3: .same(proto: "lamport"),
     4: .standard(proto: "actor_id"),
+    5: .standard(proto: "version_vector"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2189,12 +2229,17 @@ extension Yorkie_V1_ChangeID: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.serverSeq) }()
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.lamport) }()
       case 4: try { try decoder.decodeSingularBytesField(value: &self.actorID) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._versionVector) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if self.clientSeq != 0 {
       try visitor.visitSingularUInt32Field(value: self.clientSeq, fieldNumber: 1)
     }
@@ -2207,6 +2252,9 @@ extension Yorkie_V1_ChangeID: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if !self.actorID.isEmpty {
       try visitor.visitSingularBytesField(value: self.actorID, fieldNumber: 4)
     }
+    try { if let v = self._versionVector {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2215,6 +2263,39 @@ extension Yorkie_V1_ChangeID: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs.serverSeq != rhs.serverSeq {return false}
     if lhs.lamport != rhs.lamport {return false}
     if lhs.actorID != rhs.actorID {return false}
+    if lhs._versionVector != rhs._versionVector {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_VersionVector: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VersionVector"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "vector"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufInt64>.self, value: &self.vector) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.vector.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufInt64>.self, value: self.vector, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_VersionVector, rhs: Yorkie_V1_VersionVector) -> Bool {
+    if lhs.vector != rhs.vector {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

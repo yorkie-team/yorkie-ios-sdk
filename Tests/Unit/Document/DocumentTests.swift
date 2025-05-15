@@ -17,6 +17,9 @@
 import Combine
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 class DocumentTests: XCTestCase {
     func test_doesnt_return_error_when_trying_to_delete_a_missing_key() async throws {
@@ -1049,7 +1052,7 @@ class DocumentTests: XCTestCase {
         var length = await target.getGarbageLength()
         XCTAssertEqual(length, 2)
 
-        await target.garbageCollect(TimeTicket.max)
+        await target.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [target.changeID.getActorID()]))
         result = await target.toSortedJSON()
         XCTAssertEqual(result, "{}")
         length = await target.getGarbageLength()
@@ -1077,7 +1080,7 @@ class DocumentTests: XCTestCase {
         size = await(doc.getRoot().k1 as? JSONText)?.getTreeByID()?.size
         XCTAssertEqual(size, 3)
 
-        await doc.garbageCollect(TimeTicket.max)
+        await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: [doc.changeID.getActorID()]))
         size = await(doc.getRoot().k1 as? JSONText)?.getTreeByID()?.size
         XCTAssertEqual(size, 2)
     }
