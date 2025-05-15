@@ -9,13 +9,20 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    
+    env:
+      # swiftlint v0.58.2
+      SWIFTLINT_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/ae3894d1d8d343733160e1c57903187228628d9d/Formula/s/swiftlint.rb"
+      
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
       with:
         xcode-version: '16.1'
     - uses: actions/checkout@v4
     - name: SwiftLint install
-      run: brew install swiftlint
+      run: |
+        curl -O ${{ env.SWIFTLINT_RB_URL }} 
+        brew install --formula ./swiftlint.rb
     - name: SwiftLint
       run: |
         swiftlint --version
