@@ -138,7 +138,7 @@ extension Primitive {
         case .null:
             return "null"
         case .boolean(let value):
-            return "\"\(value)\""
+            return "\(value)"
         case .integer(let value):
             return "\(value)"
         case .double(let value):
@@ -148,7 +148,8 @@ extension Primitive {
         case .long(let value):
             return "\(value)"
         case .bytes(let value):
-            return "\(value)"
+            let byteValues = [UInt8](value).map { String($0) }.joined(separator: ",")
+            return "[\(byteValues)]"
         case .date(let value):
             return "\(value.millisecondsTimeIntervalSince1970)"
         }

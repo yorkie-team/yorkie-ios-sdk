@@ -114,7 +114,7 @@ class CRDTObjectTests: XCTestCase {
 
         let result = target.toSortedJSON()
         let expected = """
-        {"K1":1,"K2":"A2","K3":"true"}
+        {"K1":1,"K2":"A2","K3":true}
         """
         XCTAssertEqual(result, expected)
     }

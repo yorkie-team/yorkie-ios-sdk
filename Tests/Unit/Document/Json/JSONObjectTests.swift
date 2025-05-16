@@ -40,14 +40,14 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           {"boolean":true,"compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
             compD?.set(key: "id", value: "d-2")
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           {"boolean":true,"compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
         }
     }
@@ -73,7 +73,7 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           {"boolean":true,"compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
             root.remove(key: "string")
@@ -82,7 +82,7 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","double":1.2222222,"long":9999999}
+                           {"boolean":true,"double":1.2222222,"long":9999999}
                            """)
         }
     }
@@ -99,7 +99,7 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           {"boolean":true,"compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
             let compB = root.compB as? JSONObject
@@ -109,7 +109,7 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
+                           {"boolean":true,"compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}
                            """)
 
             let idOfCompD = compD?.id as? String
@@ -130,7 +130,7 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
+                           {"top":{"boolean":true,"compB":{"compC":{"compD":{"id":"d-1"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
                            """)
 
             let top = root.top as? JSONObject
@@ -141,7 +141,7 @@ class JSONObjectTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"top":{"boolean":"true","compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
+                           {"top":{"boolean":true,"compB":{"compC":{"compD":{"id":"d-2"},"id":"c"},"id":"b"},"double":1.2222222,"integer":111,"long":9999999,"string":"abc"}}
                            """)
 
             let idOfCompD = compD?.id as? String
