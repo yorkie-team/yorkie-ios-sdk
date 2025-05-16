@@ -17,7 +17,7 @@
 import Foundation
 
 /// `JSONObjectable` provides a way to make a dictionary including members of a type confirming ``JSONObjectable``.
-public protocol JSONObjectable: Codable {
+public protocol JSONObjectable: Codable, JSONValuable {
     /// The members of excludedMembers is not included in a dictionary made by toJsonObject.
     var excludedMembers: [String] { get }
 }
@@ -65,3 +65,21 @@ extension Array {
         }
     }
 }
+
+public protocol JSONValuable {}
+
+extension Bool: JSONValuable {}
+extension Int32: JSONValuable {}
+extension Int64: JSONValuable {}
+extension Double: JSONValuable {}
+extension String: JSONValuable {}
+extension Data: JSONValuable {}
+extension Date: JSONValuable {}
+extension JSONObject: JSONValuable {}
+extension JSONArray: JSONValuable {}
+extension JSONCounter: JSONValuable {}
+extension JSONText: JSONValuable {}
+extension JSONTree: JSONValuable {}
+extension Optional: JSONValuable where Wrapped: JSONValuable {}
+extension [String: JSONValuable]: JSONValuable {}
+extension [JSONValuable]: JSONValuable {}
