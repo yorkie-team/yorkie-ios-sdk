@@ -574,4 +574,153 @@ final class DocumentIntegrationTests: XCTestCase {
 
         try await c1.deactivate()
     }
+
+    func test_document_with_initialRoot() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        // 01. attach and initialize document
+        let doc1 = Document(key: docKey)
+        try await c1.attach(doc1, initialRoot: [
+            "counter": JSONCounter(value: Int32(0)),
+            "content": [
+                "x": Int32(1),
+                "y": Int32(1)
+            ]
+        ])
+
+        let doc1JSON = await doc1.toSortedJSON()
+        XCTAssertEqual(doc1JSON, "{\"content\":{\"x\":1,\"y\":1},\"counter\":0}")
+
+        try await c1.sync()
+
+        // 02. attach and initialize document with new fields and if key already exists, it will be discarded
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, initialRoot: [
+            "counter": JSONCounter(value: Int32(1)),
+            "content": [
+                "x": Int32(1),
+                "y": Int32(2)
+            ],
+            "new": ["k": "v"]
+        ])
+
+        let doc2JSON = await doc2.toSortedJSON()
+        XCTAssertEqual(doc2JSON, "{\"content\":{\"x\":1,\"y\":1},\"counter\":0,\"new\":{\"k\":\"v\"}}")
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
+
+    func test_can_handle_concurrent_attach_with_initialRoot() async throws {
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        // 01. user1 attach with initialRoot and client doesn't sync
+        let doc1 = Document(key: docKey)
+        try await c1.attach(doc1, initialRoot: [
+            "writer": "user1"
+        ])
+        var doc1JSON = await doc1.toSortedJSON()
+        XCTAssertEqual(doc1JSON, "{\"writer\":\"user1\"}")
+
+        // 02. user2 attach with initialRoot and client doesn't sync
+        let doc2 = Document(key: docKey)
+        try await c2.attach(doc2, initialRoot: [
+            "writer": "user2"
+        ])
+        var doc2JSON = await doc2.toSortedJSON()
+        XCTAssertEqual(doc2JSON, "{\"writer\":\"user2\"}")
+
+        // 03. user1 sync first and user2 seconds
+        try await c1.sync()
+        try await c2.sync()
+
+        // 04. user1's local document's writer was user1
+        doc1JSON = await doc1.toSortedJSON()
+        XCTAssertEqual(doc1JSON, "{\"writer\":\"user1\"}")
+        doc2JSON = await doc2.toSortedJSON()
+        XCTAssertEqual(doc2JSON, "{\"writer\":\"user2\"}")
+
+        // 05. user1's local document's writer is overwritten by user2
+        try await c1.sync()
+        doc1JSON = await doc2.toSortedJSON()
+        XCTAssertEqual(doc1JSON, "{\"writer\":\"user2\"}")
+
+        try await c1.deactivate()
+        try await c2.deactivate()
+    }
+
+    func test_can_support_various_types() async throws {
+        struct TestCase {
+            let name: String
+            let input: JSONValuable?
+            let expectedJSON: String
+        }
+
+        let testCases: [TestCase] = [
+            TestCase(name: "tree",
+                     input:
+                     JSONTree(initialRoot: JSONTreeElementNode(type: "doc",
+                                                               children: [
+                                                                   JSONTreeElementNode(type: "p", children: [
+                                                                       JSONTreeTextNode(value: "ab")
+                                                                   ])
+                                                               ])),
+                     expectedJSON: "{\"tree\":{\"children\":[{\"children\":[{\"type\":\"text\",\"value\":\"ab\"}],\"type\":\"p\"}],\"type\":\"doc\"}}"),
+            TestCase(name: "text",
+                     input: JSONText(),
+                     expectedJSON: "{\"text\":[]}"),
+            TestCase(name: "counter",
+                     input: JSONCounter(value: Int32(1)),
+                     expectedJSON: "{\"counter\":1}"),
+            TestCase(name: "null",
+                     input: nil,
+                     expectedJSON: "{\"null\":null}"),
+            TestCase(name: "boolean",
+                     input: true,
+                     expectedJSON: "{\"boolean\":true}"),
+            TestCase(name: "number",
+                     input: Int32(1),
+                     expectedJSON: "{\"number\":1}"),
+            TestCase(name: "long",
+                     input: Int64.max,
+                     expectedJSON: "{\"long\":9223372036854775807}"),
+            TestCase(name: "object",
+                     input: [
+                         "k": "v"
+                     ],
+                     expectedJSON: "{\"object\":{\"k\":\"v\"}}"),
+            TestCase(name: "array",
+                     input: [Int32(1), Int32(2)],
+                     expectedJSON: "{\"array\":[1,2]}"),
+            // TODO(hackerwins): We need to consider the case where the value is
+            // a byte array and a date.
+            TestCase(name: "bytes",
+                     input: Data([UInt8]([1, 2])),
+                     expectedJSON: "{\"bytes\":[1,2]}")
+        ]
+
+        for testCase in testCases {
+            let c1 = Client(rpcAddress)
+            try await c1.activate()
+            let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+            let doc = Document(key: docKey)
+            try await c1.attach(doc, initialRoot: [
+                testCase.name: testCase.input
+            ])
+
+            let docJSON = await doc.toSortedJSON()
+            XCTAssertEqual(docJSON, testCase.expectedJSON)
+
+            try await c1.deactivate()
+        }
+    }
 }

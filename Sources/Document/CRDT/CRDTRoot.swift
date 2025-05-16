@@ -255,7 +255,7 @@ class CRDTRoot {
     /**
      * `toSortedJSON` returns the sorted JSON encoding of this root object.
      */
-    private func toSortedJSON() -> String {
+    func toSortedJSON() -> String {
         return self.rootObject.toSortedJSON()
     }
 }

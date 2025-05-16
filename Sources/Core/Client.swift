@@ -263,7 +263,11 @@ public class Client {
      *   the client will synchronize the given document.
      */
     @discardableResult
-    public func attach(_ doc: Document, _ initialPresence: PresenceData = [:], _ syncMode: SyncMode = .realtime) async throws -> Document {
+    public func attach(_ doc: Document,
+                       _ initialPresence: PresenceData = [:],
+                       _ syncMode: SyncMode = .realtime,
+                       initialRoot: [String: JSONValuable?]? = nil) async throws -> Document
+    {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -337,6 +341,15 @@ public class Client {
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
 
             self.semaphoresForInitialzation.removeValue(forKey: docKey)
+
+            let crdtObject = doc.getRootObject()
+            if let initialRoot {
+                try doc.update { root, _ in
+                    for key in initialRoot.keys where !crdtObject.has(key: key) {
+                        root.set(key: key, value: initialRoot[key])
+                    }
+                }
+            }
 
             return doc
         } catch {

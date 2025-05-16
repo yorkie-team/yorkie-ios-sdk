@@ -793,6 +793,7 @@ final class ClientIntegrationTests: XCTestCase {
             do {
                 try await client.attach(doc)
                 try await client.deactivate()
+                try await Task.sleep(milliseconds: 100)
             } catch {
                 XCTFail("\(error.localizedDescription)")
             }

@@ -22,6 +22,13 @@ protocol OptionalValue {
 
 extension Optional: OptionalValue {
     var isNil: Bool {
-        return self == nil
+        switch self {
+        case .none:
+            return true
+        case .some(let unrwapped):
+            // for Any?
+            let mirror = Mirror(reflecting: unrwapped)
+            return mirror.displayStyle == .optional && mirror.children.isEmpty
+        }
     }
 }
