@@ -24,19 +24,26 @@ struct ChangeID {
      * `initial` represents the initial state ID. Usually this is used to
      * represent a state where nothing has been edited.
      */
-    static let initial = ChangeID(clientSeq: 0, lamport: 0, actor: ActorIDs.initial)
+    static let initial = ChangeID(clientSeq: 0, lamport: 0, actor: ActorIDs.initial, versionVector: .initial)
 
     // `serverSeq` is optional and only present for changes stored on the server.
     private var serverSeq: Int64?
 
+    // `clientSeq` is the sequence number of the client that created this change.
     private let clientSeq: UInt32
+
+    // `lamport` and `actor` are the lamport clock and the actor of this change.
+    // This is used to determine the order of changes in logical time.
     private var lamport: Int64
     private var actor: ActorID
 
-    init(clientSeq: UInt32, lamport: Int64, actor: ActorID, serverSeq: Int64? = nil) {
+    private var versionVector: VersionVector
+
+    init(clientSeq: UInt32, lamport: Int64, actor: ActorID, versionVector: VersionVector, serverSeq: Int64? = nil) {
         self.clientSeq = clientSeq
         self.lamport = lamport
         self.actor = actor
+        self.versionVector = versionVector
         self.serverSeq = serverSeq
     }
 
@@ -44,20 +51,45 @@ struct ChangeID {
      * `next` creates a next ID of this ID.
      */
     func next() -> ChangeID {
-        return ChangeID(clientSeq: self.clientSeq + 1, lamport: self.lamport + 1, actor: self.actor)
+        var vector = self.versionVector.deepcopy()
+        vector.set(actorID: self.actor, lamport: self.lamport + 1)
+
+        return ChangeID(clientSeq: self.clientSeq + 1,
+                        lamport: self.lamport + 1,
+                        actor: self.actor,
+                        versionVector: vector)
     }
 
     /**
-     * `syncLamport` syncs lamport timestamp with the given ID.
-     *
-     * {@link https://en.wikipedia.org/wiki/Lamport_timestamps#Algorithm}
+     * `syncClocks` syncs logical clocks with the given ID.
      */
     @discardableResult
-    mutating func syncLamport(with otherLamport: Int64) -> ChangeID {
-        let lamport = otherLamport > self.lamport ? otherLamport : self.lamport + 1
-        self.lamport = lamport
+    func syncClocks(with other: ChangeID) -> ChangeID {
+        let lamport = other.lamport > self.lamport ? other.lamport + 1 : self.lamport + 1
+        let maxVersionVector = self.versionVector.max(other: other.versionVector)
 
-        return ChangeID(clientSeq: self.clientSeq, lamport: self.lamport, actor: self.actor)
+        var newID = ChangeID(clientSeq: self.clientSeq,
+                             lamport: lamport,
+                             actor: self.actor,
+                             versionVector: maxVersionVector)
+        newID.versionVector.set(actorID: self.actor, lamport: lamport)
+        return newID
+    }
+
+    /**
+     * `setClocks` sets the given clocks to this ID. This is used when the snapshot
+     * is given from the server.
+     */
+    @discardableResult
+    func setClocks(with otherLamport: Int64, vector: VersionVector) -> ChangeID {
+        let lamport = otherLamport > self.lamport ? otherLamport : self.lamport + 1
+        var maxVersionVector = self.versionVector.max(other: vector)
+        maxVersionVector.set(actorID: self.actor, lamport: lamport)
+
+        return ChangeID(clientSeq: self.clientSeq,
+                        lamport: lamport,
+                        actor: self.actor,
+                        versionVector: maxVersionVector)
     }
 
     /**
@@ -71,7 +103,22 @@ struct ChangeID {
      * `setActor` sets the given actor.
      */
     func setActor(_ actorID: ActorID) -> ChangeID {
-        ChangeID(clientSeq: self.clientSeq, lamport: self.lamport, actor: actorID, serverSeq: self.serverSeq)
+        ChangeID(clientSeq: self.clientSeq,
+                 lamport: self.lamport,
+                 actor: actorID,
+                 versionVector: self.versionVector,
+                 serverSeq: self.serverSeq)
+    }
+
+    /**
+     * `setVersionVector` sets the given version vector.
+     */
+    func setVersionVector(_ versionVector: VersionVector) -> ChangeID {
+        ChangeID(clientSeq: self.clientSeq,
+                 lamport: self.lamport,
+                 actor: self.actor,
+                 versionVector: versionVector,
+                 serverSeq: self.serverSeq)
     }
 
     /**
@@ -111,6 +158,13 @@ struct ChangeID {
      */
     func getActorID() -> String? {
         return self.actor
+    }
+
+    /**
+     * `getVersionVector` returns the version vector of this ID.
+     */
+    func getVersionVector() -> VersionVector {
+        return self.versionVector
     }
 
     /**

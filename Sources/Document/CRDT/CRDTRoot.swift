@@ -204,24 +204,23 @@ class CRDTRoot {
      * `garbageCollect` purges elements that were removed before the given time.
      */
     @discardableResult
-    func garbageCollect(lessThanOrEqualTo ticket: TimeTicket) -> Int {
+    func garbageCollect(minSyncedVersionVector: VersionVector) -> Int {
         var count = 0
 
         for createdAt in self.gcElementSetByCreatedAt {
-            guard let pair = self.elementPairMapByCreatedAt[createdAt],
-                  let removedAt = pair.element.removedAt, removedAt <= ticket
-            else {
+            guard let pair = self.elementPairMapByCreatedAt[createdAt] else {
                 continue
             }
 
-            try? pair.parent?.purge(element: pair.element)
-            count += self.garbageCollectInternal(element: pair.element)
+            if let removedAt = pair.element.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
+                try? pair.parent?.purge(element: pair.element)
+                count += self.garbageCollectInternal(element: pair.element)
+            }
         }
 
         for pair in self.gcPairMap.values {
-            if let child = pair.child, let removedAt = child.removedAt, ticket >= removedAt {
+            if let child = pair.child, let removedAt = child.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
                 pair.parent?.purge(node: child)
-
                 self.gcPairMap.removeValue(forKey: child.toIDString)
                 count += 1
             }

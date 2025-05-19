@@ -93,7 +93,7 @@ public class Document {
     private let key: DocumentKey
     private(set) var status: DocumentStatus = .detached
     private let disableGC: Bool
-    private var changeID: ChangeID = .initial
+    private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
 
@@ -300,8 +300,10 @@ public class Document {
      * - Parameter pack: change pack
      */
     func applyChangePack(_ pack: ChangePack) throws {
-        if let snapshot = pack.getSnapshot() {
-            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), snapshot)
+        let hasSnapshot = pack.hasSnapshot()
+
+        if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
+            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot)
         } else if pack.hasChanges() {
             try self.applyChanges(pack.getChanges())
         }
@@ -315,7 +317,7 @@ public class Document {
         // them after applying the snapshot. We need to treat the local changes
         // as remote changes because the application should apply the local
         // changes to their own document.
-        if pack.hasSnapshot() {
+        if hasSnapshot {
             try self.applyChanges(self.localChanges)
         }
 
@@ -323,11 +325,14 @@ public class Document {
         self.checkpoint.forward(other: pack.getCheckpoint())
 
         // 04. Do Garbage collection.
-        if let ticket = pack.getMinSyncedTicket() {
-            self.garbageCollect(ticket)
+        if !hasSnapshot, let versionVector = pack.getVersionVector() {
+            self.garbageCollect(minSyncedVersionVector: versionVector)
+
+            // 05. Filter detached client's lamport from version vector
+            self.filterVersionVector(minSyncedVersionVector: versionVector)
         }
 
-        // 05. Update the status.
+        // 06. Update the status.
         if pack.isRemoved {
             self.applyStatus(.removed)
         }
@@ -364,7 +369,11 @@ public class Document {
     func createChangePack(_ forceToRemoved: Bool = false) -> ChangePack {
         let changes = self.localChanges
         let checkpoint = self.checkpoint.increasedClientSeq(by: UInt32(changes.count))
-        return ChangePack(key: self.key, checkpoint: checkpoint, isRemoved: forceToRemoved ? true : self.status == .removed, changes: changes)
+        return ChangePack(key: self.key,
+                          checkpoint: checkpoint,
+                          isRemoved: forceToRemoved ? true : self.status == .removed,
+                          changes: changes,
+                          versionVector: self.getVersionVector())
     }
 
     /**
@@ -420,15 +429,15 @@ public class Document {
      *
      */
     @discardableResult
-    func garbageCollect(_ ticket: TimeTicket) -> Int {
+    func garbageCollect(minSyncedVersionVector: VersionVector) -> Int {
         if self.disableGC {
             return 0
         }
 
         if let clone = self.clone {
-            clone.root.garbageCollect(lessThanOrEqualTo: ticket)
+            clone.root.garbageCollect(minSyncedVersionVector: minSyncedVersionVector)
         }
-        return self.root.garbageCollect(lessThanOrEqualTo: ticket)
+        return self.root.garbageCollect(minSyncedVersionVector: minSyncedVersionVector)
     }
 
     /**
@@ -471,16 +480,20 @@ public class Document {
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    public func applySnapshot(_ serverSeq: Int64, _ snapshot: Data) throws {
+    public func applySnapshot(_ serverSeq: Int64, _ snapshotVector: VersionVector, _ snapshot: Data) throws {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
-        self.changeID = self.changeID.syncLamport(with: serverSeq)
+        self.changeID = self.changeID.setClocks(with: serverSeq, vector: snapshotVector)
 
         // drop clone because it is contaminated.
         self.clone = nil
 
-        let snapshotEvent = SnapshotEvent(value: snapshot)
+        let hexSnapshotVector = try Converter.versionVectorToHex(vector: snapshotVector)
+        let snapshotInfo = SnapshotInfo(serverSeq: serverSeq,
+                                        snapshot: snapshot,
+                                        snapshotVector: hexSnapshotVector)
+        let snapshotEvent = SnapshotEvent(value: snapshotInfo)
         self.publish(snapshotEvent)
     }
 
@@ -541,6 +554,7 @@ public class Document {
             }
 
             let opInfos = try change.execute(root: self.root, presences: &self.presences)
+            self.changeID = self.changeID.syncClocks(with: change.id)
 
             if change.hasOperations {
                 changeInfo = ChangeInfo(message: change.message ?? "",
@@ -562,8 +576,6 @@ public class Document {
             if let presenceEvent {
                 self.publish(presenceEvent)
             }
-
-            self.changeID = self.changeID.syncLamport(with: change.id.getLamport())
         }
 
         Logger.debug(
@@ -760,6 +772,16 @@ public class Document {
     }
 
     /**
+     * 'filterVersionVector' filters detached client's lamport from version vector.
+     */
+    private func filterVersionVector(minSyncedVersionVector: VersionVector) {
+        let versionVector = self.changeID.getVersionVector()
+        let filteredVersionVector = versionVector.filter(versionVector: minSyncedVersionVector)
+
+        self.changeID = self.changeID.setVersionVector(filteredVersionVector)
+    }
+
+    /**
      * `setOnlineClients` sets the given online client set.
      */
     func setOnlineClients(_ onlineClients: Set<ActorID>) {
@@ -854,5 +876,12 @@ public class Document {
         let value = LocalBroadcastValue(topic: topic, payload: payload)
         let localBroadcastEvent = LocalBroadcastEvent(value: value, options: options)
         self.publish(localBroadcastEvent)
+    }
+
+    /**
+     * `getVersionVector` returns the version vector of document
+     */
+    public func getVersionVector() -> VersionVector {
+        return self.changeID.getVersionVector()
     }
 }

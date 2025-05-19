@@ -32,20 +32,28 @@ let package = Package(
                       "API/V1/buf.yaml",
                       "API/V1/run_protoc.sh"]
         ),
+        .target(
+            name: "YorkieTestHelper",
+            dependencies: ["Yorkie"],
+            path: "Tests/Helper"
+        ),
         .testTarget(
             name: "YorkieUnitTests",
-            dependencies: ["Yorkie"],
-            path: "Tests/Unit"
+            dependencies: ["Yorkie", "YorkieTestHelper"],
+            path: "Tests/Unit",
+            swiftSettings: [.define("SWIFT_TEST")]
         ),
         .testTarget(
             name: "YorkieIntegrationTests",
-            dependencies: ["Yorkie"],
-            path: "Tests/Integration"
+            dependencies: ["Yorkie", "YorkieTestHelper"],
+            path: "Tests/Integration",
+            swiftSettings: [.define("SWIFT_TEST")]
         ),
         .testTarget(
             name: "YorkieBenchmarkTests",
-            dependencies: ["Yorkie"],
-            path: "Tests/Benchmark"
+            dependencies: ["Yorkie", "YorkieTestHelper"],
+            path: "Tests/Benchmark",
+            swiftSettings: [.define("SWIFT_TEST")]
         )
     ]
 )

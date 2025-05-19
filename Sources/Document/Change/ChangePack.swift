@@ -45,15 +45,28 @@ struct ChangePack {
     private let minSyncedTicket: TimeTicket?
 
     /**
+     * `versionVector` is the version vector current document
+     */
+    private let versionVector: VersionVector?
+
+    /**
      * `IsRemoved` is a flag that indicates whether the document is removed.
      */
     let isRemoved: Bool
 
-    init(key: String, checkpoint: Checkpoint, isRemoved: Bool, changes: [Change], snapshot: Data? = nil, minSyncedTicket: TimeTicket? = nil) {
+    init(key: String,
+         checkpoint: Checkpoint,
+         isRemoved: Bool,
+         changes: [Change],
+         snapshot: Data? = nil,
+         versionVector: VersionVector?,
+         minSyncedTicket: TimeTicket? = nil)
+    {
         self.documentKey = key
         self.checkpoint = checkpoint
         self.changes = changes
         self.snapshot = snapshot
+        self.versionVector = versionVector
         self.minSyncedTicket = minSyncedTicket
         self.isRemoved = isRemoved
     }
@@ -112,5 +125,12 @@ struct ChangePack {
      */
     func getMinSyncedTicket() -> TimeTicket? {
         return self.minSyncedTicket
+    }
+
+    /**
+     * `getVersionVector` returns the document's version vector of this pack
+     */
+    func getVersionVector() -> VersionVector? {
+        return self.versionVector
     }
 }

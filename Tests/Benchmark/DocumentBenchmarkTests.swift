@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 final class DocumentBenchmarkTests: XCTestCase {
     func benchmarkTreeEdit(_ size: Int) async {
@@ -87,7 +90,7 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             var garbageLen = await doc.getGarbageLength()
             XCTAssertEqual(size, garbageLen)
-            let garbageCollect = await doc.garbageCollect(TimeTicket.max)
+            let garbageCollect = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: []))
             XCTAssertEqual(size, garbageCollect)
 
             garbageLen = await doc.getGarbageLength()
@@ -120,7 +123,7 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             var garbageLen = await doc.getGarbageLength()
             XCTAssertEqual(size, garbageLen)
-            let garbageCollect = await doc.garbageCollect(TimeTicket.max)
+            let garbageCollect = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: []))
             XCTAssertEqual(size, garbageCollect)
 
             garbageLen = await doc.getGarbageLength()
