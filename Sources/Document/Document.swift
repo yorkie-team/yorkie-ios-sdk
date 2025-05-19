@@ -477,6 +477,13 @@ public class Document {
         return self.root.toSortedJSON()
     }
 
+    /*
+     * `getStats` returns the statistics of this document.
+     */
+    public func getStats() -> RootStats {
+        return self.root.getStats()
+    }
+
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
