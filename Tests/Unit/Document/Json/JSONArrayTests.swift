@@ -41,7 +41,7 @@ class JSONArrayTests: XCTestCase {
 
             XCTAssertEqual(root.debugDescription,
                            """
-                           {"array":[1,2,"a",1.2345,"true",[11,12,13,21,22,23]]}
+                           {"array":[1,2,"a",1.2345,true,[11,12,13,21,22,23]]}
                            """)
         }
     }

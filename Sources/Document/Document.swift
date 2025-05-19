@@ -474,7 +474,14 @@ public class Document {
      * `toSortedJSON` returns the sorted JSON encoding of this array.
      */
     public func toSortedJSON() -> String {
-        return self.root.debugDescription
+        return self.root.toSortedJSON()
+    }
+
+    /*
+     * `getStats` returns the statistics of this document.
+     */
+    public func getStats() -> RootStats {
+        return self.root.getStats()
     }
 
     /**

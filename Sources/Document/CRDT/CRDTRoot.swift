@@ -17,6 +17,26 @@
 typealias CRDTElementPair = (element: CRDTElement, parent: CRDTContainer?)
 
 /**
+ * `RootStats` is a structure that represents the statistics of the root object.
+ */
+public struct RootStats {
+    /**
+     * `elements` is the number of elements in the root object.
+     */
+    let elements: Int
+
+    /**
+     * `gcElements` is the number of elements that can be garbage collected.
+     */
+    let gcElements: Int
+
+    /**
+     * `gcPairs` is the number of garbage collection pairs.
+     */
+    let gcPairs: Int
+}
+
+/**
  * `CRDTRoot` is a structure represents the root. It has a hash table of
  * all elements to find a specific element when applying remote changes
  * received from server.
@@ -255,8 +275,18 @@ class CRDTRoot {
     /**
      * `toSortedJSON` returns the sorted JSON encoding of this root object.
      */
-    private func toSortedJSON() -> String {
+    func toSortedJSON() -> String {
         return self.rootObject.toSortedJSON()
+    }
+
+    /**
+     * `getStats` returns the current statistics of the root object.
+     * This includes counts of various types of elements and structural information.
+     */
+    func getStats() -> RootStats {
+        return RootStats(elements: self.elementMapSize,
+                         gcElements: self.garbageElementSetSize,
+                         gcPairs: self.gcPairMap.count)
     }
 }
 
