@@ -285,8 +285,8 @@ class CRDTRoot {
      */
     func getStats() -> RootStats {
         return RootStats(elements: self.elementMapSize,
-                         gcElements: self.gcPairMap.count,
-                         gcPairs: self.garbageElementSetSize)
+                         gcElements: self.garbageElementSetSize,
+                         gcPairs: self.gcPairMap.count)
     }
 }
 
