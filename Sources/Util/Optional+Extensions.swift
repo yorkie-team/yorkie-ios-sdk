@@ -26,9 +26,10 @@ extension Optional: OptionalValue {
         case .none:
             return true
         case .some(let unrwapped):
-            // for Any?
-            let mirror = Mirror(reflecting: unrwapped)
-            return mirror.displayStyle == .optional && mirror.children.isEmpty
+            if let nested = unrwapped as? OptionalValue {
+                return nested.isNil
+            }
+            return false
         }
     }
 }
