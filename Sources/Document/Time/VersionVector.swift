@@ -30,7 +30,7 @@ public struct VersionVector: Sendable {
 
     private var vector: [String: Int64]
 
-    init(vector: [String: Int64]? = nil) {
+    public init(vector: [String: Int64]? = nil) {
         self.vector = vector ?? [:]
     }
 
