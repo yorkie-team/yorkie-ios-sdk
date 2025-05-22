@@ -750,7 +750,7 @@ public class Document {
                                       clientSeq: event.value.clientSeq,
                                       serverSeq: event.value.serverSeq)
 
-                if let callback = self.subscribeCallbacks[key] {
+                if let callback = self.subscribeCallbacks[key], key != "$" {
                     callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
                 }
             }
