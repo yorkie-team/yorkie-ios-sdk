@@ -770,6 +770,12 @@ public class Client {
             case .documentChanged:
                 self.attachmentMap[docKey]?.remoteChangeEventReceived = true
             case .documentWatched:
+                if let doc = self.attachmentMap[docKey]?.doc,
+                   doc.onlineClients.contains(pbWatchEvent.publisher), doc.hasPresence(pbWatchEvent.publisher)
+                {
+                    return
+                }
+
                 self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
                 // unless we also know their initial presence data at this point.

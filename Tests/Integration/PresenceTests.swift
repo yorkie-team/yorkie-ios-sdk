@@ -325,53 +325,37 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.activate()
         let c1ID = await c1.id!
         let c2ID = await c2.id!
-        var eventCount1 = 0
-        var eventCount2 = 0
-
-        let expect1 = expectation(description: "sub 1")
-        let expect2 = expectation(description: "sub 2")
-
-        var eventReceived1 = [EventResult]()
-        var eventReceived2 = [EventResult]()
 
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a"])
 
+        let eventCollectorD1 = EventCollector<EventResult>(doc: doc1)
         await doc1.subscribePresence { event, _ in
-            eventCount1 += 1
-
-            eventReceived1.append(EventResult(event))
-
-            if eventCount1 == 3 {
-                expect1.fulfill()
-            }
+            eventCollectorD1.add(event: EventResult(event))
         }
+
+        assertPeerElementsEqual(peers1: await doc1.getPresences(),
+                                peers2: [
+                                    PeerElement(c1ID, ["name": "a"])
+                                ])
 
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["name": "b"])
 
+        let eventCollectorD2 = EventCollector<EventResult>(doc: doc2)
         await doc2.subscribePresence { event, _ in
-            eventCount2 += 1
-
-            eventReceived2.append(EventResult(event))
-
-            if eventCount2 == 2 {
-                expect2.fulfill()
-            }
+            eventCollectorD2.add(event: EventResult(event))
         }
 
-        try await doc1.update { _, presence in
-            presence.set(["name": "A"])
-        }
-        try await doc2.update { _, presence in
-            presence.set(["name": "B"])
-        }
-
-        await fulfillment(of: [expect1, expect2], timeout: 5, enforceOrder: false)
+        assertPeerElementsEqual(peers1: await doc2.getPresences(),
+                                peers2: [
+                                    PeerElement(c2ID, ["name": "b"]),
+                                    PeerElement(c1ID, ["name": "a"])
+                                ])
 
         let result1 = [
-            EventResult(.presenceChanged, [PeerElement(c1ID, ["name": "A"])]),
             EventResult(.watched, [PeerElement(c2ID, ["name": "b"])]),
+            EventResult(.presenceChanged, [PeerElement(c1ID, ["name": "A"])]),
             EventResult(.presenceChanged, [PeerElement(c2ID, ["name": "B"])])
         ]
 
@@ -380,22 +364,34 @@ final class PresenceSubscribeTests: XCTestCase {
             EventResult(.presenceChanged, [PeerElement(c1ID, ["name": "A"])])
         ]
 
-        let presence = await doc2.getPresences()
-        XCTAssertEqual(presence.first { $0.clientID == c2ID }?.presence["name"] as? String, "B")
-        XCTAssertEqual(presence.first { $0.clientID == c1ID }?.presence["name"] as? String, "A")
+        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: result1[0])
 
-        for (index, value) in result1.enumerated() {
-            XCTAssertEqual(value, eventReceived1[index])
+        try await doc1.update { _, presence in
+            presence.set(["name": "A"])
+        }
+        try await doc2.update { _, presence in
+            presence.set(["name": "B"])
         }
 
-        for (index, value) in result2.enumerated() {
-            XCTAssertEqual(value, eventReceived2[index])
-        }
+        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 2, isEqualTo: result1[1])
+        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 3, isEqualTo: result1[2])
+
+        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: result2[0])
+        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 2, isEqualTo: result2[1])
 
         let resultPresence1 = await doc1.getPresences()
         let resultPresence2 = await doc2.getPresences()
+        assertPeerElementsEqual(peers1: resultPresence2,
+                                peers2: [
+                                    PeerElement(c2ID, ["name": "B"]),
+                                    PeerElement(c1ID, ["name": "A"])
+                                ])
 
-        XCTAssert(Self.comparePresences(resultPresence1, resultPresence2))
+        assertPeerElementsEqual(peers1: resultPresence1,
+                                peers2: [
+                                    PeerElement(c2ID, ["name": "B"]),
+                                    PeerElement(c1ID, ["name": "A"])
+                                ])
 
         try await c1.deactivate()
         try await c2.deactivate()

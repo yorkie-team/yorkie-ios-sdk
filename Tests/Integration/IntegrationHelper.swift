@@ -182,6 +182,12 @@ class EventCollector<T: Equatable> {
         }
     }
 
+    func reset() {
+        self.queue.sync {
+            self._values.removeAll()
+        }
+    }
+
     func asyncStream() -> AsyncStream<T> {
         return AsyncStream<T> { continuation in
             for value in self.values {
@@ -189,6 +195,11 @@ class EventCollector<T: Equatable> {
             }
             continuation.finish()
         }
+    }
+
+    func waitAndVerifyNthValue(milliseconds: UInt64, at nth: Int, isEqualTo targetValue: T) async throws {
+        try await Task.sleep(milliseconds: milliseconds)
+        await self.verifyNthValue(at: nth, isEqualTo: targetValue)
     }
 
     func verifyNthValue(at nth: Int, isEqualTo targetValue: T) async {
