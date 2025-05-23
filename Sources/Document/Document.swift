@@ -301,34 +301,26 @@ public class Document {
      */
     func applyChangePack(_ pack: ChangePack) throws {
         let hasSnapshot = pack.hasSnapshot()
+        let clientSeq = Int64(pack.getCheckpoint().getClientSeq())
 
+        // 01. Apply snapshot or changes to the root object.
         if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
-            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot)
-        } else if pack.hasChanges() {
-            try self.applyChanges(pack.getChanges())
+            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot, clientSeq)
+        } else {
+            try self.applyChanges(pack.getChanges(), source: .remote)
+
+            // Remove local changes applied to server.
+            self.removePushedLocalChanges(clientSeq: clientSeq)
         }
 
-        // 02. Remove local changes applied to server.
-        while let change = self.localChanges.first, change.id.getClientSeq() <= pack.getCheckpoint().getClientSeq() {
-            self.localChanges.removeFirst()
-        }
-
-        // NOTE(hackerwins): If the document has local changes, we need to apply
-        // them after applying the snapshot. We need to treat the local changes
-        // as remote changes because the application should apply the local
-        // changes to their own document.
-        if hasSnapshot {
-            try self.applyChanges(self.localChanges)
-        }
-
-        // 03. Update the checkpoint.
+        // 02. Update the checkpoint.
         self.checkpoint.forward(other: pack.getCheckpoint())
 
-        // 04. Do Garbage collection.
+        // 03. Do Garbage collection.
         if !hasSnapshot, let versionVector = pack.getVersionVector() {
             self.garbageCollect(minSyncedVersionVector: versionVector)
 
-            // 05. Filter detached client's lamport from version vector
+            // 04. Filter detached client's lamport from version vector
             self.filterVersionVector(minSyncedVersionVector: versionVector)
         }
 
@@ -487,7 +479,11 @@ public class Document {
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    public func applySnapshot(_ serverSeq: Int64, _ snapshotVector: VersionVector, _ snapshot: Data) throws {
+    public func applySnapshot(_ serverSeq: Int64,
+                              _ snapshotVector: VersionVector,
+                              _ snapshot: Data,
+                              _ clientSeq: Int64 = -1) throws
+    {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
@@ -495,6 +491,14 @@ public class Document {
 
         // drop clone because it is contaminated.
         self.clone = nil
+
+        self.removePushedLocalChanges(clientSeq: clientSeq)
+
+        // NOTE(hackerwins): If the document has local changes, we need to apply
+        // them after applying the snapshot, as local changes are not included in the snapshot data.
+        // Afterward, we should publish a snapshot event with the latest
+        // version of the document to ensure the user receives the most up-to-date snapshot.
+        try self.applyChanges(self.localChanges, source: .local)
 
         let hexSnapshotVector = try Converter.versionVectorToHex(vector: snapshotVector)
         let snapshotInfo = SnapshotInfo(serverSeq: serverSeq,
@@ -507,10 +511,10 @@ public class Document {
     /**
      * `applyChanges` applies the given changes into this document.
      */
-    public func applyChanges(_ changes: [Change]) throws {
+    public func applyChanges(_ changes: [Change], source: OpSource) throws {
         Logger.debug(
             """
-            trying to apply \(changes.count) remote changes.
+            trying to apply \(changes.count) \(source) changes.
             elements:\(self.root.elementMapSize),
             removeds:\(self.root.garbageElementSetSize)
             """)
@@ -587,7 +591,7 @@ public class Document {
 
         Logger.debug(
             """
-            after appling \(changes.count) remote changes.
+            after appling \(changes.count) \(source) changes.
             elements:\(self.root.elementMapSize),
             removeds:\(self.root.garbageElementSetSize)
             """
@@ -776,6 +780,21 @@ public class Document {
         }
 
         return result
+    }
+
+    /**
+     * `removePushedLocalChanges` removes local changes that have been applied to
+     * the server from the local changes.
+     *
+     * @param clientSeq - client sequence number to remove local changes before it
+     */
+    private func removePushedLocalChanges(clientSeq: Int64) {
+        while !self.localChanges.isEmpty {
+            guard let change = self.localChanges.first, change.id.getClientSeq() <= clientSeq else {
+                return
+            }
+            self.localChanges.removeFirst()
+        }
     }
 
     /**

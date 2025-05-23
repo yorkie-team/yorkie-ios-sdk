@@ -22,8 +22,8 @@ final class SnapshotTests: XCTestCase {
 
     func test_should_handle_snapshot() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
-            // 01. Updates 700 changes over snapshot threshold.
-            for idx in 0 ..< 700 {
+            // 01. Updates changes over snapshot threshold.
+            for idx in 0 ..< defaultSnapshotThreshold {
                 try await d1.update { root, _ in
                     root["\(idx)"] = Int32(idx)
                 }
@@ -51,7 +51,7 @@ final class SnapshotTests: XCTestCase {
 
     func test_should_handle_snapshot_for_text_object() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
-            for _ in 0 ..< 700 {
+            for _ in 0 ..< defaultSnapshotThreshold {
                 try await d1.update { root, _ in
                     root.k1 = JSONText()
                 }
@@ -59,8 +59,8 @@ final class SnapshotTests: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            // 01. Updates 500 changes over snapshot threshold by c1.
-            for idx in 0 ..< 500 {
+            // 01. Updates changes over snapshot threshold by c1.
+            for idx in 0 ..< defaultSnapshotThreshold {
                 try await d1.update { root, _ in
                     (root.k1 as? JSONText)?.edit(idx, idx, "x")
                 }
@@ -90,8 +90,8 @@ final class SnapshotTests: XCTestCase {
             try await c1.sync()
             try await c2.sync()
 
-            // 01. Updates 700 changes over snapshot threshold by c1.
-            for _ in 0 ..< 700 {
+            // 01. Updates changes over snapshot threshold by c1.
+            for _ in 0 ..< defaultSnapshotThreshold {
                 try await d1.update { root, _ in
                     (root.k1 as? JSONText)?.setStyle(0, 1, ["bold": true])
                 }

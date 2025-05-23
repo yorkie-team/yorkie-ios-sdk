@@ -34,22 +34,20 @@ final class PresenceTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, [:], .manual)
 
-        let snapshotThreshold = 500
-
-        for index in 0 ..< snapshotThreshold {
+        for index in 0 ..< defaultSnapshotThreshold {
             try await doc1.update { _, presence in
                 presence.set(["key": index])
             }
         }
 
         var presence = await doc1.getPresenceForTest(c1.id!)?["key"] as? Int
-        XCTAssertEqual(presence, snapshotThreshold - 1)
+        XCTAssertEqual(presence, defaultSnapshotThreshold - 1)
 
         try await c1.sync()
         try await c2.sync()
 
         presence = await doc2.getPresenceForTest(c1.id!)?["key"] as? Int
-        XCTAssertEqual(presence, snapshotThreshold - 1)
+        XCTAssertEqual(presence, defaultSnapshotThreshold - 1)
     }
 
     func test_can_be_set_initial_value_in_attach_and_be_removed_in_detach() async throws {

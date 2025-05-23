@@ -926,7 +926,7 @@ final class ClientIntegrationTests: XCTestCase {
             try await c2.sync()
 
             // 01. c1 increases the counter for creating snapshot.
-            for _ in 0 ..< 500 {
+            for _ in 0 ..< defaultSnapshotThreshold {
                 try await d1.update { root, _ in
                     (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
                 }

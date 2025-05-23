@@ -17,6 +17,8 @@
 import XCTest
 @testable import Yorkie
 
+let defaultSnapshotThreshold = 1000
+
 func maxVersionVector(actors: [String?]) -> VersionVector {
     var actors = actors.compactMap { $0 }
 

@@ -1164,7 +1164,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         try await c2.attach(d2, [:], .manual)
 
         // Perform a dummy update to apply changes up to the snapshot threshold.
-        let snapshotThreshold = 500
+        let snapshotThreshold = defaultSnapshotThreshold
         for _ in 0 ..< snapshotThreshold {
             try await d1.update { root, _ in
                 root.num = Int64(0)
