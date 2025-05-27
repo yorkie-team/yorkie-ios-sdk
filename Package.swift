@@ -34,7 +34,10 @@ let package = Package(
         ),
         .target(
             name: "YorkieTestHelper",
-            dependencies: ["Yorkie"],
+            dependencies: [
+                "Yorkie",
+                .product(name: "ConnectNIO", package: "connect-swift")
+            ],
             path: "Tests/Helper"
         ),
         .testTarget(

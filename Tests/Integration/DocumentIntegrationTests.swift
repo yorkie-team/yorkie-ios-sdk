@@ -17,6 +17,9 @@
 import Combine
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 final class DocumentIntegrationTests: XCTestCase {
     var cancellables = Set<AnyCancellable>()

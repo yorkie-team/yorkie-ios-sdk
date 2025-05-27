@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 final class SnapshotTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
