@@ -160,8 +160,14 @@ func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationI
 }
 
 class EventCollector<T: Equatable> {
+    struct WaitUntil {
+        var continuation: AsyncStream<T>.Continuation
+        var stopValue: T
+    }
+
     private let queue = DispatchQueue(label: "com.yorkie.eventcollector", attributes: .concurrent)
     private var _values: [T] = []
+    private var waitUntil: WaitUntil?
 
     let doc: Document
     var values: [T] {
@@ -179,21 +185,35 @@ class EventCollector<T: Equatable> {
     func add(event: T) {
         self.queue.async(flags: .barrier) {
             self._values.append(event)
+
+            if let waitUntil = self.waitUntil {
+                waitUntil.continuation.yield(event)
+                if event == waitUntil.stopValue {
+                    waitUntil.continuation.finish()
+                }
+            }
         }
     }
 
     func reset() {
         self.queue.sync {
             self._values.removeAll()
+            self.waitUntil = nil
         }
     }
 
-    func asyncStream() -> AsyncStream<T> {
+    func valueStream() -> AsyncStream<T> {
         return AsyncStream<T> { continuation in
             for value in self.values {
                 continuation.yield(value)
             }
             continuation.finish()
+        }
+    }
+
+    func waitStream(until stopValue: T) -> AsyncStream<T> where T: Equatable {
+        return AsyncStream<T> { continuation in
+            self.waitUntil = WaitUntil(continuation: continuation, stopValue: stopValue)
         }
     }
 
@@ -209,7 +229,7 @@ class EventCollector<T: Equatable> {
         }
 
         var counter = 0
-        for await value in self.asyncStream() {
+        for await value in self.valueStream() {
             counter += 1
 
             if counter == nth {
@@ -221,7 +241,7 @@ class EventCollector<T: Equatable> {
         XCTFail("Stream ended before finding \(nth)th value")
     }
 
-    func subscribeDocumentStatus() async where T == DocumentStatus {
+    func subscribeDocumentStatus() async where T == DocStatus {
         await self.doc.subscribeStatus { [weak self] event, _ in
             guard let status = (event as? StatusChangedEvent)?.value.status else {
                 return

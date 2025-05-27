@@ -125,6 +125,7 @@
 		CECCCB8428C96CD600544204 /* XCTestCase+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */; };
 		CECDCB522D8932C800DE6B81 /* StringValueTypeDictionaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECDCB512D8932C800DE6B81 /* StringValueTypeDictionaryTests.swift */; };
 		CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */; };
+		CEDD01572DE467F80074CF4F /* AuthTokenInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDD01562DE467F80074CF4F /* AuthTokenInjector.swift */; };
 		CEDD01592DE483210074CF4F /* ConnectNIO in Frameworks */ = {isa = PBXBuildFile; productRef = CEDD01582DE483210074CF4F /* ConnectNIO */; };
 		CEDD64D52D3E449700590DB1 /* YorkieService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDD64D42D3E449700590DB1 /* YorkieService.swift */; };
 		CEDDE26E2914EAD00032B16A /* JSONObjectable.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */; };
@@ -271,6 +272,7 @@
 		CECCCB8228C96C9200544204 /* XCTestCase+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "XCTestCase+Extension.swift"; sourceTree = "<group>"; };
 		CECDCB512D8932C800DE6B81 /* StringValueTypeDictionaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringValueTypeDictionaryTests.swift; sourceTree = "<group>"; };
 		CEDB32DF28EBE6A4004BBA80 /* CRDTObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTObjectTests.swift; sourceTree = "<group>"; };
+		CEDD01562DE467F80074CF4F /* AuthTokenInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthTokenInjector.swift; sourceTree = "<group>"; };
 		CEDD64D42D3E449700590DB1 /* YorkieService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieService.swift; sourceTree = "<group>"; };
 		CEDDE26D2914EAD00032B16A /* JSONObjectable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONObjectable.swift; sourceTree = "<group>"; };
 		CEDDE2702914EB260032B16A /* YorkieJSONObjectableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YorkieJSONObjectableTests.swift; sourceTree = "<group>"; };
@@ -613,6 +615,7 @@
 				CE8C230428C9F1BD00432DE5 /* Client.swift */,
 				9A20CE85299F61CD00E4CE7E /* Auth.swift */,
 				CEDD64D42D3E449700590DB1 /* YorkieService.swift */,
+				CEDD01562DE467F80074CF4F /* AuthTokenInjector.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";

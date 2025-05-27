@@ -802,8 +802,8 @@ final class ClientIntegrationTests: XCTestCase {
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        let eventCollectorD1 = EventCollector<DocumentSyncStatus>(doc: d1)
-        let eventCollectorD2 = EventCollector<DocumentSyncStatus>(doc: d2)
+        let eventCollectorD1 = EventCollector<DocSyncStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocSyncStatus>(doc: d2)
 
         await d1.subscribeSync { event, _ in
             if let syncStatusEvent = event as? SyncStatusChangedEvent {

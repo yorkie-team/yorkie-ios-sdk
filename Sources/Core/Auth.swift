@@ -19,7 +19,7 @@ import Foundation
 
 struct AuthHeader {
     let apiKey: String?
-    let token: String?
+    var token: String?
 
     func makeHeader(_ docKey: String?) -> [String: [String]] {
         var header = [String: [String]]()
@@ -43,5 +43,9 @@ struct AuthHeader {
         header["x-yorkie-user-agent"] = ["yorkie-ios-sdk/\(yorkieVersion)"]
 
         return header
+    }
+
+    mutating func setAuth(token: String) {
+        self.token = token
     }
 }

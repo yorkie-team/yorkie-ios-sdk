@@ -34,14 +34,15 @@ public enum YorkieProjectHelper {
         rpcAddress: String,
         username: String,
         password: String,
-        webhookURL: String
+        webhookURL: String,
+        webhookMethods: [String] = []
     ) async throws -> YorkieProjectContext {
         let token = try await logIn(rpcAddress: rpcAddress, username: username, password: password)
 
         let name = "auth-webhook-\(Int(Date().timeIntervalSince1970))"
         let (projectID, publicKey) = try await createProject(rpcAddress: rpcAddress, token: token, name: name)
 
-        try await updateProjectWebhook(rpcAddress: rpcAddress, token: token, projectID: projectID, webhookURL: webhookURL)
+        try await updateProjectWebhook(rpcAddress: rpcAddress, token: token, projectID: projectID, webhookURL: webhookURL, webhookMethods: webhookMethods)
 
         return YorkieProjectContext(rpcAddress: rpcAddress, adminToken: token, apiKey: publicKey, projectID: projectID)
     }
@@ -75,15 +76,26 @@ public enum YorkieProjectHelper {
     public static func updateProjectWebhook(rpcAddress: String,
                                             token: String,
                                             projectID: String,
-                                            webhookURL: String) async throws
+                                            webhookURL: String,
+                                            webhookMethods: [String] = []) async throws
     {
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/UpdateProject")!
+
+        var fields: [String: Any] = [
+            "auth_webhook_url": webhookURL
+        ]
+
+        if !webhookMethods.isEmpty {
+            fields["auth_webhook_methods"] = [
+                "methods": webhookMethods
+            ]
+        }
+
         let body: [String: Any] = [
             "id": projectID,
-            "fields": [
-                "auth_webhook_url": webhookURL
-            ]
+            "fields": fields
         ]
+
         let headers = ["Authorization": token]
         _ = try await self.postJSON(to: url, body: body, headers: headers)
     }

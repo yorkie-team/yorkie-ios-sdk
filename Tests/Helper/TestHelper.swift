@@ -109,8 +109,26 @@ func assertPeerElementsEqual(peers1: [PeerElement], peers2: [PeerElement]) {
     }
 }
 
+func assertThrows<T: Error>(_ expression: @escaping () async throws -> Void,
+                            isExpectedError: (T) -> Bool,
+                            message: String? = nil) async
+{
+    do {
+        try await expression()
+        XCTFail("Expected to throw \(T.self), but no error was thrown.")
+    } catch let error as T {
+        XCTAssertTrue(isExpectedError(error), message ?? "Thrown error did not match expected error.")
+    } catch {
+        XCTFail("Expected to throw \(T.self), but got different error: \(error)")
+    }
+}
+
 extension Date {
-    func timeInterval(after seconds: Double) -> TimeInterval {
-        return (self + seconds).timeIntervalSince1970
+    func timeInterval(before milliseconds: Double) -> TimeInterval {
+        return (self - (milliseconds / 1000)).timeIntervalSince1970
+    }
+
+    func timeInterval(after milliseconds: Double) -> TimeInterval {
+        return (self + (milliseconds / 1000)).timeIntervalSince1970
     }
 }

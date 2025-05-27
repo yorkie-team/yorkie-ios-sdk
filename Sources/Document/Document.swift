@@ -50,9 +50,9 @@ public struct DocumentOptions {
 }
 
 /**
- * `DocumentStatus` represents the status of the document.
+ * `DocStatus` represents the status of the document.
  */
-public enum DocumentStatus: String {
+public enum DocStatus: String {
     /**
      * Detached means that the document is not attached to the client.
      * The actor of the ticket is created without being assigned.
@@ -72,7 +72,7 @@ public enum DocumentStatus: String {
     case removed
 }
 
-public typealias DocumentKey = String
+public typealias DocKey = String
 public typealias DocumentID = String
 
 public enum PresenceSubscriptionType: String {
@@ -90,8 +90,8 @@ public enum PresenceSubscriptionType: String {
 public class Document {
     public typealias SubscribeCallback = @MainActor (DocEvent, Document) -> Void
 
-    private let key: DocumentKey
-    private(set) var status: DocumentStatus = .detached
+    private let key: DocKey
+    private(set) var status: DocStatus = .detached
     private let disableGC: Bool
     private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
@@ -108,6 +108,7 @@ public class Document {
     private var syncSubscribeCallback: SubscribeCallback?
     private var broadcastSubscribeCallback: SubscribeCallback?
     private var localBroadcastSubscribeCallback: SubscribeCallback?
+    private var authErrorSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -123,7 +124,7 @@ public class Document {
         self.init(key: key, opts: DocumentOptions(disableGC: false))
     }
 
-    public nonisolated init(key: DocumentKey, opts: DocumentOptions) {
+    public nonisolated init(key: DocKey, opts: DocumentOptions) {
         self.key = key
         self.disableGC = opts.disableGC
     }
@@ -246,6 +247,14 @@ public class Document {
     }
 
     /**
+     * `subscribeAuthError` registers a callback to subscribe to events on the document.
+     * The callback will be called when the authentification error occurs.
+     */
+    public func subscribeAuthError(_ callback: @escaping SubscribeCallback) {
+        self.authErrorSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -289,6 +298,13 @@ public class Document {
      */
     func unsubscribeLocalBroadcast() {
         self.localBroadcastSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeAuthError` unregisters a callback to subscribe to events on the document.
+     */
+    func unsubscribeAuthError() {
+        self.authErrorSubscribeCallback = nil
     }
 
     /**
@@ -629,7 +645,7 @@ public class Document {
     /**
      * `applyStatus` applies the document status into this document.
      */
-    func applyStatus(_ status: DocumentStatus) {
+    func applyStatus(_ status: DocStatus) {
         self.status = status
 
         if status == .detached {
@@ -667,7 +683,7 @@ public class Document {
         self.publish(ConnectionChangedEvent(value: status))
     }
 
-    func publishSyncEvent(_ status: DocumentSyncStatus) {
+    func publishSyncEvent(_ status: DocSyncStatus) {
         self.publish(SyncStatusChangedEvent(value: status))
     }
 
@@ -679,6 +695,11 @@ public class Document {
         let value = BroadcastValue(clientID: clientID, topic: topic, payload: payload)
         let broadcastEvent = BroadcastEvent(value: value, options: nil)
         self.publish(broadcastEvent)
+    }
+
+    func publishAuthErrorEvent(reason: String, method: AuthErrorValue.Method) {
+        let authErrorEvent = AuthErrorEvent(value: AuthErrorValue(reason: reason, method: method))
+        self.publish(authErrorEvent)
     }
 
     /**
@@ -735,6 +756,8 @@ public class Document {
             self.localBroadcastSubscribeCallback?(localBroadcastEvent, self)
         } else if let broadcastEvent = event as? BroadcastEvent {
             self.broadcastSubscribeCallback?(broadcastEvent, self)
+        } else if let authErrorEvent = event as? AuthErrorEvent {
+            self.authErrorSubscribeCallback?(authErrorEvent, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
 

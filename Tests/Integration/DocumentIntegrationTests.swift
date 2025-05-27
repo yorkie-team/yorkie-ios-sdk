@@ -481,8 +481,8 @@ final class DocumentIntegrationTests: XCTestCase {
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        let eventCollectorD1 = EventCollector<DocumentStatus>(doc: d1)
-        let eventCollectorD2 = EventCollector<DocumentStatus>(doc: d2)
+        let eventCollectorD1 = EventCollector<DocStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocStatus>(doc: d2)
         await eventCollectorD1.subscribeDocumentStatus()
         await eventCollectorD2.subscribeDocumentStatus()
 
@@ -506,8 +506,8 @@ final class DocumentIntegrationTests: XCTestCase {
         let docKey2 = "\(self.description)-\(Date().description)".toDocKey
         let d3 = Document(key: docKey2)
         let d4 = Document(key: docKey2)
-        let eventCollectorD3 = EventCollector<DocumentStatus>(doc: d3)
-        let eventCollectorD4 = EventCollector<DocumentStatus>(doc: d4)
+        let eventCollectorD3 = EventCollector<DocStatus>(doc: d3)
+        let eventCollectorD4 = EventCollector<DocStatus>(doc: d4)
         await eventCollectorD3.subscribeDocumentStatus()
         await eventCollectorD4.subscribeDocumentStatus()
 
@@ -550,8 +550,8 @@ final class DocumentIntegrationTests: XCTestCase {
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        let eventCollectorD1 = EventCollector<DocumentStatus>(doc: d1)
-        let eventCollectorD2 = EventCollector<DocumentStatus>(doc: d2)
+        let eventCollectorD1 = EventCollector<DocStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocStatus>(doc: d2)
         await eventCollectorD1.subscribeDocumentStatus()
         await eventCollectorD2.subscribeDocumentStatus()
 

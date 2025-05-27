@@ -56,7 +56,7 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrDocumentRemoved is returned when the document is removed.
         case errDocumentRemoved = "ErrDocumentRemoved"
 
-        /// InvalidObjectKey is returned when the object key is invalid.
+        /// ErrInvalidObjectKey is returned when the object key is invalid.
         case errInvalidObjectKey = "ErrInvalidObjectKey"
 
         /// ErrInvalidArgument is returned when the argument is invalid.
@@ -76,20 +76,30 @@ struct YorkieError: Error, CustomStringConvertible {
 
         /// ErrRPC is returned when an error occurred in the RPC Request
         case errRPC = "ErrRPC"
+
+        // ErrPermissionDenied is returned when the authorization webhook denies the request.
+        case errPermissionDenied = "ErrPermissionDenied"
+
+        // ErrUnauthenticated is returned when the request does not have valid authentication credentials.
+        case errUnauthenticated = "ErrUnauthenticated"
     }
+}
+
+/**
+ * `errorMetadataOf` returns the error metadata of the given connect error.
+ */
+func errorMetadataOf(error: ConnectError) -> [String: String] {
+    // NOTE(hackerwins): Currently, we only use the first detail to represent the
+    // error code.
+    let infos: [ErrorInfo] = error.unpackedDetails()
+    return infos.first?.metadata ?? [:]
 }
 
 /**
  * `errorCodeOf` returns the error code of the given connect error.
  */
 func errorCodeOf(error: ConnectError) -> String {
-    // NOTE(hackerwins): Currently, we only use the first detail to represent the
-    // error code.
-    let infos: [ErrorInfo] = error.unpackedDetails()
-    for info in infos {
-        return info.metadata["code"] ?? ""
-    }
-    return ""
+    return errorMetadataOf(error: error)["code"] ?? ""
 }
 
 func toYorkieErrorCode(from error: Error) -> YorkieError.Code? {
