@@ -108,3 +108,9 @@ func assertPeerElementsEqual(peers1: [PeerElement], peers2: [PeerElement]) {
         }
     }
 }
+
+extension Date {
+    func timeInterval(after seconds: Double) -> TimeInterval {
+        return (self + seconds).timeIntervalSince1970
+    }
+}
