@@ -743,7 +743,9 @@ final class ClientIntegrationTests: XCTestCase {
             ]))
         }
 
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: .remoteChange)
+        for await _ in eventCollectorD2.waitStream(until: .remoteChange) {
+            await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .remoteChange)
+        }
 
         var d1XML = await(d1.getRoot().tree as? JSONTree)?.toXML()
         var d2XML = await(d2.getRoot().tree as? JSONTree)?.toXML()
@@ -779,7 +781,9 @@ final class ClientIntegrationTests: XCTestCase {
             try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
         }
 
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 3, isEqualTo: .remoteChange)
+        for await _ in eventCollectorD1.waitStream(until: .remoteChange) {
+            await eventCollectorD1.verifyNthValue(at: 3, isEqualTo: .remoteChange)
+        }
 
         d1XML = await(d1.getRoot().tree as? JSONTree)?.toXML()
         d2XML = await(d2.getRoot().tree as? JSONTree)?.toXML()
@@ -820,14 +824,18 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.attach(d1)
         try await c2.attach(d2)
 
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: .synced)
+        for await _ in eventCollectorD1.waitStream(until: .synced) {
+            await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: .synced)
+        }
 
         try await d1.update { root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
         }
 
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: .synced)
+        for await _ in eventCollectorD2.waitStream(until: .synced) {
+            await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .synced)
+        }
 
         var d1JSON = await(d1.getRoot().t as? JSONText)?.toString
         var d2JSON = await(d2.getRoot().t as? JSONText)?.toString
@@ -840,18 +848,25 @@ final class ClientIntegrationTests: XCTestCase {
         try await d2.update { root, _ in
             (root.t as? JSONText)?.edit(1, 1, "b")
         }
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 2, isEqualTo: .synced)
+
+        for await _ in eventCollectorD2.waitStream(until: .synced) {
+            await eventCollectorD2.verifyNthValue(at: 2, isEqualTo: .synced)
+        }
 
         try await d2.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }
 
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 3, isEqualTo: .synced)
+        for await _ in eventCollectorD2.waitStream(until: .synced) {
+            await eventCollectorD2.verifyNthValue(at: 3, isEqualTo: .synced)
+        }
 
         XCTAssertEqual(eventCollectorD1.count, 0)
         try await c1.changeSyncMode(d1, .realtime)
 
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: .synced)
+        for await _ in eventCollectorD1.waitStream(until: .synced) {
+            await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: .synced)
+        }
 
         d1JSON = await(d1.getRoot().t as? JSONText)?.toString
         d2JSON = await(d2.getRoot().t as? JSONText)?.toString
