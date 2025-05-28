@@ -1037,7 +1037,7 @@ public extension Client {
 
     private func injectAuthTokenAfterGet(with authTokenInjector: AuthTokenInjector, reason: String?) async throws {
         let token = try await authTokenInjector.getToken(reason: reason)
-        self.authHeader.setAuth(token: token)
+        self.authHeader.updateToken(token)
     }
 
     private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment?, method: AuthErrorValue.Method) {

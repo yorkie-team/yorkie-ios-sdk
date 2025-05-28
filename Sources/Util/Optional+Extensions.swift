@@ -25,8 +25,8 @@ extension Optional: OptionalValue {
         switch self {
         case .none:
             return true
-        case .some(let unrwapped):
-            if let nested = unrwapped as? OptionalValue {
+        case .some(let unwrapped):
+            if let nested = unwrapped as? OptionalValue {
                 return nested.isNil
             }
             return false

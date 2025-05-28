@@ -45,7 +45,9 @@ struct AuthHeader {
         return header
     }
 
-    mutating func setAuth(token: String) {
+    /// Updates the authentication token for this header
+    /// - Parameter token: The new authentication toke
+    mutating func updateToken(_ token: String) {
         self.token = token
     }
 }

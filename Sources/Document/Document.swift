@@ -296,14 +296,14 @@ public class Document {
     /**
      * `unsubscribeLocalBroadcast` unregisters a callback to subscribe to events on the document.
      */
-    func unsubscribeLocalBroadcast() {
+    public func unsubscribeLocalBroadcast() {
         self.localBroadcastSubscribeCallback = nil
     }
 
     /**
      * `unsubscribeAuthError` unregisters a callback to subscribe to events on the document.
      */
-    func unsubscribeAuthError() {
+    public func unsubscribeAuthError() {
         self.authErrorSubscribeCallback = nil
     }
 

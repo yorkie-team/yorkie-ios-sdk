@@ -170,7 +170,7 @@ class EventCollector<T: Equatable> {
     }
 
     func reset() {
-        self.queue.sync {
+        self.queue.async(flags: .barrier) {
             self._values.removeAll()
             self.waitUntil = nil
         }
