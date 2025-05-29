@@ -17,6 +17,9 @@
 import Combine
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 final class DocumentIntegrationTests: XCTestCase {
     var cancellables = Set<AnyCancellable>()
@@ -481,8 +484,8 @@ final class DocumentIntegrationTests: XCTestCase {
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        let eventCollectorD1 = EventCollector<DocumentStatus>(doc: d1)
-        let eventCollectorD2 = EventCollector<DocumentStatus>(doc: d2)
+        let eventCollectorD1 = EventCollector<DocStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocStatus>(doc: d2)
         await eventCollectorD1.subscribeDocumentStatus()
         await eventCollectorD2.subscribeDocumentStatus()
 
@@ -506,8 +509,8 @@ final class DocumentIntegrationTests: XCTestCase {
         let docKey2 = "\(self.description)-\(Date().description)".toDocKey
         let d3 = Document(key: docKey2)
         let d4 = Document(key: docKey2)
-        let eventCollectorD3 = EventCollector<DocumentStatus>(doc: d3)
-        let eventCollectorD4 = EventCollector<DocumentStatus>(doc: d4)
+        let eventCollectorD3 = EventCollector<DocStatus>(doc: d3)
+        let eventCollectorD4 = EventCollector<DocStatus>(doc: d4)
         await eventCollectorD3.subscribeDocumentStatus()
         await eventCollectorD4.subscribeDocumentStatus()
 
@@ -550,8 +553,8 @@ final class DocumentIntegrationTests: XCTestCase {
         let d1 = Document(key: docKey)
         let d2 = Document(key: docKey)
 
-        let eventCollectorD1 = EventCollector<DocumentStatus>(doc: d1)
-        let eventCollectorD2 = EventCollector<DocumentStatus>(doc: d2)
+        let eventCollectorD1 = EventCollector<DocStatus>(doc: d1)
+        let eventCollectorD2 = EventCollector<DocStatus>(doc: d2)
         await eventCollectorD1.subscribeDocumentStatus()
         await eventCollectorD2.subscribeDocumentStatus()
 
@@ -721,6 +724,49 @@ final class DocumentIntegrationTests: XCTestCase {
             XCTAssertEqual(docJSON, testCase.expectedJSON)
 
             try await c1.deactivate()
+        }
+    }
+
+    // This test was moved to the integration tests for the Yorkie server, but it remains a unit test in yorkie-js-sdk.
+    func test_should_publish_snapshot_event_with_up_to_date_document() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            let eventCollector = EventCollector<Int32>(doc: d2)
+
+            await d2.subscribe("$") { event, doc in
+                if event.type == .snapshot {
+                    if let value = (doc.getRoot().counter as? JSONCounter<Int32>)?.value as? Int32 {
+                        eventCollector.add(event: value)
+                    }
+                }
+            }
+
+            try await d1.update { root, _ in
+                root.counter = JSONCounter(value: Int32(0))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // 01. c1 increases the counter for creating snapshot.
+            for _ in 1 ... defaultSnapshotThreshold {
+                try await d1.update { root, _ in
+                    (root.counter as? JSONCounter<Int32>)?.increase(value: 1)
+                }
+            }
+            try await c1.sync()
+
+            // 02. c2 receives the snapshot and increases the counter simultaneously.
+            try await d2.update { root, _ in
+                (root.counter as? JSONCounter<Int32>)?.increase(value: 1)
+            }
+            // should have a local change after receiving a snapshot event
+            Task {
+                try await c2.sync()
+            }
+
+            let targetValue = Int32(defaultSnapshotThreshold + 1)
+            for await _ in eventCollector.waitStream(until: targetValue) {
+                await eventCollector.verifyNthValue(at: 1, isEqualTo: targetValue)
+            }
         }
     }
 }

@@ -50,9 +50,9 @@ public struct DocumentOptions {
 }
 
 /**
- * `DocumentStatus` represents the status of the document.
+ * `DocStatus` represents the status of the document.
  */
-public enum DocumentStatus: String {
+public enum DocStatus: String {
     /**
      * Detached means that the document is not attached to the client.
      * The actor of the ticket is created without being assigned.
@@ -72,7 +72,7 @@ public enum DocumentStatus: String {
     case removed
 }
 
-public typealias DocumentKey = String
+public typealias DocKey = String
 public typealias DocumentID = String
 
 public enum PresenceSubscriptionType: String {
@@ -90,8 +90,8 @@ public enum PresenceSubscriptionType: String {
 public class Document {
     public typealias SubscribeCallback = @MainActor (DocEvent, Document) -> Void
 
-    private let key: DocumentKey
-    private(set) var status: DocumentStatus = .detached
+    private let key: DocKey
+    private(set) var status: DocStatus = .detached
     private let disableGC: Bool
     private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
@@ -108,6 +108,7 @@ public class Document {
     private var syncSubscribeCallback: SubscribeCallback?
     private var broadcastSubscribeCallback: SubscribeCallback?
     private var localBroadcastSubscribeCallback: SubscribeCallback?
+    private var authErrorSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -123,7 +124,7 @@ public class Document {
         self.init(key: key, opts: DocumentOptions(disableGC: false))
     }
 
-    public nonisolated init(key: DocumentKey, opts: DocumentOptions) {
+    public nonisolated init(key: DocKey, opts: DocumentOptions) {
         self.key = key
         self.disableGC = opts.disableGC
     }
@@ -246,6 +247,14 @@ public class Document {
     }
 
     /**
+     * `subscribeAuthError` registers a callback to subscribe to events on the document.
+     * The callback will be called when the authentification error occurs.
+     */
+    public func subscribeAuthError(_ callback: @escaping SubscribeCallback) {
+        self.authErrorSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -287,8 +296,15 @@ public class Document {
     /**
      * `unsubscribeLocalBroadcast` unregisters a callback to subscribe to events on the document.
      */
-    func unsubscribeLocalBroadcast() {
+    public func unsubscribeLocalBroadcast() {
         self.localBroadcastSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeAuthError` unregisters a callback to subscribe to events on the document.
+     */
+    public func unsubscribeAuthError() {
+        self.authErrorSubscribeCallback = nil
     }
 
     /**
@@ -301,34 +317,26 @@ public class Document {
      */
     func applyChangePack(_ pack: ChangePack) throws {
         let hasSnapshot = pack.hasSnapshot()
+        let clientSeq = Int64(pack.getCheckpoint().getClientSeq())
 
+        // 01. Apply snapshot or changes to the root object.
         if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
-            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot)
-        } else if pack.hasChanges() {
-            try self.applyChanges(pack.getChanges())
+            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot, clientSeq)
+        } else {
+            try self.applyChanges(pack.getChanges(), source: .remote)
+
+            // Remove local changes applied to server.
+            self.removePushedLocalChanges(clientSeq: clientSeq)
         }
 
-        // 02. Remove local changes applied to server.
-        while let change = self.localChanges.first, change.id.getClientSeq() <= pack.getCheckpoint().getClientSeq() {
-            self.localChanges.removeFirst()
-        }
-
-        // NOTE(hackerwins): If the document has local changes, we need to apply
-        // them after applying the snapshot. We need to treat the local changes
-        // as remote changes because the application should apply the local
-        // changes to their own document.
-        if hasSnapshot {
-            try self.applyChanges(self.localChanges)
-        }
-
-        // 03. Update the checkpoint.
+        // 02. Update the checkpoint.
         self.checkpoint.forward(other: pack.getCheckpoint())
 
-        // 04. Do Garbage collection.
+        // 03. Do Garbage collection.
         if !hasSnapshot, let versionVector = pack.getVersionVector() {
             self.garbageCollect(minSyncedVersionVector: versionVector)
 
-            // 05. Filter detached client's lamport from version vector
+            // 04. Filter detached client's lamport from version vector
             self.filterVersionVector(minSyncedVersionVector: versionVector)
         }
 
@@ -487,7 +495,11 @@ public class Document {
     /**
      * `applySnapshot` applies the given snapshot into this document.
      */
-    public func applySnapshot(_ serverSeq: Int64, _ snapshotVector: VersionVector, _ snapshot: Data) throws {
+    public func applySnapshot(_ serverSeq: Int64,
+                              _ snapshotVector: VersionVector,
+                              _ snapshot: Data,
+                              _ clientSeq: Int64 = -1) throws
+    {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
@@ -495,6 +507,14 @@ public class Document {
 
         // drop clone because it is contaminated.
         self.clone = nil
+
+        self.removePushedLocalChanges(clientSeq: clientSeq)
+
+        // NOTE(hackerwins): If the document has local changes, we need to apply
+        // them after applying the snapshot, as local changes are not included in the snapshot data.
+        // Afterward, we should publish a snapshot event with the latest
+        // version of the document to ensure the user receives the most up-to-date snapshot.
+        try self.applyChanges(self.localChanges, source: .local)
 
         let hexSnapshotVector = try Converter.versionVectorToHex(vector: snapshotVector)
         let snapshotInfo = SnapshotInfo(serverSeq: serverSeq,
@@ -507,10 +527,10 @@ public class Document {
     /**
      * `applyChanges` applies the given changes into this document.
      */
-    public func applyChanges(_ changes: [Change]) throws {
+    public func applyChanges(_ changes: [Change], source: OpSource) throws {
         Logger.debug(
             """
-            trying to apply \(changes.count) remote changes.
+            trying to apply \(changes.count) \(source) changes.
             elements:\(self.root.elementMapSize),
             removeds:\(self.root.garbageElementSetSize)
             """)
@@ -587,7 +607,7 @@ public class Document {
 
         Logger.debug(
             """
-            after appling \(changes.count) remote changes.
+            after appling \(changes.count) \(source) changes.
             elements:\(self.root.elementMapSize),
             removeds:\(self.root.garbageElementSetSize)
             """
@@ -625,7 +645,7 @@ public class Document {
     /**
      * `applyStatus` applies the document status into this document.
      */
-    func applyStatus(_ status: DocumentStatus) {
+    func applyStatus(_ status: DocStatus) {
         self.status = status
 
         if status == .detached {
@@ -663,7 +683,7 @@ public class Document {
         self.publish(ConnectionChangedEvent(value: status))
     }
 
-    func publishSyncEvent(_ status: DocumentSyncStatus) {
+    func publishSyncEvent(_ status: DocSyncStatus) {
         self.publish(SyncStatusChangedEvent(value: status))
     }
 
@@ -675,6 +695,11 @@ public class Document {
         let value = BroadcastValue(clientID: clientID, topic: topic, payload: payload)
         let broadcastEvent = BroadcastEvent(value: value, options: nil)
         self.publish(broadcastEvent)
+    }
+
+    func publishAuthErrorEvent(reason: String, method: AuthErrorValue.Method) {
+        let authErrorEvent = AuthErrorEvent(value: AuthErrorValue(reason: reason, method: method))
+        self.publish(authErrorEvent)
     }
 
     /**
@@ -731,6 +756,8 @@ public class Document {
             self.localBroadcastSubscribeCallback?(localBroadcastEvent, self)
         } else if let broadcastEvent = event as? BroadcastEvent {
             self.broadcastSubscribeCallback?(broadcastEvent, self)
+        } else if let authErrorEvent = event as? AuthErrorEvent {
+            self.authErrorSubscribeCallback?(authErrorEvent, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
 
@@ -750,7 +777,7 @@ public class Document {
                                       clientSeq: event.value.clientSeq,
                                       serverSeq: event.value.serverSeq)
 
-                if let callback = self.subscribeCallbacks[key] {
+                if let callback = self.subscribeCallbacks[key], key != "$" {
                     callback(event.type == .localChange ? LocalChangeEvent(value: info) : RemoteChangeEvent(value: info), self)
                 }
             }
@@ -776,6 +803,21 @@ public class Document {
         }
 
         return result
+    }
+
+    /**
+     * `removePushedLocalChanges` removes local changes that have been applied to
+     * the server from the local changes.
+     *
+     * @param clientSeq - client sequence number to remove local changes before it
+     */
+    private func removePushedLocalChanges(clientSeq: Int64) {
+        while !self.localChanges.isEmpty {
+            guard let change = self.localChanges.first, change.id.getClientSeq() <= clientSeq else {
+                return
+            }
+            self.localChanges.removeFirst()
+        }
     }
 
     /**

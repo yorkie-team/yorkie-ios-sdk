@@ -12,7 +12,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/connectrpc/connect-swift", exact: "1.0.2"),
+        .package(url: "https://github.com/connectrpc/connect-swift", exact: "1.0.3"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.6.3"),
         .package(url: "https://github.com/groue/Semaphore.git", exact: "0.0.8"),
         .package(url: "https://github.com/apple/swift-docc-plugin", exact: "1.4.3")
@@ -34,7 +34,10 @@ let package = Package(
         ),
         .target(
             name: "YorkieTestHelper",
-            dependencies: ["Yorkie"],
+            dependencies: [
+                "Yorkie",
+                .product(name: "ConnectNIO", package: "connect-swift")
+            ],
             path: "Tests/Helper"
         ),
         .testTarget(

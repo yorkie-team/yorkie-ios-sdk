@@ -1,7 +1,7 @@
 /*
- * Copyright 2022 The Yorkie Authors. All rights reserved.
+ * Copyright 2025 The Yorkie Authors. All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -16,20 +16,8 @@
 
 import Foundation
 
-protocol OptionalValue {
-    var isNil: Bool { get }
-}
+typealias AuthToken = String
 
-extension Optional: OptionalValue {
-    var isNil: Bool {
-        switch self {
-        case .none:
-            return true
-        case .some(let unwrapped):
-            if let nested = unwrapped as? OptionalValue {
-                return nested.isNil
-            }
-            return false
-        }
-    }
+public protocol AuthTokenInjector {
+    func getToken(reason: String?) async throws -> String
 }

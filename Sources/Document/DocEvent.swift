@@ -80,6 +80,11 @@ public enum DocEventType: String {
      * `localBroadcast` means that the broadcast event is sent from the local client.
      */
     case localBroadcast = "local-broadcast"
+
+    /**
+     * `authError` indicates an authorization failure in syncLoop or watchLoop.
+     */
+    case authError = "auth-error"
 }
 
 /**
@@ -90,7 +95,7 @@ public protocol DocEvent {
 }
 
 public struct StatusInfo {
-    public let status: DocumentStatus
+    public let status: DocStatus
     public let actorID: ActorID?
 }
 
@@ -134,9 +139,9 @@ public struct ConnectionChangedEvent: DocEvent {
 }
 
 /**
- * `DocumentSyncStatus` is document sync result types
+ * `DocSyncStatus` is document sync result types
  */
-public enum DocumentSyncStatus: String {
+public enum DocSyncStatus: String {
     /**
      * type when Document synced.
      */
@@ -156,7 +161,7 @@ public struct SyncStatusChangedEvent: DocEvent {
     /**
      * SyncStatusChangedEvent type
      */
-    public var value: DocumentSyncStatus
+    public var value: DocSyncStatus
 }
 
 /**
@@ -319,4 +324,45 @@ public struct LocalBroadcastEvent: DocEvent {
      */
     public let value: LocalBroadcastValue
     public let options: BroadcastOptions?
+}
+
+public struct AuthErrorValue: Equatable {
+    public enum Method: CustomStringConvertible {
+        case pushPull
+        case watchDocuments
+        case other(String)
+
+        public var description: String {
+            switch self {
+            case .pushPull:
+                return "PushPull"
+            case .watchDocuments:
+                return "WatchDocuments"
+            case .other(let name):
+                return name
+            }
+        }
+    }
+
+    public let reason: String
+    public let method: Method
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        guard lhs.reason == rhs.reason else {
+            return false
+        }
+
+        return String(describing: lhs.method) == String(describing: rhs.method)
+    }
+}
+
+public struct AuthErrorEvent: DocEvent {
+    /**
+     * ``DocEventType/authError``
+     */
+    public let type: DocEventType = .authError
+    /**
+     * AuthErrorEvent type
+     */
+    public let value: AuthErrorValue
 }

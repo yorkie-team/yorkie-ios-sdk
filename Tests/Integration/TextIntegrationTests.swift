@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 final class TextIntegrationTests: XCTestCase {
     func test_should_handle_edit_operations() async throws {

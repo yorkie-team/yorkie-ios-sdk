@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/connectrpc/connect-swift.git",
       "state" : {
-        "revision" : "09e7dd47db03412b61a9d4bc20f17864b43fc778",
-        "version" : "1.0.2"
+        "revision" : "7a67b10b04352717685a08aaf150a7dcf25a05ae",
+        "version" : "1.0.3"
       }
     },
     {

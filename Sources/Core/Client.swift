@@ -84,6 +84,7 @@ public enum ClientCondition: String {
 public struct ClientOptions {
     private enum DefaultClientOptions {
         static let syncLoopDuration = 50
+        static let retrySyncLoopDelay = 1000 // 1000 millisecond
         static let reconnectStreamDelay = 1000 // 1000 millisecond
         static let maximumAttachmentTimeout = 5000 // millisecond
     }
@@ -101,10 +102,11 @@ public struct ClientOptions {
     var apiKey: String?
 
     /**
-     * `token` is the authentication token of this client. It is used to identify
-     * the user of the client.
+     * `authTokenInjector` is a function that provides a token for the auth webhook.
+     * When the webhook response status code is 401, this function is called to refresh the token.
+     * The `reason` parameter is the reason from the webhook response.
      */
-    var token: String?
+    var authTokenInjector: AuthTokenInjector?
 
     /**
      * `syncLoopDuration` is the duration of the sync loop. After each sync loop,
@@ -112,6 +114,13 @@ public struct ClientOptions {
      * `50`(ms).
      */
     var syncLoopDuration: Int
+
+    /**
+     * `retrySyncLoopDelay` is the delay of the retry sync loop. If the sync loop
+     * fails, the client waits for the delay to retry the sync loop. The default
+     * value is `1000`(ms).
+     */
+    var retrySyncLoopDelay: Int
 
     /**
      * `reconnectStreamDelay` is the delay of the reconnect stream. If the stream
@@ -126,11 +135,19 @@ public struct ClientOptions {
      */
     var maximumAttachmentTimeout: Int
 
-    public init(key: String? = nil, apiKey: String? = nil, token: String? = nil, syncLoopDuration: Int? = nil, reconnectStreamDelay: Int? = nil, attachTimeout: Int? = nil) {
+    public init(key: String? = nil,
+                apiKey: String? = nil,
+                authTokenInjector: AuthTokenInjector? = nil,
+                syncLoopDuration: Int? = nil,
+                retrySyncLoopDelay: Int? = nil,
+                reconnectStreamDelay: Int? = nil,
+                attachTimeout: Int? = nil)
+    {
         self.key = key
         self.apiKey = apiKey
-        self.token = token
+        self.authTokenInjector = authTokenInjector
         self.syncLoopDuration = syncLoopDuration ?? DefaultClientOptions.syncLoopDuration
+        self.retrySyncLoopDelay = retrySyncLoopDelay ?? DefaultClientOptions.retrySyncLoopDelay
         self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
         self.maximumAttachmentTimeout = attachTimeout ?? DefaultClientOptions.maximumAttachmentTimeout
     }
@@ -152,7 +169,7 @@ enum DefaultBroadcastOptions {
  */
 @MainActor
 public class Client {
-    private var attachmentMap = [DocumentKey: Attachment]()
+    private var attachmentMap = [DocKey: Attachment]()
     private var conditions: [ClientCondition: Bool] = [
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
@@ -160,11 +177,13 @@ public class Client {
 
     private let syncLoopDuration: Int
     private let reconnectStreamDelay: Int
+    private let retrySyncLoopDelay: Int
     private let maximumAttachmentTimeout: Int
 
     private var yorkieService: YorkieService
+    private var authTokenInjector: AuthTokenInjector?
     private var authHeader: AuthHeader
-    private var semaphoresForInitialzation = [DocumentKey: DispatchSemaphore]()
+    private var semaphoresForInitialzation = [DocKey: DispatchSemaphore]()
     private let syncSemaphore = AsyncSemaphore(value: 1)
 
     // Public variables.
@@ -180,6 +199,7 @@ public class Client {
     public nonisolated init(_ urlString: String, _ options: ClientOptions = ClientOptions(), isMockingEnabled: Bool = false) {
         self.key = options.key ?? UUID().uuidString
         self.syncLoopDuration = options.syncLoopDuration
+        self.retrySyncLoopDelay = options.retrySyncLoopDelay
         self.reconnectStreamDelay = options.reconnectStreamDelay
         self.maximumAttachmentTimeout = options.maximumAttachmentTimeout
 
@@ -189,7 +209,8 @@ public class Client {
                                                                          codec: ProtoCodec()))
 
         self.yorkieService = YorkieService(rpcClient: YorkieServiceClient(client: protocolClient), isMockingEnabled: isMockingEnabled)
-        self.authHeader = AuthHeader(apiKey: options.apiKey, token: options.token)
+        self.authTokenInjector = options.authTokenInjector
+        self.authHeader = AuthHeader(apiKey: options.apiKey, token: "")
     }
 
     /**
@@ -210,9 +231,14 @@ public class Client {
             return
         }
 
+        if let authTokenInjector {
+            try await injectAuthTokenAfterGet(with: authTokenInjector, reason: nil)
+        }
+
         do {
             let activateRequest = ActivateClientRequest.with { $0.clientKey = self.key }
-            let activateResponse = await self.yorkieService.activateClient(request: activateRequest, headers: self.authHeader.makeHeader(nil))
+            let activateResponse = await self.yorkieService.activateClient(request: activateRequest,
+                                                                           headers: self.authHeader.makeHeader(nil))
 
             guard activateResponse.error == nil, let message = activateResponse.message else {
                 throw self.handleErrorResponse(activateResponse.error, defaultMessage: "Unknown activate error")
@@ -226,7 +252,7 @@ public class Client {
             Logger.debug("Client(\(self.key)) activated")
         } catch {
             Logger.error("Failed to request activate client(\(self.key)).")
-            self.handleConnectError(error)
+            await self.handleConnectError(error)
             throw error
         }
     }
@@ -242,7 +268,8 @@ public class Client {
         do {
             let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
-            let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest)
+            let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest,
+                                                                               headers: self.authHeader.makeHeader(nil))
 
             guard deactivateResponse.error == nil else {
                 throw self.handleErrorResponse(deactivateResponse.error, defaultMessage: "Unknown deactivate error")
@@ -253,7 +280,7 @@ public class Client {
             Logger.info("Client(\(self.key) deactivated.")
         } catch {
             Logger.error("Failed to request deactivate client(\(self.key)).")
-            self.handleConnectError(error)
+            await self.handleConnectError(error)
             throw error
         }
     }
@@ -354,7 +381,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
-            self.handleConnectError(error)
+            await self.handleConnectError(error)
             throw error
         }
     }
@@ -391,7 +418,8 @@ public class Client {
         detachDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
 
         do {
-            let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
+            let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest,
+                                                                                 headers: self.authHeader.makeHeader(doc.getKey()))
 
             guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
                 throw self.handleErrorResponse(detachDocumentResponse.error, defaultMessage: "Unknown detach error")
@@ -412,7 +440,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request detach document(\(self.key)).", error: error)
-            self.handleConnectError(error)
+            await self.handleConnectError(error)
             throw error
         }
     }
@@ -458,7 +486,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request remove document(\(self.key)).", error: error)
-            self.handleConnectError(error)
+            await self.handleConnectError(error)
             throw error
         }
     }
@@ -480,7 +508,7 @@ public class Client {
     /**
      * `broadcast` broadcasts the given payload to the given topic.
      */
-    public func broadcast(_ docKey: DocumentKey, topic: String, payload: Payload, options: BroadcastOptions?) async throws {
+    public func broadcast(_ docKey: DocKey, topic: String, payload: Payload, options: BroadcastOptions?) async throws {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -575,12 +603,12 @@ public class Client {
         do {
             return try await self.performSyncInternal(false, attachment)
         } catch {
-            self.handleConnectError(error)
+            await self.handleConnectError(error)
             throw error
         }
     }
 
-    private func clearAttachmentRemoteChangeEventReceived(_ docKey: DocumentKey) {
+    private func clearAttachmentRemoteChangeEventReceived(_ docKey: DocKey) {
         self.attachmentMap[docKey]?.remoteChangeEventReceived = false
     }
 
@@ -644,7 +672,8 @@ public class Client {
 
             self.setSyncTimer(false)
         } catch {
-            if self.handleConnectError(error) {
+            if await self.handleConnectError(error) {
+                try? await Task.sleep(nanoseconds: UInt64(self.retrySyncLoopDelay * 1_000_000))
                 self.setSyncTimer(true)
             } else {
                 self.setCondition(.syncLoop, value: false)
@@ -662,7 +691,7 @@ public class Client {
         await self.doSyncLoop()
     }
 
-    private func doWatchLoop(_ docKey: DocumentKey, with attachment: Attachment) throws {
+    private func doWatchLoop(_ docKey: DocKey, with attachment: Attachment) throws {
         attachment.resetWatchLoopTimer()
 
         guard self.isActive, let id = self.id else {
@@ -689,6 +718,7 @@ public class Client {
 
                     if await self.handleConnectError(error) {
                         Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
+                        await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .watchDocuments)
                         try await self.onStreamDisconnect(docKey, with: attachment)
                     } else {
                         await self.setCondition(.watchLoop, value: false)
@@ -714,7 +744,7 @@ public class Client {
      * `runWatchLoop` runs the watch loop for the given document. The watch loop
      * listens to the events of the given document from the server.
      */
-    private func runWatchLoop(_ docKey: DocumentKey) throws {
+    private func runWatchLoop(_ docKey: DocKey) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
         guard let attachment = self.attachmentMap[docKey] else {
             throw YorkieError(code: .errDocumentNotAttached, message: "\(docKey) is not attached")
@@ -724,7 +754,7 @@ public class Client {
         try self.doWatchLoop(docKey, with: attachment)
     }
 
-    private func stopWatchLoop(_ docKey: DocumentKey, with attachment: Attachment) throws {
+    private func stopWatchLoop(_ docKey: DocKey, with attachment: Attachment) throws {
         try self.disconnectWatchStream(docKey, with: attachment)
     }
 
@@ -743,7 +773,7 @@ public class Client {
         }
     }
 
-    private func handleWatchDocumentsResponse(docKey: DocumentKey, response: WatchDocumentResponse) async {
+    private func handleWatchDocumentsResponse(docKey: DocKey, response: WatchDocumentResponse) async {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
         guard let body = response.body else {
@@ -770,6 +800,12 @@ public class Client {
             case .documentChanged:
                 self.attachmentMap[docKey]?.remoteChangeEventReceived = true
             case .documentWatched:
+                if let doc = self.attachmentMap[docKey]?.doc,
+                   doc.onlineClients.contains(pbWatchEvent.publisher), doc.hasPresence(pbWatchEvent.publisher)
+                {
+                    return
+                }
+
                 self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
                 // unless we also know their initial presence data at this point.
@@ -797,7 +833,7 @@ public class Client {
         }
     }
 
-    private func disconnectWatchStream(_ docKey: DocumentKey, with attachment: Attachment) throws {
+    private func disconnectWatchStream(_ docKey: DocKey, with attachment: Attachment) throws {
         guard !attachment.isDisconnectedStream else {
             return
         }
@@ -807,7 +843,7 @@ public class Client {
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
-    private func onStreamDisconnect(_ docKey: DocumentKey, with attachment: Attachment) throws {
+    private func onStreamDisconnect(_ docKey: DocKey, with attachment: Attachment) throws {
         try self.disconnectWatchStream(docKey, with: attachment)
 
         // check if watch loop is stopped
@@ -836,7 +872,7 @@ public class Client {
         }
     }
 
-    private func detachInternal(_ docKey: DocumentKey) throws {
+    private func detachInternal(_ docKey: DocKey) throws {
         guard let attachment = self.attachmentMap[docKey] else {
             return
         }
@@ -896,6 +932,7 @@ public class Client {
             return doc
         } catch {
             doc.publishSyncEvent(.syncFailed)
+            publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .pushPull)
 
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 
@@ -908,7 +945,7 @@ public class Client {
      * retried after handling, it returns true.
      */
     @discardableResult
-    private func handleConnectError(_ error: Error?) -> Bool {
+    private func handleConnectError(_ error: Error?) async -> Bool {
         guard let connectError = error as? ConnectError else {
             return false
         }
@@ -926,8 +963,17 @@ public class Client {
             return true
         }
 
-        // NOTE(hackerwins): Some errors should fix the state of the client.
+        // NOTE(chacha912): If the error is `Unauthenticated`, it means that the
+        // token is invalid or expired. In this case, the client gets a new token
+        // from the `authTokenInjector` and retries the api call.
         let yorkieErrorCode = YorkieError.Code(rawValue: errorCodeOf(error: connectError))
+        if yorkieErrorCode == .errUnauthenticated, let authTokenInjector {
+            let reason = errorMetadataOf(error: connectError)["reason"]
+            try? await injectAuthTokenAfterGet(with: authTokenInjector, reason: reason)
+            return true
+        }
+
+        // NOTE(hackerwins): Some errors should fix the state of the client.
         if yorkieErrorCode == YorkieError.Code.errClientNotActivated ||
             yorkieErrorCode == YorkieError.Code.errClientNotFound
         {
@@ -978,7 +1024,7 @@ public extension Client {
             case .failure(let error):
                 Logger.error("[BC] c:\(self.key)", error: error)
 
-                if !self.handleConnectError(error) || retryCount >= maxRetries {
+                if await !self.handleConnectError(error) || retryCount >= maxRetries {
                     throw error
                 }
 
@@ -987,5 +1033,21 @@ public extension Client {
                 retryCount += 1
             }
         }
+    }
+
+    private func injectAuthTokenAfterGet(with authTokenInjector: AuthTokenInjector, reason: String?) async throws {
+        let token = try await authTokenInjector.getToken(reason: reason)
+        self.authHeader.updateToken(token)
+    }
+
+    private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment?, method: AuthErrorValue.Method) {
+        guard let connectError = error, let attachment else { return }
+        let rawValue = errorCodeOf(error: connectError)
+        guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
+            return
+        }
+
+        let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
+        attachment.doc.publishAuthErrorEvent(reason: reason, method: method)
     }
 }
