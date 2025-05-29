@@ -365,7 +365,9 @@ final class PresenceSubscribeTests: XCTestCase {
             EventResult(.presenceChanged, [PeerElement(c1ID, ["name": "A"])])
         ]
 
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: result1[0])
+        for await _ in eventCollectorD1.waitStream(until: result1[0]) {
+            await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: result1[0])
+        }
 
         try await doc1.update { _, presence in
             presence.set(["name": "A"])
@@ -374,11 +376,14 @@ final class PresenceSubscribeTests: XCTestCase {
             presence.set(["name": "B"])
         }
 
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 2, isEqualTo: result1[1])
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 3, isEqualTo: result1[2])
+        for await _ in eventCollectorD1.waitStream(until: result1[2]) {
+            await eventCollectorD1.verifyNthValue(at: 2, isEqualTo: result1[1])
+            await eventCollectorD1.verifyNthValue(at: 3, isEqualTo: result1[2])
+        }
 
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: result2[0])
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 2, isEqualTo: result2[1])
+        try await Task.sleep(milliseconds: 300)
+        await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: result2[0])
+        await eventCollectorD2.verifyNthValue(at: 2, isEqualTo: result2[1])
 
         let resultPresence1 = await doc1.getPresences()
         let resultPresence2 = await doc2.getPresences()

@@ -726,4 +726,47 @@ final class DocumentIntegrationTests: XCTestCase {
             try await c1.deactivate()
         }
     }
+
+    // This test was moved to the integration tests for the Yorkie server, but it remains a unit test in yorkie-js-sdk.
+    func test_should_publish_snapshot_event_with_up_to_date_document() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            let eventCollector = EventCollector<Int32>(doc: d2)
+
+            await d2.subscribe("$") { event, doc in
+                if event.type == .snapshot {
+                    if let value = (doc.getRoot().counter as? JSONCounter<Int32>)?.value as? Int32 {
+                        eventCollector.add(event: value)
+                    }
+                }
+            }
+
+            try await d1.update { root, _ in
+                root.counter = JSONCounter(value: Int32(0))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // 01. c1 increases the counter for creating snapshot.
+            for _ in 1 ... defaultSnapshotThreshold {
+                try await d1.update { root, _ in
+                    (root.counter as? JSONCounter<Int32>)?.increase(value: 1)
+                }
+            }
+            try await c1.sync()
+
+            // 02. c2 receives the snapshot and increases the counter simultaneously.
+            try await d2.update { root, _ in
+                (root.counter as? JSONCounter<Int32>)?.increase(value: 1)
+            }
+            // should have a local change after receiving a snapshot event
+            Task {
+                try await c2.sync()
+            }
+
+            let targetValue = Int32(defaultSnapshotThreshold + 1)
+            for await _ in eventCollector.waitStream(until: targetValue) {
+                await eventCollector.verifyNthValue(at: 1, isEqualTo: targetValue)
+            }
+        }
+    }
 }

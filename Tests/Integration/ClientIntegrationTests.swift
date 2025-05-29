@@ -662,7 +662,9 @@ final class ClientIntegrationTests: XCTestCase {
             ]))
         }
 
-        try await eventCollectorD2.waitAndVerifyNthValue(milliseconds: 200, at: 1, isEqualTo: .remoteChange)
+        for await _ in eventCollectorD2.waitStream(until: .remoteChange) {
+            await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .remoteChange)
+        }
 
         var d1JSON = await(d1.getRoot().tree as? JSONTree)?.toXML()
         var d2JSON = await(d2.getRoot().tree as? JSONTree)?.toXML()
@@ -698,7 +700,9 @@ final class ClientIntegrationTests: XCTestCase {
             try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
         }
 
-        try await eventCollectorD1.waitAndVerifyNthValue(milliseconds: 200, at: 3, isEqualTo: .remoteChange)
+        for await _ in eventCollectorD1.waitStream(until: .remoteChange) {
+            await eventCollectorD1.verifyNthValue(at: 3, isEqualTo: .remoteChange)
+        }
 
         d1JSON = await(d1.getRoot().tree as? JSONTree)?.toXML()
         d2JSON = await(d2.getRoot().tree as? JSONTree)?.toXML()
