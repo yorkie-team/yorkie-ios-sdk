@@ -331,4 +331,7 @@ extension TextEditorViewController: UITextInputDelegate {
     func textWillChange(_: UITextInput?) {}
 
     func textDidChange(_: UITextInput?) {}
+
+    @available(iOS 18.4, *)
+    func conversationContext(_ context: UIConversationContext?, didChange textInput: (any UITextInput)?) {}
 }
