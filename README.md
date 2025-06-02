@@ -36,6 +36,32 @@ $ docker pull yorkieteam/yorkie:latest
 $ docker-compose -f docker/docker-compose.yml up --build -d
 ```
 
+
+
+## Testing yorkie-ios-sdk with Homebrew
+
+To test the yorkie-ios-sdk against a locally running Yorkie server installed via Homebrew:
+
+Make sure Homebrew is up to date:
+
+```
+$ brew update
+```
+
+Install the Yorkie server:
+
+```
+$ brew install yorkie
+```
+
+Start the server in your local environment:
+
+```
+$ yorkie server
+```
+
+
+
 ## Contributing
 
 See [CONTRIBUTING](CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
