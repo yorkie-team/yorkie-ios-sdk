@@ -26,6 +26,7 @@ jobs:
         curl -O ${{ env.SWIFTLINT_RB_URL }}
         brew install --formula ./swiftlint.rb
         
+        brew unlink swiftformat
         curl -O ${{ env.SWIFTFORMAT_RB_URL }}
         brew install --formula ./swiftformat.rb
     - name: SwiftLint
