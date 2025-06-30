@@ -22,7 +22,7 @@ class VersionVectorTest: XCTestCase {
         super.tearDown()
     }
 
-    func addVersionAfters(_ number: Int) {
+    func addVersionVectors(number: Int) {
         for id in 0 ... number {
             self.sut.set(actorID: "actorID-\(id)", lamport: Int64(id))
         }
@@ -30,7 +30,7 @@ class VersionVectorTest: XCTestCase {
 }
 
 extension VersionVectorTest {
-    func test_set_actorID_with_lamdaPort_get_corresonding_lamdaport_from_vector() {
+    func test_set_actorID_with_lamport_get_corresponding_lamport_from_vector() {
         // given
         let actorID: ActorID = "actorID"
         let lamdaPort: Int64 = 123
@@ -42,29 +42,29 @@ extension VersionVectorTest {
         XCTAssertEqual(self.sut.get(actorID), lamdaPort)
     }
 
-    func test_when_no_max_lamdar_port_then_return_zero() {
+    func test_when_no_max_lamport_then_return_zero() {
         // given
-        // no lamda port added
+        // no lamport added
         // then
         XCTAssertEqual(self.sut.maxLamport(), .zero)
     }
 
-    func test_when_add_more_lamda_port_get_max_lamda_port() {
+    func test_when_add_more_lamport_get_max_lamport() {
         // given
         let actorID1: ActorID = "actorID-1"
-        let lamdaPort1: Int64 = 123
+        let lamPort1: Int64 = 123
         let actorID2: ActorID = "actorID-2"
-        let lamdaPort2: Int64 = 456
+        let lamPort2: Int64 = 456
 
         // when
-        self.sut.set(actorID: actorID1, lamport: lamdaPort1)
-        self.sut.set(actorID: actorID2, lamport: lamdaPort2)
+        self.sut.set(actorID: actorID1, lamport: lamPort1)
+        self.sut.set(actorID: actorID2, lamport: lamPort2)
 
-        let maxLamdaPort = self.sut.maxLamport()
+        let maxLamport = self.sut.maxLamport()
 
         // then
-        XCTAssertEqual(maxLamdaPort, lamdaPort2)
-        XCTAssertNotEqual(maxLamdaPort, lamdaPort1)
+        XCTAssertEqual(maxLamport, lamPort2)
+        XCTAssertNotEqual(maxLamport, lamPort1)
     }
 }
 
@@ -72,7 +72,7 @@ extension VersionVectorTest {
 
 extension VersionVectorTest {
     func test_get_max_from_other_vector() {
-        self.addVersionAfters(200)
+        self.addVersionVectors(number: 200)
 
         // modify actor 100 lamport from 100 -> 150
         self.sut.set(actorID: "actorID-100", lamport: 150)
@@ -92,7 +92,7 @@ extension VersionVectorTest {
 extension VersionVectorTest {
     func test_when_no_vector_get_after_or_equal_lamdaport_return_false() {
         // given
-        // no lamda port added
+        // no lamport added
 
         // then
         let afterOrEqual = self.sut.afterOrEqual(other: .initial)
@@ -102,7 +102,7 @@ extension VersionVectorTest {
 
     func test_when_given_other_timeTicket_get_after_or_equal_lamdaport() {
         // when
-        self.addVersionAfters(200)
+        self.addVersionVectors(number: 200)
 
         let timeTicketFalse = TimeTicket(lamport: 250, delimiter: 0, actorID: "actorID-200")
         let timeTicketTrue = TimeTicket(lamport: 150, delimiter: 0, actorID: "actorID-200")
@@ -121,7 +121,7 @@ extension VersionVectorTest {
 extension VersionVectorTest {
     func test_deep_copy_return_corresponding_all_data_correctly() {
         // given 200 vectors exist
-        self.addVersionAfters(200)
+        self.addVersionVectors(number: 200)
 
         // then
         let copySut = self.sut.deepcopy()
@@ -147,7 +147,7 @@ extension VersionVectorTest {
 // MARK: - filter(versionVector: VersionVector)
 
 extension VersionVectorTest {
-    func test_filter_vector_vertsion_give_no_vector_return_empty_vector() {
+    func test_filter_vector_version_give_no_vector_return_empty_vector() {
         // given premitive sut
         // when filter initial vector
         // then
@@ -158,7 +158,7 @@ extension VersionVectorTest {
 
     func test_filter_vector_version_give_some_vector_return_correct_vector() {
         // given 200 vectors exist
-        self.addVersionAfters(200)
+        self.addVersionVectors(number: 200)
 
         // when get actor 100th
         let filteredSut = self.sut.filter(versionVector: .init(vector: ["actorID-100": 100, "actorID-300": 300]))
