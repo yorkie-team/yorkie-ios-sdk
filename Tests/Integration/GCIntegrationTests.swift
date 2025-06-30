@@ -1422,6 +1422,96 @@ class GCIntegrationTests: XCTestCase {
         try await client1.deactivate()
         try await client2.deactivate()
     }
+    
+    // gc targeting nodes made by deactivated client
+    func test_gc_targeting_nodes_made_by_deactivated_client() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1)
+        ])
+
+        try await client2.attach(doc2, [:], .manual)
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client2.id!, lamport: 2)
+        ])
+
+        try await doc1.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+            (root.t as? JSONText)?.edit(1, 1, "b")
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "sets text")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2)
+        ])
+
+        try await client1.sync()
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 3),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
+
+        try await client2.sync()
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 3)
+        ])
+
+        try await doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "insert c")
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4)
+        ])
+
+        try await doc1.update({ root, _ in
+            (root.t as? JSONText)?.edit(1, 3, "")
+        }, "delete bd")
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 1)
+        ])
+
+        try await client1.sync()
+        try await client2.sync()
+
+        try await client1.deactivate()
+
+        let garbageLength1 = await doc2.getGarbageLength()
+        let getVersionVector1 = await doc2.getVersionVector().size()
+
+        XCTAssertEqual(garbageLength1, 2)
+        XCTAssertEqual(getVersionVector1, 2)
+
+        try await client2.sync()
+        let garbageLength2 = await doc2.getGarbageLength()
+        let getVersionVector2 = await doc2.getVersionVector().size()
+
+        XCTAssertEqual(garbageLength2, 0)
+        XCTAssertEqual(getVersionVector2, 1)
+    }
+    
+    // attach > pushpull > detach lifecycle version vector test (run gc at last client detaches document, but no tombstone exsits)
+    // attach > pushpull > detach lifecycle version vector test (run gc at last client detaches document)
 }
 
 // swiftlint:enable function_body_length type_body_length

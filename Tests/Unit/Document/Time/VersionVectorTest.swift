@@ -90,14 +90,14 @@ extension VersionVectorTest {
 // MARK: - afterOrEqual
 
 extension VersionVectorTest {
-    func test_when_no_vector_get_after_or_equal_lamdaport_return_false() {
+    func test_when_no_vector_get_after_or_equal_lamdaport_return_true() {
         // given
         // no lamport added
 
         // then
-        let afterOrEqual = self.sut.afterOrEqual(other: .initial)
+        let afterOrEqual = self.sut.afterOrEqual(other: .init(lamport: 200, delimiter: 0, actorID: "actorID-200"))
 
-        XCTAssertFalse(afterOrEqual)
+        XCTAssertTrue(afterOrEqual)
     }
 
     func test_when_given_other_timeTicket_get_after_or_equal_lamdaport() {
