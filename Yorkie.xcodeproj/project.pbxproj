@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		499CF0D62E0B9FC40011272A /* VersionVectorTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */; };
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
 		9A20CE86299F61CD00E4CE7E /* Auth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A20CE85299F61CD00E4CE7E /* Auth.swift */; };
@@ -151,6 +152,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionVectorTest.swift; sourceTree = "<group>"; };
 		96DA808228C5B7B400E2C1DA /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA808628C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		96DA808B28C5B7B400E2C1DA /* YorkieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YorkieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -536,6 +538,7 @@
 			isa = PBXGroup;
 			children = (
 				CE3EC96C28D3FFED009471BC /* TimeTicketTests.swift */,
+				499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */,
 			);
 			path = Time;
 			sourceTree = "<group>";
@@ -1033,6 +1036,7 @@
 				9A3CF3EF2966A7370024E3DD /* CRDTTextTests.swift in Sources */,
 				CEDF92112DE0B38C009EF4AB /* WebhookIntegrationTests.swift in Sources */,
 				CEC631DA28F02BFD00915A85 /* CRDTRootTests.swift in Sources */,
+				499CF0D62E0B9FC40011272A /* VersionVectorTest.swift in Sources */,
 				CE7B998B28E694FC00D56198 /* ElementRHTTests.swift in Sources */,
 				9AD6E7E929C19E0A001A1F89 /* DocumentIntegrationTests.swift in Sources */,
 				9A569CBD2C060307007EF118 /* GCIntegrationTests.swift in Sources */,
