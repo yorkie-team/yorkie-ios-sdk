@@ -23,8 +23,8 @@ class VersionVectorTest: XCTestCase {
     }
 
     func addVersionAfters(_ number: Int) {
-        for i in 0 ... number {
-            self.sut.set(actorID: "actorID-\(i)", lamport: Int64(i))
+        for id in 0 ... number {
+            self.sut.set(actorID: "actorID-\(id)", lamport: Int64(id))
         }
     }
 }
