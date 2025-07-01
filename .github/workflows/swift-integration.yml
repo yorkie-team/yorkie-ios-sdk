@@ -12,7 +12,7 @@ jobs:
     
     env:
       # yorkie server v0.5.6
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/11f5c36522b935751de3c3f46540e7e253246604/Formula/y/yorkie.rb"
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/71cac80f8ec61c9da5e04e4ab0f72c5ee5e703dc/Formula/y/yorkie.rb"
         
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
