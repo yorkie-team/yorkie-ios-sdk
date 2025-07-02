@@ -62,6 +62,20 @@ public struct VersionVector: Sendable {
     }
 
     /**
+     * `minLamport` returns min lamport value from vector
+     */
+
+    public func minLamport() -> Int64 {
+        var min = Int64.max
+
+        for (_, lamport) in self where lamport < min {
+            min = lamport
+        }
+
+        return min
+    }
+
+    /**
      * `max` returns new version vector which consists of max value of each vector
      */
     public func max(other: VersionVector) -> VersionVector {
@@ -89,7 +103,7 @@ public struct VersionVector: Sendable {
      */
     public func afterOrEqual(other: TimeTicket) -> Bool {
         guard let lamport = self.vector[other.actorID] else {
-            return false
+            return self.minLamport() > other.lamport
         }
 
         return lamport >= other.lamport
