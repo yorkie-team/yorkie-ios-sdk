@@ -186,7 +186,6 @@ class TextEditorViewController: UIViewController {
                 self.peerSelection = self.peerSelection.filter { $0.value.0.length > 0 }
 
             case .select(let range, let actorID):
-
                 print("#### select \(range) \(self.textView.textStorage.length)")
 
                 let newColor = UIColor(red: CGFloat.random(in: 0 ... 1), green: CGFloat.random(in: 0 ... 1), blue: CGFloat.random(in: 0 ... 1), alpha: 0.2)
@@ -253,7 +252,7 @@ extension TextEditorViewController: UITextViewDelegate {
         }
     }
 
-    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+    func textView(_: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
         let str = text as NSString
 
         self.isTyping = true
@@ -333,5 +332,5 @@ extension TextEditorViewController: UITextInputDelegate {
     func textDidChange(_: UITextInput?) {}
 
     @available(iOS 18.4, *)
-    func conversationContext(_ context: UIConversationContext?, didChange textInput: (any UITextInput)?) {}
+    func conversationContext(_: UIConversationContext?, didChange textInput: (any UITextInput)?) {}
 }

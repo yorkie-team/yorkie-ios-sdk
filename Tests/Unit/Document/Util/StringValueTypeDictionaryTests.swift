@@ -19,7 +19,7 @@ import Testing
 @testable import Yorkie
 
 struct StringValueTypeDictionaryTests {
-    @Test func test_presence_value_StringValueTypeDictionary() async throws {
+    @Test func presence_value_StringValueTypeDictionary() async throws {
         struct CodableStruct: Codable {
             let value: String
         }

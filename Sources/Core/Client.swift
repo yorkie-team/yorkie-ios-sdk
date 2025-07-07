@@ -542,7 +542,7 @@ public class Client {
         request.topic = topic
         request.payload = payloadData
 
-        try await self.broadcast(request: request, maxRetries: maxRetries)
+        try await self.broadcast(docKey: docKey, request: request, maxRetries: maxRetries)
     }
 
     /**
@@ -842,7 +842,7 @@ public class Client {
         }
     }
 
-    private func disconnectWatchStream(_ docKey: DocKey, with attachment: Attachment) throws {
+    private func disconnectWatchStream(_: DocKey, with attachment: Attachment) throws {
         guard !attachment.isDisconnectedStream else {
             return
         }
@@ -1020,8 +1020,11 @@ public extension Client {
         return min(DefaultBroadcastOptions.initialRetryInterval * pow(2, Double(retryCount)), DefaultBroadcastOptions.maxBackoff)
     }
 
-    private func broadcast(request: BroadcastRequest, maxRetries: Int) async throws {
+    private func broadcast(docKey: DocKey, request: BroadcastRequest, maxRetries: Int) async throws {
         var retryCount = 0
+        guard var attachment = self.attachmentMap[docKey] else {
+            throw YorkieError(code: .errDocumentNotAttached, message: "document \(docKey) is not attached")
+        }
 
         while retryCount <= maxRetries {
             let message = await self.yorkieService.broadcast(request: request)
@@ -1033,13 +1036,25 @@ public extension Client {
             case .failure(let error):
                 Logger.error("[BC] c:\(self.key)", error: error)
 
-                if await !self.handleConnectError(error) || retryCount >= maxRetries {
+                if await !self.handleConnectError(error) {
+                    if YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errUnauthenticated {
+                        attachment.doc
+                            .publishAuthErrorEvent(
+                                reason: errorMetadataOf(error: error)["reason"] ?? "AuthError",
+                                method: .broadcast
+                            )
+                    }
+                }
+
+                retryCount += 1
+
+                if retryCount > maxRetries {
+                    Logger.error("BROADCAST, Exceeded maximum retry attempts for topic $topic")
                     throw error
                 }
 
-                let retryInterval = self.exponentialBackoff(retryCount: retryCount)
+                let retryInterval = self.exponentialBackoff(retryCount: retryCount - 1)
                 try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000))
-                retryCount += 1
             }
         }
     }
