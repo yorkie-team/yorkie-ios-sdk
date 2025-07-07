@@ -335,9 +335,6 @@ public class Document {
         // 03. Do Garbage collection.
         if !hasSnapshot, let versionVector = pack.getVersionVector() {
             self.garbageCollect(minSyncedVersionVector: versionVector)
-
-            // 04. Filter detached client's lamport from version vector
-            self.filterVersionVector(minSyncedVersionVector: versionVector)
         }
 
         // 06. Update the status.

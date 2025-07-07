@@ -97,7 +97,7 @@ extension VersionVectorTest {
         // then
         let afterOrEqual = self.sut.afterOrEqual(other: .init(lamport: 200, delimiter: 0, actorID: "actorID-200"))
 
-        XCTAssertTrue(afterOrEqual)
+        XCTAssertFalse(afterOrEqual)
     }
 
     func test_when_given_other_timeTicket_get_after_or_equal_lamdaport() {
