@@ -110,7 +110,7 @@ class KanbanViewController: UIViewController {
 }
 
 extension KanbanViewController: UICollectionViewDataSource {
-    func collectionView(_: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         self.viewModel.columns[section].cards.count
     }
 

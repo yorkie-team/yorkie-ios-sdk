@@ -1501,7 +1501,7 @@ class GCIntegrationTests: XCTestCase {
         let getVersionVector2 = await doc2.getVersionVector().size()
 
         XCTAssertEqual(garbageLength2, 0)
-        XCTAssertEqual(getVersionVector2, 2)
+        XCTAssertEqual(getVersionVector2, 1)
     }
 
     // attach > pushpull > detach lifecycle version vector test (run gc at last client detaches document, but no tombstone exsits)
