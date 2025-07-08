@@ -35,7 +35,10 @@ struct RemoveOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     @discardableResult
-    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+    func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector? = nil
+    ) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let object = parent as? CRDTContainer else {
             let log: String

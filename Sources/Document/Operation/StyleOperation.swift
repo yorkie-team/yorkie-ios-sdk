@@ -53,7 +53,10 @@ struct StyleOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     @discardableResult
-    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+    func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector?
+    ) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let text = parent as? CRDTText else {
             let log: String
@@ -65,7 +68,13 @@ struct StyleOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (_, pairs, changes) = try text.setStyle((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
+        let (_, pairs, changes) = try text.setStyle(
+            (self.fromPos, self.toPos),
+            self.attributes,
+            self.executedAt,
+            self.maxCreatedAtMapByActor,
+            versionVector
+        )
 
         for pair in pairs {
             root.registerGCPair(pair)

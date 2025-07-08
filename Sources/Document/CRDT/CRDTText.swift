@@ -183,11 +183,14 @@ final class CRDTText: CRDTElement {
      * `edit` edits the given range with the given content and attributes.
      */
     @discardableResult
-    func edit(_ range: RGATreeSplitPosRange,
-              _ content: String,
-              _ editedAt: TimeTicket,
-              _ attributes: [String: String]? = nil,
-              _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [TextChange], [GCPair], RGATreeSplitPosRange)
+    func edit(
+        _ range: RGATreeSplitPosRange,
+        _ content: String,
+        _ editedAt: TimeTicket,
+        _ attributes: [String: String]? = nil,
+        _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([String: TimeTicket], [TextChange], [GCPair], RGATreeSplitPosRange)
     {
         let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
@@ -200,7 +203,7 @@ final class CRDTText: CRDTElement {
             range,
             editedAt,
             value,
-            maxCreatedAtMapByActor
+            maxCreatedAtMapByActor, versionVector
         )
 
         let changes = contentChanges.compactMap { TextChange(type: .content, actor: $0.actor, from: $0.from, to: $0.to, content: $0.content?.toString) }
@@ -225,10 +228,13 @@ final class CRDTText: CRDTElement {
      * @param maxCreatedAtMapByActor - maxCreatedAtMapByActor
      */
     @discardableResult
-    func setStyle(_ range: RGATreeSplitPosRange,
-                  _ attributes: [String: String],
-                  _ editedAt: TimeTicket,
-                  _ maxCreatedAtMapByActor: [String: TimeTicket] = [:]) throws -> ([String: TimeTicket], [GCPair], [TextChange])
+    func setStyle(
+        _ range: RGATreeSplitPosRange,
+        _ attributes: [String: String],
+        _ editedAt: TimeTicket,
+        _ maxCreatedAtMapByActor: [String: TimeTicket]? = [:],
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([String: TimeTicket], [GCPair], [TextChange])
     {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
@@ -242,15 +248,23 @@ final class CRDTText: CRDTElement {
         for node in nodes {
             let actorID = node.createdAt.actorID
 
-            let maxCreatedAt: TimeTicket
-
-            if maxCreatedAtMapByActor.isEmpty {
-                maxCreatedAt = TimeTicket.max
+            var maxCreatedAt: TimeTicket?
+            var clientLamportAtChange: Int64 = .zero
+                
+            if versionVector == nil && maxCreatedAtMapByActor == nil {
+                // Local edit - use version vector comparison
+                clientLamportAtChange = .max
+            } else if let versionVector, versionVector.size() > 0 {
+                clientLamportAtChange = versionVector.get(actorID) ?? 0
             } else {
-                maxCreatedAt = maxCreatedAtMapByActor[actorID] ?? TimeTicket.initial
+                if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
+                    maxCreatedAt = map
+                } else {
+                    maxCreatedAt = TimeTicket.initial
+                }
             }
 
-            if node.canStyle(editedAt, maxCreatedAt) {
+            if node.canStyle(editedAt, maxCreatedAt, clientLamportAtChange: clientLamportAtChange) {
                 let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
 

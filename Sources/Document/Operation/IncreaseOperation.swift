@@ -44,7 +44,10 @@ struct IncreaseOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     @discardableResult
-    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+    func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector?
+    ) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
             throw YorkieError(code: .errInvalidArgument, message: log)
