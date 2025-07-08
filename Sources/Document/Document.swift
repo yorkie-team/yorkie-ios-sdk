@@ -500,7 +500,10 @@ public class Document {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
-        self.changeID = self.changeID.setClocks(with: serverSeq, vector: snapshotVector)
+        self.changeID = self.changeID.setClocks(
+            with: snapshotVector.maxLamport(),
+            vector: snapshotVector
+        )
 
         // drop clone because it is contaminated.
         self.clone = nil

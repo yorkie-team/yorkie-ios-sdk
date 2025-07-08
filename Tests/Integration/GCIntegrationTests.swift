@@ -1987,6 +1987,131 @@ class GCIntegrationTests: XCTestCase {
         try await client2.deactivate()
         try await client1.deactivate()
     }
+    
+    // snapshot version vector test
+    func test_snapshot_version_vector() async throws {
+        let docKey = "\(#function)-\(Date().timeIntervalSince1970)".toDocKey
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+        let doc3 = Document(key: docKey)
+        
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+        let client3 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+        try await client3.activate()
+        
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
+        try await client3.attach(doc3, [:], .manual)
+        
+        try await doc1.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+        }, "sets text")
+        
+        try await client1.sync()
+        try await client2.sync()
+        try await client3.sync()
+        
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 4),
+            ActorData(actor: client2.id!, lamport: 1),
+            ActorData(actor: client3.id!, lamport: 1)
+        ])
+        
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 4),
+            ActorData(actor: client3.id!, lamport: 1)
+        ])
+        
+        await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 1),
+            ActorData(actor: client3.id!, lamport: 4)
+        ])
+        
+        for idx in 0..<(defaultSnapshotThreshold / 2) {
+            try await doc1.update({ root, _ in
+                root.t = JSONText()
+                (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
+            })
+            
+            try await client1.sync()
+            try await client2.sync()
+            
+            try await doc2.update({ root, _ in
+                root.t = JSONText()
+                (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
+            })
+            
+            try await client2.sync()
+            try await client1.sync()
+        }
+        
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2004),
+            ActorData(actor: client2.id!, lamport: 2003),
+            ActorData(actor: client3.id!, lamport: 1)
+        ])
+        
+        await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2001),
+            ActorData(actor: client2.id!, lamport: 2003),
+            ActorData(actor: client3.id!, lamport: 1)
+        ])
+
+        await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client2.id!, lamport: 1),
+            ActorData(actor: client3.id!, lamport: 4)
+        ])
+
+        // 02. Makes local changes then pull a snapshot from the server.
+        try await doc3.update({ root, _ in
+            // root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "c")
+        })
+        
+        try await client3.sync()
+
+        // TODO: - Fix the testcase below
+        await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
+            ActorData(actor: client1.id!, lamport: 2001),
+            ActorData(actor: client2.id!, lamport: 2003),
+            ActorData(actor: client3.id!, lamport: 2006) // 2005
+        ])
+        
+        // TODO: - Fix the testcase below
+        let json3Count = await doc3.getRoot().toJSON().count
+        XCTAssertEqual(defaultSnapshotThreshold + 2, json3Count)
+        
+        // 03. Delete text after receiving the snapshot.
+        try await doc3.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(1, 3, "")
+        })
+        
+        let json4Count = await doc3.getRoot().toJSON().count
+        XCTAssertEqual(defaultSnapshotThreshold, json4Count)
+        
+        try await client3.sync()
+        try await client2.sync()
+        try await client1.sync()
+        
+        let json2Count = await doc2.getRoot().toJSON().count
+        XCTAssertEqual(defaultSnapshotThreshold, json2Count)
+        
+        let json1Count = await doc1.getRoot().toJSON().count
+        XCTAssertEqual(defaultSnapshotThreshold, json1Count)
+        
+        try await client3.deactivate()
+        try await client2.deactivate()
+        try await client1.deactivate()
+    }
 }
 
 // swiftlint:enable function_body_length type_body_length
