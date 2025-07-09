@@ -42,11 +42,11 @@ public struct VersionVector: Sendable {
     }
 
     /**
-       * `unset` removes the version for the given actor from the VersionVector.
-       */
-      public mutating func unset(actorID: String) {
-          self.vector.removeValue(forKey: actorID)
-      }
+     * `unset` removes the version for the given actor from the VersionVector.
+     */
+    public mutating func unset(actorID: String) {
+        self.vector.removeValue(forKey: actorID)
+    }
 
     /**
      * `get` gets the lamport timestamp of the given actor.

@@ -469,8 +469,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ value: T?,
         _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> (RGATreeSplitPos, [String: TimeTicket], [GCPair], [ContentChange<T>])
-    {
+    ) throws -> (RGATreeSplitPos, [String: TimeTicket], [GCPair], [ContentChange<T>]) {
         // 01. split nodes with from and to
         let (toLeft, toRight) = try self.findNodeWithSplit(range.1, editedAt)
         let (fromLeft, fromRight) = try self.findNodeWithSplit(range.0, editedAt)
@@ -785,8 +784,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ maxCreatedAtMapByActor: [ActorID: TimeTicket]?,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?])
-    {
+    ) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?]) {
         var nodesToDelete = [RGATreeSplitNode<T>]()
         var nodesToKeep = [RGATreeSplitNode<T>?]()
 
@@ -798,7 +796,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
 
-            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
+            if versionVector == nil, maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
             } else if let versionVector, versionVector.size() > 0 {

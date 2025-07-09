@@ -190,8 +190,7 @@ final class CRDTText: CRDTElement {
         _ attributes: [String: String]? = nil,
         _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([String: TimeTicket], [TextChange], [GCPair], RGATreeSplitPosRange)
-    {
+    ) throws -> ([String: TimeTicket], [TextChange], [GCPair], RGATreeSplitPosRange) {
         let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
             for (key, jsonValue) in attributes {
@@ -235,8 +234,7 @@ final class CRDTText: CRDTElement {
         _ editedAt: TimeTicket,
         _ maxCreatedAtMapByActor: [String: TimeTicket]? = [:],
         _ versionVector: VersionVector? = nil
-    ) throws -> ([String: TimeTicket], [GCPair], [TextChange])
-    {
+    ) throws -> ([String: TimeTicket], [GCPair], [TextChange]) {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
         let fromRight = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt).1

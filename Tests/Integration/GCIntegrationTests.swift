@@ -1862,31 +1862,31 @@ class GCIntegrationTests: XCTestCase {
         ])
 
         // doc3 update
-        try await doc3.update({ root, _ in
+        try await doc3.update { root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
-        })
+        }
 
         // doc1 update
-        try await doc1.update({ root, _ in
+        try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "1")
-        })
+        }
 
-        try await doc1.update({ root, _ in
+        try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "2")
-        })
+        }
 
-        try await doc1.update({ root, _ in
+        try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "3")
-        })
+        }
 
         // doc2 update
-        try await doc2.update({ root, _ in
+        try await doc2.update { root, _ in
             (root.t as? JSONText)?.edit(3, 3, "x")
-        })
+        }
 
-        try await doc2.update({ root, _ in
+        try await doc2.update { root, _ in
             (root.t as? JSONText)?.edit(4, 4, "y")
-        })
+        }
 
         // sync
         try await client1.sync()
@@ -1897,12 +1897,12 @@ class GCIntegrationTests: XCTestCase {
         let doc2Expected = await doc1.toJSON()
 
         let doc1JSON = """
-            {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"b"},{"val":"c"},{"val":"x"},{"val":"y"}]}
-            """
+        {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"b"},{"val":"c"},{"val":"x"},{"val":"y"}]}
+        """
 
         let doc2JSON = """
-            {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"b"},{"val":"c"},{"val":"x"},{"val":"y"}]}
-            """
+        {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"b"},{"val":"c"},{"val":"x"},{"val":"y"}]}
+        """
         XCTAssertEqual(doc1JSON, doc1Expected)
         XCTAssertEqual(doc2JSON, doc2Expected)
 
@@ -1926,9 +1926,9 @@ class GCIntegrationTests: XCTestCase {
 
         try await client3.detach(doc3)
 
-        try await doc2.update({ root, _ in
+        try await doc2.update { root, _ in
             (root.t as? JSONText)?.edit(5, 5, "z")
-        })
+        }
 
         try await client1.sync()
 
@@ -1959,11 +1959,11 @@ class GCIntegrationTests: XCTestCase {
         let doc3Expected = await doc1.toJSON()
         let doc4Expected = await doc1.toJSON()
         let doc3JSON = """
-            {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"z"},{"val":"x"},{"val":"y"}]}
-            """
+        {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"z"},{"val":"x"},{"val":"y"}]}
+        """
         let doc4JSON = """
-            {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"z"},{"val":"x"},{"val":"y"}]}
-            """
+        {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"z"},{"val":"x"},{"val":"y"}]}
+        """
         XCTAssertEqual(doc3JSON, doc3Expected)
         XCTAssertEqual(doc4JSON, doc4Expected)
 
@@ -2034,19 +2034,17 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client3.id!, lamport: 4)
         ])
 
-        for idx in 0..<(defaultSnapshotThreshold / 2) {
-            try await doc1.update({ root, _ in
-                // root.t = JSONText()
+        for idx in 0 ..< (defaultSnapshotThreshold / 2) {
+            try await doc1.update { root, _ in
                 (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
-            })
+            }
 
             try await client1.sync()
             try await client2.sync()
 
-            try await doc2.update({ root, _ in
-                // root.t = JSONText()
+            try await doc2.update { root, _ in
                 (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
-            })
+            }
 
             try await client2.sync()
             try await client1.sync()
@@ -2071,10 +2069,9 @@ class GCIntegrationTests: XCTestCase {
         ])
 
         // 02. Makes local changes then pull a snapshot from the server.
-        try await doc3.update({ root, _ in
-            // root.t = JSONText()
+        try await doc3.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "c")
-        })
+        }
 
         try await client3.sync()
 
@@ -2092,9 +2089,9 @@ class GCIntegrationTests: XCTestCase {
 
         // PASSED
         // 03. Delete text after receiving the snapshot.
-        try await doc3.update({ root, _ in
+        try await doc3.update { root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
-        })
+        }
 
         json3Count = (await doc3.getRoot().t as? JSONText)?.length ?? 0
 

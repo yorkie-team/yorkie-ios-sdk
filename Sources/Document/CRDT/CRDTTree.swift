@@ -677,8 +677,7 @@ class CRDTTree: CRDTElement {
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
-            } else if let versionVector,
-                      versionVector.size() > 0 {
+            } else if let versionVector, versionVector.size() > 0 {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
             } else {
                 if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
@@ -691,9 +690,7 @@ class CRDTTree: CRDTElement {
                 editedAt,
                 maxCreatedAt,
                 clientLamportAtChange
-            ),
-               !node.isText,
-               let attributes {
+            ), !node.isText, let attributes {
                 let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
                 if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
@@ -761,8 +758,7 @@ class CRDTTree: CRDTElement {
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
-            } else if let versionVector,
-                      versionVector.size() > 0 {
+            } else if let versionVector, versionVector.size() > 0 {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
             } else {
                 if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
@@ -776,8 +772,7 @@ class CRDTTree: CRDTElement {
                 editedAt,
                 maxCreatedAt,
                 clientLamportAtChange
-            ),
-               !attributesToRemove.isEmpty {
+            ), !attributesToRemove.isEmpty {
                 let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
                 if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
@@ -841,8 +836,7 @@ class CRDTTree: CRDTElement {
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
             let (node, tokenType) = treeToken
-            if tokenType == .start,
-               !ended {
+            if tokenType == .start, !ended {
                 // TODO(hackerwins): Define more clearly merge-able rules
                 // between two parents. For now, we only merge two parents are
                 // both element nodes having text children.
@@ -866,8 +860,7 @@ class CRDTTree: CRDTElement {
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
-            } else if let versionVector,
-                      versionVector.size() > 0 {
+            } else if let versionVector, versionVector.size() > 0 {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
             } else {
                 maxCreatedAt = maxCreatedAtMapByActor?[node.createdAt.actorID] ?? .initial
