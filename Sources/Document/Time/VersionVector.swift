@@ -40,7 +40,7 @@ public struct VersionVector: Sendable {
     public mutating func set(actorID: ActorID, lamport: Int64) {
         self.vector[actorID] = lamport
     }
-    
+
     /**
        * `unset` removes the version for the given actor from the VersionVector.
        */
@@ -67,7 +67,7 @@ public struct VersionVector: Sendable {
 
         return max
     }
-    
+
     /**
      * `max` returns new version vector which consists of max value of each vector
      */

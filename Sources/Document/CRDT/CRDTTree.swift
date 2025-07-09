@@ -668,9 +668,7 @@ class CRDTTree: CRDTElement {
         var changes: [TreeChange] = []
         var createdAtMapByActor = [String: TimeTicket]()
         var pairs = [GCPair]()
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) {
-            token,
-            _ in
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             let actorID = node.createdAt.actorID
             var maxCreatedAt: TimeTicket?
@@ -754,9 +752,7 @@ class CRDTTree: CRDTElement {
         var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
 
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) {
-            token,
-            _ in
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             let actorID = node.createdAt.actorID
             var maxCreatedAt: TimeTicket?
@@ -841,9 +837,7 @@ class CRDTTree: CRDTElement {
         var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var maxCreatedAtMap = [String: TimeTicket]()
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) {
-            treeToken,
-            ended in
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
             let (node, tokenType) = treeToken
@@ -856,19 +850,19 @@ class CRDTTree: CRDTElement {
                 // if (!fromParent.hasTextChild() || !toParent.hasTextChild()) {
                 //   return;
                 // }
-                
+
                 toBeMovedToFromParents.append(contentsOf: node.children)
             }
-            
+
             let actorID = node.createdAt.actorID
-            
+
             var maxCreatedAt: TimeTicket?
-            
+
             // NOTE(sejongk): If the node is removable or its parent is going to
             // be removed, then this node should be removed.
-            
+
             var clientLamportAtChange: Int64 = 0
-            
+
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
@@ -878,7 +872,7 @@ class CRDTTree: CRDTElement {
             } else {
                 maxCreatedAt = maxCreatedAtMapByActor?[node.createdAt.actorID] ?? .initial
             }
-            
+
             if node.canDelete(
                 editedAt,
                 maxCreatedAt,

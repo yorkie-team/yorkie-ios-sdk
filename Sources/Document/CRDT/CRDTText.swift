@@ -251,7 +251,7 @@ final class CRDTText: CRDTElement {
 
             var maxCreatedAt: TimeTicket = .max
             var clientLamportAtChange: Int64 = .zero
-                
+
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max

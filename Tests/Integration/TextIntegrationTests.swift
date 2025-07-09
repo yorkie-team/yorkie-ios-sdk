@@ -328,7 +328,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
             d1JSON = await d1.toSortedJSON()
             d2JSON = await d2.toSortedJSON()
             XCTAssertEqual(d1JSON, "{\"k1\":[{\"attrs\":{\"bold\":true},\"val\":\"The \"},{\"val\":\"brown \"},{\"attrs\":{\"bold\":true},\"val\":\"fox jumped.\"}]}")
-            
+
             // TODO(MoonGyu1): d1 and d2 should have the result below after applying mark operation
             // assert.equal(
             //   d1.toSortedJSON(),

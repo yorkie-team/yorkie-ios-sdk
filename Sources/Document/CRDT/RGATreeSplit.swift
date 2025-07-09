@@ -355,13 +355,13 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     ) -> Bool {
         let justRemoved = self.removedAt == nil
         let nodeExisted: Bool
-        
+
         if let maxCreatedAt = maxCreatedAt {
             nodeExisted = !self.createdAt.after(maxCreatedAt)
         } else {
             nodeExisted = self.createdAt.lamport <= clientLamportAtChange
         }
-        
+
         if nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!)) {
             return justRemoved
         }
@@ -797,7 +797,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             let actorID = node.createdAt.actorID
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
-            
+
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
