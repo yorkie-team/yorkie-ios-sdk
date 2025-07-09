@@ -673,7 +673,7 @@ class CRDTTree: CRDTElement {
             let actorID = node.createdAt.actorID
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
-            
+
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
@@ -757,7 +757,7 @@ class CRDTTree: CRDTElement {
             let actorID = node.createdAt.actorID
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
-            
+
             if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
@@ -771,7 +771,7 @@ class CRDTTree: CRDTElement {
                     maxCreatedAt = TimeTicket.initial
                 }
             }
-            
+
             if node.canStyle(
                 editedAt,
                 maxCreatedAt,

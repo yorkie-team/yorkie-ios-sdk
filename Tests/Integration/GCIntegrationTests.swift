@@ -1805,62 +1805,62 @@ class GCIntegrationTests: XCTestCase {
         try await client1.activate()
         try await client2.activate()
         try await client3.activate()
-    
+
         try await client1.attach(doc1, [:], .manual)
         try await client2.attach(doc2, [:], .manual)
         try await client3.attach(doc3, [:], .manual)
-    
+
         try await client1.sync()
         try await client2.sync()
         try await client3.sync()
-    
+
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 3),
             ActorData(actor: client2.id!, lamport: 1),
             ActorData(actor: client3.id!, lamport: 1)
         ])
-    
+
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 1),
             ActorData(actor: client2.id!, lamport: 3),
             ActorData(actor: client3.id!, lamport: 1)
         ])
-    
+
         await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 1),
             ActorData(actor: client2.id!, lamport: 1),
             ActorData(actor: client3.id!, lamport: 3)
         ])
-    
+
         try await doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
             (root.t as? JSONText)?.edit(2, 2, "c")
         }, "sets text")
-    
+
         try await client1.sync()
         try await client2.sync()
         try await client3.sync()
-    
+
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 4),
             ActorData(actor: client2.id!, lamport: 1),
             ActorData(actor: client3.id!, lamport: 1)
         ])
-    
+
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 4),
             ActorData(actor: client2.id!, lamport: 5),
             ActorData(actor: client3.id!, lamport: 1)
         ])
-    
+
         await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 4),
             ActorData(actor: client2.id!, lamport: 1),
             ActorData(actor: client3.id!, lamport: 5)
         ])
-    
+
         // doc3 update
         try await doc3.update({ root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
