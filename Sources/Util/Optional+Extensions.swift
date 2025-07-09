@@ -33,3 +33,10 @@ extension Optional: OptionalValue {
         }
     }
 }
+
+extension Optional where Wrapped: Collection {
+    /// `Optional collection` can be `nil`, return true when `empty` or `nil`, otherwise return `false`
+    var isNilOrEmpty: Bool {
+        self?.isEmpty ?? true
+    }
+}

@@ -798,7 +798,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
             
-            if versionVector == nil && maxCreatedAtMapByActor == nil {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
             } else if let versionVector, versionVector.size() > 0 {

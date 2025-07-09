@@ -203,7 +203,8 @@ final class CRDTText: CRDTElement {
             range,
             editedAt,
             value,
-            maxCreatedAtMapByActor, versionVector
+            maxCreatedAtMapByActor,
+            versionVector
         )
 
         let changes = contentChanges.compactMap { TextChange(type: .content, actor: $0.actor, from: $0.from, to: $0.to, content: $0.content?.toString) }
@@ -248,23 +249,23 @@ final class CRDTText: CRDTElement {
         for node in nodes {
             let actorID = node.createdAt.actorID
 
-            var maxCreatedAt: TimeTicket?
+            var maxCreatedAt: TimeTicket = .max
             var clientLamportAtChange: Int64 = .zero
                 
-            if versionVector == nil && maxCreatedAtMapByActor == nil {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
             } else if let versionVector, versionVector.size() > 0 {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
             } else {
-                if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
-                    maxCreatedAt = map
-                } else {
-                    maxCreatedAt = TimeTicket.initial
-                }
+                maxCreatedAt = maxCreatedAtMapByActor?[node.createdAt.actorID] ?? .initial
             }
-
-            if node.canStyle(editedAt, maxCreatedAt, clientLamportAtChange: clientLamportAtChange) {
+            let canStyle = node.canStyle(
+                editedAt,
+                maxCreatedAt,
+                clientLamportAtChange: clientLamportAtChange
+            )
+            if canStyle {
                 let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
 

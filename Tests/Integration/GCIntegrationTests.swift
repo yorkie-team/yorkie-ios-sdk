@@ -2036,7 +2036,7 @@ class GCIntegrationTests: XCTestCase {
         
         for idx in 0..<(defaultSnapshotThreshold / 2) {
             try await doc1.update({ root, _ in
-                root.t = JSONText()
+                // root.t = JSONText()
                 (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
             })
             
@@ -2044,7 +2044,7 @@ class GCIntegrationTests: XCTestCase {
             try await client2.sync()
             
             try await doc2.update({ root, _ in
-                root.t = JSONText()
+                // root.t = JSONText()
                 (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
             })
             
@@ -2077,35 +2077,37 @@ class GCIntegrationTests: XCTestCase {
         })
         
         try await client3.sync()
-
-        // TODO: - Fix the testcase below
-        await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
+        
+        let vectors = await doc3.getVersionVector()
+        await assertTrue(versionVector: vectors, actorDatas: [
             ActorData(actor: client1.id!, lamport: 2001),
             ActorData(actor: client2.id!, lamport: 2003),
-            ActorData(actor: client3.id!, lamport: 2006) // 2005
+            ActorData(actor: client3.id!, lamport: 2006)
         ])
         
-        // TODO: - Fix the testcase below
-        let json3Count = await doc3.getRoot().toJSON().count
+        try await client3.sync()
+        
+        var json3Count = (await doc3.getRoot().t as? JSONText)?.length ?? 0
         XCTAssertEqual(defaultSnapshotThreshold + 2, json3Count)
         
+        // PASSED
         // 03. Delete text after receiving the snapshot.
         try await doc3.update({ root, _ in
-            root.t = JSONText()
             (root.t as? JSONText)?.edit(1, 3, "")
         })
         
-        let json4Count = await doc3.getRoot().toJSON().count
-        XCTAssertEqual(defaultSnapshotThreshold, json4Count)
+        json3Count = (await doc3.getRoot().t as? JSONText)?.length ?? 0
+        
+        XCTAssertEqual(defaultSnapshotThreshold, json3Count)
         
         try await client3.sync()
         try await client2.sync()
         try await client1.sync()
         
-        let json2Count = await doc2.getRoot().toJSON().count
+        let json2Count = (await doc2.getRoot().t as? JSONText)?.length ?? 0
         XCTAssertEqual(defaultSnapshotThreshold, json2Count)
         
-        let json1Count = await doc1.getRoot().toJSON().count
+        let json1Count = (await doc1.getRoot().t as? JSONText)?.length ?? 0
         XCTAssertEqual(defaultSnapshotThreshold, json1Count)
         
         try await client3.deactivate()

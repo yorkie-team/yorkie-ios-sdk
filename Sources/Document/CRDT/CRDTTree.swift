@@ -676,7 +676,7 @@ class CRDTTree: CRDTElement {
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
             
-            if versionVector == nil && maxCreatedAtMapByActor == nil {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
             } else if let versionVector,
@@ -762,7 +762,7 @@ class CRDTTree: CRDTElement {
             var maxCreatedAt: TimeTicket?
             var clientLamportAtChange: Int64 = 0
             
-            if versionVector == nil && maxCreatedAtMapByActor == nil {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
             } else if let versionVector,
@@ -869,18 +869,14 @@ class CRDTTree: CRDTElement {
             
             var clientLamportAtChange: Int64 = 0
             
-            if versionVector == nil && maxCreatedAtMapByActor == nil {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
                 // Local edit - use version vector comparison
                 clientLamportAtChange = .max
             } else if let versionVector,
                       versionVector.size() > 0 {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
             } else {
-                if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
-                    maxCreatedAt = map
-                } else {
-                    maxCreatedAt = TimeTicket.initial
-                }
+                maxCreatedAt = maxCreatedAtMapByActor?[node.createdAt.actorID] ?? .initial
             }
             
             if node.canDelete(
