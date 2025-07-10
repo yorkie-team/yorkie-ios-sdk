@@ -191,7 +191,6 @@ public class Client {
     public nonisolated let key: String
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus = .deactivated
-    public private(set) var keepAlive = false
 
     /**
      * @param rpcAddr - the address of the RPC server.
@@ -261,16 +260,12 @@ public class Client {
     /**
      * `deactivate` deactivates this client.
      */
-    public func deactivate(keepAlive: Bool = false) async throws {
+    public func deactivate() async throws {
         guard self.status == .activated, let clientID = self.id else {
             return
         }
 
         do {
-            if keepAlive {
-                self.keepAlive = true
-            }
-
             let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
             let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest,
@@ -283,10 +278,6 @@ public class Client {
             try self.deactivateInternal()
 
             Logger.info("Client(\(self.key) deactivated.")
-
-            if keepAlive {
-                self.keepAlive = false
-            }
         } catch {
             Logger.error("Failed to request deactivate client(\(self.key)).")
             await self.handleConnectError(error)

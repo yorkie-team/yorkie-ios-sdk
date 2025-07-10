@@ -71,9 +71,21 @@ class TreeStyleOperation: Operation {
         let pairs: [GCPair]
 
         if self.attributes.isEmpty == false {
-            (_, pairs, changes) = try tree.style((self.fromPos, self.toPos), self.attributes, self.executedAt, self.maxCreatedAtMapByActor)
+            (_, pairs, changes) = try tree.style(
+                (self.fromPos, self.toPos),
+                self.attributes,
+                self.executedAt,
+                self.maxCreatedAtMapByActor,
+                versionVector
+            )
         } else {
-            (_, pairs, changes) = try tree.removeStyle((self.fromPos, self.toPos), self.attributesToRemove, self.executedAt, self.maxCreatedAtMapByActor)
+            (_, pairs, changes) = try tree.removeStyle(
+                (self.fromPos, self.toPos),
+                self.attributesToRemove,
+                self.executedAt,
+                self.maxCreatedAtMapByActor,
+                versionVector
+            )
         }
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)
