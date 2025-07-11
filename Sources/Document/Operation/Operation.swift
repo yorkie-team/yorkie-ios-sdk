@@ -271,7 +271,10 @@ protocol Operation {
     /**
      * `execute` executes this operation on the given document(`root`).
      */
-    func execute(root: CRDTRoot) throws -> [any OperationInfo]
+    func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector?
+    ) throws -> [any OperationInfo]
 }
 
 extension Operation {

@@ -42,6 +42,13 @@ public struct VersionVector: Sendable {
     }
 
     /**
+     * `unset` removes the version for the given actor from the VersionVector.
+     */
+    public mutating func unset(actorID: String) {
+        self.vector.removeValue(forKey: actorID)
+    }
+
+    /**
      * `get` gets the lamport timestamp of the given actor.
      */
     public func get(_ actorID: ActorID) -> Int64? {
@@ -59,20 +66,6 @@ public struct VersionVector: Sendable {
         }
 
         return max
-    }
-
-    /**
-     * `minLamport` returns min lamport value from vector
-     */
-
-    public func minLamport() -> Int64 {
-        var min = Int64.max
-
-        for (_, lamport) in self where lamport < min {
-            min = lamport
-        }
-
-        return min
     }
 
     /**
@@ -103,7 +96,7 @@ public struct VersionVector: Sendable {
      */
     public func afterOrEqual(other: TimeTicket) -> Bool {
         guard let lamport = self.vector[other.actorID] else {
-            return self.minLamport() > other.lamport
+            return false
         }
 
         return lamport >= other.lamport

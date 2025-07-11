@@ -335,9 +335,6 @@ public class Document {
         // 03. Do Garbage collection.
         if !hasSnapshot, let versionVector = pack.getVersionVector() {
             self.garbageCollect(minSyncedVersionVector: versionVector)
-
-            // 04. Filter detached client's lamport from version vector
-            self.filterVersionVector(minSyncedVersionVector: versionVector)
         }
 
         // 06. Update the status.
@@ -503,7 +500,10 @@ public class Document {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
-        self.changeID = self.changeID.setClocks(with: serverSeq, vector: snapshotVector)
+        self.changeID = self.changeID.setClocks(
+            with: snapshotVector.maxLamport(),
+            vector: snapshotVector
+        )
 
         // drop clone because it is contaminated.
         self.clone = nil

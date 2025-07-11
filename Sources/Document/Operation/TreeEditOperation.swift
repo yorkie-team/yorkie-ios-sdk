@@ -52,7 +52,10 @@ struct TreeEditOperation: Operation {
      * `execute` executes this operation on the given `CRDTRoot`.
      */
     @discardableResult
-    public func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+    public func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector?
+    ) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
             Logger.critical(log)

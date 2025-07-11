@@ -27,6 +27,16 @@ final class WebhookIntegrationTests: XCTestCase {
     let testAPIPW = "admin"
 
     var apiKey = ""
+    let allAuthWebhookMethods = [
+        "ActivateClient",
+        "DeactivateClient",
+        "AttachDocument",
+        "DetachDocument",
+        "RemoveDocument",
+        "PushPull",
+        "WatchDocuments",
+        "Broadcast"
+    ]
 
     enum Constant {
         static let expiredTokenErrorMessage = "expired token"
@@ -66,10 +76,13 @@ final class WebhookIntegrationTests: XCTestCase {
         self.webhookServer = WebhookServer(port: 3004)
         try self.webhookServer.start()
 
-        self.context = try await YorkieProjectHelper.initializeProject(rpcAddress: self.rpcAddress,
-                                                                       username: self.testAPIID,
-                                                                       password: self.testAPIPW,
-                                                                       webhookURL: self.webhookServer.authWebhookUrl)
+        self.context = try await YorkieProjectHelper.initializeProject(
+            rpcAddress: self.rpcAddress,
+            username: self.testAPIID,
+            password: self.testAPIPW,
+            webhookURL: self.webhookServer.authWebhookUrl,
+            webhookMethods: self.allAuthWebhookMethods
+        )
         self.apiKey = self.context.apiKey
     }
 
@@ -93,19 +106,39 @@ final class WebhookIntegrationTests: XCTestCase {
             }
         }
 
-        let client = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
-        try await client.activate()
+        let client1 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client2 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+
+        try await client1.activate()
+        try await client2.activate()
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
-        let doc = Document(key: docKey)
-        try await client.attach(doc)
-        try await doc.update { root, _ in
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        try await client1.attach(doc1)
+        try await client2.attach(doc2)
+
+        let syncEventCollector = EventCollector<DocSyncStatus>(doc: doc2)
+        await doc1.subscribeSync { event, _ in
+            guard let syncEvent = event as? SyncStatusChangedEvent else { return }
+            syncEventCollector.add(event: syncEvent.value)
+        }
+
+        try await doc2.update { root, _ in
             root.k1 = "v1"
         }
 
-        try await client.sync(doc)
-        try await client.detach(doc)
-        try await client.deactivate()
+        try await client1.sync(doc1)
+        try await client2.sync(doc2)
+
+        let k1Value = await(doc2.getRoot().k1 as? String)
+        XCTAssertEqual(k1Value, "v1")
+
+        // try await client1.detach(doc)
+        try await client1.deactivate()
+        try await client2.deactivate()
     }
 
     func test_should_return_unauthenticated_error_for_client_with_empty_token_401() async throws {

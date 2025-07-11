@@ -39,7 +39,10 @@ struct SetOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     @discardableResult
-    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+    func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector? = nil
+    ) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let parent = parent as? CRDTObject else {
             let log: String

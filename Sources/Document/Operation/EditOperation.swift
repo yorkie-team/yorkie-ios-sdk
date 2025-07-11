@@ -59,7 +59,10 @@ struct EditOperation: Operation {
      * `execute` executes this operation on the given document(`root`).
      */
     @discardableResult
-    func execute(root: CRDTRoot) throws -> [any OperationInfo] {
+    func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector?
+    ) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let text = parent as? CRDTText else {
             let log: String
@@ -71,7 +74,14 @@ struct EditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (_, changes, pairs, _) = try text.edit((self.fromPos, self.toPos), self.content, self.executedAt, self.attributes, self.maxCreatedAtMapByActor)
+        let (_, changes, pairs, _) = try text.edit(
+            (self.fromPos, self.toPos),
+            self.content,
+            self.executedAt,
+            self.attributes,
+            self.maxCreatedAtMapByActor,
+            versionVector
+        )
 
         for pair in pairs {
             root.registerGCPair(pair)

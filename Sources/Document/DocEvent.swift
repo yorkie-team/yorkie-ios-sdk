@@ -331,6 +331,7 @@ public struct AuthErrorValue: Equatable {
         case pushPull
         case watchDocuments
         case other(String)
+        case broadcast
 
         public var description: String {
             switch self {
@@ -340,6 +341,8 @@ public struct AuthErrorValue: Equatable {
                 return "WatchDocuments"
             case .other(let name):
                 return name
+            case .broadcast:
+                return "Broadcast"
             }
         }
     }

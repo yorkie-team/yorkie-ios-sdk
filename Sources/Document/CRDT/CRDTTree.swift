@@ -415,21 +415,47 @@ final class CRDTTreeNode: IndexTreeNode {
     /**
      * `canDelete` checks if node is able to delete.
      */
-    func canDelete(_ editedAt: TimeTicket, _ maxCreatedAt: TimeTicket) -> Bool {
-        !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    func canDelete(
+        _ editedAt: TimeTicket,
+        _ maxCreatedAt: TimeTicket?,
+        _ clientLamportAtChange: Int64
+    ) -> Bool {
+        let nodeExisted: Bool
+        if let maxCreatedAt = maxCreatedAt {
+            nodeExisted = !self.createdAt.after(maxCreatedAt)
+        } else {
+            nodeExisted = self.createdAt.lamport <= clientLamportAtChange
+        }
+
+        return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
     /**
      * `canStyle` checks if node is able to style.
      */
-    func canStyle(_ editedAt: TimeTicket, _ maxCreatedAt: TimeTicket) -> Bool {
-        !self.createdAt.after(maxCreatedAt) && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    func canStyle(
+        _ editedAt: TimeTicket,
+        _ maxCreatedAt: TimeTicket?,
+        _ clientLamportAtChange: Int64
+    ) -> Bool {
+        if self.isText { return false }
+        let nodeExisted: Bool
+        if let maxCreatedAt = maxCreatedAt {
+            nodeExisted = !self.createdAt.after(maxCreatedAt)
+        } else {
+            nodeExisted = self.createdAt.lamport <= clientLamportAtChange
+        }
+
+        return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
     /**
      * `setAttrs` sets the attributes of the node.
      */
-    func setAttrs(_ attrs: [String: String], _ editedAt: TimeTicket) -> [(RHTNode?, RHTNode?)] {
+    func setAttrs(
+        _ attrs: [String: String],
+        _ editedAt: TimeTicket
+    ) -> [(RHTNode?, RHTNode?)] {
         if self.attrs == nil {
             self.attrs = RHT()
         }
@@ -629,7 +655,13 @@ class CRDTTree: CRDTElement {
      * `style` applies the given attributes of the given range.
      */
     @discardableResult
-    func style(_ range: TreePosRange, _ attributes: [String: String]?, _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
+    func style(
+        _ range: TreePosRange,
+        _ attributes: [String: String]?,
+        _ editedAt: TimeTicket,
+        _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
 
@@ -639,9 +671,26 @@ class CRDTTree: CRDTElement {
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             let actorID = node.createdAt.actorID
-            let maxCreatedAt = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor![actorID] ?? TimeTicket.initial : TimeTicket.max
+            var maxCreatedAt: TimeTicket?
+            var clientLamportAtChange: Int64 = 0
 
-            if node.canStyle(editedAt, maxCreatedAt), !node.isText, let attributes {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
+                // Local edit - use version vector comparison
+                clientLamportAtChange = .max
+            } else if let versionVector, versionVector.size() > 0 {
+                clientLamportAtChange = versionVector.get(actorID) ?? 0
+            } else {
+                if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
+                    maxCreatedAt = map
+                } else {
+                    maxCreatedAt = .initial
+                }
+            }
+            if node.canStyle(
+                editedAt,
+                maxCreatedAt,
+                clientLamportAtChange
+            ), !node.isText, let attributes {
                 let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
                 if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
@@ -686,7 +735,13 @@ class CRDTTree: CRDTElement {
     /**
      * `removeStyle` removes the given attributes of the given range.
      */
-    func removeStyle(_ range: TreePosRange, _ attributesToRemove: [String], _ editedAt: TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
+    func removeStyle(
+        _ range: TreePosRange,
+        _ attributesToRemove: [String],
+        _ editedAt: TimeTicket,
+        _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([String: TimeTicket], [GCPair], [TreeChange]) {
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
         var changes: [TreeChange] = []
@@ -697,9 +752,27 @@ class CRDTTree: CRDTElement {
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, _) = token
             let actorID = node.createdAt.actorID
-            let maxCreatedAt = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor![actorID] ?? TimeTicket.initial : TimeTicket.max
+            var maxCreatedAt: TimeTicket?
+            var clientLamportAtChange: Int64 = 0
 
-            if node.canStyle(editedAt, maxCreatedAt), !attributesToRemove.isEmpty {
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
+                // Local edit - use version vector comparison
+                clientLamportAtChange = .max
+            } else if let versionVector, versionVector.size() > 0 {
+                clientLamportAtChange = versionVector.get(actorID) ?? 0
+            } else {
+                if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
+                    maxCreatedAt = map
+                } else {
+                    maxCreatedAt = TimeTicket.initial
+                }
+            }
+
+            if node.canStyle(
+                editedAt,
+                maxCreatedAt,
+                clientLamportAtChange
+            ), !attributesToRemove.isEmpty {
                 let maxCreatedAt = createdAtMapByActor[actorID]
                 let createdAt = node.createdAt
                 if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
@@ -739,7 +812,15 @@ class CRDTTree: CRDTElement {
      * If the content is undefined, the range will be removed.
      */
     @discardableResult
-    func edit(_ range: TreePosRange, _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ issueTimeTicket: () -> TimeTicket, _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil) throws -> ([TreeChange], [GCPair], [String: TimeTicket]) {
+    func edit(
+        _ range: TreePosRange,
+        _ contents: [CRDTTreeNode]?,
+        _ splitLevel: Int32,
+        _ editedAt: TimeTicket,
+        _ issueTimeTicket: () -> TimeTicket,
+        _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([TreeChange], [GCPair], [String: TimeTicket]) {
         // 01. find nodes from the given range and split nodes.
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
         let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -769,11 +850,27 @@ class CRDTTree: CRDTElement {
 
             let actorID = node.createdAt.actorID
 
-            let maxCreatedAt = maxCreatedAtMapByActor != nil ? maxCreatedAtMapByActor![actorID] ?? TimeTicket.initial : TimeTicket.max
+            var maxCreatedAt: TimeTicket?
 
             // NOTE(sejongk): If the node is removable or its parent is going to
             // be removed, then this node should be removed.
-            if node.canDelete(editedAt, maxCreatedAt) || nodesToBeRemoved.contains(where: { $0 === node.parent }) {
+
+            var clientLamportAtChange: Int64 = 0
+
+            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
+                // Local edit - use version vector comparison
+                clientLamportAtChange = .max
+            } else if let versionVector, versionVector.size() > 0 {
+                clientLamportAtChange = versionVector.get(actorID) ?? 0
+            } else {
+                maxCreatedAt = maxCreatedAtMapByActor?[node.createdAt.actorID] ?? .initial
+            }
+
+            if node.canDelete(
+                editedAt,
+                maxCreatedAt,
+                clientLamportAtChange
+            ) || nodesToBeRemoved.contains(where: { $0 === node.parent }) {
                 let maxCreatedAt = maxCreatedAtMap[actorID]
                 let createdAt = node.createdAt
 
@@ -892,10 +989,24 @@ class CRDTTree: CRDTElement {
      * `editT` edits the given range with the given value.
      * This method uses indexes instead of a pair of TreePos for testing.
      */
-    func editT(_ range: (Int, Int), _ contents: [CRDTTreeNode]?, _ splitLevel: Int32, _ editedAt: TimeTicket, _ issueTimeTicket: () -> TimeTicket) throws {
+    func editT(
+        _ range: (Int, Int),
+        _ contents: [CRDTTreeNode]?,
+        _ splitLevel: Int32,
+        _ editedAt: TimeTicket,
+        _ issueTimeTicket: () -> TimeTicket
+    ) throws {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
-        try self.edit((fromPos, toPos), contents, splitLevel, editedAt, issueTimeTicket)
+        try self.edit(
+            (fromPos, toPos),
+            contents,
+            splitLevel,
+            editedAt,
+            issueTimeTicket,
+            nil,
+            nil
+        )
     }
 
     /**

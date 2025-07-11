@@ -91,7 +91,12 @@ public class JSONText {
             attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
-        let (maxCreatedAtMapByActor, _, pairs, rangeAfterEdit) = try text.edit(range, content, ticket, attrs)
+        let (maxCreatedAtMapByActor, _, pairs, rangeAfterEdit) = try text.edit(
+            range,
+            content,
+            ticket,
+            attrs
+        )
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
@@ -158,14 +163,22 @@ public class JSONText {
         let pairs: [GCPair]
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
 
-        (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(range, stringAttrs, ticket)
+        (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(
+            range,
+            stringAttrs,
+            ticket
+        )
 
-        context.push(operation: StyleOperation(parentCreatedAt: text.createdAt,
-                                               fromPos: range.0,
-                                               toPos: range.1,
-                                               maxCreatedAtMapByActor: maxCreatedAtMapByActor,
-                                               attributes: stringAttrs,
-                                               executedAt: ticket))
+        context.push(
+            operation: StyleOperation(
+                parentCreatedAt: text.createdAt,
+                fromPos: range.0,
+                toPos: range.1,
+                maxCreatedAtMapByActor: maxCreatedAtMapByActor,
+                attributes: stringAttrs,
+                executedAt: ticket
+            )
+        )
 
         for pair in pairs {
             self.context?.registerGCPair(pair)

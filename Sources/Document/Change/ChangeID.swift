@@ -66,12 +66,20 @@ struct ChangeID {
     @discardableResult
     func syncClocks(with other: ChangeID) -> ChangeID {
         let lamport = other.lamport > self.lamport ? other.lamport + 1 : self.lamport + 1
-        let maxVersionVector = self.versionVector.max(other: other.versionVector)
 
-        var newID = ChangeID(clientSeq: self.clientSeq,
-                             lamport: lamport,
-                             actor: self.actor,
-                             versionVector: maxVersionVector)
+        var otherVV = other.versionVector
+        if otherVV.size() == 0 {
+            otherVV = otherVV.deepcopy()
+            otherVV.set(actorID: other.actor, lamport: other.lamport)
+        }
+        let maxVersionVector = self.versionVector.max(other: otherVV)
+
+        var newID = ChangeID(
+            clientSeq: self.clientSeq,
+            lamport: lamport,
+            actor: self.actor,
+            versionVector: maxVersionVector
+        )
         newID.versionVector.set(actorID: self.actor, lamport: lamport)
         return newID
     }
@@ -82,7 +90,12 @@ struct ChangeID {
      */
     @discardableResult
     func setClocks(with otherLamport: Int64, vector: VersionVector) -> ChangeID {
-        let lamport = otherLamport > self.lamport ? otherLamport : self.lamport + 1
+        let lamport = otherLamport > self.lamport ? otherLamport + 1 : self.lamport + 1
+
+        // clone another vector before mutating
+        var vector = vector
+        vector.unset(actorID: ActorIDs.initial)
+
         var maxVersionVector = self.versionVector.max(other: vector)
         maxVersionVector.set(actorID: self.actor, lamport: lamport)
 
