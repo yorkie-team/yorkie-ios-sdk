@@ -44,6 +44,8 @@ public struct Yorkie_V1_ActivateClientRequest: Sendable {
   public var clientKey: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+    
+  public var metadata: [String: String] = [:]
 
   public init() {}
 }

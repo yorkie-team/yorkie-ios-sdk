@@ -134,6 +134,8 @@ public struct ClientOptions {
      * The default value is `5000`(ms).
      */
     var maximumAttachmentTimeout: Int
+    
+    private(set) var metadata: [String: String]
 
     public init(key: String? = nil,
                 apiKey: String? = nil,
@@ -150,6 +152,7 @@ public struct ClientOptions {
         self.retrySyncLoopDelay = retrySyncLoopDelay ?? DefaultClientOptions.retrySyncLoopDelay
         self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
         self.maximumAttachmentTimeout = attachTimeout ?? DefaultClientOptions.maximumAttachmentTimeout
+        self.metadata = [:]
     }
 }
 
@@ -191,12 +194,18 @@ public class Client {
     public nonisolated let key: String
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus = .deactivated
+    
+    private(set) var metadata: [String: String]
 
     /**
      * @param rpcAddr - the address of the RPC server.
      * @param opts - the options of the client.
      */
-    public nonisolated init(_ urlString: String, _ options: ClientOptions = ClientOptions(), isMockingEnabled: Bool = false) {
+    public nonisolated init(
+        _ urlString: String,
+        _ options: ClientOptions = ClientOptions(),
+        isMockingEnabled: Bool = false
+    ) {
         self.key = options.key ?? UUID().uuidString
         self.syncLoopDuration = options.syncLoopDuration
         self.retrySyncLoopDelay = options.retrySyncLoopDelay
@@ -211,6 +220,7 @@ public class Client {
         self.yorkieService = YorkieService(rpcClient: YorkieServiceClient(client: protocolClient), isMockingEnabled: isMockingEnabled)
         self.authTokenInjector = options.authTokenInjector
         self.authHeader = AuthHeader(apiKey: options.apiKey, token: "")
+        self.metadata = options.metadata
     }
 
     /**
@@ -236,9 +246,15 @@ public class Client {
         }
 
         do {
-            let activateRequest = ActivateClientRequest.with { $0.clientKey = self.key }
-            let activateResponse = await self.yorkieService.activateClient(request: activateRequest,
-                                                                           headers: self.authHeader.makeHeader(nil))
+            let activateRequest = ActivateClientRequest.with {
+                $0.clientKey = self.key
+                $0.metadata = self.metadata
+            }
+            var header = self.authHeader.makeHeader(nil)
+            let activateResponse = await self.yorkieService.activateClient(
+                request: activateRequest,
+                headers: self.authHeader.makeHeader(nil)
+            )
 
             guard activateResponse.error == nil, let message = activateResponse.message else {
                 throw self.handleErrorResponse(activateResponse.error, defaultMessage: "Unknown activate error")
