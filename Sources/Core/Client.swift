@@ -250,7 +250,7 @@ public class Client {
                 $0.clientKey = self.key
                 $0.metadata = self.metadata
             }
-            var header = self.authHeader.makeHeader(nil)
+
             let activateResponse = await self.yorkieService.activateClient(
                 request: activateRequest,
                 headers: self.authHeader.makeHeader(nil)
