@@ -134,7 +134,7 @@ public struct ClientOptions {
      * The default value is `5000`(ms).
      */
     var maximumAttachmentTimeout: Int
-    
+
     private(set) var metadata: [String: String]
 
     public init(key: String? = nil,
@@ -194,7 +194,7 @@ public class Client {
     public nonisolated let key: String
     public var isActive: Bool { self.status == .activated }
     public private(set) var status: ClientStatus = .deactivated
-    
+
     private(set) var metadata: [String: String]
 
     /**
