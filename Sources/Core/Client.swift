@@ -992,7 +992,7 @@ public class Client {
         // that the document has reached the maximum number of allowed subscriptions.
         // In this case, the client should retry the connection.
         if yorkieErrorCode == YorkieError.Code.errTooManySubscribers {
-            Logger.error("Too manysubscribers: \(String(describing: yorkieErrorCode))")
+            Logger.error("Too many subscribers: \(String(describing: yorkieErrorCode))")
             return true
         }
 
