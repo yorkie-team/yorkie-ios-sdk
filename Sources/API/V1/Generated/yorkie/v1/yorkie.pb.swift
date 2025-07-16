@@ -43,6 +43,8 @@ public struct Yorkie_V1_ActivateClientRequest: Sendable {
 
   public var clientKey: String = String()
 
+  public var metadata: Dictionary<String,String> = [:]
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -366,6 +368,7 @@ extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf.
   public static let protoMessageName: String = _protobuf_package + ".ActivateClientRequest"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "client_key"),
+    2: .same(proto: "metadata"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -375,6 +378,7 @@ extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
+      case 2: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -384,11 +388,15 @@ extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if !self.clientKey.isEmpty {
       try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 1)
     }
+    if !self.metadata.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_ActivateClientRequest, rhs: Yorkie_V1_ActivateClientRequest) -> Bool {
     if lhs.clientKey != rhs.clientKey {return false}
+    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

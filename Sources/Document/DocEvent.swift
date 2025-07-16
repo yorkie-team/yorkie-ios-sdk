@@ -90,7 +90,7 @@ public enum DocEventType: String {
 /**
  * An event that occurs in ``Document``. It can be delivered
  */
-public protocol DocEvent {
+public protocol TransactionEvent {
     var type: DocEventType { get }
 }
 
@@ -103,7 +103,7 @@ public struct StatusInfo {
  * `StatusChangedEvent` is an event that occurs when
  * the client's stream connection state changes.
  */
-public struct StatusChangedEvent: DocEvent {
+public struct StatusChangedEvent: TransactionEvent {
     public let type: DocEventType = .statusChanged
     /**
      * StatusChangedEvent type
@@ -130,7 +130,7 @@ public enum StreamConnectionStatus {
  * `ConnectionChangedEvent` is an event that occurs when
  * the client's stream connection state changes.
  */
-public struct ConnectionChangedEvent: DocEvent {
+public struct ConnectionChangedEvent: TransactionEvent {
     public let type: DocEventType = .connectionChanged
     /**
      * ConnectionChanged type
@@ -156,7 +156,7 @@ public enum DocSyncStatus: String {
  * `SyncStatusChangedEvent` is an event that occurs when document
  * attached to the client are synced.
  */
-public struct SyncStatusChangedEvent: DocEvent {
+public struct SyncStatusChangedEvent: TransactionEvent {
     public let type: DocEventType = .syncStatusChanged
     /**
      * SyncStatusChangedEvent type
@@ -168,7 +168,7 @@ public struct SyncStatusChangedEvent: DocEvent {
  * `SnapshotEvent` is an event that occurs when a snapshot is received from
  * the server.
  */
-public struct SnapshotEvent: DocEvent {
+public struct SnapshotEvent: TransactionEvent {
     public let type: DocEventType = .snapshot
     /**
      * SnapshotEvent type
@@ -190,7 +190,7 @@ public struct SnapshotInfo {
  * `ChangeEvent` is an event that occurs when the document is changed
  * by local or remote changes.
  */
-protocol ChangeEvent: DocEvent {
+protocol ChangeEvent: TransactionEvent {
     var type: DocEventType { get }
     var value: ChangeInfo { get }
 }
@@ -244,7 +244,7 @@ public struct RemoteChangeEvent: ChangeEvent {
  */
 public typealias PeerElement = (clientID: ActorID, presence: [String: Any])
 
-public struct InitializedEvent: DocEvent {
+public struct InitializedEvent: TransactionEvent {
     /**
      * ``DocEventType/initialized``
      */
@@ -256,7 +256,7 @@ public struct InitializedEvent: DocEvent {
     public let value: [PeerElement]
 }
 
-public struct WatchedEvent: DocEvent {
+public struct WatchedEvent: TransactionEvent {
     /**
      * ``DocEventType/watched``
      */
@@ -267,7 +267,7 @@ public struct WatchedEvent: DocEvent {
     public var value: PeerElement
 }
 
-public struct UnwatchedEvent: DocEvent {
+public struct UnwatchedEvent: TransactionEvent {
     /**
      * ``DocEventType/unwatched``
      */
@@ -278,7 +278,7 @@ public struct UnwatchedEvent: DocEvent {
     public var value: PeerElement
 }
 
-public struct PresenceChangedEvent: DocEvent {
+public struct PresenceChangedEvent: TransactionEvent {
     /**
      * ``DocEventType/presenceChanged``
      */
@@ -302,7 +302,7 @@ public struct BroadcastValue {
     let payload: Payload
 }
 
-public struct BroadcastEvent: DocEvent {
+public struct BroadcastEvent: TransactionEvent {
     /**
      * ``DocEventType/broadcast``
      */
@@ -314,7 +314,7 @@ public struct BroadcastEvent: DocEvent {
     public let options: BroadcastOptions?
 }
 
-public struct LocalBroadcastEvent: DocEvent {
+public struct LocalBroadcastEvent: TransactionEvent {
     /**
      * ``DocEventType/localBroadcast``
      */
@@ -359,7 +359,7 @@ public struct AuthErrorValue: Equatable {
     }
 }
 
-public struct AuthErrorEvent: DocEvent {
+public struct AuthErrorEvent: TransactionEvent {
     /**
      * ``DocEventType/authError``
      */
