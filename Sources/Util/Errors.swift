@@ -82,7 +82,7 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrUnauthenticated is returned when the request does not have valid authentication credentials.
         case errUnauthenticated = "ErrUnauthenticated"
-        
+
         // ErrTooManyAttachments is returned when the number of attachments exceeds the limit.
         case errTooManyAttachments = "ErrTooManyAttachments"
     }
