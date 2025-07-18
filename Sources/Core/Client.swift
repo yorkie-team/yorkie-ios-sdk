@@ -989,6 +989,13 @@ public class Client {
             return true
         }
 
+        // The client has reached the maximum number of allowed attachments.
+        // In this case, the client should remove some attachments.
+        if yorkieErrorCode == .errTooManyAttachments {
+            Logger.error("Yorkie handle error with code: errTooManyAttachments")
+            return false
+        }
+
         // that the document has reached the maximum number of allowed subscriptions.
         // In this case, the client should retry the connection.
         if yorkieErrorCode == YorkieError.Code.errTooManySubscribers {
