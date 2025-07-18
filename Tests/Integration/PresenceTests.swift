@@ -255,7 +255,7 @@ final class PresenceSubscribeTests: XCTestCase {
         var type: DocEventType
         var elements = [PeerElement]()
 
-        init(_ event: TransactionEvent) {
+        init(_ event: DocEvent) {
             if let event = event as? InitializedEvent {
                 self.type = .initialized
                 self.elements = event.value

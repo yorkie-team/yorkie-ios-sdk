@@ -85,6 +85,9 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrTooManyAttachments is returned when the number of attachments exceeds the limit.
         case errTooManyAttachments = "ErrTooManyAttachments"
+
+        // ErrTooManySubscribers is returned when the number of subscribers exceeds the limit.
+        case errTooManySubscribers = "ErrTooManySubscribers"
     }
 }
 
