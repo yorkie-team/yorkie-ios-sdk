@@ -88,7 +88,7 @@ public enum PresenceSubscriptionType: String {
  */
 @MainActor
 public class Document {
-    public typealias SubscribeCallback = @MainActor (TransactionEvent, Document) -> Void
+    public typealias SubscribeCallback = @MainActor (DocEvent, Document) -> Void
 
     private let key: DocKey
     private(set) var status: DocStatus = .detached
@@ -543,7 +543,7 @@ public class Document {
             try change.execute(root: clone.root, presences: &self.clone!.presences)
 
             var changeInfo: ChangeInfo?
-            var presenceEvent: TransactionEvent?
+            var presenceEvent: DocEvent?
 
             guard let actorID = change.id.getActorID() else {
                 throw YorkieError(code: .errUnexpected, message: "ActorID is null")
@@ -706,7 +706,7 @@ public class Document {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    private func publish(_ event: TransactionEvent) {
+    private func publish(_ event: DocEvent) {
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
         if presenceEvents.contains(event.type) {
