@@ -16,7 +16,10 @@
 
 import Foundation
 
-// TODO: - refactor me
+/**
+ * `TimeTicketSize` is the size of the ticket in bytes.
+ * lamport(`int64`) + delimiter(`uint32`) + actorID(`12 bytes`)
+ */
 public let TimeTicketSize = 8 + 4 + 12
 
 /**
