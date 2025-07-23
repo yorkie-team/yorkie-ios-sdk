@@ -96,6 +96,22 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
+     * `getDataSize` returns the data usage of this value.
+     */
+    func getDataSize() -> DataSize {
+        var dataSize = DataSize(
+            data: content.length * 2,
+            meta: 0
+        )
+        for node in self.attributes {
+            let size = node.getDataSize()
+            dataSize.data += size.data
+            dataSize.meta += size.meta
+        }
+        return dataSize
+    }
+
+    /**
      * `toJSON` returns the JSON encoding of this .
      */
     public var toJSON: String {
@@ -160,6 +176,24 @@ extension CRDTTextValue: GCParent {
 }
 
 final class CRDTText: CRDTElement {
+    /**
+     * `getDataSize` returns the data usage of this element.
+     */
+    func getDataSize() -> DataSize {
+        var data = 0
+        var meta = self.getMetaUsage()
+        
+        for node in self.rgaTreeSplit where node.isRemoved == false {
+            let size = node.getDataSize()
+            data += size.data
+            meta += size.meta
+        }
+        return DataSize(
+            data: data,
+            meta: meta
+        )
+    }
+    
     public typealias TextVal = (attributes: Codable, content: String)
 
     var createdAt: TimeTicket

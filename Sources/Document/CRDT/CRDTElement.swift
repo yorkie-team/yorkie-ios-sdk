@@ -16,6 +16,9 @@
 
 import Foundation
 
+// TODO: - refactor me
+public let TimeTicketSize = 8 + 4 + 12
+
 /**
  * `CRDTElement` represents element type containing logical clock.
  */
@@ -32,6 +35,8 @@ protocol CRDTElement: AnyObject {
     func toSortedJSON() -> String
 
     func deepcopy() -> CRDTElement
+    
+    func getDataSize() -> DataSize
 }
 
 extension CRDTElement {
@@ -87,6 +92,19 @@ extension CRDTElement {
         }
 
         return false
+    }
+    
+    func getMetaUsage() -> Int {
+        var meta = TimeTicketSize
+
+        if self.movedAt != nil {
+            meta += TimeTicketSize
+        }
+        if self.removedAt != nil {
+            meta += TimeTicketSize
+        }
+
+        return meta
     }
 
     func equals(_ target: CRDTElement) -> Bool {

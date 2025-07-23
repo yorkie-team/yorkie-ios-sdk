@@ -257,9 +257,9 @@ extension Converter {
      */
     static func toCounterType(_ valueType: any YorkieCountable) -> PbValueType {
         if valueType is Int32 {
-            return .integerCnt
+            return .integer
         } else {
-            return .longCnt
+            return .long
         }
     }
 }

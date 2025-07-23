@@ -18,6 +18,10 @@ import XCTest
 @testable import Yorkie
 
 class TestCRDTElement: CRDTElement {
+    func getDataSize() -> Yorkie.DataSize {
+        .init(data: 0, meta: 0)
+    }
+    
     var createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?

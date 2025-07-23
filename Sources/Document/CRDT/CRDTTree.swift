@@ -563,6 +563,35 @@ extension CRDTTreeNode: GCParent {
 
 extension CRDTTreeNode: GCChild {
     /**
+     * `getDataSize` returns the data size of the node.
+     */
+    func getDataSize() -> DataSize {
+        var meta = 0
+        var data = 0
+        
+        if self.isText {
+            data += self.size * 2
+        }
+        
+        // assume self.id is always `NOT` nil
+        meta += TimeTicketSize
+        
+        if self.removedAt != nil {
+            meta += TimeTicketSize
+        }
+        
+        if let attrs {
+            for node in attrs where node.removedAt == nil {
+                let size = node.getDataSize()
+                meta += size.meta
+                data += size.data
+            }
+        }
+        
+        return .init(data: data, meta: meta)
+    }
+    
+    /**
      * `toIDString` returns the IDString of this node.
      */
     var toIDString: String {
@@ -1072,6 +1101,28 @@ class CRDTTree: CRDTElement {
         CRDTTreeNode.toXML(node: self.indexTree.root)
     }
 
+    /**
+     * `getDataSize` returns the data usage of this element.
+     */
+    func getDataSize() -> DataSize {
+        var data = 0
+        var meta = self.getMetaUsage()
+        self.indexTree.traverse { node, _ in
+            if node.removedAt != nil {
+                return
+            }
+            
+            let size = node.getDataSize()
+            data += size.data
+            meta += size.meta
+        }
+        
+        return DataSize(
+            data: data,
+            meta: meta
+        )
+    }
+    
     /**
      * `toJSON` returns the JSON encoding of this tree.
      */
