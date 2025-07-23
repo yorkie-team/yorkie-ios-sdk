@@ -30,10 +30,9 @@ final class DocumentSizeTest: XCTestCase {
     }
 }
 
+// MARK: - Helpers
+
 extension DocumentSizeTest {
-
-    // MARK: - Helpers
-
     func expectLive(with dataSize: DataSize) async {
         let size = await self.doc.getDocSize().live
         XCTAssertEqual(size, dataSize)

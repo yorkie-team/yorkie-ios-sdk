@@ -49,13 +49,13 @@ class RHTNode: GCChild {
 
         return nil
     }
-    
+
     /**
      * `getDataSize` returns the data size of the element
      */
     func getDataSize() -> DataSize {
         .init(
-            data: (key.count + value.count) * 2,
+            data: (self.key.count + self.value.count) * 2,
             meta: timeTicketSize
         )
     }
