@@ -428,12 +428,12 @@ public class Document {
 
         return JSONObject(target: clone.root.object, context: context)
     }
-    
+
     /**
      * `getDocSize` returns the size of this document.
      */
     public func getDocSize() -> DocSize {
-        root.getDocSize()
+        self.root.getDocSize()
     }
 
     /**

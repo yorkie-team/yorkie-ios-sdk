@@ -38,7 +38,7 @@ protocol CRDTElement: AnyObject {
     func toSortedJSON() -> String
 
     func deepcopy() -> CRDTElement
-    
+
     func getDataSize() -> DataSize
 }
 
@@ -96,7 +96,7 @@ extension CRDTElement {
 
         return false
     }
-    
+
     func getMetaUsage() -> Int {
         var meta = timeTicketSize
 

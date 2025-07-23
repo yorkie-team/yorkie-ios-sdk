@@ -186,7 +186,7 @@ extension CRDTArray {
             }
         }
     }
-    
+
     /**
      * `getDataSize` returns the data size of the array.
      */

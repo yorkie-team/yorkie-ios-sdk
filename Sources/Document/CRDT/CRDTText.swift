@@ -182,7 +182,7 @@ final class CRDTText: CRDTElement {
     func getDataSize() -> DataSize {
         var data = 0
         var meta = self.getMetaUsage()
-        
+
         for node in self.rgaTreeSplit where node.isRemoved == false {
             let size = node.getDataSize()
             data += size.data
@@ -193,7 +193,7 @@ final class CRDTText: CRDTElement {
             meta: meta
         )
     }
-    
+
     public typealias TextVal = (attributes: Codable, content: String)
 
     var createdAt: TimeTicket

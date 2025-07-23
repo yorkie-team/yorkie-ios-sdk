@@ -430,18 +430,18 @@ extension RGATreeSplitNode: GCChild {
     func getDataSize() -> DataSize {
         let dataSize = self.value.getDataSize()
         var meta = dataSize.meta + timeTicketSize
-        
+
         // Add meta size for removedAt if present
         if self.removedAt != nil {
             meta += timeTicketSize
         }
-        
+
         return .init(
             data: dataSize.data,
             meta: meta
         )
     }
-    
+
     var toIDString: String {
         self.id.toIDString
     }

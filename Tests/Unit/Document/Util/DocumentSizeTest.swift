@@ -20,180 +20,182 @@ import XCTest
 final class DocumentSizeTest: XCTestCase {
     var doc: Document!
     override func setUp() {
-        doc = .init(key: "test-doc")
+        self.doc = .init(key: "test-doc")
         super.setUp()
     }
-    
+
     override func tearDown() {
-        doc = nil
+        self.doc = nil
         super.tearDown()
     }
 }
 
 extension DocumentSizeTest {
+
     // MARK: - Helpers
+    
     func expectLive(with dataSize: DataSize) async {
-        let size = await doc.getDocSize().live
+        let size = await self.doc.getDocSize().live
         XCTAssertEqual(size, dataSize)
     }
-    
+
     func expectGC(with dataSize: DataSize) async {
-        let size = await doc.getDocSize().gc
+        let size = await self.doc.getDocSize().gc
         XCTAssertEqual(size, dataSize)
     }
 }
 
 extension DocumentSizeTest {
     func test_if_primitive_type_has_correct_live_size() async throws {
-        try await doc.update({ root, _ in
+        try await self.doc.update({ root, _ in
             root["k0"] = nil
         }, "test NULL")
         await expectLive(with: .init(data: 8, meta: 48))
-        
-        try await doc.update({ root, _ in
+
+        try await self.doc.update({ root, _ in
             root["k1"] = true
         }, "test BOOL")
         await expectLive(with: .init(data: 12, meta: 72))
-        
-        try await doc.update({ root, _ in
+
+        try await self.doc.update({ root, _ in
             root["k2"] = Int32(1234)
         }, "test INT 32")
         await expectLive(with: .init(data: 16, meta: 96))
-        
-        try await doc.update({ root, _ in
+
+        try await self.doc.update({ root, _ in
             root["k3"] = Int64(12345)
         }, "test INT 64")
         await expectLive(with: .init(data: 24, meta: 120))
-        
-        try await doc.update({ root, _ in
+
+        try await self.doc.update({ root, _ in
             root["k4"] = 1.79
         }, "test DOUBLE")
         await expectLive(with: .init(data: 32, meta: 144))
 
-        try await doc.update({ root, _ in
+        try await self.doc.update({ root, _ in
             root["k5"] = "40"
         }, "test STRING x2")
         await expectLive(with: .init(data: 36, meta: 168))
 
-        try await doc.update({ root, _ in
+        try await self.doc.update({ root, _ in
             let byteArray = Data(repeating: .zero, count: 2)
             root["k6"] = byteArray
         }, "test DATA")
         await expectLive(with: .init(data: 38, meta: 192))
     }
-    
+
     // array test
     func test_if_array_type_has_correct_size() async throws {
-        try await doc.update { root, _ in
+        try await self.doc.update { root, _ in
             root["arr"] = [String]()
         }
         await expectLive(with: .init(data: 0, meta: 48))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             (root["arr"] as? JSONArray)?.append("a")
         }
         await expectLive(with: .init(data: 2, meta: 72))
         await expectGC(with: .init(data: 0, meta: 0))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             (root["arr"] as? JSONArray)?.remove(at: 0)
         }
         await expectLive(with: .init(data: 0, meta: 48))
         await expectGC(with: .init(data: 2, meta: 48))
     }
-    
+
     // gc test
     func test_if_primitive_type_has_correct_gc_size() async throws {
-        try await doc.update { root, _ in
+        try await self.doc.update { root, _ in
             root["num"] = Int32(1)
             root["str"] = "hello"
         }
         await expectLive(with: .init(data: 14, meta: 72))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             root.remove(key: "num")
         }
         await expectLive(with: .init(data: 10, meta: 48))
         await expectGC(with: .init(data: 4, meta: 48))
     }
-    
+
     // counter test
     func test_counter_type_has_correct_size() async throws {
-        try await doc.update { root, _ in
+        try await self.doc.update { root, _ in
             root["counter"] = JSONCounter(value: Int32(1))
         }
         await expectLive(with: .init(data: 4, meta: 48))
     }
-    
+
     // text test
     func test_text_type_has_correct_size() async throws {
-        try await doc.update { root, _ in
+        try await self.doc.update { root, _ in
             root.text = JSONText()
         }
         await expectLive(with: .init(data: 0, meta: 72))
         await expectGC(with: .init(data: 0, meta: 0))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(0, 0, "helloworld")
         }
-        
+
         await expectLive(with: .init(data: 20, meta: 96))
         await expectGC(with: .init(data: 0, meta: 0))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(5, 5, " ")
         }
-        
+
         await expectLive(with: .init(data: 22, meta: 144))
         await expectGC(with: .init(data: 0, meta: 0))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(6, 11, "")
         }
-        
+
         await expectLive(with: .init(data: 12, meta: 120))
         await expectGC(with: .init(data: 10, meta: 48))
                 
-        try await doc.update { root, _ in
+        try await self.doc.update { root, _ in
             (root.text as? JSONText)?.setStyle(0, 5, ["bold": true])
         }
-        
+
         await expectLive(with: .init(data: 28, meta: 144))
         await expectGC(with: .init(data: 10, meta: 48))
     }
-    
+
     // tree test
     func test_tree_type_has_correct_size() async throws {
-        try await doc.update { root, _ in
+        try await self.doc.update { root, _ in
             root.t = JSONTree(initialRoot: .init(type: "doc", children: []))
             
             try (root.t as? JSONTree)?.edit(0, 0, JSONTreeElementNode(type: "p", children: []))
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), "<doc><p></p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 0, meta: 96))
         await expectGC(with: .init(data: 0, meta: 0))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(1, 1, JSONTreeTextNode(value: "helloworld"))
             
             let xml = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(xml, "<doc><p>helloworld</p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 20, meta: 120))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(1, 7, JSONTreeTextNode(value: "w"))
             
             let xml = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(xml, "<doc><p>world</p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 10, meta: 144))
         await expectGC(with: .init(data: 12, meta: 48))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(
                 7, 7,
                 JSONTreeElementNode(type: "p", children: [
@@ -204,10 +206,10 @@ extension DocumentSizeTest {
             let xml = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(xml, "<doc><p>world</p><p>abcd</p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 18, meta: 192))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(
                 7, 13
             )
@@ -215,32 +217,33 @@ extension DocumentSizeTest {
             let xml = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(xml, "<doc><p>world</p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 10, meta: 144))
         await expectGC(with: .init(data: 20, meta: 144))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.style(0, 7, ["bold": true])
             
             let xml = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(xml, "<doc><p bold=true>world</p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 26, meta: 168))
-        
-        try await doc.update { root, _ in
+
+        try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.removeStyle(0, 7, ["bold"])
             
             let xml = (root.t as? JSONTree)?.toXML()
             XCTAssertEqual(xml, "<doc><p>world</p></doc>")
         }
-        
+
         await expectLive(with: .init(data: 10, meta: 144))
         await expectGC(with: .init(data: 36, meta: 168))
     }
 }
 
 // MARK: - Extensions
+
 extension DocSize: @retroactive Equatable {
     public static func == (lhs: DocSize, rhs: DocSize) -> Bool {
         return lhs.live == rhs.live && lhs.gc == rhs.gc

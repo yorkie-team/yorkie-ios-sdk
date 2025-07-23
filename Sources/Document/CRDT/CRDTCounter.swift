@@ -30,7 +30,7 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
             meta: self.getMetaUsage()
         )
     }
-    
+
     let createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?

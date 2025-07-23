@@ -208,7 +208,7 @@ class CRDTRoot {
     var garbageLength: Int {
         self.garbageElementSetSize + self.gcPairMap.count
     }
-    
+
     /**
      * `getDocSize` returns the size of the document.
      */
@@ -217,7 +217,7 @@ class CRDTRoot {
         var liveMeta = 0
         var gcData = 0
         var gcMeta = 0
-        
+
         for (createdAt, value) in self.elementPairMapByCreatedAt {
             let size = value.element.getDataSize()
             if self.gcElementSetByCreatedAt.contains(createdAt) {
@@ -228,13 +228,13 @@ class CRDTRoot {
                 liveMeta += size.meta
             }
         }
-        
+
         for child in self.gcPairMap.values.compactMap(\.child) {
             let size = child.getDataSize()
             gcData += size.data
             gcMeta += size.meta
         }
-        
+
         return .init(
             live: .init(
                 data: liveData,

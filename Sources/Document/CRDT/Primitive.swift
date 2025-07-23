@@ -124,7 +124,7 @@ class Primitive: CRDTElement {
             return withUnsafeBytes(of: milliseconds.littleEndian) { Data($0) }
         }
     }
-    
+
     /**
      * `getValueSize` returns the size of the value. The size is similar to
      * the size of primitives in JavaScript.
@@ -141,10 +141,10 @@ class Primitive: CRDTElement {
             return value.count
         }
     }
-    
+
     /**
-      * `getDataSize` returns the data usage of this element.
-      */
+     * `getDataSize` returns the data usage of this element.
+     */
     func getDataSize() -> DataSize {
         return DataSize(
             data: self.getValueSize(),
