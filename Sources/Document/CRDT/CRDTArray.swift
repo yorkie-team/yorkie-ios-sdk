@@ -186,6 +186,16 @@ extension CRDTArray {
             }
         }
     }
+
+    /**
+     * `getDataSize` returns the data size of the array.
+     */
+    func getDataSize() -> DataSize {
+        return .init(
+            data: 0,
+            meta: self.getMetaUsage()
+        )
+    }
 }
 
 extension CRDTArray: Sequence {
@@ -223,4 +233,22 @@ extension CRDTArray: CustomDebugStringConvertible {
     var debugDescription: String {
         self.toSortedJSON()
     }
+}
+
+/// Represents the size of a resource in bytes.
+public struct DataSize {
+    /// The size of the data in bytes.
+    var data: Int
+
+    /// The size of the metadata in bytes.
+    var meta: Int
+}
+
+/// Represents the size of a document in bytes.
+public struct DocSize {
+    /// The size of the live document in bytes.
+    var live: DataSize
+
+    /// The size of the garbage collected data in bytes.
+    var gc: DataSize
 }

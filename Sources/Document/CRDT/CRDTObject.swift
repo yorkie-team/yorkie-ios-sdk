@@ -62,6 +62,16 @@ class CRDTObject: CRDTContainer {
     }
 
     /**
+     * `getDataSize` returns the data usage of this element.
+     */
+    func getDataSize() -> DataSize {
+        .init(
+            data: 0,
+            meta: self.getMetaUsage()
+        )
+    }
+
+    /**
      * `keys` returns array of keys in this object.
      */
     var keys: [String] {

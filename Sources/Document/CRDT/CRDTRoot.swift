@@ -210,6 +210,44 @@ class CRDTRoot {
     }
 
     /**
+     * `getDocSize` returns the size of the document.
+     */
+    public func getDocSize() -> DocSize {
+        var liveData = 0
+        var liveMeta = 0
+        var gcData = 0
+        var gcMeta = 0
+
+        for (createdAt, value) in self.elementPairMapByCreatedAt {
+            let size = value.element.getDataSize()
+            if self.gcElementSetByCreatedAt.contains(createdAt) {
+                gcData += size.data
+                gcMeta += size.meta
+            } else {
+                liveData += size.data
+                liveMeta += size.meta
+            }
+        }
+
+        for child in self.gcPairMap.values.compactMap(\.child) {
+            let size = child.getDataSize()
+            gcData += size.data
+            gcMeta += size.meta
+        }
+
+        return .init(
+            live: .init(
+                data: liveData,
+                meta: liveMeta
+            ),
+            gc: .init(
+                data: gcData,
+                meta: gcMeta
+            )
+        )
+    }
+
+    /**
      * `deepcopy` copies itself deeply.
      */
     func deepcopy() -> CRDTRoot {

@@ -660,7 +660,6 @@ final class GCTestsForText: XCTestCase {
                 }
 
                 let result = await(doc.getRoot().t as? JSONText)!.toSortedJSON()
-                // TODO: - fix the testcase below
                 XCTAssertEqual(step.expectXML, result)
 
                 let len = await doc.getGarbageLength()

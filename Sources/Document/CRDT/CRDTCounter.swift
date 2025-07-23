@@ -20,6 +20,17 @@ import Foundation
  * `CRDTCounter` represents changeable number data type.
  */
 class CRDTCounter<T: YorkieCountable>: CRDTElement {
+    /**
+     * `getDataSize` returns the data usage of this element.
+     */
+    func getDataSize() -> DataSize {
+        let data = self.value is Int32 ? 4 : 8
+        return DataSize(
+            data: data,
+            meta: self.getMetaUsage()
+        )
+    }
+
     let createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?

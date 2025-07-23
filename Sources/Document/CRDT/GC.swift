@@ -38,6 +38,7 @@ protocol GCParent: AnyObject {
 protocol GCChild: AnyObject {
     var toIDString: String { get }
     var removedAt: TimeTicket? { get }
+    func getDataSize() -> DataSize
 }
 
 protocol CRDTGCPairContainable: CRDTElement {
