@@ -84,18 +84,18 @@ extension DocumentSizeTest {
     
     // array test
     func test_if_array_type_has_correct_size() async throws {
-        try await doc.update { root, presence in
+        try await doc.update { root, _ in
             root["arr"] = [String]()
         }
         await expectLive(with: .init(data: 0, meta: 48))
         
-        try await doc.update { root, presence in
+        try await doc.update { root, _ in
             (root["arr"] as? JSONArray)?.append("a")
         }
         await expectLive(with: .init(data: 2, meta: 72))
         await expectGC(with: .init(data: 0, meta: 0))
         
-        try await doc.update { root, presence in
+        try await doc.update { root, _ in
             (root["arr"] as? JSONArray)?.remove(at: 0)
         }
         await expectLive(with: .init(data: 0, meta: 48))
@@ -192,7 +192,6 @@ extension DocumentSizeTest {
         
         await expectLive(with: .init(data: 10, meta: 144))
         await expectGC(with: .init(data: 12, meta: 48))
-        
         
         try await doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(
