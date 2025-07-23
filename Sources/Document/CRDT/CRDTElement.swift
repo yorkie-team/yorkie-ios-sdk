@@ -17,10 +17,10 @@
 import Foundation
 
 /**
- * `TimeTicketSize` is the size of the ticket in bytes.
+ * `timeTicketSize` is the size of the ticket in bytes.
  * lamport(`int64`) + delimiter(`uint32`) + actorID(`12 bytes`)
  */
-public let TimeTicketSize = 8 + 4 + 12
+public let timeTicketSize = 8 + 4 + 12
 
 /**
  * `CRDTElement` represents element type containing logical clock.
@@ -98,13 +98,13 @@ extension CRDTElement {
     }
     
     func getMetaUsage() -> Int {
-        var meta = TimeTicketSize
+        var meta = timeTicketSize
 
         if self.movedAt != nil {
-            meta += TimeTicketSize
+            meta += timeTicketSize
         }
         if self.removedAt != nil {
-            meta += TimeTicketSize
+            meta += timeTicketSize
         }
 
         return meta

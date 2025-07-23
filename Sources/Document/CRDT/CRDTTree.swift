@@ -574,10 +574,10 @@ extension CRDTTreeNode: GCChild {
         }
         
         // assume self.id is always `NOT` nil
-        meta += TimeTicketSize
+        meta += timeTicketSize
         
         if self.removedAt != nil {
-            meta += TimeTicketSize
+            meta += timeTicketSize
         }
         
         if let attrs {

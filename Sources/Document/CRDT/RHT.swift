@@ -56,7 +56,7 @@ class RHTNode: GCChild {
     func getDataSize() -> DataSize {
         .init(
             data: (key.count + value.count) * 2,
-            meta: TimeTicketSize
+            meta: timeTicketSize
         )
     }
 }
