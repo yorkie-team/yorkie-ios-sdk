@@ -17,6 +17,12 @@
 import Foundation
 
 /**
+ * `timeTicketSize` is the size of the ticket in bytes.
+ * lamport(`int64`) + delimiter(`uint32`) + actorID(`12 bytes`)
+ */
+public let timeTicketSize = 8 + 4 + 12
+
+/**
  * `CRDTElement` represents element type containing logical clock.
  */
 protocol CRDTElement: AnyObject {
@@ -32,6 +38,8 @@ protocol CRDTElement: AnyObject {
     func toSortedJSON() -> String
 
     func deepcopy() -> CRDTElement
+
+    func getDataSize() -> DataSize
 }
 
 extension CRDTElement {
@@ -87,6 +95,19 @@ extension CRDTElement {
         }
 
         return false
+    }
+
+    func getMetaUsage() -> Int {
+        var meta = timeTicketSize
+
+        if self.movedAt != nil {
+            meta += timeTicketSize
+        }
+        if self.removedAt != nil {
+            meta += timeTicketSize
+        }
+
+        return meta
     }
 
     func equals(_ target: CRDTElement) -> Bool {

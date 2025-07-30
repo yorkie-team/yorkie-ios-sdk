@@ -34,6 +34,7 @@ protocol RGATreeSplitValue {
     init()
     var count: Int { get }
     func substring(from: Int, to: Int) -> Self
+    func getDataSize() -> DataSize
 }
 
 /**
@@ -423,6 +424,24 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
 }
 
 extension RGATreeSplitNode: GCChild {
+    /**
+     * `getDataSize` returns the data of this node.
+     */
+    func getDataSize() -> DataSize {
+        let dataSize = self.value.getDataSize()
+        var meta = dataSize.meta + timeTicketSize
+
+        // Add meta size for removedAt if present
+        if self.removedAt != nil {
+            meta += timeTicketSize
+        }
+
+        return .init(
+            data: dataSize.data,
+            meta: meta
+        )
+    }
+
     var toIDString: String {
         self.id.toIDString
     }

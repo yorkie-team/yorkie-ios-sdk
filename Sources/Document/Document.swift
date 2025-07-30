@@ -430,6 +430,13 @@ public class Document {
     }
 
     /**
+     * `getDocSize` returns the size of this document.
+     */
+    public func getDocSize() -> DocSize {
+        self.root.getDocSize()
+    }
+
+    /**
      * `garbageCollect` purges elements that were removed before the given time.
      *
      */
