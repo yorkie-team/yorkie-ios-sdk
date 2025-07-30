@@ -267,6 +267,20 @@ extension IndexTreeNode {
     }
 
     /**
+     * `getChildrenText` returns text value of all text type children.
+     */
+    func getChildrenText() -> String {
+        if self.isText {
+            return self.value as String
+        }
+        if self.hasTextChild {
+            return self.children.map({ $0.value as String })
+                .joined(separator: "")
+        }
+        return ""
+    }
+
+    /**
      * `append` appends the given nodes to the children.
      */
     func append(contentsOf newNode: [Self]) throws {

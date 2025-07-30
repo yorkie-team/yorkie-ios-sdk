@@ -52,7 +52,7 @@ extension CRDTTreeNode {
  */
 public struct JSONTreeElementNode: JSONTreeNode {
     public let type: TreeNodeType
-    public let attributes: [String: String]
+    public var attributes: [String: String]
     public let children: [any JSONTreeNode]
 
     public static func == (lhs: JSONTreeElementNode, rhs: JSONTreeElementNode) -> Bool {
@@ -145,6 +145,168 @@ public struct JSONTreeTextNode: JSONTreeNode {
     public var toJSONString: String {
         return "{\"type\":\(self.type.toJSONString),\"value\":\((self.value as String).toJSONString)}"
     }
+}
+
+typealias ElementNode = JSONTreeElementNode
+typealias TextNode = JSONTreeTextNode
+typealias TreeNode = JSONTreeNode
+
+/**
+ * `toTreeNode` returns tree node from CRDTTreeNode.
+ */
+func toTreeNode(_ node: CRDTTreeNode) -> any TreeNode {
+    if node.isText {
+        return TextNode(value: node.value)
+    }
+
+    var newNode = ElementNode(
+        type: node.type,
+        children: node.children.map { toTreeNode($0) }
+    )
+    if let attrs = node.attrs {
+        newNode.attributes = parseObjectValues(attrs.toDictionaryStringObject())
+    }
+
+    return newNode
+}
+
+/**
+ * `createSplitNode` returns new node which is split from the given node.
+ */
+func createSplitNode(
+    node: CRDTTreeNode,
+    offset: Int
+) -> ElementNode {
+    let type: TreeNodeType
+    let parentNode = node.parent
+
+    if node.isText, parentNode != nil {
+        type = parentNode!.type
+    } else {
+        type = node.type
+    }
+
+    var attributes: [String: String] = [:]
+    if let attris = node.attrs, parseObjectValues(attris.toDictionaryStringObject()).count > 0 {
+        attributes = parseObjectValues(attris.toDictionaryStringObject())
+    }
+    if node.isText, let parentAttribute = parentNode?.attrs, !parseObjectValues(parentAttribute.toDictionaryStringObject()).isEmpty {
+        attributes = parseObjectValues(parentAttribute.toDictionaryStringObject())
+    }
+
+    let children: [any TreeNode]
+
+    if node.isText {
+        if parentNode == nil || parentNode?.getChildrenText().count == offset {
+            children = []
+        } else {
+            let childrenText = parentNode?.getChildrenText() ?? ""
+            let endIndex = childrenText.endIndex
+            let startIndex = childrenText.index(childrenText.startIndex, offsetBy: offset)
+            let value = String(childrenText[startIndex..<endIndex])
+
+            children = [
+                JSONTreeTextNode(value: value)
+            ]
+        }
+    } else {
+        children = node.children.dropFirst(offset).map { toTreeNode($0) }
+    }
+
+    let newNode = ElementNode(type: type, children: children, attributes: attributes)
+    return newNode
+}
+
+/**
+ * `separateSplit` separates the split operation into insert and delete operations.
+ */
+func separateSplit(
+    treePos: TreePos<CRDTTreeNode>,
+    path: [Int]
+) -> [(fromPath: [Int], toPath: [Int], content: (any TreeNode)?)] {
+    let node = treePos.node
+    let parentPath = Array(path.dropLast())
+    let parentNode = node.parent
+    let last: Int
+
+    if node.isText, let parentNode {
+        last = parentNode.getChildrenText().count
+    } else {
+        last = node.children.count
+    }
+
+    let toPath = parentPath + [last]
+    var insertPath = parentPath
+    var res: [(fromPath: [Int], toPath: [Int], content: (any TreeNode)?)] = []
+
+    insertPath[insertPath.count - 1] += 1
+
+    if path != toPath {
+        res.append((fromPath: path, toPath: toPath, content: nil))
+    }
+    let newNode = createSplitNode(node: node, offset: path.last ?? 0)
+    res.append((fromPath: insertPath, toPath: insertPath, content: newNode))
+
+    return res
+}
+
+/**
+ `parseObjectValues` returns the JSON parsable string values to the origin states.
+*/
+func parseObjectValues(_ attrs: [String: String]) -> [String: String] {
+    var attributes: [String: String] = [:]
+    for (key, value) in attrs {
+        if let data = value.data(using: .utf8) {
+            do {
+                attributes[key] = try JSONSerialization.jsonObject(with: data, options: []) as? String
+            } catch {
+                // Handle JSON parse error if needed
+                attributes[key] = value
+            }
+        } else {
+            attributes[key] = value
+        }
+    }
+    return attributes
+}
+
+/**
+ * `separateMerge` separates the merge operation into insert and delete operations.
+ */
+func separateMerge(
+    treePos: TreePos<CRDTTreeNode>,
+    path: [Int]
+) -> [(fromPath: [Int], toPath: [Int], contents: [any TreeNode])] {
+    let parentNode = treePos.node
+    let offset = Int(treePos.offset)
+
+    let node = parentNode.children[offset]
+    let leftSiblingNode = parentNode.children[offset - 1]
+    let children = node.children
+    let parentPath = Array(path.dropLast())
+
+    var res: [(fromPath: [Int], toPath: [Int], contents: [any TreeNode])] = []
+    res.append((path, parentPath + [offset + 1], []))
+
+    if children.isEmpty {
+        return res
+    }
+
+    let length: Int
+    if leftSiblingNode.hasTextChild {
+        length = leftSiblingNode.getChildrenText().count
+    } else {
+        length = leftSiblingNode.children.count
+    }
+
+    var insertPath = parentPath
+    insertPath.append(offset - 1)
+    insertPath.append(length)
+
+    let nodes = children.map { toTreeNode($0) }
+
+    res.append((insertPath, insertPath, nodes))
+    return res
 }
 
 /**
@@ -324,6 +486,69 @@ public class JSONTree {
         }
 
         return tree.indexTree
+    }
+    
+    /**
+     * `splitByPath` splits the tree by the given path.
+     */
+    public func splitByPath(_ path: [Int]) throws {
+        guard self.context != nil , let tree = self.tree else {
+            throw YorkieError(code: .errInvalidArgument, message: "Tree is not initialized yet")
+        }
+        guard !path.isEmpty else {
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
+        }
+        let treePos = try tree.pathToTreePos(path)
+        let commands = separateSplit(treePos: treePos, path: path)
+
+        for command in commands {
+            let fromPath = command.fromPath
+            let toPath = command.toPath
+
+            let fromPos = try tree.pathToPos(fromPath)
+            let toPos = try tree.pathToPos(toPath)
+            let content = [command.content] as? [any TreeNode] ?? []
+            _ = try self.editInternal(
+                fromPos,
+                toPos,
+                content
+            )
+        }
+    }
+
+    /**
+     * `mergeByPath` merges the tree by the given path.
+     */
+    public func mergeByPath(_ path: [Int]) throws {
+        guard !path.isEmpty else {
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
+        }
+
+        guard self.context != nil, let tree = self.tree else {
+            throw YorkieError(code: .errInvalidArgument, message: "Tree is not initialized yet")
+        }
+
+        let treePos = try tree.pathToTreePos(path)
+
+        if treePos.node.isText {
+            throw YorkieError(code: .errInvalidArgument, message: "text node cannot be merged")
+        }
+        let commands = separateMerge(treePos: treePos, path: path)
+
+        for command in commands {
+            let fromPath = command.fromPath
+            let toPath = command.toPath
+            let content = command.contents
+
+            let fromPos = try tree.pathToPos(fromPath)
+            let toPos = try tree.pathToPos(toPath)
+
+            _ = try self.editInternal(
+                fromPos,
+                toPos,
+                content
+            )
+        }
     }
 
     /**

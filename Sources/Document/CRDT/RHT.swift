@@ -239,6 +239,19 @@ class RHT {
         return result
     }
 
+    /**
+     * `toObject` returns the object of this hashtable.
+     * - Returns: `[String: String]` with key and node value as a pair without removed nodes
+     */
+    func toDictionaryStringObject() -> [String: String] {
+        var result = [String: String]()
+        for (key, node) in self.nodeMapByKey where node.isRemoved == false {
+            result[key] = node.value
+        }
+
+        return result
+    }
+
     var toDictionary: [String: Any] {
         self.nodeMapByKey.compactMapValues { node -> Any? in
             guard !node.isRemoved else { return nil }
