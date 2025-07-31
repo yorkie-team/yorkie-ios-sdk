@@ -210,7 +210,7 @@ func createSplitNode(
             let childrenText = parentNode?.getChildrenText() ?? ""
             let endIndex = childrenText.endIndex
             let startIndex = childrenText.index(childrenText.startIndex, offsetBy: offset)
-            let value = String(childrenText[startIndex..<endIndex])
+            let value = String(childrenText[startIndex ..< endIndex])
 
             children = [
                 JSONTreeTextNode(value: value)
@@ -258,7 +258,7 @@ func separateSplit(
 }
 
 /**
- `parseObjectValues` returns the JSON parsable string values to the origin states.
+* `parseObjectValues` returns the JSON parsable string values to the origin states.
 */
 func parseObjectValues(_ attrs: [String: String]) -> [String: String] {
     var attributes: [String: String] = [:]
@@ -494,7 +494,7 @@ public class JSONTree {
 
         return tree.indexTree
     }
-    
+
     /**
      * `splitByPath` splits the tree by the given path.
      */

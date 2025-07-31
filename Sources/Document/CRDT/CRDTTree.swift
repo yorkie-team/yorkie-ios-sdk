@@ -1050,7 +1050,7 @@ class CRDTTree: CRDTElement {
      * `pathToTreePos` converts the given path of the node to the TreePos.
      */
     public func pathToTreePos(_ path: [Int]) throws -> TreePos<CRDTTreeNode> {
-        return try indexTree.pathToTreePos(path)
+        return try self.indexTree.pathToTreePos(path)
     }
 
     /**
