@@ -239,9 +239,8 @@ class RHT {
         return result
     }
 
-    /**
-     * `toObject` returns the object of this hashtable.
-     * - Returns: `[String: String]` with key and node value as a pair without removed nodes
+    /**`toDictionaryStringObject` returns a simplified dictionary representation of this hashtable.
+     * - Returns: `[String: String]` containing only active (non-removed) key-value pairs
      */
     func toDictionaryStringObject() -> [String: String] {
         var result = [String: String]()

@@ -187,11 +187,18 @@ func createSplitNode(
     }
 
     var attributes: [String: String] = [:]
-    if let attris = node.attrs, !parseObjectValues(attris.toDictionaryStringObject()).isEmpty {
-        attributes = parseObjectValues(attris.toDictionaryStringObject())
+    if let attrs = node.attrs {
+        let parsedAttrs = parseObjectValues(attrs.toDictionaryStringObject())
+        if !parsedAttrs.isEmpty {
+            attributes = parsedAttrs
+        }
     }
-    if node.isText, let parentAttribute = parentNode?.attrs, !parseObjectValues(parentAttribute.toDictionaryStringObject()).isEmpty {
-        attributes = parseObjectValues(parentAttribute.toDictionaryStringObject())
+
+    if node.isText, let parentAttrs = parentNode?.attrs {
+        let parsedParentAttrs = parseObjectValues(parentAttrs.toDictionaryStringObject())
+        if !parsedParentAttrs.isEmpty {
+            attributes = parsedParentAttrs
+        }
     }
 
     let children: [any TreeNode]

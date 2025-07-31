@@ -274,7 +274,7 @@ extension IndexTreeNode {
             return self.value as String
         }
         if self.hasTextChild {
-            return self.children.map({ $0.value as String })
+            return self.children.map { $0.value as String }
                 .joined(separator: "")
         }
         return ""
