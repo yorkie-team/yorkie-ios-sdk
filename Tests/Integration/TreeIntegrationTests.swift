@@ -382,22 +382,21 @@ final class TreeIntegrationTests: XCTestCase {
         let doc = Document(key: docKey)
 
         try await doc.update { root, _ in
-            root.t = JSONTree(
-                initialRoot:
-                    JSONTreeElementNode(type: "doc", children: [
-                        JSONTreeElementNode(type: "tc", children: [
-                            JSONTreeElementNode(type: "p", children: [
-                                JSONTreeElementNode(type: "tn", children: [
-                                    JSONTreeTextNode(value: "1234")
-                                ])
-                            ]),
-                            JSONTreeElementNode(type: "p", children: [
-                                JSONTreeElementNode(type: "tn", children: [
-                                    JSONTreeTextNode(value: "5678")
-                                ])
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "tc", children: [
+                        JSONTreeElementNode(type: "p", children: [
+                            JSONTreeElementNode(type: "tn", children: [
+                                JSONTreeTextNode(value: "1234")
+                            ])
+                        ]),
+                        JSONTreeElementNode(type: "p", children: [
+                            JSONTreeElementNode(type: "tn", children: [
+                                JSONTreeTextNode(value: "5678")
                             ])
                         ])
                     ])
+                ])
             )
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), "<doc><tc><p><tn>1234</tn></p><p><tn>5678</tn></p></tc></doc>")
 
