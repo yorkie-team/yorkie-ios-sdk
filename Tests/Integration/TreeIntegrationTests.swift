@@ -424,22 +424,21 @@ final class TreeIntegrationTests: XCTestCase {
         let doc = Document(key: docKey)
 
         try await doc.update { root, _ in
-            root.t = JSONTree(
-                initialRoot:
-                    JSONTreeElementNode(type: "doc", children: [
-                        JSONTreeElementNode(type: "tc", children: [
-                            JSONTreeElementNode(type: "p", children: [
-                                JSONTreeElementNode(type: "tn", children: [
-                                    JSONTreeTextNode(value: "1234")
-                                ])
-                            ]),
-                            JSONTreeElementNode(type: "p", children: [
-                                JSONTreeElementNode(type: "tn", children: [
-                                    JSONTreeTextNode(value: "5678")
-                                ])
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "tc", children: [
+                        JSONTreeElementNode(type: "p", children: [
+                            JSONTreeElementNode(type: "tn", children: [
+                                JSONTreeTextNode(value: "1234")
+                            ])
+                        ]),
+                        JSONTreeElementNode(type: "p", children: [
+                            JSONTreeElementNode(type: "tn", children: [
+                                JSONTreeTextNode(value: "5678")
                             ])
                         ])
                     ])
+                ])
             )
 
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), "<doc><tc><p><tn>1234</tn></p><p><tn>5678</tn></p></tc></doc>")
@@ -456,25 +455,24 @@ final class TreeIntegrationTests: XCTestCase {
     func test_can_sync_its_split_with_other_clients() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
-                root.t = JSONTree(
-                    initialRoot:
-                        JSONTreeElementNode(type: "doc", children: [
-                            JSONTreeElementNode(type: "tc", children: [
-                                JSONTreeElementNode(type: "p", children: [
-                                    JSONTreeElementNode(type: "tn", children: [
-                                        JSONTreeTextNode(value: "1234")
-                                    ])
-                                ]),
-                                JSONTreeElementNode(type: "p", children: [
-                                    JSONTreeElementNode(type: "tn", children: [
-                                        JSONTreeTextNode(value: "5678")
-                                    ])
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "tc", children: [
+                            JSONTreeElementNode(type: "p", children: [
+                                JSONTreeElementNode(type: "tn", children: [
+                                    JSONTreeTextNode(value: "1234")
+                                ])
+                            ]),
+                            JSONTreeElementNode(type: "p", children: [
+                                JSONTreeElementNode(type: "tn", children: [
+                                    JSONTreeTextNode(value: "5678")
                                 ])
                             ])
                         ])
+                    ])
                 )
             }
-            
+
             try await c1.sync()
             try await c2.sync()
 
@@ -515,22 +513,21 @@ final class TreeIntegrationTests: XCTestCase {
     func test_can_sync_its_merge_with_other_clients() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
-                root.t = JSONTree(
-                    initialRoot:
-                        JSONTreeElementNode(type: "doc",
-                                            children: [
-                                                JSONTreeElementNode(type: "tc", children: [
-                                                    JSONTreeElementNode(type: "p", children: [
-                                                        JSONTreeElementNode(type: "tn", children: [
-                                                            JSONTreeTextNode(value: "1234")])
-                                                    ]),
-                                                    JSONTreeElementNode(type: "p", children: [
-                                                        JSONTreeElementNode(type: "tn", children: [
-                                                            JSONTreeTextNode(value: "5678")
-                                                        ])
-                                                    ])
-                                                ])
-                                            ])
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "tc", children: [
+                            JSONTreeElementNode(type: "p", children: [
+                                JSONTreeElementNode(type: "tn", children: [
+                                    JSONTreeTextNode(value: "1234")
+                                ])
+                            ]),
+                            JSONTreeElementNode(type: "p", children: [
+                                JSONTreeElementNode(type: "tn", children: [
+                                    JSONTreeTextNode(value: "5678")
+                                ])
+                            ])
+                        ])
+                    ])
                 )
             }
 
