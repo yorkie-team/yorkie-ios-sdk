@@ -258,8 +258,8 @@ func separateSplit(
 }
 
 /**
-* `parseObjectValues` returns the JSON parsable string values to the origin states.
-*/
+ * `parseObjectValues` returns the JSON parsable string values to the origin states.
+ */
 func parseObjectValues(_ attrs: [String: String]) -> [String: String] {
     var attributes: [String: String] = [:]
     for (key, value) in attrs {
