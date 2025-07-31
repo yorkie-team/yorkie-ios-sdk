@@ -187,7 +187,7 @@ func createSplitNode(
     }
 
     var attributes: [String: String] = [:]
-    if let attris = node.attrs, parseObjectValues(attris.toDictionaryStringObject()).count > 0 {
+    if let attris = node.attrs, !parseObjectValues(attris.toDictionaryStringObject()).isEmpty {
         attributes = parseObjectValues(attris.toDictionaryStringObject())
     }
     if node.isText, let parentAttribute = parentNode?.attrs, !parseObjectValues(parentAttribute.toDictionaryStringObject()).isEmpty {
@@ -492,7 +492,7 @@ public class JSONTree {
      * `splitByPath` splits the tree by the given path.
      */
     public func splitByPath(_ path: [Int]) throws {
-        guard self.context != nil , let tree = self.tree else {
+        guard self.context != nil, let tree = self.tree else {
             throw YorkieError(code: .errInvalidArgument, message: "Tree is not initialized yet")
         }
         guard !path.isEmpty else {

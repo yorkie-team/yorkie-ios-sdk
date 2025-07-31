@@ -381,9 +381,7 @@ final class TreeIntegrationTests: XCTestCase {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
 
-        try await doc.update {
-            root,
-            _ in
+        try await doc.update { root, _ in
             root.t = JSONTree(
                 initialRoot:
                     JSONTreeElementNode(
