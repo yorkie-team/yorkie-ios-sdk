@@ -30,21 +30,20 @@ struct StyleOperation: Operation {
     private(set) var toPos: RGATreeSplitPos
 
     /**
-     * `maxCreatedAtMapByActor` returns the map that stores the latest creation time
-     * by actor for the nodes included in the editing range.
-     */
-    private(set) var maxCreatedAtMapByActor: [String: TimeTicket]
-
-    /**
      * `attributes` returns the attributes of this Edit.
      */
     private(set) var attributes: [String: String]
 
-    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitPos, toPos: RGATreeSplitPos, maxCreatedAtMapByActor: [String: TimeTicket], attributes: [String: String], executedAt: TimeTicket) {
+    init(
+        parentCreatedAt: TimeTicket,
+        fromPos: RGATreeSplitPos,
+        toPos: RGATreeSplitPos,
+        attributes: [String: String],
+        executedAt: TimeTicket
+    ) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
-        self.maxCreatedAtMapByActor = maxCreatedAtMapByActor
         self.attributes = attributes
         self.executedAt = executedAt
     }
@@ -68,11 +67,10 @@ struct StyleOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (_, pairs, changes) = try text.setStyle(
+        let (pairs, changes) = try text.setStyle(
             (self.fromPos, self.toPos),
             self.attributes,
             self.executedAt,
-            self.maxCreatedAtMapByActor,
             versionVector
         )
 

@@ -27,8 +27,7 @@ class ChangePackTests: XCTestCase {
                                 isRemoved: false,
                                 changes: [],
                                 snapshot: nil,
-                                versionVector: nil,
-                                minSyncedTicket: nil)
+                                versionVector: nil)
 
         XCTAssertEqual(target.getDocumentKey(), "documentKey-1")
         XCTAssertEqual(target.getCheckpoint().toTestString, "serverSeq=1, clientSeq=10")
@@ -36,7 +35,6 @@ class ChangePackTests: XCTestCase {
         XCTAssertEqual(target.getChangeSize(), 0)
         XCTAssertNil(target.getSnapshot())
         XCTAssertNil(target.getVersionVector())
-        XCTAssertNil(target.getMinSyncedTicket())
     }
 
     func test_can_has_changes() {
@@ -49,8 +47,7 @@ class ChangePackTests: XCTestCase {
                                 isRemoved: false,
                                 changes: [change1, change2],
                                 snapshot: nil,
-                                versionVector: nil,
-                                minSyncedTicket: nil)
+                                versionVector: nil)
 
         XCTAssertTrue(target.hasChanges())
         XCTAssertEqual(target.getChangeSize(), 2)

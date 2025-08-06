@@ -351,17 +351,10 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      */
     public func canDelete(
         _ editedAt: TimeTicket,
-        _ maxCreatedAt: TimeTicket?,
         clientLamportAtChange: Int64
     ) -> Bool {
         let justRemoved = self.removedAt == nil
-        let nodeExisted: Bool
-
-        if let maxCreatedAt = maxCreatedAt {
-            nodeExisted = !self.createdAt.after(maxCreatedAt)
-        } else {
-            nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-        }
+        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
 
         if nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!)) {
             return justRemoved
@@ -375,15 +368,9 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      */
     public func canStyle(
         _ editedAt: TimeTicket,
-        _ maxCreatedAt: TimeTicket?,
         clientLamportAtChange: Int64
     ) -> Bool {
-        let nodeExisted: Bool
-        if let maxCreatedAt = maxCreatedAt {
-            nodeExisted = !self.createdAt.after(maxCreatedAt)
-        } else {
-            nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-        }
+        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
         return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
     }
 
@@ -478,7 +465,6 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * @param range - range of RGATreeSplitNode
      * @param editedAt - edited time
      * @param value - value
-     * @param maxCreatedAtMapByActor - maxCreatedAtMapByActor
      * @returns `(RGATreeSplitNodePos, [String: TimeTicket], [GCPair], [Change])`
      */
     @discardableResult
@@ -486,19 +472,17 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ range: RGATreeSplitPosRange,
         _ editedAt: TimeTicket,
         _ value: T?,
-        _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> (RGATreeSplitPos, [String: TimeTicket], [GCPair], [ContentChange<T>]) {
+    ) throws -> (RGATreeSplitPos, [GCPair], [ContentChange<T>]) {
         // 01. split nodes with from and to
         let (toLeft, toRight) = try self.findNodeWithSplit(range.1, editedAt)
         let (fromLeft, fromRight) = try self.findNodeWithSplit(range.0, editedAt)
 
         // 02. delete between from and to
         let nodesToDelete = self.findBetween(fromRight, toRight)
-        var (changes, maxCreatedAtMap, removedNodes) = try self.deleteNodes(
+        var (changes, removedNodes) = try self.deleteNodes(
             nodesToDelete,
             editedAt,
-            maxCreatedAtMapByActor,
             versionVector
         )
 
@@ -529,7 +513,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             pairs.append(GCPair(parent: self, child: removedNode))
         }
 
-        return (caretPos, maxCreatedAtMap, pairs, changes)
+        return (caretPos, pairs, changes)
     }
 
     /**
@@ -755,14 +739,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     private func deleteNodes(
         _ candidates: [RGATreeSplitNode<T>],
         _ editedAt: TimeTicket,
-        _ maxCreatedAtMapByActor: [String: TimeTicket]?,
         _ versionVector: VersionVector? = nil
     ) throws -> ([ContentChange<T>],
-                 [String: TimeTicket],
                  [String: RGATreeSplitNode<T>])
     {
         guard !candidates.isEmpty else {
-            return ([], [:], [:])
+            return ([], [:])
         }
 
         // There are 2 types of nodes in `candidates`: should delete, should not delete.
@@ -771,7 +753,6 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         let (nodesToDelete, nodesToKeep) = try self.filterNodes(
             candidates,
             editedAt,
-            maxCreatedAtMapByActor,
             versionVector
         )
 
@@ -795,13 +776,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // Finally remove index nodes of tombstones.
         self.deleteIndexNodes(nodesToKeep)
 
-        return (changes, createdAtMapByActor, removedNodes)
+        return (changes, removedNodes)
     }
 
     private func filterNodes(
         _ candidates: [RGATreeSplitNode<T>],
         _ editedAt: TimeTicket,
-        _ maxCreatedAtMapByActor: [ActorID: TimeTicket]?,
         _ versionVector: VersionVector? = nil
     ) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?]) {
         var nodesToDelete = [RGATreeSplitNode<T>]()
@@ -812,25 +792,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         for node in candidates {
             let actorID = node.createdAt.actorID
-            var maxCreatedAt: TimeTicket?
-            var clientLamportAtChange: Int64 = 0
+            var clientLamportAtChange: Int64 = .max
 
-            if versionVector == nil, maxCreatedAtMapByActor.isNilOrEmpty {
-                // Local edit - use version vector comparison
-                clientLamportAtChange = .max
-            } else if let versionVector, versionVector.size() > 0 {
+            if let versionVector {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
-            } else {
-                if let map = maxCreatedAtMapByActor?[node.createdAt.actorID] {
-                    maxCreatedAt = map
-                } else {
-                    maxCreatedAt = TimeTicket.initial
-                }
             }
-
             if node.canDelete(
                 editedAt,
-                maxCreatedAt,
                 clientLamportAtChange: clientLamportAtChange
             ) {
                 nodesToDelete.append(node)

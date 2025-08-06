@@ -222,9 +222,8 @@ final class CRDTText: CRDTElement {
         _ content: String,
         _ editedAt: TimeTicket,
         _ attributes: [String: String]? = nil,
-        _ maxCreatedAtMapByActor: [String: TimeTicket]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([String: TimeTicket], [TextChange], [GCPair], RGATreeSplitPosRange) {
+    ) throws -> ([TextChange], [GCPair], RGATreeSplitPosRange) {
         let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
             for (key, jsonValue) in attributes {
@@ -232,11 +231,10 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        let (caretPos, maxCreatedAtMap, pairs, contentChanges) = try self.rgaTreeSplit.edit(
+        let (caretPos, pairs, contentChanges) = try self.rgaTreeSplit.edit(
             range,
             editedAt,
             value,
-            maxCreatedAtMapByActor,
             versionVector
         )
 
@@ -248,7 +246,7 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        return (maxCreatedAtMap, changes, pairs, (caretPos, caretPos))
+        return (changes, pairs, (caretPos, caretPos))
     }
 
     /**
@@ -259,16 +257,14 @@ final class CRDTText: CRDTElement {
      * @param range - range of RGATreeSplitNode
      * @param attributes - style attributes
      * @param editedAt - edited time
-     * @param maxCreatedAtMapByActor - maxCreatedAtMapByActor
      */
     @discardableResult
     func setStyle(
         _ range: RGATreeSplitPosRange,
         _ attributes: [String: String],
         _ editedAt: TimeTicket,
-        _ maxCreatedAtMapByActor: [String: TimeTicket]? = [:],
         _ versionVector: VersionVector? = nil
-    ) throws -> ([String: TimeTicket], [GCPair], [TextChange]) {
+    ) throws -> ([GCPair], [TextChange]) {
         // 01. split nodes with from and to
         let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
         let fromRight = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt).1
@@ -276,34 +272,20 @@ final class CRDTText: CRDTElement {
         // 02. style nodes between from and to
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
-        var createdAtMapByActor = [String: TimeTicket]()
         var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
         for node in nodes {
             let actorID = node.createdAt.actorID
 
-            var maxCreatedAt: TimeTicket = .max
-            var clientLamportAtChange: Int64 = .zero
+            var clientLamportAtChange: Int64 = .max
 
-            if versionVector == nil && maxCreatedAtMapByActor.isNilOrEmpty {
-                // Local edit - use version vector comparison
-                clientLamportAtChange = .max
-            } else if let versionVector, versionVector.size() > 0 {
+            if let versionVector {
                 clientLamportAtChange = versionVector.get(actorID) ?? 0
-            } else {
-                maxCreatedAt = maxCreatedAtMapByActor?[node.createdAt.actorID] ?? .initial
             }
             let canStyle = node.canStyle(
                 editedAt,
-                maxCreatedAt,
                 clientLamportAtChange: clientLamportAtChange
             )
             if canStyle {
-                let maxCreatedAt = createdAtMapByActor[actorID]
-                let createdAt = node.createdAt
-
-                if maxCreatedAt == nil || createdAt.after(maxCreatedAt!) {
-                    createdAtMapByActor[actorID] = createdAt
-                }
                 toBeStyleds.append(node)
             }
         }
@@ -330,7 +312,7 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        return (createdAtMapByActor, pairs, changes)
+        return (pairs, changes)
     }
 
     /**

@@ -30,12 +30,6 @@ struct EditOperation: Operation {
     private(set) var toPos: RGATreeSplitPos
 
     /**
-     * `maxCreatedAtMapByActor` returns the map that stores the latest creation time
-     * by actor for the nodes included in the editing range.
-     */
-    private(set) var maxCreatedAtMapByActor: [String: TimeTicket]
-
-    /**
      * `content` returns the content of RichEdit.
      */
     private(set) var content: String
@@ -45,11 +39,17 @@ struct EditOperation: Operation {
      */
     private(set) var attributes: [String: String]?
 
-    init(parentCreatedAt: TimeTicket, fromPos: RGATreeSplitPos, toPos: RGATreeSplitPos, maxCreatedAtMapByActor: [String: TimeTicket], content: String, attributes: [String: String]?, executedAt: TimeTicket) {
+    init(
+        parentCreatedAt: TimeTicket,
+        fromPos: RGATreeSplitPos,
+        toPos: RGATreeSplitPos,
+        content: String,
+        attributes: [String: String]?,
+        executedAt: TimeTicket
+    ) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
-        self.maxCreatedAtMapByActor = maxCreatedAtMapByActor
         self.content = content
         self.attributes = attributes
         self.executedAt = executedAt
@@ -74,12 +74,11 @@ struct EditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (_, changes, pairs, _) = try text.edit(
+        let (changes, pairs, _) = try text.edit(
             (self.fromPos, self.toPos),
             self.content,
             self.executedAt,
             self.attributes,
-            self.maxCreatedAtMapByActor,
             versionVector
         )
 

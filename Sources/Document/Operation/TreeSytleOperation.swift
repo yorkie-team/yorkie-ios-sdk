@@ -42,7 +42,6 @@ class TreeStyleOperation: Operation {
         parentCreatedAt: TimeTicket,
         fromPos: CRDTTreePos,
         toPos: CRDTTreePos,
-        maxCreatedAtMapByActor: [String: TimeTicket],
         attributes: [String: String],
         attributesToRemove: [String],
         executedAt: TimeTicket
@@ -77,19 +76,17 @@ class TreeStyleOperation: Operation {
         let pairs: [GCPair]
 
         if self.attributes.isEmpty == false {
-            (_, pairs, changes) = try tree.style(
+            (pairs, changes) = try tree.style(
                 (self.fromPos, self.toPos),
                 self.attributes,
                 self.executedAt,
-                [:],
                 versionVector
             )
         } else {
-            (_, pairs, changes) = try tree.removeStyle(
+            (pairs, changes) = try tree.removeStyle(
                 (self.fromPos, self.toPos),
                 self.attributesToRemove,
                 self.executedAt,
-                [:],
                 versionVector
             )
         }

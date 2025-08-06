@@ -91,7 +91,7 @@ public class JSONText {
             attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
-        let (maxCreatedAtMapByActor, _, pairs, rangeAfterEdit) = try text.edit(
+        let (_, pairs, rangeAfterEdit) = try text.edit(
             range,
             content,
             ticket,
@@ -103,13 +103,14 @@ public class JSONText {
         }
 
         context.push(
-            operation: EditOperation(parentCreatedAt: text.createdAt,
-                                     fromPos: range.0,
-                                     toPos: range.1,
-                                     maxCreatedAtMapByActor: maxCreatedAtMapByActor,
-                                     content: content,
-                                     attributes: attrs,
-                                     executedAt: ticket)
+            operation: EditOperation(
+                parentCreatedAt: text.createdAt,
+                fromPos: range.0,
+                toPos: range.1,
+                content: content,
+                attributes: attrs,
+                executedAt: ticket
+            )
         )
 
         return try? self.text?.findIndexesFromRange(rangeAfterEdit)
@@ -159,11 +160,10 @@ public class JSONText {
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
         let ticket = context.issueTimeTicket
-        let maxCreatedAtMapByActor: [String: TimeTicket]
         let pairs: [GCPair]
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
 
-        (maxCreatedAtMapByActor, pairs, _) = try text.setStyle(
+        (pairs, _) = try text.setStyle(
             range,
             stringAttrs,
             ticket
@@ -174,7 +174,6 @@ public class JSONText {
                 parentCreatedAt: text.createdAt,
                 fromPos: range.0,
                 toPos: range.1,
-                maxCreatedAtMapByActor: maxCreatedAtMapByActor,
                 attributes: stringAttrs,
                 executedAt: ticket
             )
