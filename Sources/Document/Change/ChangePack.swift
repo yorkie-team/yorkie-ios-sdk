@@ -52,8 +52,8 @@ struct ChangePack {
          isRemoved: Bool,
          changes: [Change],
          snapshot: Data? = nil,
-         versionVector: VersionVector?
-    ) {
+         versionVector: VersionVector?)
+    {
         self.documentKey = key
         self.checkpoint = checkpoint
         self.changes = changes

@@ -42,8 +42,8 @@ struct TreeEditOperation: Operation {
          toPos: CRDTTreePos,
          contents: [CRDTTreeNode]?,
          splitLevel: Int32,
-         executedAt: TimeTicket
-    ) {
+         executedAt: TimeTicket)
+    {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
