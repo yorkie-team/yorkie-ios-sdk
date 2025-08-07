@@ -792,7 +792,7 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
-        _ versionVector: VersionVector?
+        _ versionVector: VersionVector? = nil
     ) throws -> ([TreeChange], [GCPair]) {
         // 01. find nodes from the given range and split nodes.
         let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
