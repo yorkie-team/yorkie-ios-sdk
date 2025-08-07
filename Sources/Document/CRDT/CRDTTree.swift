@@ -959,7 +959,7 @@ class CRDTTree: CRDTElement {
             splitLevel,
             editedAt,
             issueTimeTicket,
-            nil,
+            nil
         )
     }
 
