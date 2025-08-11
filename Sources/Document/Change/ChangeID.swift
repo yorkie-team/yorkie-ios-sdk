@@ -67,11 +67,7 @@ struct ChangeID {
     func syncClocks(with other: ChangeID) -> ChangeID {
         let lamport = other.lamport > self.lamport ? other.lamport + 1 : self.lamport + 1
 
-        var otherVV = other.versionVector
-        if otherVV.size() == 0 {
-            otherVV = otherVV.deepcopy()
-            otherVV.set(actorID: other.actor, lamport: other.lamport)
-        }
+        let otherVV = other.versionVector
         let maxVersionVector = self.versionVector.max(other: otherVV)
 
         var newID = ChangeID(

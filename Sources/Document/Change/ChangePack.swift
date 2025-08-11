@@ -38,13 +38,6 @@ struct ChangePack {
     private let snapshot: Data?
 
     /**
-     * `minSyncedTicket` is the minimum logical time taken by clients who attach
-     * to the document. It is used to collect garbage on the replica on the
-     * client.
-     */
-    private let minSyncedTicket: TimeTicket?
-
-    /**
      * `versionVector` is the version vector current document
      */
     private let versionVector: VersionVector?
@@ -59,15 +52,13 @@ struct ChangePack {
          isRemoved: Bool,
          changes: [Change],
          snapshot: Data? = nil,
-         versionVector: VersionVector?,
-         minSyncedTicket: TimeTicket? = nil)
+         versionVector: VersionVector?)
     {
         self.documentKey = key
         self.checkpoint = checkpoint
         self.changes = changes
         self.snapshot = snapshot
         self.versionVector = versionVector
-        self.minSyncedTicket = minSyncedTicket
         self.isRemoved = isRemoved
     }
 
@@ -118,13 +109,6 @@ struct ChangePack {
      */
     func hasSnapshot() -> Bool {
         self.snapshot != nil
-    }
-
-    /**
-     * `getMinSyncedTicket` returns the minimum synced ticket of this pack.
-     */
-    func getMinSyncedTicket() -> TimeTicket? {
-        return self.minSyncedTicket
     }
 
     /**

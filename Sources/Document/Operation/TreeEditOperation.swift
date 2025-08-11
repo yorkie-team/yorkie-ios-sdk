@@ -36,16 +36,20 @@ struct TreeEditOperation: Operation {
      */
     let contents: [CRDTTreeNode]?
     let splitLevel: Int32
-    let maxCreatedAtMapByActor: [String: TimeTicket]
 
-    init(parentCreatedAt: TimeTicket, fromPos: CRDTTreePos, toPos: CRDTTreePos, contents: [CRDTTreeNode]?, splitLevel: Int32, executedAt: TimeTicket, maxCreatedAtMapByActor: [String: TimeTicket]) {
+    init(parentCreatedAt: TimeTicket,
+         fromPos: CRDTTreePos,
+         toPos: CRDTTreePos,
+         contents: [CRDTTreeNode]?,
+         splitLevel: Int32,
+         executedAt: TimeTicket)
+    {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
         self.toPos = toPos
         self.contents = contents
         self.splitLevel = splitLevel
         self.executedAt = executedAt
-        self.maxCreatedAtMapByActor = maxCreatedAtMapByActor
     }
 
     /**
@@ -74,7 +78,7 @@ struct TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let (changes, pairs, _) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
+        let (changes, pairs) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
@@ -84,7 +88,7 @@ struct TreeEditOperation: Operation {
             editedAt = TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
 
             return editedAt
-        }, self.maxCreatedAtMapByActor)
+        }, versionVector)
 
         for pair in pairs {
             root.registerGCPair(pair)

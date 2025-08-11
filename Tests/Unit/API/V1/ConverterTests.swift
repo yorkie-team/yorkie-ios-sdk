@@ -139,7 +139,6 @@ class ConverterTests: XCTestCase {
             XCTAssertEqual(changePack.getChanges().first?.toTestString, converted.getChanges().first?.toTestString)
             XCTAssertEqual(changePack.getCheckpoint(), converted.getCheckpoint())
             XCTAssertEqual(changePack.getDocumentKey(), converted.getDocumentKey())
-            XCTAssertEqual(changePack.getMinSyncedTicket(), converted.getMinSyncedTicket())
         } catch {
             XCTFail("\(error)")
         }

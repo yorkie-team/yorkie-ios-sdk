@@ -616,15 +616,17 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (maxCreationMapByActor, pairs, _) = try tree.style((fromPos, toPos), stringAttrs, ticket)
+        let (pairs, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
 
-        context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
-                                                   fromPos: fromPos,
-                                                   toPos: toPos,
-                                                   maxCreatedAtMapByActor: maxCreationMapByActor,
-                                                   attributes: stringAttrs,
-                                                   attributesToRemove: [],
-                                                   executedAt: ticket)
+        context.push(
+            operation: TreeStyleOperation(
+                parentCreatedAt: tree.createdAt,
+                fromPos: fromPos,
+                toPos: toPos,
+                attributes: stringAttrs,
+                attributesToRemove: [],
+                executedAt: ticket
+            )
         )
 
         for pair in pairs {
@@ -674,23 +676,30 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (maxCreationMapByActor, pairs, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+        let (pairs, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
         }
 
-        context.push(operation: TreeStyleOperation(parentCreatedAt: tree.createdAt,
-                                                   fromPos: fromPos,
-                                                   toPos: toPos,
-                                                   maxCreatedAtMapByActor: maxCreationMapByActor,
-                                                   attributes: [:],
-                                                   attributesToRemove: attributesToRemove,
-                                                   executedAt: ticket)
+        context.push(
+            operation: TreeStyleOperation(
+                parentCreatedAt: tree.createdAt,
+                fromPos: fromPos,
+                toPos: toPos,
+                attributes: [:],
+                attributesToRemove: attributesToRemove,
+                executedAt: ticket
+            )
         )
     }
 
-    private func editInternal(_ fromPos: CRDTTreePos, _ toPos: CRDTTreePos, _ contents: [any JSONTreeNode]?, _ splitLevel: Int32 = 0) throws -> Bool {
+    private func editInternal(
+        _ fromPos: CRDTTreePos,
+        _ toPos: CRDTTreePos,
+        _ contents: [any JSONTreeNode]?,
+        _ splitLevel: Int32 = 0
+    ) throws -> Bool {
         guard let context, let tree else {
             throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
@@ -721,21 +730,23 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        let (_, pairs, maxCreatedAtMapByActor) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket) {
+        let (_, pairs) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
             context.issueTimeTicket
-        }
+        }, nil)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
         }
 
-        context.push(operation: TreeEditOperation(parentCreatedAt: tree.createdAt,
-                                                  fromPos: fromPos,
-                                                  toPos: toPos,
-                                                  contents: crdtNodes,
-                                                  splitLevel: splitLevel,
-                                                  executedAt: ticket,
-                                                  maxCreatedAtMapByActor: maxCreatedAtMapByActor)
+        context.push(
+            operation: TreeEditOperation(
+                parentCreatedAt: tree.createdAt,
+                fromPos: fromPos,
+                toPos: toPos,
+                contents: crdtNodes,
+                splitLevel: splitLevel,
+                executedAt: ticket
+            )
         )
 
         return true

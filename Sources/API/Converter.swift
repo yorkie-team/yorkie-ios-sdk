@@ -415,9 +415,6 @@ extension Converter {
             pbEditOperation.parentCreatedAt = toTimeTicket(editOperation.parentCreatedAt)
             pbEditOperation.from = toTextNodePos(pos: editOperation.fromPos)
             pbEditOperation.to = toTextNodePos(pos: editOperation.toPos)
-            editOperation.maxCreatedAtMapByActor.forEach {
-                pbEditOperation.createdAtMapByActor[$0.key] = toTimeTicket($0.value)
-            }
             pbEditOperation.content = editOperation.content
             editOperation.attributes?.forEach {
                 pbEditOperation.attributes[$0.key] = $0.value
@@ -429,9 +426,6 @@ extension Converter {
             pbStyleOperation.parentCreatedAt = toTimeTicket(styleOperation.parentCreatedAt)
             pbStyleOperation.from = toTextNodePos(pos: styleOperation.fromPos)
             pbStyleOperation.to = toTextNodePos(pos: styleOperation.toPos)
-            styleOperation.maxCreatedAtMapByActor.forEach {
-                pbStyleOperation.createdAtMapByActor[$0.key] = toTimeTicket($0.value)
-            }
             styleOperation.attributes.forEach {
                 pbStyleOperation.attributes[$0.key] = $0.value
             }
@@ -445,9 +439,6 @@ extension Converter {
             pbOperation.increase = pbIncreaseOperation
         } else if let treeEditOperation = operation as? TreeEditOperation {
             var pbTreeEditOperation = PbOperation.TreeEdit()
-            treeEditOperation.maxCreatedAtMapByActor.forEach { key, value in
-                pbTreeEditOperation.createdAtMapByActor[key] = toTimeTicket(value)
-            }
             pbTreeEditOperation.parentCreatedAt = toTimeTicket(treeEditOperation.parentCreatedAt)
             pbTreeEditOperation.from = toTreePos(treeEditOperation.fromPos)
             pbTreeEditOperation.to = toTreePos(treeEditOperation.toPos)
@@ -460,9 +451,6 @@ extension Converter {
             pbTreeStyleOperation.parentCreatedAt = toTimeTicket(treeStyleOperation.parentCreatedAt)
             pbTreeStyleOperation.from = toTreePos(treeStyleOperation.fromPos)
             pbTreeStyleOperation.to = toTreePos(treeStyleOperation.toPos)
-            treeStyleOperation.maxCreatedAtMapByActor.forEach { key, value in
-                pbTreeStyleOperation.createdAtMapByActor[key] = toTimeTicket(value)
-            }
             treeStyleOperation.attributes.forEach { key, value in
                 pbTreeStyleOperation.attributes[key] = value
             }
@@ -508,12 +496,9 @@ extension Converter {
                                        createdAt: fromTimeTicket(pbRemoveOperation.createdAt),
                                        executedAt: fromTimeTicket(pbRemoveOperation.executedAt))
             } else if case let .edit(pbEditOperation) = pbOperation.body {
-                let createdAtMapByActor = pbEditOperation.createdAtMapByActor.mapValues { fromTimeTicket($0) }
-                                
                 return EditOperation(parentCreatedAt: fromTimeTicket(pbEditOperation.parentCreatedAt),
                                      fromPos: fromTextNodePos(pbEditOperation.from),
                                      toPos: fromTextNodePos(pbEditOperation.to),
-                                     maxCreatedAtMapByActor: createdAtMapByActor,
                                      content: pbEditOperation.content,
                                      attributes: pbEditOperation.attributes,
                                      executedAt: fromTimeTicket(pbEditOperation.executedAt))
@@ -521,7 +506,6 @@ extension Converter {
                 return StyleOperation(parentCreatedAt: fromTimeTicket(pbStyleOperation.parentCreatedAt),
                                       fromPos: fromTextNodePos(pbStyleOperation.from),
                                       toPos: fromTextNodePos(pbStyleOperation.to),
-                                      maxCreatedAtMapByActor: pbStyleOperation.createdAtMapByActor.mapValues({ fromTimeTicket($0) }),
                                       attributes: pbStyleOperation.attributes,
                                       executedAt: fromTimeTicket(pbStyleOperation.executedAt))
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {
@@ -529,29 +513,17 @@ extension Converter {
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
-                var createdAtMapByActor = [String: TimeTicket]()
-                
-                pbTreeEditOperation.createdAtMapByActor.forEach { key, value in
-                    createdAtMapByActor[key] = fromTimeTicket(value)
-                }
-                
                 return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
                                          toPos: fromTreePos(pbTreeEditOperation.to),
                                          contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
                                          splitLevel: pbTreeEditOperation.splitLevel,
-                                         executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
-                                         maxCreatedAtMapByActor: createdAtMapByActor)
+                                         executedAt: fromTimeTicket(pbTreeEditOperation.executedAt))
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
-                var createdAtMapByActor = [String: TimeTicket]()
-                pbTreeStyleOperation.createdAtMapByActor.forEach { key, value in
-                    createdAtMapByActor[key] = fromTimeTicket(value)
-                }
                 if !pbTreeStyleOperation.attributesToRemove.isEmpty {
                     return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
                                               fromPos: fromTreePos(pbTreeStyleOperation.from),
                                               toPos: fromTreePos(pbTreeStyleOperation.to),
-                                              maxCreatedAtMapByActor: createdAtMapByActor,
                                               attributes: [:],
                                               attributesToRemove: pbTreeStyleOperation.attributesToRemove,
                                               executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
@@ -559,7 +531,6 @@ extension Converter {
                     return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
                                               fromPos: fromTreePos(pbTreeStyleOperation.from),
                                               toPos: fromTreePos(pbTreeStyleOperation.to),
-                                              maxCreatedAtMapByActor: createdAtMapByActor,
                                               attributes: pbTreeStyleOperation.attributes,
                                               attributesToRemove: [],
                                               executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
@@ -1113,11 +1084,6 @@ extension Converter {
         if let versionVector = pack.getVersionVector() {
             pbChangePack.versionVector = toVersionVector(versionVector)
         }
-        if let minSyncedTicket = pack.getMinSyncedTicket() {
-            pbChangePack.minSyncedTicket = toTimeTicket(minSyncedTicket)
-        } else {
-            pbChangePack.clearMinSyncedTicket()
-        }
         pbChangePack.isRemoved = pack.isRemoved
         return pbChangePack
     }
@@ -1131,8 +1097,8 @@ extension Converter {
                    isRemoved: pbPack.isRemoved,
                    changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
-                   versionVector: fromVersionVector(pbPack.versionVector),
-                   minSyncedTicket: pbPack.hasMinSyncedTicket ? fromTimeTicket(pbPack.minSyncedTicket) : nil)
+                   versionVector: fromVersionVector(pbPack.versionVector)
+        )
     }
 
 }

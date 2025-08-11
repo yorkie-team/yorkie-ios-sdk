@@ -208,6 +208,7 @@ public struct Yorkie_V1_ChangePack: @unchecked Sendable {
 
   public var changes: [Yorkie_V1_Change] = []
 
+  /// deprecated
   public var minSyncedTicket: Yorkie_V1_TimeTicket {
     get {return _minSyncedTicket ?? Yorkie_V1_TimeTicket()}
     set {_minSyncedTicket = newValue}
@@ -641,6 +642,7 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     public mutating func clearTo() {_uniqueStorage()._to = nil}
 
+    /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
       get {return _storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
@@ -773,6 +775,7 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
       get {return _storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
@@ -856,6 +859,7 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     public mutating func clearTo() {_uniqueStorage()._to = nil}
 
+    /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
       get {return _storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
@@ -938,6 +942,7 @@ public struct Yorkie_V1_Operation: Sendable {
       set {_uniqueStorage()._attributesToRemove = newValue}
     }
 
+    /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
       get {return _storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
