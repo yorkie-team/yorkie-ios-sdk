@@ -44,7 +44,7 @@ func vectorOf(_ actorDatas: [ActorData]) -> VersionVector {
     for actorData in actorDatas {
         vector[actorData.actor] = actorData.lamport
     }
-    
+
     return VersionVector(vector: vector)
 }
 

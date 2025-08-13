@@ -24,7 +24,7 @@ import Foundation
 class ChangeContext {
     private let prevID: ChangeID
     private let nextID: ChangeID
-    
+
     private let root: CRDTRoot
     private var operations: [Operation]
     var presenceChange: PresenceChange?
@@ -86,7 +86,7 @@ class ChangeContext {
      * document for the next change.returns the next ID of this context.
      */
     func getNextID() -> ChangeID {
-        if operations.isEmpty {
+        if self.operations.isEmpty {
             return self.prevID
                 .next(true)
                 .setLamport(self.prevID.getLamport())
@@ -99,7 +99,7 @@ class ChangeContext {
      * `toChange` creates a new instance of Change in this context.
      */
     func toChange() -> Change {
-        let id = self.operations.isEmpty ? self.prevID.next(true): self.nextID
+        let id = self.operations.isEmpty ? self.prevID.next(true) : self.nextID
         return Change(
             id: id,
             operations: self.operations,

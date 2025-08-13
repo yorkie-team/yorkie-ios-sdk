@@ -49,10 +49,10 @@ struct ChangeID {
     }
 
     /**
-       * `hasClocks` returns true if this ID has logical clocks.
-       */
+     * `hasClocks` returns true if this ID has logical clocks.
+     */
     func hasClocks() -> Bool {
-        return self.versionVector.size() > 0 && self.lamport != initialLamport
+        return self.versionVector.size() > 0 && self.lamport != self.initialLamport
     }
 
     /**
@@ -65,7 +65,7 @@ struct ChangeID {
                 lamport: self.lamport + 1,
                 actor: self.actor,
                 versionVector: .initial,
-                serverSeq: initialLamport
+                serverSeq: self.initialLamport
             )
         }
         var vector = self.versionVector.deepcopy()
