@@ -259,7 +259,7 @@ class GCIntegrationTests: XCTestCase {
 
         try await client1.sync()
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
-            ActorData(actor: client1.id!, lamport: 1),
+            ActorData(actor: client1.id!, lamport: 1)
         ])
 
         try await client2.sync()
@@ -521,7 +521,7 @@ class GCIntegrationTests: XCTestCase {
             (root["5"] as? JSONText)?.edit(0, 1, "h", ["b": "1"])
         }, "removes 2 and edit text type elements")
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
-            ActorData(actor: client1.id!, lamport: 2),
+            ActorData(actor: client1.id!, lamport: 2)
         ])
 
         len = await doc1.getGarbageLength()
