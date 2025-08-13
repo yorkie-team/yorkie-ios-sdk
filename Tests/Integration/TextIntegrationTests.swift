@@ -454,6 +454,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    // ex6. conflicting overlaps(bold) - 1
     func test_ex6_conflicting_overlaps_bold() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -497,7 +498,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
 
             d1JSON = await d1.toSortedJSON()
             d2JSON = await d2.toSortedJSON()
-            XCTAssertEqual(d1JSON, "{\"k1\":[{\"attrs\":{\"bold\":true},\"val\":\"The \"},{\"attrs\":{\"bold\":false},\"val\":\"fox \"},{\"attrs\":{\"bold\":false},\"val\":\"jumped.\"}]}")
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"attrs\":{\"bold\":true},\"val\":\"The \"},{\"attrs\":{\"bold\":false},\"val\":\"fox \"},{\"attrs\":{\"bold\":true},\"val\":\"jumped.\"}]}")
             XCTAssertEqual(d1JSON, d2JSON)
         }
     }

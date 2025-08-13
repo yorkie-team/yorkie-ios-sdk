@@ -35,7 +35,7 @@ class ChangeContextTests: XCTestCase {
         let root = CRDTRoot(rootObject: rootObject)
 
         let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: actorId, versionVector: VersionVector(vector: [actorId: 2]))
-        let target = ChangeContext(id: changeID, root: root, message: "test message.")
+        let target = ChangeContext(prevID: changeID, root: root, message: "test message.")
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
@@ -49,7 +49,7 @@ class ChangeContextTests: XCTestCase {
 
         XCTAssertTrue(target.hasChange)
 
-        XCTAssertEqual(target.getChange().toTestString, "4:actor-1:0.SET")
+        XCTAssertEqual(target.toChange().toTestString, "4:actor-1:0.SET")
     }
 
     func test_can_create_timeticket() {
@@ -67,9 +67,9 @@ class ChangeContextTests: XCTestCase {
         let root = CRDTRoot(rootObject: rootObject)
 
         let changeID = ChangeID(clientSeq: 1, lamport: 2, actor: "actorID", versionVector: VersionVector(vector: [actorId: 2]))
-        let target = ChangeContext(id: changeID, root: root, message: "test message.")
+        let target = ChangeContext(prevID: changeID, root: root, message: "test message.")
 
         let result = target.issueTimeTicket
-        XCTAssertEqual(result.toTestString, "2:actorID:1")
+        XCTAssertEqual(result.toTestString, "3:actorID:1")
     }
 }

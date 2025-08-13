@@ -22,15 +22,18 @@ import Foundation
  * Finally returns a Change after the modification has been completed.
  */
 class ChangeContext {
-    private let id: ChangeID
+    private let prevID: ChangeID
+    private let nextID: ChangeID
+    
     private let root: CRDTRoot
     private var operations: [Operation]
     var presenceChange: PresenceChange?
     private let message: String?
     private var delimiter: UInt32
 
-    init(id: ChangeID, root: CRDTRoot, message: String? = nil) {
-        self.id = id
+    init(prevID: ChangeID, root: CRDTRoot, message: String? = nil) {
+        self.prevID = prevID
+        self.nextID = prevID.next()
         self.root = root
         self.message = message
         self.operations = []
@@ -38,7 +41,11 @@ class ChangeContext {
     }
 
     func deepcopy() -> ChangeContext {
-        let clone = ChangeContext(id: self.id, root: self.root.deepcopy(), message: self.message)
+        let clone = ChangeContext(
+            prevID: self.prevID,
+            root: self.root.deepcopy(),
+            message: self.message
+        )
 
         clone.operations = self.operations
         clone.delimiter = self.delimiter
@@ -75,10 +82,30 @@ class ChangeContext {
     }
 
     /**
-     * `getChange` creates a new instance of Change in this context.
+     * `getNextID` returns the next ID of this context. It will be set to the
+     * document for the next change.returns the next ID of this context.
      */
-    func getChange() -> Change {
-        return Change(id: self.id, operations: self.operations, presenceChange: self.presenceChange, message: self.message)
+    func getNextID() -> ChangeID {
+        if operations.isEmpty {
+            return self.prevID
+                .next(true)
+                .setLamport(self.prevID.getLamport())
+                .setVersionVector(self.prevID.getVersionVector())
+        }
+        return self.nextID
+    }
+
+    /**
+     * `toChange` creates a new instance of Change in this context.
+     */
+    func toChange() -> Change {
+        let id = self.operations.isEmpty ? self.prevID.next(true): self.nextID
+        return Change(
+            id: id,
+            operations: self.operations,
+            presenceChange: self.presenceChange,
+            message: self.message
+        )
     }
 
     /**
@@ -93,13 +120,13 @@ class ChangeContext {
      */
     var issueTimeTicket: TimeTicket {
         self.delimiter += 1
-        return self.id.createTimeTicket(delimiter: self.delimiter)
+        return self.nextID.createTimeTicket(delimiter: self.delimiter)
     }
 
     /**
      * `letLastTimeTicket` returns the last time ticket issued in this context.
      */
     var lastTimeTicket: TimeTicket {
-        self.id.createTimeTicket(delimiter: self.delimiter)
+        self.nextID.createTimeTicket(delimiter: self.delimiter)
     }
 }

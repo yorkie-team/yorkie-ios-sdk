@@ -19,7 +19,7 @@ import XCTest
 
 let defaultSnapshotThreshold = 1000
 
-func maxVersionVector(actors: [String?]) -> VersionVector {
+func maxVectorOf(actors: [String?]) -> VersionVector {
     var actors = actors.compactMap { $0 }
 
     if actors.isEmpty {
@@ -39,24 +39,13 @@ struct ActorData {
     let lamport: Int64
 }
 
-func versionVectorHelper(_ versionVector: VersionVector,
-                         actorDatas: [ActorData]) async -> Bool
-{
-    guard versionVector.size() == actorDatas.count else {
-        return false
-    }
-
+func vectorOf(_ actorDatas: [ActorData]) -> VersionVector {
+    var vector: [String: Int64] = [:]
     for actorData in actorDatas {
-        guard let vvLamport = versionVector.get(actorData.actor) else {
-            return false
-        }
-
-        guard vvLamport == actorData.lamport else {
-            return false
-        }
+        vector[actorData.actor] = actorData.lamport
     }
-
-    return true
+    
+    return VersionVector(vector: vector)
 }
 
 extension Task where Success == Never, Failure == Never {
@@ -69,8 +58,8 @@ extension Task where Success == Never, Failure == Never {
 }
 
 func assertTrue(versionVector: VersionVector, actorDatas: [ActorData]) async {
-    let result = await versionVectorHelper(versionVector, actorDatas: actorDatas)
-    XCTAssertTrue(result)
+    let result = vectorOf(actorDatas)
+    XCTAssertEqual(versionVector, result)
 }
 
 func assertPeerElementsEqual(peers1: [PeerElement], peers2: [PeerElement]) {
@@ -376,5 +365,15 @@ func subscribeDocs(_ d1: Document, _ d2: Document, _ d1Expected: [any OperationI
 
             d2Index += 1
         }
+    }
+}
+
+extension VersionVector: @retroactive Equatable {
+    public static func == (lhs: VersionVector, rhs: VersionVector) -> Bool {
+        for (key, value) in lhs {
+            guard value == rhs.get(key) else { return false }
+        }
+        guard lhs.size() == rhs.size() else { return false }
+        return true
     }
 }

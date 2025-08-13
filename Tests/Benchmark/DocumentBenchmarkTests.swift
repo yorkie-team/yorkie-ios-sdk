@@ -90,7 +90,7 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             var garbageLen = await doc.getGarbageLength()
             XCTAssertEqual(size, garbageLen)
-            let garbageCollect = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: []))
+            let garbageCollect = await doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: []))
             XCTAssertEqual(size, garbageCollect)
 
             garbageLen = await doc.getGarbageLength()
@@ -123,7 +123,7 @@ final class DocumentBenchmarkTests: XCTestCase {
 
             var garbageLen = await doc.getGarbageLength()
             XCTAssertEqual(size, garbageLen)
-            let garbageCollect = await doc.garbageCollect(minSyncedVersionVector: maxVersionVector(actors: []))
+            let garbageCollect = await doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: []))
             XCTAssertEqual(size, garbageCollect)
 
             garbageLen = await doc.getGarbageLength()

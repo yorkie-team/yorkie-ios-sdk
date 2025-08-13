@@ -25,6 +25,7 @@ public struct TimeTicket: Comparable {
         static let initialDelimiter: UInt32 = 0
         static let maxDelemiter: UInt32 = .max
         static let maxLamport: Int64 = .max
+        static let initialLamport: Int64 = .zero
     }
 
     public static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
