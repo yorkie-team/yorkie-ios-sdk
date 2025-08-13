@@ -38,7 +38,7 @@ jobs:
         swiftformat --version
         swiftformat --lint .
     - name: Run tests
-      run: swift test --enable-code-coverage -v --filter YorkieUnitTests --filter YorkieIntegrationTests -- filter YorkieTestHelper
+      run: swift test --enable-code-coverage -v --filter YorkieUnitTests --filter YorkieIntegrationTests --filter YorkieTestHelper
     - name: Prepare Code Coverage
       run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
     - name: Upload coverage to Codecov
