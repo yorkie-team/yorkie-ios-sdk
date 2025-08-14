@@ -62,7 +62,7 @@ struct ChangeID {
         if excludeClocks {
             return .init(
                 clientSeq: self.clientSeq + 1,
-                lamport: self.lamport + 1,
+                lamport: self.lamport,
                 actor: self.actor,
                 versionVector: .initial,
                 serverSeq: self.initialLamport
