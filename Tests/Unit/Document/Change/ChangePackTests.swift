@@ -39,8 +39,8 @@ class ChangePackTests: XCTestCase {
 
     func test_can_has_changes() {
         let actor = "actorID"
-        let change1 = Change(id: ChangeID(clientSeq: 1, lamport: 10, actor: actor, versionVector: maxVersionVector(actors: [actor])), operations: [])
-        let change2 = Change(id: ChangeID(clientSeq: 2, lamport: 20, actor: actor, versionVector: maxVersionVector(actors: [actor])), operations: [])
+        let change1 = Change(id: ChangeID(clientSeq: 1, lamport: 10, actor: actor, versionVector: maxVectorOf(actors: [actor])), operations: [])
+        let change2 = Change(id: ChangeID(clientSeq: 2, lamport: 20, actor: actor, versionVector: maxVectorOf(actors: [actor])), operations: [])
 
         let target = ChangePack(key: "documentKey-1",
                                 checkpoint: Checkpoint(serverSeq: 1, clientSeq: 10),

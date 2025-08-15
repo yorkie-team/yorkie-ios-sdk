@@ -301,10 +301,6 @@ final class TreeConcurrencyTests: XCTestCase {
                     DispatchQueue.global().async {
                         Task {
                             let result = try await self.runTest(initialState: initialState.deepcopy(), initialXML: initialXML, ranges: ranges, op1: op1, op2: op2, desc: desc)
-                            print("====== before d1: \(result.before.0)")
-                            print("====== before d2: \(result.before.1)")
-                            print("====== after d1: \(result.after.0)")
-                            print("====== after d2: \(result.after.1)")
                             XCTAssertEqual(result.after.0, result.after.1, desc)
 
                             exp.fulfill()

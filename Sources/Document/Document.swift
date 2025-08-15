@@ -143,7 +143,11 @@ public class Document {
 
         // 01. Update the clone object and create a change.
         let clone = self.cloned
-        let context = ChangeContext(id: self.changeID.next(), root: clone.root, message: message)
+        let context = ChangeContext(
+            prevID: self.changeID,
+            root: clone.root,
+            message: message
+        )
 
         let proxy = JSONObject(target: clone.root.object, context: context)
 
@@ -161,10 +165,10 @@ public class Document {
         if context.hasChange {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
-            let change = context.getChange()
+            let change = context.toChange()
             let opInfos = (try? change.execute(root: self.root, presences: &self.presences)) ?? []
             self.localChanges.append(change)
-            self.changeID = change.id
+            self.changeID = context.getNextID()
 
             // 03. Publish the document change event.
             // NOTE(chacha912): Check opInfos, which represent the actually executed operations.
@@ -424,7 +428,7 @@ public class Document {
      */
     public func getRoot() -> JSONObject {
         let clone = self.cloned
-        let context = ChangeContext(id: self.changeID.next(), root: clone.root)
+        let context = ChangeContext(prevID: self.changeID.next(), root: clone.root)
 
         return JSONObject(target: clone.root.object, context: context)
     }
@@ -825,16 +829,6 @@ public class Document {
             }
             self.localChanges.removeFirst()
         }
-    }
-
-    /**
-     * 'filterVersionVector' filters detached client's lamport from version vector.
-     */
-    private func filterVersionVector(minSyncedVersionVector: VersionVector) {
-        let versionVector = self.changeID.getVersionVector()
-        let filteredVersionVector = versionVector.filter(versionVector: minSyncedVersionVector)
-
-        self.changeID = self.changeID.setVersionVector(filteredVersionVector)
     }
 
     /**

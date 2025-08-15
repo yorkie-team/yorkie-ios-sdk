@@ -68,7 +68,7 @@ let idT = CRDTTreeNodeID(createdAt: TimeTicket.initial, offset: 0)
 /**
  * `dummyContext` is a helper context that is used for testing.
  */
-let dummyContext = ChangeContext(id: ChangeID.initial, root: CRDTRoot())
+let dummyContext = ChangeContext(prevID: ChangeID.initial, root: CRDTRoot())
 
 /**
  * `posT` is a helper function that issues a new CRDTTreeNodeID.

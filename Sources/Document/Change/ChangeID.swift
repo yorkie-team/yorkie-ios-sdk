@@ -20,6 +20,7 @@ import Foundation
  * `ChangeID` is for identifying the Change. This is immutable.
  */
 struct ChangeID {
+    private let initialLamport = TimeTicket.Values.initialLamport
     /**
      * `initial` represents the initial state ID. Usually this is used to
      * represent a state where nothing has been edited.
@@ -48,9 +49,25 @@ struct ChangeID {
     }
 
     /**
+     * `hasClocks` returns true if this ID has logical clocks.
+     */
+    func hasClocks() -> Bool {
+        return self.versionVector.size() > 0 && self.lamport != self.initialLamport
+    }
+
+    /**
      * `next` creates a next ID of this ID.
      */
-    func next() -> ChangeID {
+    func next(_ excludeClocks: Bool = false) -> ChangeID {
+        if excludeClocks {
+            return .init(
+                clientSeq: self.clientSeq + 1,
+                lamport: self.lamport,
+                actor: self.actor,
+                versionVector: .initial,
+                serverSeq: self.initialLamport
+            )
+        }
         var vector = self.versionVector.deepcopy()
         vector.set(actorID: self.actor, lamport: self.lamport + 1)
 
@@ -65,6 +82,9 @@ struct ChangeID {
      */
     @discardableResult
     func syncClocks(with other: ChangeID) -> ChangeID {
+        if other.hasClocks() == false {
+            return self
+        }
         let lamport = other.lamport > self.lamport ? other.lamport + 1 : self.lamport + 1
 
         let otherVV = other.versionVector
@@ -106,6 +126,19 @@ struct ChangeID {
      */
     func createTimeTicket(delimiter: UInt32) -> TimeTicket {
         return TimeTicket(lamport: self.lamport, delimiter: delimiter, actorID: self.actor)
+    }
+
+    /**
+     * `setLamport` sets the given lamport clock.
+     */
+    func setLamport(_ lamport: Int64) -> ChangeID {
+        return .init(
+            clientSeq: self.clientSeq,
+            lamport: lamport,
+            actor: self.actor,
+            versionVector: self.versionVector,
+            serverSeq: self.serverSeq
+        )
     }
 
     /**
