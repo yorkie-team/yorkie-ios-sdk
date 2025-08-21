@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		499CF0D62E0B9FC40011272A /* VersionVectorTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */; };
+		58A5A2172E55842400055D16 /* DocumentLimitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A5A2162E55841800055D16 /* DocumentLimitTests.swift */; };
 		58FD63132E2DF400000A4DC0 /* DocumentSizeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FD63122E2DF400000A4DC0 /* DocumentSizeTest.swift */; };
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
@@ -154,6 +155,7 @@
 
 /* Begin PBXFileReference section */
 		499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionVectorTest.swift; sourceTree = "<group>"; };
+		58A5A2162E55841800055D16 /* DocumentLimitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentLimitTests.swift; sourceTree = "<group>"; };
 		58FD63122E2DF400000A4DC0 /* DocumentSizeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSizeTest.swift; sourceTree = "<group>"; };
 		96DA808228C5B7B400E2C1DA /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA808628C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -432,6 +434,7 @@
 		9ADECA002919FC1A006BA331 /* Integration */ = {
 			isa = PBXGroup;
 			children = (
+				58A5A2162E55841800055D16 /* DocumentLimitTests.swift */,
 				9A569CB02C06009B007EF118 /* GCIntegrationTests.swift */,
 				9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */,
 				96DA809028C5B7B400E2C1DA /* GRPCTests.swift */,
@@ -1052,6 +1055,7 @@
 				CEED7ADF2D8C18920005373E /* SplayTreeBenchmarkTests.swift in Sources */,
 				9AFB4EBC2A93980A00494401 /* Dictionary+Extension.swift in Sources */,
 				CEDB32E028EBE6A4004BBA80 /* CRDTObjectTests.swift in Sources */,
+				58A5A2172E55842400055D16 /* DocumentLimitTests.swift in Sources */,
 				CE370E5C28EEBFA6008FCABD /* RHTTests.swift in Sources */,
 				CE8BB73828FE28410020F62A /* ChangeTests.swift in Sources */,
 				9A569CBC2C0601B8007EF118 /* GCTests.swift in Sources */,

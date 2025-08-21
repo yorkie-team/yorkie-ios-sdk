@@ -78,7 +78,7 @@ struct TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let (changes, pairs) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
+        let (changes, pairs, diff) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
@@ -89,7 +89,8 @@ struct TreeEditOperation: Operation {
 
             return editedAt
         }, versionVector)
-
+        root.acc(diff)
+        
         for pair in pairs {
             root.registerGCPair(pair)
         }

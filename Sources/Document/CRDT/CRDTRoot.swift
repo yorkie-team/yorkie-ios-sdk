@@ -65,12 +65,18 @@ class CRDTRoot {
      * element itself and its parent.
      */
     private var gcPairMap: [String: GCPair]
+    
+    /**
+     * `docSize` is a structure that represents the size of the document.
+     */
+    private var docSize: DocSize
 
     init(rootObject: CRDTObject = CRDTObject(createdAt: TimeTicket.initial)) {
         self.rootObject = rootObject
         self.gcPairMap = [:]
-        self.elementPairMapByCreatedAt[self.rootObject.createdAt.toIDString] = (element: self.rootObject, parent: nil)
-
+        self.docSize = .init(live: .init(data: 0, meta: 0), gc: .init(data: 0, meta: 0))
+        
+        self.registerElement(self.rootObject, parent: nil)
         self.rootObject.getDescendants(callback: { element, parent in
             self.registerElement(element, parent: parent)
             if element.removedAt != nil {
@@ -133,12 +139,21 @@ class CRDTRoot {
      */
     func registerElement(_ element: CRDTElement, parent: CRDTContainer?) {
         self.elementPairMapByCreatedAt[element.createdAt.toIDString] = (element, parent)
+        self.docSize.live.addDataSizes(others: element.getDataSize())
+        
+        if let element = element as? CRDTContainer {
+            element.getDescendants { element, parent in
+                registerElement(element, parent: parent)
+                return false
+            }
+        }
     }
 
     /**
      * `deregisterElement` deregister the given element from hash table.
      */
     func deregisterElement(_ element: CRDTElement) {
+        self.docSize.gc.subDataSize(others: element.getDataSize())
         self.elementPairMapByCreatedAt[element.createdAt.toIDString] = nil
         self.gcElementSetByCreatedAt.remove(element.createdAt.toIDString)
     }
@@ -147,6 +162,13 @@ class CRDTRoot {
      * `registerRemovedElement` registers the given element to the hash set.
      */
     func registerRemovedElement(_ element: CRDTElement) {
+        let size = element.getDataSize()
+        
+        self.docSize.gc.addDataSizes(others: size)
+        self.docSize.live.subDataSize(others: size)
+        
+        self.docSize.live.meta += timeTicketSize
+        
         self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
     }
 
@@ -164,6 +186,30 @@ class CRDTRoot {
         }
 
         self.gcPairMap[childID] = pair
+        
+        guard let size = pair.child?.getDataSize() else { fatalError() }
+        
+        // var docSizeLive: Int
+        
+        if pair.child is RHTNode {
+            self.docSize.live.subDataSize(others: size)
+        } else {
+            self.docSize.live.subDataSize(others: size)
+            self.docSize.live.meta += timeTicketSize
+        }
+        
+        self.docSize.gc.addDataSizes(others: size)
+        
+        
+        
+//        if let id = pair.child?.toIDString, let size = self.gcPairMap[id]?.child?.getDataSize() {
+//            self.docSize.gc.addDataSizes(others: size)
+//            self.docSize.live.subDataSize(others: size)
+//            
+//            if pair.child is RHTNode {
+//                self.docSize.live.meta += timeTicketSize
+//            }
+//        }
     }
 
     /**
@@ -213,38 +259,46 @@ class CRDTRoot {
      * `getDocSize` returns the size of the document.
      */
     public func getDocSize() -> DocSize {
-        var liveData = 0
-        var liveMeta = 0
-        var gcData = 0
-        var gcMeta = 0
-
-        for (createdAt, value) in self.elementPairMapByCreatedAt {
-            let size = value.element.getDataSize()
-            if self.gcElementSetByCreatedAt.contains(createdAt) {
-                gcData += size.data
-                gcMeta += size.meta
-            } else {
-                liveData += size.data
-                liveMeta += size.meta
-            }
-        }
-
-        for child in self.gcPairMap.values.compactMap(\.child) {
-            let size = child.getDataSize()
-            gcData += size.data
-            gcMeta += size.meta
-        }
-
-        return .init(
-            live: .init(
-                data: liveData,
-                meta: liveMeta
-            ),
-            gc: .init(
-                data: gcData,
-                meta: gcMeta
-            )
-        )
+        return docSize
+//        var liveData = 0
+//        var liveMeta = 0
+//        var gcData = 0
+//        var gcMeta = 0
+//
+//        for (createdAt, value) in self.elementPairMapByCreatedAt {
+//            let size = value.element.getDataSize()
+//            if self.gcElementSetByCreatedAt.contains(createdAt) {
+//                gcData += size.data
+//                gcMeta += size.meta
+//            } else {
+//                liveData += size.data
+//                liveMeta += size.meta
+//            }
+//        }
+//
+//        for child in self.gcPairMap.values.compactMap(\.child) {
+//            let size = child.getDataSize()
+//            gcData += size.data
+//            gcMeta += size.meta
+//        }
+//        let result = DocSize.init(
+//            live: .init(
+//                data: liveData,
+//                meta: liveMeta
+//            ),
+//            gc: .init(
+//                data: gcData,
+//                meta: gcMeta
+//            )
+//        )
+//        
+//        if docSize != result {
+//            print("--------------------------------------->")
+//            print(docSize)
+//            print(result)
+//            print("---------------------------------------DONE")
+//        }
+//        return result
     }
 
     /**
@@ -325,6 +379,13 @@ class CRDTRoot {
         return RootStats(elements: self.elementMapSize,
                          gcElements: self.garbageElementSetSize,
                          gcPairs: self.gcPairMap.count)
+    }
+    
+    /**
+     * `acc` accumulates the given DataSize to Live.
+     */
+    public func acc(_ diff: DataSize) {
+        self.docSize.live.addDataSizes(others: diff)
     }
 }
 

@@ -74,22 +74,25 @@ class TreeStyleOperation: Operation {
 
         let changes: [TreeChange]
         let pairs: [GCPair]
+        var diff: DataSize
 
         if self.attributes.isEmpty == false {
-            (pairs, changes) = try tree.style(
+            (pairs, changes, diff) = try tree.style(
                 (self.fromPos, self.toPos),
                 self.attributes,
                 self.executedAt,
                 versionVector
             )
         } else {
-            (pairs, changes) = try tree.removeStyle(
+            (pairs, changes, diff) = try tree.removeStyle(
                 (self.fromPos, self.toPos),
                 self.attributesToRemove,
                 self.executedAt,
                 versionVector
             )
         }
+        
+        root.acc(diff)
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)
 

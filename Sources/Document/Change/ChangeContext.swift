@@ -25,7 +25,7 @@ class ChangeContext {
     private let prevID: ChangeID
     private let nextID: ChangeID
 
-    private let root: CRDTRoot
+    let root: CRDTRoot
     private var operations: [Operation]
     var presenceChange: PresenceChange?
     private let message: String?
@@ -107,6 +107,14 @@ class ChangeContext {
             message: self.message
         )
     }
+    
+    /**
+     * `isPresenceOnlyChange` returns whether this context is only for presence
+     * change or not.
+     */
+    var isPresenceOnlyChange: Bool {
+        return self.operations.isEmpty
+    }
 
     /**
      * `hasChange` returns whether this context has change or not.
@@ -128,5 +136,12 @@ class ChangeContext {
      */
     var lastTimeTicket: TimeTicket {
         self.nextID.createTimeTicket(delimiter: self.delimiter)
+    }
+    
+    /**
+     * `acc` accumulates the given DataSize to Live size of the root.
+     */
+    func acc(_ diff: DataSize) {
+        self.root.acc(diff)
     }
 }

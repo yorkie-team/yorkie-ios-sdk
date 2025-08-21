@@ -45,6 +45,56 @@ extension DocumentSizeTest {
 }
 
 extension DocumentSizeTest {
+    // split tree node test
+    func test_split_tree_node_test() async throws {
+        let root = CRDTTreeNode(id: .initial, type: "r", children: [])
+        let para = CRDTTreeNode(id: .initial, type: "p", children: [])
+        
+        try root.append(contentsOf: [para])
+        try para.append(contentsOf: [.init(id: .initial, type: "text", value: "helloworld")])
+        
+        guard let left = para.children.first else { fatalError() }
+        
+        let (rightText, difftext) = try left.splitText(5, 0)
+        XCTAssertEqual(difftext, .init(data: 0, meta: 24))
+        XCTAssertEqual(left.getDataSize(), .init(data: 10, meta: 24))
+        XCTAssertEqual(rightText?.getDataSize(), .init(data: 10, meta: 24))
+        
+        let (rightElem, diffElem) = try para.splitElement(1, .initial)
+        XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
+        XCTAssertEqual(rightElem!.toXML, "<p>world</p>")
+        XCTAssertEqual(para.toXML, "<p>hello</p>")
+    }
+    
+    // this test case must be skipped due to uncorrect from  JS (skipped also)
+    // refactor split element later on!
+    // split tree node with attribute test
+    func skip_test_split_tree_node_with_attribute_test() async throws {
+        // TODO(raararaara): We need to check if the attributes are copied correctly when splitting elements.
+        let attributes = RHT()
+        
+        attributes.set(key: "bold", value: "true", executedAt: .initial)
+        
+        let root = CRDTTreeNode(id: .initial, type: "r")
+        let para = CRDTTreeNode(id: .initial, type: "p", children: nil, attributes: attributes)
+        
+        try root.append(contentsOf: [para])
+        try para.append(contentsOf: [CRDTTreeNode(id: .initial, type: "text", value: "helloworld")])
+        
+        XCTAssertEqual(root.toXML, "<r><p bold=true>helloworld</p></r>")
+        
+        // split text node
+        guard let left = para.children.first else { fatalError() }
+        
+        let (_, _) = try left.splitText(5, 0)
+        
+        // split element node
+        let (rightElem, diffElem) = try para.splitElement(1, .initial)
+        XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
+        XCTAssertEqual(rightElem!.toXML, "<p>world</p>")
+        XCTAssertEqual(para.toXML, "<p bold=true>hello</p>")
+    }
+    
     func test_if_primitive_type_has_correct_live_size() async throws {
         try await self.doc.update({ root, _ in
             root["k0"] = nil
@@ -161,6 +211,19 @@ extension DocumentSizeTest {
 
         await self.expectLive(with: .init(data: 28, meta: 144))
         await self.expectGC(with: .init(data: 10, meta: 48))
+        
+        try await self.doc.update { root, _ in
+            (root.text as? JSONText)?.edit(1, 1, "")
+            
+            let text = """
+                [{\"attrs\":{\"bold\":true},\"val\":\"h\"},{\"attrs\":{\"bold\":true},\"val\":\"ello\"},{\"val\":\" \"}]
+                """
+            let xml = (root.text as? JSONText)?.toSortedJSON()
+            XCTAssertEqual(xml, text)
+        }
+        
+        await self.expectLive(with: .init(data: 44, meta: 192))
+        await self.expectGC(with: .init(data: 10, meta: 48))
     }
 
     // tree test
@@ -207,7 +270,6 @@ extension DocumentSizeTest {
         }
 
         await self.expectLive(with: .init(data: 18, meta: 192))
-
         try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(
                 7, 13
@@ -238,19 +300,5 @@ extension DocumentSizeTest {
 
         await self.expectLive(with: .init(data: 10, meta: 144))
         await self.expectGC(with: .init(data: 36, meta: 168))
-    }
-}
-
-// MARK: - Extensions
-
-extension DocSize: @retroactive Equatable {
-    public static func == (lhs: DocSize, rhs: DocSize) -> Bool {
-        return lhs.live == rhs.live && lhs.gc == rhs.gc
-    }
-}
-
-extension DataSize: @retroactive Equatable {
-    public static func == (lhs: DataSize, rhs: DataSize) -> Bool {
-        return lhs.data == rhs.data && lhs.meta == rhs.meta
     }
 }

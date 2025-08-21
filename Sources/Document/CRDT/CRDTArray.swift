@@ -242,6 +242,36 @@ public struct DataSize {
 
     /// The size of the metadata in bytes.
     var meta: Int
+    
+    /**
+     * `addDataSizes` adds the size of a resource to the target resource.
+     */
+    mutating func addDataSizes(
+        functionName: String = #function,
+        others: DataSize...
+    ) {
+        for other in others {
+            self.data += other.data
+            self.meta += other.meta
+        }
+    }
+    
+    /**
+     * `subDataSize` subtracts the size of a resource from the target resource.
+     */
+    mutating func subDataSize(others: DataSize...) {
+        for other in others {
+            self.data -= other.data
+            self.meta -= other.meta
+        }
+    }
+    
+    /**
+     * `totalDataSize` calculates the total size of a resource.
+     */
+    var totalDataSize: Int {
+        return self.data + self.meta
+    }
 }
 
 /// Represents the size of a document in bytes.
@@ -251,4 +281,23 @@ public struct DocSize {
 
     /// The size of the garbage collected data in bytes.
     var gc: DataSize
+    
+    /**
+     * `totalDocSize` calculates the total size of a document.
+     */
+    var totalDocSize: Int {
+        return self.gc.totalDataSize + self.live.totalDataSize
+    }
+}
+
+extension DocSize: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.live == rhs.live && lhs.gc == rhs.gc
+    }
+}
+
+extension DataSize: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.data == rhs.data && lhs.meta == rhs.meta
+    }
 }

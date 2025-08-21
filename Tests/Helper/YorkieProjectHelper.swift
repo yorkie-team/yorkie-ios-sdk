@@ -35,12 +35,12 @@ public enum YorkieProjectHelper {
         username: String,
         password: String,
         webhookURL: String,
-        webhookMethods: [String] = []
+        webhookMethods: [String] = [],
+        projectName: String = "auth-webhook-\(Int(Date().timeIntervalSince1970))"
     ) async throws -> YorkieProjectContext {
         let token = try await logIn(rpcAddress: rpcAddress, username: username, password: password)
-
-        let name = "auth-webhook-\(Int(Date().timeIntervalSince1970))"
-        let (projectID, publicKey) = try await createProject(rpcAddress: rpcAddress, token: token, name: name)
+        
+        let (projectID, publicKey) = try await createProject(rpcAddress: rpcAddress, token: token, name: projectName)
 
         try await updateProjectWebhook(rpcAddress: rpcAddress, token: token, projectID: projectID, webhookURL: webhookURL, webhookMethods: webhookMethods)
 
@@ -73,17 +73,23 @@ public enum YorkieProjectHelper {
         return (id: id, publicKey: publicKey)
     }
 
+    @discardableResult
     public static func updateProjectWebhook(rpcAddress: String,
                                             token: String,
                                             projectID: String,
                                             webhookURL: String,
-                                            webhookMethods: [String] = []) async throws
+                                            webhookMethods: [String] = [],
+                                            customFields: [String: Any] = [:]) async throws -> [String: Any]
     {
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/UpdateProject")!
 
         var fields: [String: Any] = [
             "auth_webhook_url": webhookURL
         ]
+        
+        for field in customFields {
+            fields[field.key] = field.value
+        }
 
         if !webhookMethods.isEmpty {
             fields["auth_webhook_methods"] = [
@@ -97,7 +103,15 @@ public enum YorkieProjectHelper {
         ]
 
         let headers = ["Authorization": token]
-        _ = try await self.postJSON(to: url, body: body, headers: headers)
+        return try await self.postJSON(to: url, body: body, headers: headers)
+    }
+    
+    public static func getProject(rpcAddress: String, token: String, projectName: String) async throws -> [String: Any] {
+        let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/GetProject")!
+        let body = ["name": projectName]
+        
+        let headers = ["Authorization": token]
+        return try await self.postJSON(to: url, body: body, headers: headers)
     }
 
     private static func postJSON(to url: URL, body: [String: Any], headers: [String: String] = [:]) async throws -> [String: Any] {
