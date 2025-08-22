@@ -91,7 +91,7 @@ extension DocumentSizeTest {
         // split element node
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
         XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
-        XCTAssertEqual(rightElem!.toXML, "<p>world</p>")
+        XCTAssertEqual(rightElem!.toXML, "<p bold=true>world</p>")
         XCTAssertEqual(para.toXML, "<p bold=true>hello</p>")
     }
     

@@ -15,6 +15,7 @@ jobs:
       SWIFTLINT_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/ae3894d1d8d343733160e1c57903187228628d9d/Formula/s/swiftlint.rb"
       # swiftformat v0.55.6
       SWIFTFORMAT_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/511cf8dcf60a2625b9e3be78b1b8db92f00b02d4/Formula/s/swiftformat.rb"
+      HOMEBREW_DEVELOPER: "1"
       
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
