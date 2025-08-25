@@ -383,9 +383,7 @@ extension IndexTreeNode {
     /**
      * `splitElement` splits the given element at the given offset.
      */
-    func splitElement(
-        _ offset: Int32,
-        _ issuedTimeTicket: TimeTicket) throws -> (Self?, DataSize) {
+    func splitElement(_ offset: Int32, _ issuedTimeTicket: TimeTicket) throws -> (Self?, DataSize) {
         /**
          * TODO(hackerwins): Define ID of split node for concurrent editing.
          * Text has fixed content and its split nodes could have limited offset

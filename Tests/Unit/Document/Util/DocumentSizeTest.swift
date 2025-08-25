@@ -86,7 +86,7 @@ extension DocumentSizeTest {
         // split text node
         guard let left = para.children.first else { fatalError() }
 
-        (_, _) = try left.splitText(5, 0)
+        _ = try left.splitText(5, 0)
 
         // split element node
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
