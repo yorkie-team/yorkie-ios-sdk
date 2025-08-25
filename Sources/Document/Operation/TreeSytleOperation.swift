@@ -91,7 +91,7 @@ class TreeStyleOperation: Operation {
                 versionVector
             )
         }
-        
+
         root.acc(diff)
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)

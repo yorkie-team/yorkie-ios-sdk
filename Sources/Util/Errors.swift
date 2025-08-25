@@ -55,7 +55,7 @@ struct YorkieError: Error, CustomStringConvertible {
 
         /// ErrDocumentRemoved is returned when the document is removed.
         case errDocumentRemoved = "ErrDocumentRemoved"
-        
+
         /// ErrDocumentSizeExceedsLimit is returned when the document size exceeds the limit.
         case errDocumentSizeExceedsLimit = "ErrDocumentSizeExceedsLimit"
 

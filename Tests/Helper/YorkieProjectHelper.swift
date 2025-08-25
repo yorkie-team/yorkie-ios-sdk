@@ -39,7 +39,7 @@ public enum YorkieProjectHelper {
         projectName: String = "auth-webhook-\(Int(Date().timeIntervalSince1970))"
     ) async throws -> YorkieProjectContext {
         let token = try await logIn(rpcAddress: rpcAddress, username: username, password: password)
-        
+
         let (projectID, publicKey) = try await createProject(rpcAddress: rpcAddress, token: token, name: projectName)
 
         try await updateProjectWebhook(rpcAddress: rpcAddress, token: token, projectID: projectID, webhookURL: webhookURL, webhookMethods: webhookMethods)
@@ -105,11 +105,11 @@ public enum YorkieProjectHelper {
         let headers = ["Authorization": token]
         return try await self.postJSON(to: url, body: body, headers: headers)
     }
-    
+
     public static func getProject(rpcAddress: String, token: String, projectName: String) async throws -> [String: Any] {
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/GetProject")!
         let body = ["name": projectName]
-        
+
         let headers = ["Authorization": token]
         return try await self.postJSON(to: url, body: body, headers: headers)
     }

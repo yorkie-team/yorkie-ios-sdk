@@ -242,7 +242,7 @@ public struct DataSize {
 
     /// The size of the metadata in bytes.
     var meta: Int
-    
+
     /**
      * `addDataSizes` adds the size of a resource to the target resource.
      */
@@ -255,7 +255,7 @@ public struct DataSize {
             self.meta += other.meta
         }
     }
-    
+
     /**
      * `subDataSize` subtracts the size of a resource from the target resource.
      */
@@ -265,7 +265,7 @@ public struct DataSize {
             self.meta -= other.meta
         }
     }
-    
+
     /**
      * `totalDataSize` calculates the total size of a resource.
      */

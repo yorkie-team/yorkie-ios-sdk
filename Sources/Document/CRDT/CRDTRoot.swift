@@ -249,45 +249,6 @@ class CRDTRoot {
      */
     public func getDocSize() -> DocSize {
         return docSize
-//        var liveData = 0
-//        var liveMeta = 0
-//        var gcData = 0
-//        var gcMeta = 0
-//
-//        for (createdAt, value) in self.elementPairMapByCreatedAt {
-//            let size = value.element.getDataSize()
-//            if self.gcElementSetByCreatedAt.contains(createdAt) {
-//                gcData += size.data
-//                gcMeta += size.meta
-//            } else {
-//                liveData += size.data
-//                liveMeta += size.meta
-//            }
-//        }
-//
-//        for child in self.gcPairMap.values.compactMap(\.child) {
-//            let size = child.getDataSize()
-//            gcData += size.data
-//            gcMeta += size.meta
-//        }
-//        let result = DocSize.init(
-//            live: .init(
-//                data: liveData,
-//                meta: liveMeta
-//            ),
-//            gc: .init(
-//                data: gcData,
-//                meta: gcMeta
-//            )
-//        )
-//        
-//        if docSize != result {
-//            print("--------------------------------------->")
-//            print(docSize)
-//            print(result)
-//            print("---------------------------------------DONE")
-//        }
-//        return result
     }
 
     /**
@@ -369,7 +330,7 @@ class CRDTRoot {
                          gcElements: self.garbageElementSetSize,
                          gcPairs: self.gcPairMap.count)
     }
-    
+
     /**
      * `acc` accumulates the given DataSize to Live.
      */

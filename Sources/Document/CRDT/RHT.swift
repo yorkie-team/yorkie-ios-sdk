@@ -272,7 +272,7 @@ class RHT {
         self.nodeMapByKey.removeValue(forKey: child.key)
         self.numberOfRemovedElement -= 1
     }
-    
+
     /**
      * `getNodeMapByKey` returns the hashtable of RHT.
      */

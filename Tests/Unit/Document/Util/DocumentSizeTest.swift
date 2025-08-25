@@ -49,17 +49,17 @@ extension DocumentSizeTest {
     func test_split_tree_node_test() async throws {
         let root = CRDTTreeNode(id: .initial, type: "r", children: [])
         let para = CRDTTreeNode(id: .initial, type: "p", children: [])
-        
+
         try root.append(contentsOf: [para])
         try para.append(contentsOf: [.init(id: .initial, type: "text", value: "helloworld")])
-        
+
         guard let left = para.children.first else { fatalError() }
-        
+
         let (rightText, difftext) = try left.splitText(5, 0)
         XCTAssertEqual(difftext, .init(data: 0, meta: 24))
         XCTAssertEqual(left.getDataSize(), .init(data: 10, meta: 24))
         XCTAssertEqual(rightText?.getDataSize(), .init(data: 10, meta: 24))
-        
+
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
         XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
         XCTAssertEqual(rightElem!.toXML, "<p>world</p>")
@@ -72,29 +72,29 @@ extension DocumentSizeTest {
     func skip_test_split_tree_node_with_attribute_test() async throws {
         // TODO(raararaara): We need to check if the attributes are copied correctly when splitting elements.
         let attributes = RHT()
-        
+
         attributes.set(key: "bold", value: "true", executedAt: .initial)
-        
+
         let root = CRDTTreeNode(id: .initial, type: "r")
         let para = CRDTTreeNode(id: .initial, type: "p", children: nil, attributes: attributes)
-        
+
         try root.append(contentsOf: [para])
         try para.append(contentsOf: [CRDTTreeNode(id: .initial, type: "text", value: "helloworld")])
-        
+
         XCTAssertEqual(root.toXML, "<r><p bold=true>helloworld</p></r>")
-        
+
         // split text node
         guard let left = para.children.first else { fatalError() }
-        
+
         let (_, _) = try left.splitText(5, 0)
-        
+
         // split element node
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
         XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
         XCTAssertEqual(rightElem!.toXML, "<p bold=true>world</p>")
         XCTAssertEqual(para.toXML, "<p bold=true>hello</p>")
     }
-    
+
     func test_if_primitive_type_has_correct_live_size() async throws {
         try await self.doc.update({ root, _ in
             root["k0"] = nil

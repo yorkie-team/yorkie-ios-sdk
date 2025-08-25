@@ -25,7 +25,7 @@ class ChangeContext {
     private let prevID: ChangeID
     private let nextID: ChangeID
 
-    let root: CRDTRoot
+    private let root: CRDTRoot
     private var operations: [Operation]
     var presenceChange: PresenceChange?
     private let message: String?

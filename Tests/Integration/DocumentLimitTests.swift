@@ -74,7 +74,7 @@ class DocumentSizeLimitTest: XCTestCase {
     var context: YorkieProjectContext!
     var projectName: String!
     var sizeLimit: Int!
-    
+
     override func setUp() async throws {
         self.webhookServer = WebhookServer(port: 3004)
         try self.webhookServer.start()
@@ -90,7 +90,7 @@ class DocumentSizeLimitTest: XCTestCase {
         )
         self.apiKey = self.context.apiKey
     }
-    
+
     override func tearDown() async throws {
         self.webhookServer.stop()
         self.projectName = nil
@@ -101,7 +101,7 @@ class DocumentSizeLimitTest: XCTestCase {
         // Prevents duplication of project ID (based on timeInterval)
         try await Task.sleep(milliseconds: 1000)
     }
-    
+
     func whenUpdateMaxSizeLimit(sizeLimit: Int) async throws {
         // update the max size of document
         try await YorkieProjectHelper.updateProjectWebhook(
@@ -111,14 +111,14 @@ class DocumentSizeLimitTest: XCTestCase {
             webhookURL: self.webhookServer.authWebhookUrl,
             customFields: ["max_size_per_document": sizeLimit]
         )
-        
+
         // get project detail and ensure the max size of document is correct!
         let response = try await YorkieProjectHelper.getProject(
             rpcAddress: self.rpcAddress,
             token: self.context.adminToken,
             projectName: self.projectName
         )
-        
+
         if let maxSizePerDocument = (response["project"] as? [String: Any])?["maxSizePerDocument"] as? Int {
             XCTAssertEqual(maxSizePerDocument, sizeLimit)
             return
@@ -126,28 +126,28 @@ class DocumentSizeLimitTest: XCTestCase {
             XCTFail("The error in Webhook call!")
         }
     }
-    
+
     private func makeRandomSize() -> Int {
         // to make the test case more stable, use random integer instead of fixed number
         let randomInt = Int.random(in: 10...100)
         let sizeLimit = randomInt * 1024 * 1024
         return sizeLimit
     }
-    
+
     func activateClientAndDocument(size: Int? = nil) async throws -> (Client, Document) {
         let size = size ?? sizeLimit
         sizeLimit = size
         try await whenUpdateMaxSizeLimit(sizeLimit: size!)
         let client1 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
-        
+
         try await client1.activate()
-        
+
         let doc1 = Document(key: docKey)
-        
+
         try await client1.attach(doc1, [:], .manual)
         let docMaxSize = await doc1.getMaxSizePerDoc()
         XCTAssertEqual(docMaxSize, size)
-        
+
         return (client1, doc1)
     }
 }
@@ -161,7 +161,7 @@ extension DocumentSizeLimitTest {
         
         XCTAssertEqual(docMaxSize, sizeLimit)
     }
-    
+
     // should reject local update that exceeds document size limit
     func test_should_reject_local_update_that_exceeds_document_size_limit() async throws {
         let expectation = XCTestExpectation(description: "Must throws when update due to size limitation risk!")
@@ -169,12 +169,12 @@ extension DocumentSizeLimitTest {
         try await document.update { root, _ in
             root.t = JSONText()
         }
-        
+
         let size = await document.getDocSize()
         XCTAssertEqual(size.live, .init(data: 0, meta: 72))
         let rootSize = await document.getClone()?.root.getDocSize()
         XCTAssertEqual(size, rootSize)
-        
+
         // document size exceeded
         do {
             try await document.update { root, _ in
@@ -183,64 +183,64 @@ extension DocumentSizeLimitTest {
         } catch {
             expectation.fulfill()
         }
-        
+
         let totalSize = await document.getDocSize().totalDocSize
         XCTAssertEqual(totalSize, 72)
         
         try await client.detach(document)
         try await client.deactivate()
-        
+
         await fulfillment(of: [expectation], timeout: 1.0)
     }
-    
+
     // should allow remote updates even if they exceed document size limit
     func test_should_allow_remote_updates_even_if_they_exceed_document_size_limit() async throws {
         let (client1, doc1) = try await activateClientAndDocument(size: 100)
-        
+
         let client2 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
-        
+
         try await client2.activate()
         let doc2 = Document(key: docKey)
-        
+
         try await client2.attach(doc2)
-        
+
         try await doc1.update { root, _ in
             root.t = JSONText()
         }
-        
+
         var size = await doc1.getDocSize()
         XCTAssertEqual(size.live, .init(data: 0, meta: 72))
-        
+
         try await client1.sync()
         try await client2.sync()
-        
+
         size = await doc1.getDocSize()
         XCTAssertEqual(size.live, .init(data: 0, meta: 72))
-        
+
         try await doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "aa")
         }
         var live = await doc1.getDocSize().live
         XCTAssertEqual(live, .init(data: 4, meta: 96))
-        
+
         try await doc2.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "a")
         }
-        
+
         live = await doc2.getDocSize().live
         XCTAssertEqual(live, .init(data: 2, meta: 96))
-        
+
         try await client2.sync()
         // Pulls changes - should succeed despite exceeding limit
-        
+
         live = await doc2.getDocSize().live
         XCTAssertEqual(live, .init(data: 2, meta: 96))
-        
+
         try await client1.sync()
-        
+
         live = await doc1.getDocSize().live
         XCTAssertEqual(live, .init(data: 6, meta: 120))
-        
+
         let expectation = XCTestExpectation(description: "Must return error!")
         do {
             try await doc1.update { root, _ in
@@ -249,12 +249,12 @@ extension DocumentSizeLimitTest {
         } catch {
             expectation.fulfill()
         }
-        
+
         await fulfillment(of: [expectation], timeout: 1.0)
-        
+
         try await client1.detach(doc1)
         try await client1.deactivate()
-        
+
         try await client2.detach(doc2)
         try await client2.deactivate()
     }

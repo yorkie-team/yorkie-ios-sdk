@@ -230,7 +230,7 @@ extension IndexTreeNode {
      */
     func splitText(_ offset: Int32, _ absOffset: Int32) throws -> (Self?, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
-        
+
         guard offset > 0, offset < self.size else {
             return (nil, diff)
         }
@@ -241,17 +241,17 @@ extension IndexTreeNode {
         if rightValue.length == 0 || offset == size {
             return (nil, diff)
         }
-        
+
         let prvSize = self.getDataSize()
-        
+
         self.value = leftValue
 
         let rightNode = self.cloneText(offset: offset + absOffset)
         rightNode.value = rightValue
-        
+
         diff.addDataSizes(others: self.getDataSize(), rightNode.getDataSize())
         diff.subDataSize(others: prvSize)
-        
+
         try self.parent?.insertAfterInternal(newNode: rightNode, referenceNode: self)
 
         return (rightNode, diff)

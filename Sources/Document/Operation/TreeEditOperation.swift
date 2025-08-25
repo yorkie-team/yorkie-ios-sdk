@@ -90,7 +90,7 @@ struct TreeEditOperation: Operation {
             return editedAt
         }, versionVector)
         root.acc(diff)
-        
+
         for pair in pairs {
             root.registerGCPair(pair)
         }
