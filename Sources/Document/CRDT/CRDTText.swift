@@ -148,7 +148,7 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     public func getAttributes() -> [String: (value: String, updatedAt: TimeTicket)] {
         self.attributes.toObject()
     }
-    
+
     func getAttrs() -> RHT {
         return self.attributes
     }
@@ -273,9 +273,9 @@ final class CRDTText: CRDTElement {
         // 01. split nodes with from and to
         let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
         let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
-        
+
         diff.addDataSizes(others: diffTo, diffFrom)
-        
+
         // 02. style nodes between from and to
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
@@ -316,7 +316,7 @@ final class CRDTText: CRDTElement {
                 if prev != nil {
                     pairs.append(GCPair(parent: node.value, child: prev))
                 }
-                
+
                 if let curr = node.value.getAttrs().getNodeByKey(key) {
                     diff.addDataSizes(others: curr.getDataSize())
                 }

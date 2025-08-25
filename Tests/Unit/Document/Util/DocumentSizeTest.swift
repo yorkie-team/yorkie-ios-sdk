@@ -65,7 +65,7 @@ extension DocumentSizeTest {
         XCTAssertEqual(rightElem!.toXML, "<p>world</p>")
         XCTAssertEqual(para.toXML, "<p>hello</p>")
     }
-    
+
     // this test case must be skipped due to uncorrect from  JS (skipped also)
     // refactor split element later on!
     // split tree node with attribute test
@@ -86,7 +86,7 @@ extension DocumentSizeTest {
         // split text node
         guard let left = para.children.first else { fatalError() }
 
-        let (_, _) = try left.splitText(5, 0)
+        (_, _) = try left.splitText(5, 0)
 
         // split element node
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
@@ -211,17 +211,15 @@ extension DocumentSizeTest {
 
         await self.expectLive(with: .init(data: 28, meta: 144))
         await self.expectGC(with: .init(data: 10, meta: 48))
-        
+
         try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(1, 1, "")
-            
-            let text = """
-                [{\"attrs\":{\"bold\":true},\"val\":\"h\"},{\"attrs\":{\"bold\":true},\"val\":\"ello\"},{\"val\":\" \"}]
-                """
+
+            let text = "[{\"attrs\":{\"bold\":true},\"val\":\"h\"},{\"attrs\":{\"bold\":true},\"val\":\"ello\"},{\"val\":\" \"}]"
             let xml = (root.text as? JSONText)?.toSortedJSON()
             XCTAssertEqual(xml, text)
         }
-        
+
         await self.expectLive(with: .init(data: 44, meta: 192))
         await self.expectGC(with: .init(data: 10, meta: 48))
     }

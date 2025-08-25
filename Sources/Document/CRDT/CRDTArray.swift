@@ -281,7 +281,7 @@ public struct DocSize {
 
     /// The size of the garbage collected data in bytes.
     var gc: DataSize
-    
+
     /**
      * `totalDocSize` calculates the total size of a document.
      */

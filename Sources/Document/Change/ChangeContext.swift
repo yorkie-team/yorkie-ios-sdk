@@ -107,7 +107,7 @@ class ChangeContext {
             message: self.message
         )
     }
-    
+
     /**
      * `isPresenceOnlyChange` returns whether this context is only for presence
      * change or not.
@@ -137,7 +137,7 @@ class ChangeContext {
     var lastTimeTicket: TimeTicket {
         self.nextID.createTimeTicket(delimiter: self.delimiter)
     }
-    
+
     /**
      * `acc` accumulates the given DataSize to Live size of the root.
      */

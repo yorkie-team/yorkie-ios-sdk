@@ -79,7 +79,7 @@ class DocumentSizeLimitTest: XCTestCase {
         self.webhookServer = WebhookServer(port: 3004)
         try self.webhookServer.start()
         self.projectName = "auth-webhook-\(Int(Date().timeIntervalSince1970))"
-        self.sizeLimit = makeRandomSize()
+        self.sizeLimit = self.makeRandomSize()
         self.context = try await YorkieProjectHelper.initializeProject(
             rpcAddress: self.rpcAddress,
             username: self.testAPIID,
@@ -129,15 +129,15 @@ class DocumentSizeLimitTest: XCTestCase {
 
     private func makeRandomSize() -> Int {
         // to make the test case more stable, use random integer instead of fixed number
-        let randomInt = Int.random(in: 10...100)
+        let randomInt = Int.random(in: 10 ... 100)
         let sizeLimit = randomInt * 1024 * 1024
         return sizeLimit
     }
 
     func activateClientAndDocument(size: Int? = nil) async throws -> (Client, Document) {
-        let size = size ?? sizeLimit
-        sizeLimit = size
-        try await whenUpdateMaxSizeLimit(sizeLimit: size!)
+        let size = size ?? self.sizeLimit
+        self.sizeLimit = size
+        try await self.whenUpdateMaxSizeLimit(sizeLimit: size!)
         let client1 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
 
         try await client1.activate()
@@ -158,8 +158,8 @@ extension DocumentSizeLimitTest {
         // update the max size of document
         let (_, document) = try await activateClientAndDocument()
         let docMaxSize = await document.getMaxSizePerDoc()
-        
-        XCTAssertEqual(docMaxSize, sizeLimit)
+
+        XCTAssertEqual(docMaxSize, self.sizeLimit)
     }
 
     // should reject local update that exceeds document size limit
@@ -186,7 +186,7 @@ extension DocumentSizeLimitTest {
 
         let totalSize = await document.getDocSize().totalDocSize
         XCTAssertEqual(totalSize, 72)
-        
+
         try await client.detach(document)
         try await client.deactivate()
 
@@ -261,6 +261,7 @@ extension DocumentSizeLimitTest {
 }
 
 // MARK: - Helpers
+
 private struct TestAuthTokenInjector: AuthTokenInjector {
     func getToken(reason: String?) async throws -> String {
         return "token-\(Date().timeInterval(after: 1000 * 1000 * 60 * 60))" // expire in 1 hour

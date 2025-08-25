@@ -165,7 +165,7 @@ public class Document {
         try updater(proxy, &presence)
 
         self.clone?.presences[actorID] = presence.presence
-        
+
         let size = self.getClone()?.root.getDocSize().totalDocSize ?? 0
         if !context.isPresenceOnlyChange, self.maxSizeLimit > 0, self.maxSizeLimit < size {
             self.clone = nil
@@ -450,7 +450,7 @@ public class Document {
     public func getDocSize() -> DocSize {
         self.root.getDocSize()
     }
-    
+
     /**
      * `getMaxSizePerDocument` gets the maximum size of this document.
      */
@@ -524,7 +524,7 @@ public class Document {
     public func getStats() -> RootStats {
         return self.root.getStats()
     }
-    
+
     /**
      * `getClone` returns this clone.
      */

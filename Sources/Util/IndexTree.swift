@@ -385,8 +385,7 @@ extension IndexTreeNode {
      */
     func splitElement(
         _ offset: Int32,
-        _ issuedTimeTicket: TimeTicket
-    ) throws -> (Self?, DataSize) {
+        _ issuedTimeTicket: TimeTicket) throws -> (Self?, DataSize) {
         /**
          * TODO(hackerwins): Define ID of split node for concurrent editing.
          * Text has fixed content and its split nodes could have limited offset
@@ -395,10 +394,10 @@ extension IndexTreeNode {
          * and its order could be broken when concurrent editing happens.
          * Currently, we use the similar ID of split element with the split text.
          */
-        
+
         var diff = DataSize(data: 0, meta: 0)
         let prvSize = self.getDataSize()
-        
+
         let clone = self.cloneElement(issueTimeTicket: issuedTimeTicket)
         try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
         clone.updateAncestorsSize()
@@ -417,7 +416,7 @@ extension IndexTreeNode {
         for innerChild in clone.innerChildren {
             innerChild.parent = clone
         }
-        
+
         diff.addDataSizes(others: self.getDataSize(), clone.getDataSize())
         diff.subDataSize(others: prvSize)
         return (clone, diff)

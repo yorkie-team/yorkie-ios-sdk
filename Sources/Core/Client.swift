@@ -328,7 +328,7 @@ public class Client {
         try doc.update { _, presence in
             presence.set(initialPresence)
         }
-        
+
         // 02. Subscribe local broadcast event.
         doc.subscribeLocalBroadcast { [weak self] event, doc in
             guard let self else { return }
@@ -363,7 +363,7 @@ public class Client {
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach error")
             }
-            
+
             let maxSizePerDocument = message.maxSizePerDocument
             if maxSizePerDocument > 0 {
                 doc.setMaxSizePerDocument(Int(maxSizePerDocument))

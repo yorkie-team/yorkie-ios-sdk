@@ -563,7 +563,7 @@ extension CRDTTreeNode: GCChild {
         if self.isText {
             data += self.size * 2
         }
-        
+
         if self.isRemoved {
             meta += timeTicketSize
         }
@@ -728,7 +728,7 @@ class CRDTTree: CRDTElement {
                         pairs.append(GCPair(parent: node, child: prev))
                     }
                 }
-                
+
                 for attr in attributes {
                     let key = attr.key
                     let curr = node.attrs?.getNodeByKey(key)

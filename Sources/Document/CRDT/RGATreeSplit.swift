@@ -475,7 +475,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ versionVector: VersionVector? = nil
     ) throws -> (RGATreeSplitPos, [GCPair], DataSize, [ContentChange<T>]) {
         var diff = DataSize(data: 0, meta: 0)
-        
+
         // 01. split nodes with from and to
         let (toLeft, diffTo, toRight) = try self.findNodeWithSplit(range.1, editedAt)
         let (fromLeft, diffFrom, fromRight) = try self.findNodeWithSplit(range.0, editedAt)
@@ -500,7 +500,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 fromLeft,
                 RGATreeSplitNode(RGATreeSplitNodeID(editedAt, 0), value)
             )
-            
+
             diff.addDataSizes(others: inserted.getDataSize())
 
             if !changes.isEmpty, changes[changes.count - 1].from == idx {
@@ -732,7 +732,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         } else if offset == node.contentLength {
             return (node.next, diff)
         }
-        
+
         let prvSize = node.getDataSize()
 
         let splitNode = node.split(offset)
@@ -743,7 +743,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             node.insNext!.setInsPrev(splitNode)
         }
         splitNode.setInsPrev(node)
-        
+
         diff.addDataSizes(others: node.getDataSize(), splitNode.getDataSize())
         diff.subDataSize(others: prvSize)
 

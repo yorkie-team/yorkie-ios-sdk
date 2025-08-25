@@ -86,7 +86,7 @@ public enum YorkieProjectHelper {
         var fields: [String: Any] = [
             "auth_webhook_url": webhookURL
         ]
-        
+
         for field in customFields {
             fields[field.key] = field.value
         }

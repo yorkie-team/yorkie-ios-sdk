@@ -65,7 +65,7 @@ class CRDTRoot {
      * element itself and its parent.
      */
     private var gcPairMap: [String: GCPair]
-    
+
     /**
      * `docSize` is a structure that represents the size of the document.
      */
@@ -75,7 +75,7 @@ class CRDTRoot {
         self.rootObject = rootObject
         self.gcPairMap = [:]
         self.docSize = .init(live: .init(data: 0, meta: 0), gc: .init(data: 0, meta: 0))
-        
+
         self.registerElement(self.rootObject, parent: nil)
         self.rootObject.getDescendants(callback: { element, parent in
             self.registerElement(element, parent: parent)
@@ -140,10 +140,10 @@ class CRDTRoot {
     func registerElement(_ element: CRDTElement, parent: CRDTContainer?) {
         self.elementPairMapByCreatedAt[element.createdAt.toIDString] = (element, parent)
         self.docSize.live.addDataSizes(others: element.getDataSize())
-        
+
         if let element = element as? CRDTContainer {
-            element.getDescendants { element, parent in
-                registerElement(element, parent: parent)
+            element.getDescendants { [unowned self] element, parent in
+                self.registerElement(element, parent: parent)
                 return false
             }
         }
@@ -163,12 +163,12 @@ class CRDTRoot {
      */
     func registerRemovedElement(_ element: CRDTElement) {
         let size = element.getDataSize()
-        
+
         self.docSize.gc.addDataSizes(others: size)
         self.docSize.live.subDataSize(others: size)
-        
+
         self.docSize.live.meta += timeTicketSize
-        
+
         self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
     }
 
@@ -186,18 +186,18 @@ class CRDTRoot {
         }
 
         self.gcPairMap[childID] = pair
-        
+
         guard let size = pair.child?.getDataSize() else { fatalError() }
-        
+
         // var docSizeLive: Int
-        
+
         if pair.child is RHTNode {
             self.docSize.live.subDataSize(others: size)
         } else {
             self.docSize.live.subDataSize(others: size)
             self.docSize.live.meta += timeTicketSize
         }
-        
+
         self.docSize.gc.addDataSizes(others: size)
     }
 
@@ -248,7 +248,7 @@ class CRDTRoot {
      * `getDocSize` returns the size of the document.
      */
     public func getDocSize() -> DocSize {
-        return docSize
+        return self.docSize
     }
 
     /**
