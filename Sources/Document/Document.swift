@@ -528,7 +528,7 @@ public class Document {
     /**
      * `getClone` returns this clone.
      */
-    func getClone() -> Optional<(root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])> {
+    func getClone() -> (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])? {
         return self.clone
     }
 

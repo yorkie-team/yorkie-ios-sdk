@@ -261,7 +261,7 @@ extension DocumentSizeLimitTest {
 }
 
 // MARK: - Helpers
-fileprivate struct TestAuthTokenInjector: AuthTokenInjector {
+private struct TestAuthTokenInjector: AuthTokenInjector {
     func getToken(reason: String?) async throws -> String {
         return "token-\(Date().timeInterval(after: 1000 * 1000 * 60 * 60))" // expire in 1 hour
     }

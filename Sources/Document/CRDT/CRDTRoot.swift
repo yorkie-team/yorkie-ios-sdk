@@ -199,17 +199,6 @@ class CRDTRoot {
         }
         
         self.docSize.gc.addDataSizes(others: size)
-        
-        
-        
-//        if let id = pair.child?.toIDString, let size = self.gcPairMap[id]?.child?.getDataSize() {
-//            self.docSize.gc.addDataSizes(others: size)
-//            self.docSize.live.subDataSize(others: size)
-//            
-//            if pair.child is RHTNode {
-//                self.docSize.live.meta += timeTicketSize
-//            }
-//        }
     }
 
     /**
