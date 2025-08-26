@@ -187,7 +187,10 @@ class CRDTRoot {
 
         self.gcPairMap[childID] = pair
 
-        guard let size = pair.child?.getDataSize() else { fatalError() }
+        guard let size = pair.child?.getDataSize() else {
+            Logger.critical("registerGCPair: missing child size for \(String(describing: pair.child))")
+            return
+        }
 
         // var docSizeLive: Int
 
