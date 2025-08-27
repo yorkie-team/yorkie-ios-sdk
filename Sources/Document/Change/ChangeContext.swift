@@ -109,6 +109,14 @@ class ChangeContext {
     }
 
     /**
+     * `isPresenceOnlyChange` returns whether this context is only for presence
+     * change or not.
+     */
+    var isPresenceOnlyChange: Bool {
+        return self.operations.isEmpty
+    }
+
+    /**
      * `hasChange` returns whether this context has change or not.
      */
     var hasChange: Bool {
@@ -128,5 +136,12 @@ class ChangeContext {
      */
     var lastTimeTicket: TimeTicket {
         self.nextID.createTimeTicket(delimiter: self.delimiter)
+    }
+
+    /**
+     * `acc` accumulates the given DataSize to Live size of the root.
+     */
+    func acc(_ diff: DataSize) {
+        self.root.acc(diff)
     }
 }

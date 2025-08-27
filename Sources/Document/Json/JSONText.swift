@@ -71,7 +71,12 @@ public class JSONText {
     }
 
     @discardableResult
-    private func editThrows(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) throws -> (Int, Int)? {
+    private func editThrows(
+        _ fromIdx: Int,
+        _ toIdx: Int,
+        _ content: String,
+        _ attributes: Codable? = nil
+    ) throws -> (Int, Int)? {
         guard let context, let text else {
             throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
         }
@@ -91,12 +96,13 @@ public class JSONText {
             attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
-        let (_, pairs, rangeAfterEdit) = try text.edit(
+        let (_, pairs, diff, rangeAfterEdit) = try text.edit(
             range,
             content,
             ticket,
             attrs
         )
+        self.context?.acc(diff)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
@@ -160,14 +166,14 @@ public class JSONText {
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
         let ticket = context.issueTimeTicket
-        let pairs: [GCPair]
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
 
-        (pairs, _) = try text.setStyle(
+        let (pairs, diff, _) = try text.setStyle(
             range,
             stringAttrs,
             ticket
         )
+        self.context?.acc(diff)
 
         context.push(
             operation: StyleOperation(

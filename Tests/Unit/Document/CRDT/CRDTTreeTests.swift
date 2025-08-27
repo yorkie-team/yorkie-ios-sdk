@@ -38,7 +38,7 @@ final class CRDTTreeNodeTests: XCTestCase {
         XCTAssertEqual(para.isText, false)
 
         let left = para.children[0]
-        let right = try left.splitText(5, 0)
+        let right = try left.splitText(5, 0).0
 
         XCTAssertEqual(CRDTTreeNode.toXML(node: para), "<p>helloyorkie</p>")
         XCTAssertEqual(para.size, 11)
@@ -195,7 +195,7 @@ final class CRDTTreeEditTests: XCTestCase {
         try tree.editT((1, 3), nil, 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p></p></root>")
 
-        var (parent, left) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT())
+        var ((parent, left), _) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT())
         XCTAssertEqual(try tree.toIndex(parent, left), 1)
 
         // Find the closest index.TreePos when parentNode in crdt.TreePos is removed.
@@ -204,7 +204,7 @@ final class CRDTTreeEditTests: XCTestCase {
         try tree.editT((0, 2), nil, 0, timeT(), timeT)
         XCTAssertEqual(tree.toXML(), /* html */ "<root></root>")
 
-        (parent, left) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT())
+        ((parent, left), _) = try tree.findNodesAndSplitText(CRDTTreePos(parentID: pNode.id, leftSiblingID: textNode.id), timeT())
         XCTAssertEqual(try tree.toIndex(parent, left), 0)
     }
 }

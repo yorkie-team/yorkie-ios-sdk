@@ -473,10 +473,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ value: T?,
         _ versionVector: VersionVector? = nil
-    ) throws -> (RGATreeSplitPos, [GCPair], [ContentChange<T>]) {
+    ) throws -> (RGATreeSplitPos, [GCPair], DataSize, [ContentChange<T>]) {
+        var diff = DataSize(data: 0, meta: 0)
+
         // 01. split nodes with from and to
-        let (toLeft, toRight) = try self.findNodeWithSplit(range.1, editedAt)
-        let (fromLeft, fromRight) = try self.findNodeWithSplit(range.0, editedAt)
+        let (toLeft, diffTo, toRight) = try self.findNodeWithSplit(range.1, editedAt)
+        let (fromLeft, diffFrom, fromRight) = try self.findNodeWithSplit(range.0, editedAt)
+        diff.addDataSizes(others: diffFrom, diffTo)
 
         // 02. delete between from and to
         let nodesToDelete = self.findBetween(fromRight, toRight)
@@ -498,6 +501,8 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 RGATreeSplitNode(RGATreeSplitNodeID(editedAt, 0), value)
             )
 
+            diff.addDataSizes(others: inserted.getDataSize())
+
             if !changes.isEmpty, changes[changes.count - 1].from == idx {
                 changes[changes.count - 1].content = value
             } else {
@@ -513,7 +518,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             pairs.append(GCPair(parent: self, child: removedNode))
         }
 
-        return (caretPos, pairs, changes)
+        return (caretPos, pairs, diff, changes)
     }
 
     /**
@@ -654,18 +659,21 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodeWithSplit` splits and return nodes of the given position.
      */
-    public func findNodeWithSplit(_ pos: RGATreeSplitPos, _ editedAt: TimeTicket) throws -> (RGATreeSplitNode<T>, RGATreeSplitNode<T>?) {
+    public func findNodeWithSplit(
+        _ pos: RGATreeSplitPos,
+        _ editedAt: TimeTicket
+    ) throws -> (RGATreeSplitNode<T>, DataSize, RGATreeSplitNode<T>?) {
         let absoluteID = pos.absoluteID
         var node = try self.findFloorNodePreferToLeft(absoluteID)
         let relativeOffset = absoluteID.offset - node.id.offset
 
-        try self.splitNode(node, relativeOffset)
+        let (_, diff) = try self.splitNode(node, relativeOffset)
 
         while let next = node.next, next.createdAt.after(editedAt) {
             node = next
         }
 
-        return (node, node.next)
+        return (node, diff, node.next)
     }
 
     private func findFloorNodePreferToLeft(_ id: RGATreeSplitNodeID) throws -> RGATreeSplitNode<T> {
@@ -712,17 +720,20 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     }
 
     @discardableResult
-    private func splitNode(_ node: RGATreeSplitNode<T>, _ offset: Int32) throws -> RGATreeSplitNode<T>? {
+    private func splitNode(_ node: RGATreeSplitNode<T>, _ offset: Int32) throws -> (RGATreeSplitNode<T>?, DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
         guard offset <= node.contentLength else {
             let message = "offset should be less than or equal to length"
             throw YorkieError(code: .errInvalidArgument, message: message)
         }
 
         if offset == 0 {
-            return node
+            return (node, diff)
         } else if offset == node.contentLength {
-            return node.next
+            return (node.next, diff)
         }
+
+        let prvSize = node.getDataSize()
 
         let splitNode = node.split(offset)
         self.treeByIndex.updateWeight(splitNode)
@@ -733,7 +744,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         }
         splitNode.setInsPrev(node)
 
-        return splitNode
+        diff.addDataSizes(others: node.getDataSize(), splitNode.getDataSize())
+        diff.subDataSize(others: prvSize)
+
+        return (splitNode, diff)
     }
 
     private func deleteNodes(

@@ -311,6 +311,7 @@ public class Client {
                        _ syncMode: SyncMode = .realtime,
                        initialRoot: [String: JSONValuable?]? = nil) async throws -> Document
     {
+        // 01. Check if the client is ready to attach documents.
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -328,6 +329,7 @@ public class Client {
             presence.set(initialPresence)
         }
 
+        // 02. Subscribe local broadcast event.
         doc.subscribeLocalBroadcast { [weak self] event, doc in
             guard let self else { return }
             guard let broadcastEvent = event as? LocalBroadcastEvent else {
@@ -360,6 +362,11 @@ public class Client {
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach error")
+            }
+
+            let maxSizePerDocument = message.maxSizePerDocument
+            if maxSizePerDocument > 0 {
+                doc.setMaxSizePerDocument(Int(maxSizePerDocument))
             }
 
             let pack = try Converter.fromChangePack(message.changePack)

@@ -377,12 +377,16 @@ final class CRDTTreeNode: IndexTreeNode {
      * `split` splits the given offset of this node.
      */
     @discardableResult
-    func split(_ tree: CRDTTree, _ offset: Int32, _ issueTimeTicket: TimeTicket? = nil) throws -> CRDTTreeNode? {
+    func split(
+        _ tree: CRDTTree,
+        _ offset: Int32,
+        _ issueTimeTicket: TimeTicket? = nil
+    ) throws -> (CRDTTreeNode?, DataSize) {
         if self.isText == false, issueTimeTicket == nil {
             throw YorkieError(code: .errInvalidArgument, message: "The issueTimeTicket for Text Node have to nil!")
         }
 
-        let split = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!)
+        let (split, diff) = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!)
 
         if split != nil {
             split?.insPrevID = self.id
@@ -395,7 +399,7 @@ final class CRDTTreeNode: IndexTreeNode {
             tree.registerNode(split!)
         }
 
-        return split
+        return (split, diff)
     }
 
     /**
@@ -553,29 +557,26 @@ extension CRDTTreeNode: GCChild {
      * `getDataSize` returns the data size of the node.
      */
     func getDataSize() -> DataSize {
-        var meta = 0
         var data = 0
+        var meta = timeTicketSize
 
         if self.isText {
             data += self.size * 2
         }
 
-        // assume self.id is always `NOT` nil
-        meta += timeTicketSize
-
-        if self.removedAt != nil {
+        if self.isRemoved {
             meta += timeTicketSize
         }
 
         if let attrs {
-            for node in attrs where node.removedAt == nil {
+            for node in attrs where node.isRemoved == false {
                 let size = node.getDataSize()
                 meta += size.meta
                 data += size.data
             }
         }
-
-        return .init(data: data, meta: meta)
+        let result = DataSize(data: data, meta: meta)
+        return result
     }
 
     /**
@@ -633,7 +634,11 @@ class CRDTTree: CRDTElement {
      * This is different from `TreePos` which is a position of the tree in the
      * physical perspective.
      */
-    func findNodesAndSplitText(_ pos: CRDTTreePos, _ editedAt: TimeTicket? = nil) throws -> TreeNodePair {
+    func findNodesAndSplitText(
+        _ pos: CRDTTreePos,
+        _ editedAt: TimeTicket? = nil
+    ) throws -> (TreeNodePair, DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
         // 01. Find the parent and left sibling node of the given position.
         let (parent, leftSibling) = try pos.toTreeNodePair(tree: self)
         var leftNode = leftSibling
@@ -645,7 +650,8 @@ class CRDTTree: CRDTElement {
 
         // 03. Split text node if the left node is a text node.
         if leftNode.isText {
-            try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset, nil)
+            let (_, splitedDiff) = try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset)
+            diff = splitedDiff
         }
 
         // 04. Find the appropriate left node. If some nodes are inserted at the
@@ -664,7 +670,7 @@ class CRDTTree: CRDTElement {
             }
         }
 
-        return (realParent, leftNode)
+        return ((realParent, leftNode), diff)
     }
 
     /**
@@ -676,14 +682,16 @@ class CRDTTree: CRDTElement {
         _ attributes: [String: String]?,
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector?
-    ) throws -> ([GCPair], [TreeChange]) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
+    ) throws -> ([GCPair], [TreeChange], DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
+        let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
+        let ((toParent, toLeft), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        diff.addDataSizes(others: fromDiff, toDiff)
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
-            let (node, _) = token
+            let (node, tokenType) = token
             let actorID = node.createdAt.actorID
             var clientLamportAtChange: Int64 = .max
 
@@ -720,10 +728,18 @@ class CRDTTree: CRDTElement {
                         pairs.append(GCPair(parent: node, child: prev))
                     }
                 }
+
+                for attr in attributes {
+                    let key = attr.key
+                    let curr = node.attrs?.getNodeByKey(key)
+                    if let curr, tokenType != .end {
+                        diff.addDataSizes(others: curr.getDataSize())
+                    }
+                }
             }
         }
 
-        return (pairs, changes)
+        return (pairs, changes, diff)
     }
 
     /**
@@ -734,9 +750,11 @@ class CRDTTree: CRDTElement {
         _ attributesToRemove: [String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], [TreeChange]) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
+    ) throws -> ([GCPair], [TreeChange], DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
+        let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
+        let ((toParent, toLeft), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        diff.addDataSizes(others: fromDiff, toDiff)
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
@@ -778,7 +796,7 @@ class CRDTTree: CRDTElement {
             }
         }
 
-        return (pairs, changes)
+        return (pairs, changes, diff)
     }
 
     /**
@@ -793,10 +811,12 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair]) {
+    ) throws -> ([TreeChange], [GCPair], DataSize) {
         // 01. find nodes from the given range and split nodes.
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0, editedAt)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1, editedAt)
+        var diff = DataSize(data: 0, meta: 0)
+        let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
+        let ((toParent, toLeft), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        diff.addDataSizes(others: fromDiff, toDiff)
 
         let fromIdx = try self.toIndex(fromParent, fromLeft)
         let fromPath = try self.toPath(fromParent, fromLeft)
@@ -904,6 +924,9 @@ class CRDTTree: CRDTElement {
                         node.remove(editedAt)
 
                         pairs.append(GCPair(parent: self, child: node))
+                    } else {
+                        print(node.getDataSize())
+                        diff.addDataSizes(others: node.getDataSize())
                     }
 
                     self.nodeMapByID.put(node.id, node)
@@ -936,8 +959,7 @@ class CRDTTree: CRDTElement {
                 }
             }
         }
-
-        return (changes, pairs)
+        return (changes, pairs, diff)
     }
 
     /**
@@ -1150,8 +1172,8 @@ class CRDTTree: CRDTElement {
      * `posRangeToPathRange` converts the given position range to the path range.
      */
     func posRangeToPathRange(_ range: TreePosRange) throws -> ([Int], [Int]) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1)
+        let ((fromParent, fromLeft), _) = try self.findNodesAndSplitText(range.0)
+        let ((toParent, toLeft), _) = try self.findNodesAndSplitText(range.1)
 
         return try (self.toPath(fromParent, fromLeft), self.toPath(toParent, toLeft))
     }
@@ -1160,8 +1182,8 @@ class CRDTTree: CRDTElement {
      * `posRangeToIndexRange` converts the given position range to the path range.
      */
     func posRangeToIndexRange(_ range: TreePosRange) throws -> (Int, Int) {
-        let (fromParent, fromLeft) = try self.findNodesAndSplitText(range.0)
-        let (toParent, toLeft) = try self.findNodesAndSplitText(range.1)
+        let ((fromParent, fromLeft), _) = try self.findNodesAndSplitText(range.0)
+        let ((toParent, toLeft), _) = try self.findNodesAndSplitText(range.1)
 
         return try (self.toIndex(fromParent, fromLeft), self.toIndex(toParent, toLeft))
     }
@@ -1385,5 +1407,11 @@ extension CRDTTree: CRDTGCPairContainable {
         }
 
         return pairs
+    }
+}
+
+extension CRDTTreeNode {
+    var toXML: String {
+        return CRDTTreeNode.toXML(node: self)
     }
 }

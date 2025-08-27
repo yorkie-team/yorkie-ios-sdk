@@ -1688,49 +1688,99 @@ public struct Yorkie_V1_User: Sendable {
   fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-public struct Yorkie_V1_Project: Sendable {
+public struct Yorkie_V1_Project: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var id: String = String()
+  public var id: String {
+    get {return _storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
 
-  public var name: String = String()
+  public var name: String {
+    get {return _storage._name}
+    set {_uniqueStorage()._name = newValue}
+  }
 
-  public var publicKey: String = String()
+  public var publicKey: String {
+    get {return _storage._publicKey}
+    set {_uniqueStorage()._publicKey = newValue}
+  }
 
-  public var secretKey: String = String()
+  public var secretKey: String {
+    get {return _storage._secretKey}
+    set {_uniqueStorage()._secretKey = newValue}
+  }
 
-  public var authWebhookURL: String = String()
+  public var authWebhookURL: String {
+    get {return _storage._authWebhookURL}
+    set {_uniqueStorage()._authWebhookURL = newValue}
+  }
 
-  public var authWebhookMethods: [String] = []
+  public var authWebhookMethods: [String] {
+    get {return _storage._authWebhookMethods}
+    set {_uniqueStorage()._authWebhookMethods = newValue}
+  }
 
-  public var clientDeactivateThreshold: String = String()
+  public var eventWebhookURL: String {
+    get {return _storage._eventWebhookURL}
+    set {_uniqueStorage()._eventWebhookURL = newValue}
+  }
+
+  public var eventWebhookEvents: [String] {
+    get {return _storage._eventWebhookEvents}
+    set {_uniqueStorage()._eventWebhookEvents = newValue}
+  }
+
+  public var clientDeactivateThreshold: String {
+    get {return _storage._clientDeactivateThreshold}
+    set {_uniqueStorage()._clientDeactivateThreshold = newValue}
+  }
+
+  public var maxSubscribersPerDocument: Int32 {
+    get {return _storage._maxSubscribersPerDocument}
+    set {_uniqueStorage()._maxSubscribersPerDocument = newValue}
+  }
+
+  public var maxAttachmentsPerDocument: Int32 {
+    get {return _storage._maxAttachmentsPerDocument}
+    set {_uniqueStorage()._maxAttachmentsPerDocument = newValue}
+  }
+
+  public var maxSizePerDocument: Int32 {
+    get {return _storage._maxSizePerDocument}
+    set {_uniqueStorage()._maxSizePerDocument = newValue}
+  }
+
+  public var allowedOrigins: [String] {
+    get {return _storage._allowedOrigins}
+    set {_uniqueStorage()._allowedOrigins = newValue}
+  }
 
   public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_createdAt = newValue}
+    get {return _storage._createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {return _storage._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
-  public mutating func clearCreatedAt() {self._createdAt = nil}
+  public mutating func clearCreatedAt() {_uniqueStorage()._createdAt = nil}
 
   public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
-    set {_updatedAt = newValue}
+    get {return _storage._updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_uniqueStorage()._updatedAt = newValue}
   }
   /// Returns true if `updatedAt` has been explicitly set.
-  public var hasUpdatedAt: Bool {return self._updatedAt != nil}
+  public var hasUpdatedAt: Bool {return _storage._updatedAt != nil}
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
-  public mutating func clearUpdatedAt() {self._updatedAt = nil}
+  public mutating func clearUpdatedAt() {_uniqueStorage()._updatedAt = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
-  fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public struct Yorkie_V1_UpdatableProjectFields: Sendable {
@@ -1765,6 +1815,24 @@ public struct Yorkie_V1_UpdatableProjectFields: Sendable {
   /// Clears the value of `authWebhookMethods`. Subsequent reads from it will return its default value.
   public mutating func clearAuthWebhookMethods() {self._authWebhookMethods = nil}
 
+  public var eventWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {return _eventWebhookURL ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_eventWebhookURL = newValue}
+  }
+  /// Returns true if `eventWebhookURL` has been explicitly set.
+  public var hasEventWebhookURL: Bool {return self._eventWebhookURL != nil}
+  /// Clears the value of `eventWebhookURL`. Subsequent reads from it will return its default value.
+  public mutating func clearEventWebhookURL() {self._eventWebhookURL = nil}
+
+  public var eventWebhookEvents: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents {
+    get {return _eventWebhookEvents ?? Yorkie_V1_UpdatableProjectFields.EventWebhookEvents()}
+    set {_eventWebhookEvents = newValue}
+  }
+  /// Returns true if `eventWebhookEvents` has been explicitly set.
+  public var hasEventWebhookEvents: Bool {return self._eventWebhookEvents != nil}
+  /// Clears the value of `eventWebhookEvents`. Subsequent reads from it will return its default value.
+  public mutating func clearEventWebhookEvents() {self._eventWebhookEvents = nil}
+
   public var clientDeactivateThreshold: SwiftProtobuf.Google_Protobuf_StringValue {
     get {return _clientDeactivateThreshold ?? SwiftProtobuf.Google_Protobuf_StringValue()}
     set {_clientDeactivateThreshold = newValue}
@@ -1773,6 +1841,42 @@ public struct Yorkie_V1_UpdatableProjectFields: Sendable {
   public var hasClientDeactivateThreshold: Bool {return self._clientDeactivateThreshold != nil}
   /// Clears the value of `clientDeactivateThreshold`. Subsequent reads from it will return its default value.
   public mutating func clearClientDeactivateThreshold() {self._clientDeactivateThreshold = nil}
+
+  public var maxSubscribersPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value {
+    get {return _maxSubscribersPerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
+    set {_maxSubscribersPerDocument = newValue}
+  }
+  /// Returns true if `maxSubscribersPerDocument` has been explicitly set.
+  public var hasMaxSubscribersPerDocument: Bool {return self._maxSubscribersPerDocument != nil}
+  /// Clears the value of `maxSubscribersPerDocument`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxSubscribersPerDocument() {self._maxSubscribersPerDocument = nil}
+
+  public var maxAttachmentsPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value {
+    get {return _maxAttachmentsPerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
+    set {_maxAttachmentsPerDocument = newValue}
+  }
+  /// Returns true if `maxAttachmentsPerDocument` has been explicitly set.
+  public var hasMaxAttachmentsPerDocument: Bool {return self._maxAttachmentsPerDocument != nil}
+  /// Clears the value of `maxAttachmentsPerDocument`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxAttachmentsPerDocument() {self._maxAttachmentsPerDocument = nil}
+
+  public var maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value {
+    get {return _maxSizePerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
+    set {_maxSizePerDocument = newValue}
+  }
+  /// Returns true if `maxSizePerDocument` has been explicitly set.
+  public var hasMaxSizePerDocument: Bool {return self._maxSizePerDocument != nil}
+  /// Clears the value of `maxSizePerDocument`. Subsequent reads from it will return its default value.
+  public mutating func clearMaxSizePerDocument() {self._maxSizePerDocument = nil}
+
+  public var allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins {
+    get {return _allowedOrigins ?? Yorkie_V1_UpdatableProjectFields.AllowedOrigins()}
+    set {_allowedOrigins = newValue}
+  }
+  /// Returns true if `allowedOrigins` has been explicitly set.
+  public var hasAllowedOrigins: Bool {return self._allowedOrigins != nil}
+  /// Clears the value of `allowedOrigins`. Subsequent reads from it will return its default value.
+  public mutating func clearAllowedOrigins() {self._allowedOrigins = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1788,12 +1892,42 @@ public struct Yorkie_V1_UpdatableProjectFields: Sendable {
     public init() {}
   }
 
+  public struct EventWebhookEvents: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var events: [String] = []
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
+  public struct AllowedOrigins: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var origins: [String] = []
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
   public init() {}
 
   fileprivate var _name: SwiftProtobuf.Google_Protobuf_StringValue? = nil
   fileprivate var _authWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue? = nil
   fileprivate var _authWebhookMethods: Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods? = nil
+  fileprivate var _eventWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+  fileprivate var _eventWebhookEvents: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents? = nil
   fileprivate var _clientDeactivateThreshold: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+  fileprivate var _maxSubscribersPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
+  fileprivate var _maxAttachmentsPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
+  fileprivate var _maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
+  fileprivate var _allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins? = nil
 }
 
 public struct Yorkie_V1_DocumentSummary: Sendable {
@@ -2553,15 +2687,11 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -2653,15 +2783,11 @@ extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -2861,15 +2987,11 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _attributes: Dictionary<String,String> = [:]
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -3037,15 +3159,11 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -3147,15 +3265,11 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -3247,15 +3361,11 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _splitLevel: Int32 = 0
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -3371,15 +3481,11 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
     var _attributesToRemove: [String] = []
     var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -3489,15 +3595,11 @@ extension Yorkie_V1_Operation.ArraySet: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -4165,15 +4267,11 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _next: Yorkie_V1_RGANode? = nil
     var _element: Yorkie_V1_JSONElement? = nil
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -4411,15 +4509,11 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     var _depth: Int32 = 0
     var _attributes: Dictionary<String,Yorkie_V1_NodeAttr> = [:]
 
-    #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
       // This will force a copy to be made of this reference when the first mutation occurs;
       // hence, it is safe to mark this as `nonisolated(unsafe)`.
       static nonisolated(unsafe) let defaultInstance = _StorageClass()
-    #else
-      static let defaultInstance = _StorageClass()
-    #endif
 
     private init() {}
 
@@ -4693,76 +4787,176 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     4: .standard(proto: "secret_key"),
     5: .standard(proto: "auth_webhook_url"),
     6: .standard(proto: "auth_webhook_methods"),
-    7: .standard(proto: "client_deactivate_threshold"),
-    8: .standard(proto: "created_at"),
-    9: .standard(proto: "updated_at"),
+    7: .standard(proto: "event_webhook_url"),
+    8: .standard(proto: "event_webhook_events"),
+    9: .standard(proto: "client_deactivate_threshold"),
+    10: .standard(proto: "max_subscribers_per_document"),
+    11: .standard(proto: "max_attachments_per_document"),
+    15: .standard(proto: "max_size_per_document"),
+    14: .standard(proto: "allowed_origins"),
+    12: .standard(proto: "created_at"),
+    13: .standard(proto: "updated_at"),
   ]
 
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _name: String = String()
+    var _publicKey: String = String()
+    var _secretKey: String = String()
+    var _authWebhookURL: String = String()
+    var _authWebhookMethods: [String] = []
+    var _eventWebhookURL: String = String()
+    var _eventWebhookEvents: [String] = []
+    var _clientDeactivateThreshold: String = String()
+    var _maxSubscribersPerDocument: Int32 = 0
+    var _maxAttachmentsPerDocument: Int32 = 0
+    var _maxSizePerDocument: Int32 = 0
+    var _allowedOrigins: [String] = []
+    var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+    var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _name = source._name
+      _publicKey = source._publicKey
+      _secretKey = source._secretKey
+      _authWebhookURL = source._authWebhookURL
+      _authWebhookMethods = source._authWebhookMethods
+      _eventWebhookURL = source._eventWebhookURL
+      _eventWebhookEvents = source._eventWebhookEvents
+      _clientDeactivateThreshold = source._clientDeactivateThreshold
+      _maxSubscribersPerDocument = source._maxSubscribersPerDocument
+      _maxAttachmentsPerDocument = source._maxAttachmentsPerDocument
+      _maxSizePerDocument = source._maxSizePerDocument
+      _allowedOrigins = source._allowedOrigins
+      _createdAt = source._createdAt
+      _updatedAt = source._updatedAt
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.publicKey) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.secretKey) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.authWebhookURL) }()
-      case 6: try { try decoder.decodeRepeatedStringField(value: &self.authWebhookMethods) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self.clientDeactivateThreshold) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._publicKey) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._secretKey) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._authWebhookURL) }()
+        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._authWebhookMethods) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._eventWebhookURL) }()
+        case 8: try { try decoder.decodeRepeatedStringField(value: &_storage._eventWebhookEvents) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._clientDeactivateThreshold) }()
+        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._maxSubscribersPerDocument) }()
+        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._maxAttachmentsPerDocument) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
+        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
+        case 14: try { try decoder.decodeRepeatedStringField(value: &_storage._allowedOrigins) }()
+        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._maxSizePerDocument) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if !_storage._name.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 2)
+      }
+      if !_storage._publicKey.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._publicKey, fieldNumber: 3)
+      }
+      if !_storage._secretKey.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._secretKey, fieldNumber: 4)
+      }
+      if !_storage._authWebhookURL.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._authWebhookURL, fieldNumber: 5)
+      }
+      if !_storage._authWebhookMethods.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._authWebhookMethods, fieldNumber: 6)
+      }
+      if !_storage._eventWebhookURL.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._eventWebhookURL, fieldNumber: 7)
+      }
+      if !_storage._eventWebhookEvents.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._eventWebhookEvents, fieldNumber: 8)
+      }
+      if !_storage._clientDeactivateThreshold.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._clientDeactivateThreshold, fieldNumber: 9)
+      }
+      if _storage._maxSubscribersPerDocument != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._maxSubscribersPerDocument, fieldNumber: 10)
+      }
+      if _storage._maxAttachmentsPerDocument != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._maxAttachmentsPerDocument, fieldNumber: 11)
+      }
+      try { if let v = _storage._createdAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
+      try { if let v = _storage._updatedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      } }()
+      if !_storage._allowedOrigins.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._allowedOrigins, fieldNumber: 14)
+      }
+      if _storage._maxSizePerDocument != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._maxSizePerDocument, fieldNumber: 15)
+      }
     }
-    if !self.name.isEmpty {
-      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
-    }
-    if !self.publicKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.publicKey, fieldNumber: 3)
-    }
-    if !self.secretKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.secretKey, fieldNumber: 4)
-    }
-    if !self.authWebhookURL.isEmpty {
-      try visitor.visitSingularStringField(value: self.authWebhookURL, fieldNumber: 5)
-    }
-    if !self.authWebhookMethods.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.authWebhookMethods, fieldNumber: 6)
-    }
-    if !self.clientDeactivateThreshold.isEmpty {
-      try visitor.visitSingularStringField(value: self.clientDeactivateThreshold, fieldNumber: 7)
-    }
-    try { if let v = self._createdAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._updatedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_Project, rhs: Yorkie_V1_Project) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.name != rhs.name {return false}
-    if lhs.publicKey != rhs.publicKey {return false}
-    if lhs.secretKey != rhs.secretKey {return false}
-    if lhs.authWebhookURL != rhs.authWebhookURL {return false}
-    if lhs.authWebhookMethods != rhs.authWebhookMethods {return false}
-    if lhs.clientDeactivateThreshold != rhs.clientDeactivateThreshold {return false}
-    if lhs._createdAt != rhs._createdAt {return false}
-    if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._publicKey != rhs_storage._publicKey {return false}
+        if _storage._secretKey != rhs_storage._secretKey {return false}
+        if _storage._authWebhookURL != rhs_storage._authWebhookURL {return false}
+        if _storage._authWebhookMethods != rhs_storage._authWebhookMethods {return false}
+        if _storage._eventWebhookURL != rhs_storage._eventWebhookURL {return false}
+        if _storage._eventWebhookEvents != rhs_storage._eventWebhookEvents {return false}
+        if _storage._clientDeactivateThreshold != rhs_storage._clientDeactivateThreshold {return false}
+        if _storage._maxSubscribersPerDocument != rhs_storage._maxSubscribersPerDocument {return false}
+        if _storage._maxAttachmentsPerDocument != rhs_storage._maxAttachmentsPerDocument {return false}
+        if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
+        if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
+        if _storage._createdAt != rhs_storage._createdAt {return false}
+        if _storage._updatedAt != rhs_storage._updatedAt {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4774,7 +4968,13 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
     1: .same(proto: "name"),
     2: .standard(proto: "auth_webhook_url"),
     3: .standard(proto: "auth_webhook_methods"),
-    4: .standard(proto: "client_deactivate_threshold"),
+    4: .standard(proto: "event_webhook_url"),
+    5: .standard(proto: "event_webhook_events"),
+    6: .standard(proto: "client_deactivate_threshold"),
+    7: .standard(proto: "max_subscribers_per_document"),
+    8: .standard(proto: "max_attachments_per_document"),
+    10: .standard(proto: "max_size_per_document"),
+    9: .standard(proto: "allowed_origins"),
   ]
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4786,7 +4986,13 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
       case 1: try { try decoder.decodeSingularMessageField(value: &self._name) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._authWebhookURL) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._authWebhookMethods) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._clientDeactivateThreshold) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._eventWebhookURL) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._eventWebhookEvents) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._clientDeactivateThreshold) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._maxSubscribersPerDocument) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._maxAttachmentsPerDocument) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._allowedOrigins) }()
+      case 10: try { try decoder.decodeSingularMessageField(value: &self._maxSizePerDocument) }()
       default: break
       }
     }
@@ -4806,8 +5012,26 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
     try { if let v = self._authWebhookMethods {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
-    try { if let v = self._clientDeactivateThreshold {
+    try { if let v = self._eventWebhookURL {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._eventWebhookEvents {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._clientDeactivateThreshold {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._maxSubscribersPerDocument {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._maxAttachmentsPerDocument {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
+    try { if let v = self._allowedOrigins {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
+    try { if let v = self._maxSizePerDocument {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4816,7 +5040,13 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
     if lhs._name != rhs._name {return false}
     if lhs._authWebhookURL != rhs._authWebhookURL {return false}
     if lhs._authWebhookMethods != rhs._authWebhookMethods {return false}
+    if lhs._eventWebhookURL != rhs._eventWebhookURL {return false}
+    if lhs._eventWebhookEvents != rhs._eventWebhookEvents {return false}
     if lhs._clientDeactivateThreshold != rhs._clientDeactivateThreshold {return false}
+    if lhs._maxSubscribersPerDocument != rhs._maxSubscribersPerDocument {return false}
+    if lhs._maxAttachmentsPerDocument != rhs._maxAttachmentsPerDocument {return false}
+    if lhs._maxSizePerDocument != rhs._maxSizePerDocument {return false}
+    if lhs._allowedOrigins != rhs._allowedOrigins {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4849,6 +5079,70 @@ extension Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods: SwiftProtobuf.Mes
 
   public static func ==(lhs: Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods, rhs: Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods) -> Bool {
     if lhs.methods != rhs.methods {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_UpdatableProjectFields.EventWebhookEvents: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Yorkie_V1_UpdatableProjectFields.protoMessageName + ".EventWebhookEvents"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "events"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.events) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.events.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.events, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents, rhs: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents) -> Bool {
+    if lhs.events != rhs.events {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_UpdatableProjectFields.AllowedOrigins: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Yorkie_V1_UpdatableProjectFields.protoMessageName + ".AllowedOrigins"
+  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "origins"),
+  ]
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedStringField(value: &self.origins) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.origins.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.origins, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_UpdatableProjectFields.AllowedOrigins, rhs: Yorkie_V1_UpdatableProjectFields.AllowedOrigins) -> Bool {
+    if lhs.origins != rhs.origins {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

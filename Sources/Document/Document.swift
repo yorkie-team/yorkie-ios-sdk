@@ -96,6 +96,7 @@ public class Document {
     private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
+    private var maxSizeLimit: Int
 
     private var root = CRDTRoot()
     private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
@@ -127,12 +128,16 @@ public class Document {
     public nonisolated init(key: DocKey, opts: DocumentOptions) {
         self.key = key
         self.disableGC = opts.disableGC
+        self.maxSizeLimit = 0
     }
 
     /**
      * `update` executes the given updater to update this document.
      */
-    public func update(_ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void, _ message: String? = nil) throws {
+    public func update(
+        _ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void,
+        _ message: String? = nil
+    ) throws {
         guard self.status != .removed else {
             throw YorkieError(code: .errDocumentRemoved, message: "\(self) is removed.")
         }
@@ -160,6 +165,12 @@ public class Document {
         try updater(proxy, &presence)
 
         self.clone?.presences[actorID] = presence.presence
+
+        let size = self.getClone()?.root.getDocSize().totalDocSize ?? 0
+        if !context.isPresenceOnlyChange, self.maxSizeLimit > 0, self.maxSizeLimit < size {
+            self.clone = nil
+            throw YorkieError(code: .errDocumentSizeExceedsLimit, message: "document size exceeded: \(size) > \(self.maxSizeLimit)")
+        }
 
         // 02. Update the root object and presences from changes.
         if context.hasChange {
@@ -441,6 +452,20 @@ public class Document {
     }
 
     /**
+     * `getMaxSizePerDocument` gets the maximum size of this document.
+     */
+    public func getMaxSizePerDocument() -> Int {
+        return self.maxSizeLimit
+    }
+
+    /**
+     * `setMaxSizePerDocument` sets the maximum size of this document.
+     */
+    public func setMaxSizePerDocument(_ size: Int) {
+        self.maxSizeLimit = size
+    }
+
+    /**
      * `garbageCollect` purges elements that were removed before the given time.
      *
      */
@@ -498,6 +523,13 @@ public class Document {
      */
     public func getStats() -> RootStats {
         return self.root.getStats()
+    }
+
+    /**
+     * `getClone` returns this clone.
+     */
+    func getClone() -> (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])? {
+        return self.clone
     }
 
     /**

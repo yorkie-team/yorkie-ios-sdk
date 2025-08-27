@@ -74,13 +74,14 @@ struct EditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (changes, pairs, _) = try text.edit(
+        let (changes, pairs, diff, _) = try text.edit(
             (self.fromPos, self.toPos),
             self.content,
             self.executedAt,
             self.attributes,
             versionVector
         )
+        root.acc(diff)
 
         for pair in pairs {
             root.registerGCPair(pair)

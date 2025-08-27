@@ -1942,13 +1942,13 @@ class GCIntegrationTests: XCTestCase {
         }
 
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
-            ActorData(actor: client1.id!, lamport: 2001),
-            ActorData(actor: client2.id!, lamport: 2000)
+            ActorData(actor: client1.id!, lamport: 1001),
+            ActorData(actor: client2.id!, lamport: 1000)
         ])
 
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
-            ActorData(actor: client1.id!, lamport: 1998),
-            ActorData(actor: client2.id!, lamport: 2000)
+            ActorData(actor: client1.id!, lamport: 998),
+            ActorData(actor: client2.id!, lamport: 1000)
         ])
 
         await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [
@@ -1965,9 +1965,9 @@ class GCIntegrationTests: XCTestCase {
 
         let vectors = await doc3.getVersionVector()
         await assertTrue(versionVector: vectors, actorDatas: [
-            ActorData(actor: client1.id!, lamport: 1998),
-            ActorData(actor: client2.id!, lamport: 2000),
-            ActorData(actor: client3.id!, lamport: 2003)
+            ActorData(actor: client1.id!, lamport: 998),
+            ActorData(actor: client2.id!, lamport: 1000),
+            ActorData(actor: client3.id!, lamport: 1003)
         ])
 
         try await client3.sync()

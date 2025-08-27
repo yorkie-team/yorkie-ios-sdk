@@ -67,12 +67,13 @@ struct StyleOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (pairs, changes) = try text.setStyle(
+        let (pairs, diff, changes) = try text.setStyle(
             (self.fromPos, self.toPos),
             self.attributes,
             self.executedAt,
             versionVector
         )
+        root.acc(diff)
 
         for pair in pairs {
             root.registerGCPair(pair)

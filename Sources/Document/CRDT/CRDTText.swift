@@ -149,6 +149,10 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
         self.attributes.toObject()
     }
 
+    func getAttrs() -> RHT {
+        return self.attributes
+    }
+
     public var description: String {
         self.content as String
     }
@@ -223,7 +227,7 @@ final class CRDTText: CRDTElement {
         _ editedAt: TimeTicket,
         _ attributes: [String: String]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TextChange], [GCPair], RGATreeSplitPosRange) {
+    ) throws -> ([TextChange], [GCPair], DataSize, RGATreeSplitPosRange) {
         let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
             for (key, jsonValue) in attributes {
@@ -231,7 +235,7 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        let (caretPos, pairs, contentChanges) = try self.rgaTreeSplit.edit(
+        let (caretPos, pairs, diff, contentChanges) = try self.rgaTreeSplit.edit(
             range,
             editedAt,
             value,
@@ -246,7 +250,7 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        return (changes, pairs, (caretPos, caretPos))
+        return (changes, pairs, diff, (caretPos, caretPos))
     }
 
     /**
@@ -264,10 +268,13 @@ final class CRDTText: CRDTElement {
         _ attributes: [String: String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], [TextChange]) {
+    ) throws -> ([GCPair], DataSize, [TextChange]) {
+        var diff = DataSize(data: 0, meta: 0)
         // 01. split nodes with from and to
-        let toRight = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt).1
-        let fromRight = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt).1
+        let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
+        let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
+
+        diff.addDataSizes(others: diffTo, diffFrom)
 
         // 02. style nodes between from and to
         var changes = [TextChange]()
@@ -309,10 +316,14 @@ final class CRDTText: CRDTElement {
                 if prev != nil {
                     pairs.append(GCPair(parent: node.value, child: prev))
                 }
+
+                if let curr = node.value.getAttrs().getNodeByKey(key) {
+                    diff.addDataSizes(others: curr.getDataSize())
+                }
             }
         }
 
-        return (pairs, changes)
+        return (pairs, diff, changes)
     }
 
     /**

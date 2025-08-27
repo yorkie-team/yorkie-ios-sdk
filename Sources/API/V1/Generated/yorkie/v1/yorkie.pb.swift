@@ -114,6 +114,8 @@ public struct Yorkie_V1_AttachDocumentResponse: Sendable {
 
   public var documentID: String = String()
 
+  public var maxSizePerDocument: Int32 = 0
+
   public var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
@@ -531,6 +533,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
   public static let protoMessageName: String = _protobuf_package + ".AttachDocumentResponse"
   public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .standard(proto: "document_id"),
+    3: .standard(proto: "max_size_per_document"),
     2: .standard(proto: "change_pack"),
   ]
 
@@ -542,6 +545,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxSizePerDocument) }()
       default: break
       }
     }
@@ -558,11 +562,15 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    if self.maxSizePerDocument != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxSizePerDocument, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_AttachDocumentResponse, rhs: Yorkie_V1_AttachDocumentResponse) -> Bool {
     if lhs.documentID != rhs.documentID {return false}
+    if lhs.maxSizePerDocument != rhs.maxSizePerDocument {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
