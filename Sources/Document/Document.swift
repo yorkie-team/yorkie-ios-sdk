@@ -454,7 +454,7 @@ public class Document {
     /**
      * `getMaxSizePerDocument` gets the maximum size of this document.
      */
-    public func getMaxSizePerDoc() -> Int {
+    public func getMaxSizePerDocument() -> Int {
         return self.maxSizeLimit
     }
 
