@@ -77,7 +77,7 @@ class CRDTRoot {
         self.docSize = .init(live: .init(data: 0, meta: 0), gc: .init(data: 0, meta: 0))
 
         self.registerElement(self.rootObject, parent: nil)
-        self.rootObject.getDescendants(callback: { element, parent in
+        self.rootObject.getDescendants(callback: { element, _ in
             if element.removedAt != nil {
                 self.registerRemovedElement(element)
             }
