@@ -78,7 +78,6 @@ class CRDTRoot {
 
         self.registerElement(self.rootObject, parent: nil)
         self.rootObject.getDescendants(callback: { element, parent in
-            self.registerElement(element, parent: parent)
             if element.removedAt != nil {
                 self.registerRemovedElement(element)
             }
@@ -143,7 +142,8 @@ class CRDTRoot {
 
         if let element = element as? CRDTContainer {
             element.getDescendants { [unowned self] element, parent in
-                self.registerElement(element, parent: parent)
+                self.elementPairMapByCreatedAt[element.createdAt.toIDString] = (element, parent)
+                self.docSize.live.addDataSizes(others: element.getDataSize())
                 return false
             }
         }
