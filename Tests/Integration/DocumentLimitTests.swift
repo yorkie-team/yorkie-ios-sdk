@@ -145,7 +145,7 @@ class DocumentSizeLimitTest: XCTestCase {
         let doc1 = Document(key: docKey)
 
         try await client1.attach(doc1, [:], .manual)
-        let docMaxSize = await doc1.getMaxSizePerDoc()
+        let docMaxSize = await doc1.getMaxSizePerDocument()
         XCTAssertEqual(docMaxSize, size)
 
         return (client1, doc1)
@@ -157,7 +157,7 @@ extension DocumentSizeLimitTest {
     func test_should_successfully_assign_size_limit_to_document() async throws {
         // update the max size of document
         let (_, document) = try await activateClientAndDocument()
-        let docMaxSize = await document.getMaxSizePerDoc()
+        let docMaxSize = await document.getMaxSizePerDocument()
 
         XCTAssertEqual(docMaxSize, self.sizeLimit)
     }
