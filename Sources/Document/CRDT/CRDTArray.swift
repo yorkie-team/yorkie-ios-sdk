@@ -247,7 +247,6 @@ public struct DataSize {
      * `addDataSizes` adds the size of a resource to the target resource.
      */
     mutating func addDataSizes(
-        functionName: String = #function,
         others: DataSize...
     ) {
         for other in others {
