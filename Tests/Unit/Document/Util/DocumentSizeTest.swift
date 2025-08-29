@@ -153,21 +153,6 @@ extension DocumentSizeTest {
         await self.expectGC(with: .init(data: 2, meta: 48))
     }
 
-    // gc test
-    func test_if_primitive_type_has_correct_gc_size() async throws {
-        try await self.doc.update { root, _ in
-            root["num"] = Int32(1)
-            root["str"] = "hello"
-        }
-        await self.expectLive(with: .init(data: 14, meta: 72))
-
-        try await self.doc.update { root, _ in
-            root.remove(key: "num")
-        }
-        await self.expectLive(with: .init(data: 10, meta: 48))
-        await self.expectGC(with: .init(data: 4, meta: 48))
-    }
-
     // counter test
     func test_counter_type_has_correct_size() async throws {
         try await self.doc.update { root, _ in
@@ -298,5 +283,42 @@ extension DocumentSizeTest {
 
         await self.expectLive(with: .init(data: 10, meta: 144))
         await self.expectGC(with: .init(data: 36, meta: 168))
+    }
+
+    // gc test
+    func test_if_primitive_type_has_correct_gc_size() async throws {
+        try await self.doc.update { root, _ in
+            root["num"] = Int32(1)
+            root["str"] = "hello"
+        }
+        await self.expectLive(with: .init(data: 14, meta: 72))
+
+        try await self.doc.update { root, _ in
+            root.remove(key: "num")
+        }
+        await self.expectLive(with: .init(data: 10, meta: 48))
+        await self.expectGC(with: .init(data: 4, meta: 48))
+    }
+
+    // deep copy test
+    func test_deep_copy() async throws {
+        try await self.doc.update { root, _ in
+            root.cnt = JSONCounter(value: Int64(1))
+        }
+        let expectedDocSize = await doc.getDocSize()
+        let clone = await doc.cloned.root.deepcopy()
+        let cloneSize = clone.getDocSize()
+        XCTAssertEqual(expectedDocSize, cloneSize)
+    }
+
+    // deep copy for nested element test
+    func test_deep_copy_for_nested_element() async throws {
+        try await self.doc.update { root, _ in
+            root["arr"] = [JSONCounter<Int32>(value: 0)]
+        }
+        let expectedDocSize = await doc.getDocSize()
+        let clone = await doc.cloned.root.deepcopy()
+        let cloneSize = clone.getDocSize()
+        XCTAssertEqual(expectedDocSize, cloneSize)
     }
 }
