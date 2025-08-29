@@ -4,3 +4,4 @@ coverage:
     patch: off
 ignore:
   - Tests/
+  - "**/Generated/**"      # Ignore all Generated files]
