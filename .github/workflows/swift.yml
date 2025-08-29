@@ -30,6 +30,8 @@ jobs:
         brew unlink swiftformat
         curl -O ${{ env.SWIFTFORMAT_RB_URL }}
         brew install --formula ./swiftformat.rb
+    - name: Start Yorkie server
+      run: yorkie server &
     - name: SwiftLint
       run: |
         swiftlint --version
@@ -38,8 +40,6 @@ jobs:
       run: |
         swiftformat --version
         swiftformat --lint .
-    - name: Start Yorkie server
-      run: yorkie server --rpc-addr 0.0.0.0:8080
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
     - name: Prepare Code Coverage
