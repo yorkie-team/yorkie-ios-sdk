@@ -49,7 +49,10 @@ jobs:
     - name: Run tests
       run: swift test --enable-code-coverage -v --skip YorkieBenchmarkTests
     - name: Prepare Code Coverage
-      run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
+      run: |
+        xcrun llvm-cov export -format="lcov" \
+        .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests \
+        .build/debug/YorkieIntegrationTests.xctest/Contents/MacOS/YorkieIntegrationTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
     - name: Terminate Yorkie server
       run: killall yorkie
     - name: Upload coverage to Codecov
