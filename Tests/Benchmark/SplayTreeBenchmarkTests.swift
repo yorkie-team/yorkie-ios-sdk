@@ -115,7 +115,7 @@ final class SplayTreeBenchmarkTests: XCTestCase {
         }
     }
 
-    func check_testSplayTreeEditingTrace() throws {
+    func testSplayTreeEditingTrace() throws {
         guard let editTraceData = loadEditTraceData() else {
             XCTFail("Failed to load editing-trace.json")
             return
