@@ -38,10 +38,14 @@ jobs:
       run: |
         swiftformat --version
         swiftformat --lint .
+    - name: Start Yorkie server
+      run: yorkie server --rpc-addr 0.0.0.0:8080
     - name: Run tests
-      run: swift test --enable-code-coverage -v
+      run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
     - name: Prepare Code Coverage
       run: xcrun llvm-cov export -format="lcov" .build/debug/YorkiePackageTests.xctest/Contents/MacOS/YorkiePackageTests -instr-profile .build/debug/codecov/default.profdata > lcov.info
+    - name: Terminate Yorkie server
+      run: killall yorkie
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
