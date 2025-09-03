@@ -253,7 +253,7 @@ public class Client {
 
             let activateResponse = await self.yorkieService.activateClient(
                 request: activateRequest,
-                headers: self.authHeader.makeHeader(nil)
+                headers: self.authHeader.makeHeader(self.key)
             )
 
             guard activateResponse.error == nil, let message = activateResponse.message else {
@@ -285,7 +285,7 @@ public class Client {
             let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
 
             let deactivateResponse = await self.yorkieService.deactivateClient(request: deactivateRequest,
-                                                                               headers: self.authHeader.makeHeader(nil))
+                                                                               headers: self.authHeader.makeHeader(self.key))
 
             guard deactivateResponse.error == nil else {
                 throw self.handleErrorResponse(deactivateResponse.error, defaultMessage: "Unknown deactivate error")
