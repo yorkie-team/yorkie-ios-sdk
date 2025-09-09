@@ -133,3 +133,54 @@ public enum YorkieProjectHelper {
         return responseJSON
     }
 }
+
+extension YorkieProjectHelper {
+    @discardableResult
+    static func createSchema(
+        rpcAddress: String,
+        token: String,
+        date: String
+    ) async throws -> [String: Any] {
+        var result = [String: Any]()
+        let schema1Body: [String: Any] = [
+            "projectName": "default",
+            "schemaName": "schema1-" + date,
+            "schemaVersion": 1,
+            "schemaBody": "type Document = {title: string;};",
+            "rules": [
+                ["path": "$.title", "type": "string"]
+            ]
+        ]
+
+        let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/CreateSchema")!
+        let headers = ["Authorization": token]
+        let result1 = try await Self.postJSON(to: url, body: schema1Body, headers: headers)
+        result["\("schema1-" + date)"] = result1
+
+        let schema2Body: [String: Any] = [
+            "projectName": "default",
+            "schemaName": "schema2-" + date,
+            "schemaVersion": 1,
+            "schemaBody": "type Document = {title: integer;};",
+            "rules": [
+                ["path": "$.title", "type": "integer"]
+            ]
+        ]
+        let result2 = try await Self.postJSON(to: url, body: schema2Body, headers: headers)
+        result["\("schema2-" + date)"] = result2
+        return result
+    }
+
+    @discardableResult
+    static func updateDocument(
+        rpcAddress: String,
+        updateBody: [String: Any],
+        time: String,
+        token: String
+    ) async throws -> [String: Any] {
+        let headers = ["Authorization": token]
+        let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/UpdateDocument")!
+        let result = try await Self.postJSON(to: url, body: updateBody, headers: headers)
+        return result
+    }
+}

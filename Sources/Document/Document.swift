@@ -97,6 +97,7 @@ public class Document {
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
     private var maxSizeLimit: Int
+    private var schemaRules: [Rule] = []
 
     private var root = CRDTRoot()
     private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
@@ -165,6 +166,21 @@ public class Document {
         try updater(proxy, &presence)
 
         self.clone?.presences[actorID] = presence.presence
+
+        let schemaRules = self.getSchemaRules()
+        if !context.isPresenceOnlyChange, !schemaRules.isEmpty {
+            let result = RulesetValidator.validateYorkieRuleset(
+                data: self.clone?.root.object,
+                ruleset: schemaRules
+            )
+            if !result.valid {
+                self.clone = nil
+                throw YorkieError(
+                    code: .errDocumentSchemaValidationFailed,
+                    message: "schema validation failed: \(result.errors.map { $0.message }.joined(separator: ", "))"
+                )
+            }
+        }
 
         let size = self.getClone()?.root.getDocSize().totalDocSize ?? 0
         if !context.isPresenceOnlyChange, self.maxSizeLimit > 0, self.maxSizeLimit < size {
@@ -463,6 +479,16 @@ public class Document {
      */
     public func setMaxSizePerDocument(_ size: Int) {
         self.maxSizeLimit = size
+    }
+
+    /// Gets the schema rules of this document.
+    func getSchemaRules() -> [Rule] {
+        return self.schemaRules
+    }
+
+    /// Sets the schema rules of this document.
+    func setSchemaRules(_ rules: [Rule]) {
+        self.schemaRules = rules
     }
 
     /**
