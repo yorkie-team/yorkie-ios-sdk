@@ -59,6 +59,9 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrDocumentSizeExceedsLimit is returned when the document size exceeds the limit.
         case errDocumentSizeExceedsLimit = "ErrDocumentSizeExceedsLimit"
 
+        /// ErrDocumentSchemaValidationFailed is returned when the document schema validation failed.
+        case errDocumentSchemaValidationFailed = "ErrDocumentSchemaValidationFailed"
+
         /// ErrInvalidObjectKey is returned when the object key is invalid.
         case errInvalidObjectKey = "ErrInvalidObjectKey"
 

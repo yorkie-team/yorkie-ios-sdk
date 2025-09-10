@@ -100,6 +100,8 @@ public struct Yorkie_V1_AttachDocumentRequest: Sendable {
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
+  public var schemaKey: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -114,8 +116,6 @@ public struct Yorkie_V1_AttachDocumentResponse: Sendable {
 
   public var documentID: String = String()
 
-  public var maxSizePerDocument: Int32 = 0
-
   public var changePack: Yorkie_V1_ChangePack {
     get {return _changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
@@ -124,6 +124,10 @@ public struct Yorkie_V1_AttachDocumentResponse: Sendable {
   public var hasChangePack: Bool {return self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
+
+  public var maxSizePerDocument: Int32 = 0
+
+  public var schemaRules: [Yorkie_V1_Rule] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -334,7 +338,7 @@ public struct Yorkie_V1_PushPullChangesResponse: Sendable {
   fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
 }
 
-public struct Yorkie_V1_BroadcastRequest: @unchecked Sendable {
+public struct Yorkie_V1_BroadcastRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -368,10 +372,7 @@ fileprivate let _protobuf_package = "yorkie.v1"
 
 extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ActivateClientRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_key"),
-    2: .same(proto: "metadata"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_key\0\u{1}metadata\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -406,9 +407,7 @@ extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ActivateClientResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -438,9 +437,7 @@ extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeactivateClientRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -489,10 +486,7 @@ extension Yorkie_V1_DeactivateClientResponse: SwiftProtobuf.Message, SwiftProtob
 
 extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AttachDocumentRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "change_pack"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}change_pack\0\u{3}schema_key\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -502,6 +496,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.schemaKey) }()
       default: break
       }
     }
@@ -518,12 +513,16 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._changePack {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    if !self.schemaKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.schemaKey, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_AttachDocumentRequest, rhs: Yorkie_V1_AttachDocumentRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
     if lhs._changePack != rhs._changePack {return false}
+    if lhs.schemaKey != rhs.schemaKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -531,11 +530,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AttachDocumentResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "document_id"),
-    3: .standard(proto: "max_size_per_document"),
-    2: .standard(proto: "change_pack"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{3}change_pack\0\u{3}max_size_per_document\0\u{3}schema_rules\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -546,6 +541,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxSizePerDocument) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.schemaRules) }()
       default: break
       }
     }
@@ -565,13 +561,17 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     if self.maxSizePerDocument != 0 {
       try visitor.visitSingularInt32Field(value: self.maxSizePerDocument, fieldNumber: 3)
     }
+    if !self.schemaRules.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.schemaRules, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_AttachDocumentResponse, rhs: Yorkie_V1_AttachDocumentResponse) -> Bool {
     if lhs.documentID != rhs.documentID {return false}
-    if lhs.maxSizePerDocument != rhs.maxSizePerDocument {return false}
     if lhs._changePack != rhs._changePack {return false}
+    if lhs.maxSizePerDocument != rhs.maxSizePerDocument {return false}
+    if lhs.schemaRules != rhs.schemaRules {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -579,12 +579,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DetachDocumentRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "document_id"),
-    3: .standard(proto: "change_pack"),
-    4: .standard(proto: "remove_if_not_attached"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}change_pack\0\u{3}remove_if_not_attached\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -633,9 +628,7 @@ extension Yorkie_V1_DetachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DetachDocumentResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    2: .standard(proto: "change_pack"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}change_pack\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -669,10 +662,7 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchDocumentRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "document_id"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -707,10 +697,7 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchDocumentResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "initialization"),
-    2: .same(proto: "event"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialization\0\u{1}event\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -777,9 +764,7 @@ extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_WatchDocumentResponse.protoMessageName + ".Initialization"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_ids"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_ids\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -809,11 +794,7 @@ extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message,
 
 extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RemoveDocumentRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "document_id"),
-    3: .standard(proto: "change_pack"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}change_pack\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -857,9 +838,7 @@ extension Yorkie_V1_RemoveDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RemoveDocumentResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "change_pack"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}change_pack\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -893,12 +872,7 @@ extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PushPullChangesRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "document_id"),
-    3: .standard(proto: "change_pack"),
-    4: .standard(proto: "push_only"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}change_pack\0\u{3}push_only\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -947,9 +921,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PushPullChangesResponse"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "change_pack"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}change_pack\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -983,12 +955,7 @@ extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobu
 
 extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".BroadcastRequest"
-  public static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .standard(proto: "client_id"),
-    2: .standard(proto: "document_id"),
-    3: .same(proto: "topic"),
-    4: .same(proto: "payload"),
-  ]
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{1}topic\0\u{1}payload\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

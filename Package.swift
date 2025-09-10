@@ -15,7 +15,8 @@ let package = Package(
         .package(url: "https://github.com/connectrpc/connect-swift", exact: "1.0.3"),
         .package(url: "https://github.com/apple/swift-log.git", exact: "1.6.3"),
         .package(url: "https://github.com/groue/Semaphore.git", exact: "0.0.8"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", exact: "1.4.3")
+        .package(url: "https://github.com/apple/swift-docc-plugin", exact: "1.4.3"),
+        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.31.0")
     ],
     targets: [
         .target(
