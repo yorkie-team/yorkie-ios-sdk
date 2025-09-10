@@ -12,7 +12,7 @@ jobs:
     
     env:
       # yorkie server v0.6.18
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/65015e2aa95fcefc101264d2f28285ed09bab448/Formula/y/yorkie.rb
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/65015e2aa95fcefc101264d2f28285ed09bab448/Formula/y/yorkie.rb"
       HOMEBREW_DEVELOPER: "1"
         
     steps:

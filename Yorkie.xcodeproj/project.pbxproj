@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		499CF0D62E0B9FC40011272A /* VersionVectorTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */; };
 		5821AB402E6EB758002C0D5F /* DocumentSchemaTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5821AB3F2E6EB74F002C0D5F /* DocumentSchemaTest.swift */; };
-		5822A3062E6FD8CB00B78197 /* RulesetBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5822A3052E6FD8CB00B78197 /* RulesetBuilder.swift */; };
 		5822A3092E6FDA1600B78197 /* ServerInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5822A3082E6FDA1600B78197 /* ServerInfo.swift */; };
 		5822A30B2E6FDBD600B78197 /* Client+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5822A30A2E6FDBD300B78197 /* Client+Ex.swift */; };
 		58A5A2172E55842400055D16 /* DocumentLimitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58A5A2162E55841800055D16 /* DocumentLimitTests.swift */; };
@@ -163,7 +162,6 @@
 /* Begin PBXFileReference section */
 		499CF0D52E0B9FC40011272A /* VersionVectorTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionVectorTest.swift; sourceTree = "<group>"; };
 		5821AB3F2E6EB74F002C0D5F /* DocumentSchemaTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSchemaTest.swift; sourceTree = "<group>"; };
-		5822A3052E6FD8CB00B78197 /* RulesetBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesetBuilder.swift; sourceTree = "<group>"; };
 		5822A3082E6FDA1600B78197 /* ServerInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerInfo.swift; sourceTree = "<group>"; };
 		5822A30A2E6FDBD300B78197 /* Client+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Client+Ex.swift"; sourceTree = "<group>"; };
 		58A5A2162E55841800055D16 /* DocumentLimitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentLimitTests.swift; sourceTree = "<group>"; };
@@ -339,7 +337,6 @@
 		5822A3042E6FD85D00B78197 /* Ruleset */ = {
 			isa = PBXGroup;
 			children = (
-				5822A3052E6FD8CB00B78197 /* RulesetBuilder.swift */,
 				58B566952E6972890032FDB0 /* RulesetValidator.swift */,
 				58B566932E6972770032FDB0 /* Ruleset.swift */,
 			);
@@ -1016,7 +1013,6 @@
 				9ADAEE5A29657E03007E9F9F /* EditOperation.swift in Sources */,
 				CEA2DA4628F68D0A00431B61 /* ChangeID.swift in Sources */,
 				9A66B19E295446BF00D10B94 /* RGATreeSplit.swift in Sources */,
-				5822A3062E6FD8CB00B78197 /* RulesetBuilder.swift in Sources */,
 				9A569CAF2C060080007EF118 /* yorkie.pb.swift in Sources */,
 				9A7C75EA2A0261E7000B6E5A /* Version.swift in Sources */,
 				9A7E88C02A4962A700AF8997 /* IndexTree.swift in Sources */,

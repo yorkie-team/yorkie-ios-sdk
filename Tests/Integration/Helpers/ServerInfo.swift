@@ -28,14 +28,19 @@ enum ServerInfo {
 
     static func setUpServer() async throws -> (WebhookServer, YorkieProjectContext) {
         let webhookServer = WebhookServer(port: ServerInfo.port)
-        try webhookServer.start()
-        let context = try await YorkieProjectHelper.initializeProject(
-            rpcAddress: ServerInfo.rpcAddress,
-            username: ServerInfo.testAPIID,
-            password: ServerInfo.testAPIPW,
-            webhookURL: webhookServer.authWebhookUrl,
-            webhookMethods: ServerInfo.allAuthWebhookMethods
-        )
-        return (webhookServer, context)
+        do {
+            try webhookServer.start()
+            let context = try await YorkieProjectHelper.initializeProject(
+                rpcAddress: ServerInfo.rpcAddress,
+                username: ServerInfo.testAPIID,
+                password: ServerInfo.testAPIPW,
+                webhookURL: webhookServer.authWebhookUrl,
+                webhookMethods: ServerInfo.allAuthWebhookMethods
+            )
+            return (webhookServer, context)
+        } catch {
+            webhookServer.stop()
+            throw error
+        }
     }
 }
