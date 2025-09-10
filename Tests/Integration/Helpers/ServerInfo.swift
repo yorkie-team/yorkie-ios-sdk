@@ -15,6 +15,9 @@
  */
 
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 enum ServerInfo {
     static let rpcAddress = "http://localhost:8080"

@@ -15,6 +15,9 @@
  */
 
 import XCTest
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 @testable import Yorkie
 
 class RulesetValidatorTests: XCTestCase {
