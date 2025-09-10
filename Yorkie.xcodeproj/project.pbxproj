@@ -16,6 +16,7 @@
 		58B566942E69727A0032FDB0 /* Ruleset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B566932E6972770032FDB0 /* Ruleset.swift */; };
 		58B566962E6972950032FDB0 /* RulesetValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B566952E6972890032FDB0 /* RulesetValidator.swift */; };
 		58B566982E6972BE0032FDB0 /* RulesetValidatorTests.swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B566972E6972B90032FDB0 /* RulesetValidatorTests.swift.swift */; };
+		58B802402E71527A00B0F403 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 58B8023F2E71527A00B0F403 /* SwiftProtobuf */; };
 		58FD63132E2DF400000A4DC0 /* DocumentSizeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FD63122E2DF400000A4DC0 /* DocumentSizeTest.swift */; };
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
@@ -313,6 +314,7 @@
 				9A569CB92C060132007EF118 /* Connect in Frameworks */,
 				9A6399A7294C7E1E00BF27F5 /* Logging in Frameworks */,
 				CEDD01592DE483210074CF4F /* ConnectNIO in Frameworks */,
+				58B802402E71527A00B0F403 /* SwiftProtobuf in Frameworks */,
 				9A5D9DDC2A710FB40096C40C /* Semaphore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -871,6 +873,7 @@
 				9A5D9DDB2A710FB40096C40C /* Semaphore */,
 				9A569CB82C060132007EF118 /* Connect */,
 				CEDD01582DE483210074CF4F /* ConnectNIO */,
+				58B8023F2E71527A00B0F403 /* SwiftProtobuf */,
 			);
 			productName = Yorkie;
 			productReference = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */;
@@ -926,6 +929,7 @@
 				9A6399A5294C7E1E00BF27F5 /* XCRemoteSwiftPackageReference "swift-log" */,
 				9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */,
 				9A569CB72C060132007EF118 /* XCRemoteSwiftPackageReference "connect-swift" */,
+				58B8023E2E71527A00B0F403 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
 			);
 			productRefGroup = 96DA808328C5B7B400E2C1DA /* Products */;
 			projectDirPath = "";
@@ -1405,6 +1409,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		58B8023E2E71527A00B0F403 /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.31.0;
+			};
+		};
 		9A569CB72C060132007EF118 /* XCRemoteSwiftPackageReference "connect-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/connectrpc/connect-swift.git";
@@ -1432,6 +1444,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		58B8023F2E71527A00B0F403 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 58B8023E2E71527A00B0F403 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
 		9A569CB82C060132007EF118 /* Connect */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9A569CB72C060132007EF118 /* XCRemoteSwiftPackageReference "connect-swift" */;
