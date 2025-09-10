@@ -46,6 +46,8 @@ jobs:
       run: |
         swiftformat --version
         swiftformat --lint .
+    - name: Resolve dependencies
+      run: swift package resolve
     - name: Run tests
       run: swift test --enable-code-coverage -v --skip YorkieBenchmarkTests
     - name: Prepare Code Coverage
