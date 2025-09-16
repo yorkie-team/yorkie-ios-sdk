@@ -309,6 +309,7 @@ public class Client {
     public func attach(_ doc: Document,
                        _ initialPresence: PresenceData = [:],
                        _ syncMode: SyncMode = .realtime,
+                       _ schema: String = "",
                        initialRoot: [String: JSONValuable?]? = nil) async throws -> Document
     {
         // 01. Check if the client is ready to attach documents.
@@ -351,7 +352,8 @@ public class Client {
         var attachRequest = AttachDocumentRequest()
         attachRequest.clientID = clientID
         attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
-
+        attachRequest.schemaKey = schema
+        // 03. Attach the document to the client.
         do {
             let docKey = doc.getKey()
             let semaphore = DispatchSemaphore(value: 0)
@@ -367,6 +369,10 @@ public class Client {
             let maxSizePerDocument = message.maxSizePerDocument
             if maxSizePerDocument > 0 {
                 doc.setMaxSizePerDocument(Int(maxSizePerDocument))
+            }
+
+            if let schemaRules = attachResponse.message?.schemaRules, !schemaRules.isEmpty {
+                doc.setSchemaRules(Converter.fromSchemaRules(schemaRules))
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
