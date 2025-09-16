@@ -333,6 +333,29 @@ extension Converter {
             throw YorkieError(code: .errUnimplemented, message: "unimplemented element: \(pbElementSimple)")
         }
     }
+
+    /**
+     * `fromSchemaRules` converts the given Protobuf format to model format.
+     */
+    typealias PBRule = Yorkie_V1_Rule
+    static func fromSchemaRules(_ pbRules: [Yorkie_V1_Rule]) -> [Rule] {
+        var result = [Rule]()
+        for r in pbRules {
+            switch r.type {
+            case "string", "boolean", "integer", "double", "long", "date", "bytes", "null":
+                result.append(.primitive(.init(path: r.path, type: .primitive(PrimitiveType(rawValue: r.type) ?? .null))))
+            case "object":
+                result.append(.object(.init(path: r.path, properties: [], optional: [])))
+            case "array":
+                result.append(.array(.init(path: r.path)))
+            case "yorkie.Text", "yorkie.Tree", "yorkie.Counter", "yorkie.Object", "yorkie.Array":
+                result.append(.yorkie(.init(path: r.path, type: .yorkie(.init(rawValue: r.type) ?? .text))))
+            default:
+                break
+            }
+        }
+        return result
+    }
 }
 // MARK: TextNodeID
 extension Converter {

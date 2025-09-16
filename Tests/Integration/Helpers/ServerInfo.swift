@@ -1,0 +1,46 @@
+/*
+ * Copyright 2025 The Yorkie Authors. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
+
+enum ServerInfo {
+    static let rpcAddress = "http://localhost:8080"
+    static let testAPIID = "admin"
+    static let testAPIPW = "admin"
+    static let port = 3004
+    static let allAuthWebhookMethods = ["ActivateClient"]
+
+    static func setUpServer() async throws -> (WebhookServer, YorkieProjectContext) {
+        let webhookServer = WebhookServer(port: ServerInfo.port)
+        do {
+            try webhookServer.start()
+            let context = try await YorkieProjectHelper.initializeProject(
+                rpcAddress: ServerInfo.rpcAddress,
+                username: ServerInfo.testAPIID,
+                password: ServerInfo.testAPIPW,
+                webhookURL: webhookServer.authWebhookUrl,
+                webhookMethods: ServerInfo.allAuthWebhookMethods
+            )
+            return (webhookServer, context)
+        } catch {
+            webhookServer.stop()
+            throw error
+        }
+    }
+}

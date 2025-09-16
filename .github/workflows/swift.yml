@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      # yorkie server v0.6.14
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/13fd4a1991db44f80170ff5c41ab98bd89565cf1/Formula/y/yorkie.rb"
+      # yorkie server v0.6.18
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/65015e2aa95fcefc101264d2f28285ed09bab448/Formula/y/yorkie.rb"
       # swiftlint v0.58.2
       SWIFTLINT_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/ae3894d1d8d343733160e1c57903187228628d9d/Formula/s/swiftlint.rb"
       # swiftformat v0.55.6
@@ -46,6 +46,8 @@ jobs:
       run: |
         swiftformat --version
         swiftformat --lint .
+    - name: Resolve dependencies
+      run: swift package resolve
     - name: Run tests
       run: swift test --enable-code-coverage -v --skip YorkieBenchmarkTests
     - name: Prepare Code Coverage
