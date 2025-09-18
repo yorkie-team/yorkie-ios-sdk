@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      # yorkie server v0.6.18
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/65015e2aa95fcefc101264d2f28285ed09bab448/Formula/y/yorkie.rb"
+      # yorkie server v0.6.20
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/ff4b6a9ed35d2415619be9e0a4073c94c48d0c9f/Formula/y/yorkie.rb"
       HOMEBREW_DEVELOPER: "1"
         
     steps:
@@ -22,8 +22,6 @@ jobs:
     - uses: actions/checkout@v4
     - name: Update Brew
       run: brew update
-    - name: Resolve dependencies
-      run: swift package resolve
     - name: Setup yorkie server
       run: |
         curl -O ${{ env.YORKIE_RB_URL }} 

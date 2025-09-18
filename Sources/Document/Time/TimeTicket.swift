@@ -23,14 +23,14 @@ import Foundation
 public struct TimeTicket: Comparable {
     enum Values {
         static let initialDelimiter: UInt32 = 0
-        static let maxDelemiter: UInt32 = .max
+        static let MaxDelimiter: UInt32 = .max
         static let maxLamport: Int64 = .max
         static let initialLamport: Int64 = .zero
     }
 
     public static let initial = TimeTicket(lamport: 0, delimiter: Values.initialDelimiter, actorID: ActorIDs.initial)
     public static let next = TimeTicket(lamport: 1, delimiter: Values.initialDelimiter + 1, actorID: ActorIDs.initial)
-    public static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.maxDelemiter, actorID: ActorIDs.max)
+    public static let max = TimeTicket(lamport: Values.maxLamport, delimiter: Values.MaxDelimiter, actorID: ActorIDs.max)
 
     /**
      * `lamport` returns the lamport int64.
