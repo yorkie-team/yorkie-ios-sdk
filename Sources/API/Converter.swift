@@ -231,7 +231,7 @@ extension Converter {
     static func toVersionVector(_ vector: VersionVector) -> PbVersionVector {
         var pbVector = PbVersionVector()
         for (actorID, lamport) in vector {
-            pbVector.vector[actorID] = lamport
+            pbVector.vector[uint8ArrayToBase64(actorID.toHexData())] = lamport
         }
         
         return pbVector
@@ -243,7 +243,7 @@ extension Converter {
     static func fromVersionVector(_ pbVersionVector: PbVersionVector) -> VersionVector {
         var vector = VersionVector()
         for (actorID, lamport) in pbVersionVector.vector {
-            vector.set(actorID: actorID, lamport: lamport)
+            vector.set(actorID: bytesToHex(base64ToByteArray(actorID)), lamport: lamport)
         }
         
         return vector
@@ -1271,4 +1271,58 @@ extension String {
 
         return data
     }
+}
+
+//// Extension for ActorID to convert to Data
+extension ActorID {
+    func toHexData() -> Data {
+        return hexToBytes(self.lowercased())
+    }
+}
+
+/**
+ * Converts a Base64 string to Data.
+ */
+func base64ToByteArray(_ base64: String) -> Data? {
+    return Data(base64Encoded: base64)
+}
+
+/**
+ * Converts a hex string to Data.
+ */
+func hexToBytes(_ hex: String) -> Data {
+    precondition(hex.count % 2 == 0, "Hex string must have an even length")
+    
+    var data = Data(capacity: hex.count / 2)
+    var index = hex.startIndex
+    
+    while index < hex.endIndex {
+        let nextIndex = hex.index(index, offsetBy: 2)
+        let hexByte = String(hex[index..<nextIndex])
+        
+        if let byte = UInt8(hexByte, radix: 16) {
+            data.append(byte)
+        } else {
+            fatalError("Invalid hex character in string: \(hexByte)")
+        }
+        
+        index = nextIndex
+    }
+    
+    return data
+}
+
+/**
+ * Converts the given Data to base64 string.
+ */
+func uint8ArrayToBase64(_ byteArray: Data) -> String {
+    return byteArray.base64EncodedString()
+}
+
+/**
+ * Converts a Data to hex string.
+ */
+func bytesToHex(_ bytes: Data?) -> String {
+    guard let bytes = bytes else { return "" }
+    return bytes.map { String(format: "%02x", $0) }.joined()
 }
