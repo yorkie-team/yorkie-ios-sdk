@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 extension JSONArrayTests {
     struct ArrayOp {
