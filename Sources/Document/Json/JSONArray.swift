@@ -69,7 +69,7 @@ public class JSONArray: CustomDebugStringConvertible {
      * `setInteger` sets the element of the given index.
      */
     @discardableResult
-    func setInteger(index: Int, value: Int) throws -> Any? {
+    func setValue(index: Int, value: Any) throws -> Any? {
         guard let prev = try? target.get(index: index) else {
             throw YorkieError(
                 code: .errInvalidArgument,
@@ -78,18 +78,25 @@ public class JSONArray: CustomDebugStringConvertible {
         }
 
         let ticket = self.context.issueTimeTicket
-        let element = Primitive(value: .long(Int64(value)), createdAt: ticket)
-        let copiedValue = element.deepcopy()
-        self.context.push(
-            operation: ArraySetOperation(
-                parentCreatedAt: self.target.createdAt,
-                createdAt: prev.createdAt,
-                value: copiedValue,
-                executedAt: ticket
+        if let number = value as? Int {
+            let element = Primitive(value: .long(Int64(number)), createdAt: ticket)
+            let copiedValue = element.deepcopy()
+            self.context.push(
+                operation: ArraySetOperation(
+                    parentCreatedAt: self.target.createdAt,
+                    createdAt: prev.createdAt,
+                    value: copiedValue,
+                    executedAt: ticket
+                )
             )
-        )
 
-        return toWrappedElement(from: self.target)
+            return toWrappedElement(from: self.target)
+        } else {
+            throw YorkieError(
+                code: .errNotReady,
+                message: "This function does not support other types"
+            )
+        }
     }
 
     /**
@@ -123,7 +130,6 @@ public class JSONArray: CustomDebugStringConvertible {
     /**
      * `moveAfterByIndex` moves the element after the given index.
      */
-    @discardableResult
     func moveAfterByIndex(
         prevIndex: Int,
         targetIndex: Int
