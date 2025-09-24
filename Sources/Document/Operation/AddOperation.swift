@@ -52,7 +52,7 @@ struct AddOperation: Operation {
         }
 
         let value = self.value.deepcopy()
-        try array.insert(value: value, afterCreatedAt: self.previousCreatedAt)
+        try array.insert(value: value, prevCreatedAt: self.previousCreatedAt)
         root.registerElement(value, parent: array)
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)

@@ -53,13 +53,13 @@ class RGATreeListTests: XCTestCase {
         try target.insert(e1)
 
         let e2 = Primitive(value: .string("B2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(e2, afterCreatedAt: e1.createdAt)
+        try target.insert(e2, prevCreatedAt: e1.createdAt)
 
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[2:999:0:\"B2\"]")
 
         let e3 = Primitive(value: .string("C3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(e3, afterCreatedAt: e1.createdAt)
+        try target.insert(e3, prevCreatedAt: e1.createdAt)
 
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[3:999:0:\"C3\"]-[2:999:0:\"B2\"]")
@@ -72,13 +72,13 @@ class RGATreeListTests: XCTestCase {
         try target.insert(e1)
 
         let e3 = Primitive(value: .string("C3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(e3, afterCreatedAt: e1.createdAt)
+        try target.insert(e3, prevCreatedAt: e1.createdAt)
 
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[3:999:0:\"C3\"]")
 
         let e2 = Primitive(value: .string("B2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(e2, afterCreatedAt: e1.createdAt)
+        try target.insert(e2, prevCreatedAt: e1.createdAt)
 
         XCTAssertEqual(target.toTestString,
                        "[1:999:0:\"A1\"]-[3:999:0:\"C3\"]-[2:999:0:\"B2\"]")
