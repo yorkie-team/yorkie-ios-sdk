@@ -60,7 +60,7 @@ extension JSONArrayTests {
                 },
                 // set by index
                 ArrayOp(opName: "set.target") { arr, cid in
-                    try arr.setInteger(index: oneIdx, value: newValues[cid])
+                    try arr.setValue(index: oneIdx, value: newValues[cid])
                 },
                 // remove
                 ArrayOp(opName: "remove.target") { arr, _ in
@@ -257,7 +257,7 @@ extension JSONArrayTests {
             try await c2.sync()
 
             try await d2.update { root, _ in
-                try (root.k1 as? JSONArray)?.setInteger(index: 1, value: -4)
+                try (root.k1 as? JSONArray)?.setValue(index: 1, value: -4)
             }
 
             var d2JSON = await d2.toSortedJSON()
@@ -266,7 +266,7 @@ extension JSONArrayTests {
             """)
 
             try await d2.update { root, _ in
-                try (root.k1 as? JSONArray)?.setInteger(index: 0, value: -5)
+                try (root.k1 as? JSONArray)?.setValue(index: 0, value: -5)
             }
 
             d2JSON = await d2.toSortedJSON()

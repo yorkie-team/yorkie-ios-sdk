@@ -729,6 +729,15 @@ public class Client {
             throw YorkieError(code: .errClientNotActivated, message: "$\(docKey) is not active")
         }
 
+        // NOTE: - Check if the document is still attached to prevent
+        // watch stream creation after detachment.
+        if !self.attachmentMap.keys.contains(docKey) {
+            self.conditions[ClientCondition.watchLoop] = false
+            throw YorkieError(
+                code: .errDocumentNotAttached,
+                message: "\(docKey) is not attached"
+            )
+        }
         let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
             Task {
                 switch result {
@@ -1056,7 +1065,7 @@ public extension Client {
 
     private func broadcast(docKey: DocKey, request: BroadcastRequest, maxRetries: Int) async throws {
         var retryCount = 0
-        guard var attachment = self.attachmentMap[docKey] else {
+        guard let attachment = self.attachmentMap[docKey] else {
             throw YorkieError(code: .errDocumentNotAttached, message: "document \(docKey) is not attached")
         }
 
