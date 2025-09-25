@@ -130,6 +130,7 @@ public class JSONArray: CustomDebugStringConvertible {
     /**
      * `moveAfterByIndex` moves the element after the given index.
      */
+    @discardableResult
     func moveAfterByIndex(
         prevIndex: Int,
         targetIndex: Int

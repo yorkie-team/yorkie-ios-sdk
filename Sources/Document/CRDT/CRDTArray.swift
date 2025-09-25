@@ -106,7 +106,7 @@ class CRDTArray: CRDTContainer {
      * `set` sets the given element at the given position of the creation time.
      */
     @discardableResult
-    public func set(
+    func set(
         createdAt: TimeTicket,
         value: CRDTElement,
         executedAt: TimeTicket
