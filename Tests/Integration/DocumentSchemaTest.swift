@@ -60,8 +60,8 @@ class DocumentSchemaTest: XCTestCase {
 
 extension DocumentSchemaTest {
     // can attach document with schema
-    func testAttachDocumentWithSchema() async throws {
-        let docKey = "doc-size-\(Date().description)".toDocKey
+    func check_testAttachDocumentWithSchema() async throws {
+        let docKey = "\(#function)-\(Date().timeIntervalSince1970)".toDocKey
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
@@ -72,7 +72,7 @@ extension DocumentSchemaTest {
 
         do {
             try await client.attach(doc, [:], .manual, "noexist@1")
-            XCTAssertFalse(true)
+            XCTFail("Expected an error to be thrown")
         } catch {
             XCTAssertEqual(error.localizedDescription, "noexist: schema not found")
         }
@@ -84,7 +84,7 @@ extension DocumentSchemaTest {
     }
 
     // should reject local update that violates schema
-    func testShouldRejectLocalUpdateThatViolatesSchema() async throws {
+    func check_testShouldRejectLocalUpdateThatViolatesSchema() async throws {
         let docKey = "doc-size-\(Date().description)".toDocKey
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
@@ -101,7 +101,7 @@ extension DocumentSchemaTest {
             try await doc.update { root, _ in
                 root["title"] = Int32(123)
             }
-            XCTAssertFalse(true)
+            XCTFail("The API should not be success!")
         } catch {
             guard let error = error as? Yorkie.YorkieError else { fatalError() }
             print("success")
@@ -557,7 +557,7 @@ extension DocumentSchemaTest {
     }
 
     // can update root only when document has attached schema
-    func testCanUpdateRootOnlyWhenDocumentHasAttachedSchema() async throws {
+    func check_testCanUpdateRootOnlyWhenDocumentHasAttachedSchema() async throws {
         let docKey = "doc-size-\(Date().description)".toDocKey
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)

@@ -41,6 +41,7 @@ public enum OperationInfoType: String {
     case select
     case treeEdit
     case treeStyle
+    case array = "array-set"
 }
 
 /**
@@ -110,6 +111,11 @@ public struct EditOpInfo: OperationInfo {
 
         return false
     }
+}
+
+public struct ArraySetOpInfo: OperationInfo {
+    public let type: OperationInfoType = .array
+    public let path: String
 }
 
 public struct StyleOpInfo: OperationInfo {

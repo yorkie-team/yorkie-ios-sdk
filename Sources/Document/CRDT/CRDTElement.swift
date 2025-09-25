@@ -76,6 +76,14 @@ extension CRDTElement {
     }
 
     /**
+     * `getPositionedAt` returns the time of this element when it was positioned
+     * in the document by undo/redo or move operation.
+     */
+    func getPositionedAt() -> TimeTicket {
+        return movedAt ?? createdAt
+    }
+
+    /**
      * `remove` removes this element.
      */
     @discardableResult

@@ -28,7 +28,7 @@ class MoveOperationTests: XCTestCase {
 
         let object2 = CRDTArray(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("b1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        try object2.insert(value: b1, afterCreatedAt: TimeTicket.initial)
+        try object2.insert(value: b1, prevCreatedAt: TimeTicket.initial)
 
         rootObject.set(key: "k-a3", value: object2)
 
@@ -39,7 +39,7 @@ class MoveOperationTests: XCTestCase {
         let c2 = Primitive(value: .string("c2"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
         object3.set(key: "k-c2", value: c2)
 
-        try object2.insert(value: object3, afterCreatedAt: b1.createdAt)
+        try object2.insert(value: object3, prevCreatedAt: b1.createdAt)
 
         let root = CRDTRoot(rootObject: rootObject)
 
@@ -67,7 +67,7 @@ class MoveOperationTests: XCTestCase {
 
         let object2 = CRDTArray(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("b1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        try object2.insert(value: b1, afterCreatedAt: TimeTicket.initial)
+        try object2.insert(value: b1, prevCreatedAt: TimeTicket.initial)
 
         rootObject.set(key: "k-a3", value: object2)
 
@@ -75,10 +75,10 @@ class MoveOperationTests: XCTestCase {
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
         object3.set(key: "k-c1", value: c1)
 
-        try object2.insert(value: object3, afterCreatedAt: b1.createdAt)
+        try object2.insert(value: object3, prevCreatedAt: b1.createdAt)
 
         let valueToMove = Primitive(value: .string("value-to-move"), createdAt: TimeTicket(lamport: 8, delimiter: 0, actorID: actorId))
-        try object2.insert(value: valueToMove, afterCreatedAt: object3.createdAt)
+        try object2.insert(value: valueToMove, prevCreatedAt: object3.createdAt)
 
         let root = CRDTRoot(rootObject: rootObject)
 

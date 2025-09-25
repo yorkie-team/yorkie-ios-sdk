@@ -66,6 +66,98 @@ public class JSONArray: CustomDebugStringConvertible {
     }
 
     /**
+     * `setInteger` sets the element of the given index.
+     */
+    @discardableResult
+    func setInteger(index: Int, value: Int) throws -> Any? {
+        guard let prev = try? target.get(index: index) else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "index out of bounds: \(index)"
+            )
+        }
+
+        let ticket = self.context.issueTimeTicket
+        let element = Primitive(value: .long(Int64(value)), createdAt: ticket)
+        let copiedValue = element.deepcopy()
+        self.context.push(
+            operation: ArraySetOperation(
+                parentCreatedAt: self.target.createdAt,
+                createdAt: prev.createdAt,
+                value: copiedValue,
+                executedAt: ticket
+            )
+        )
+
+        return toWrappedElement(from: self.target)
+    }
+
+    /**
+     * `insertIntegerAfter` inserts a value after the given index.
+     */
+    @discardableResult
+    func insertIntegerAfter(index: Int, value: Int) throws -> Any? {
+        guard let prev = try? target.get(index: index) else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "index out of bounds: \(index)"
+            )
+        }
+
+        let ticket = self.context.issueTimeTicket
+        let element = Primitive(value: .long(Int64(value)), createdAt: ticket)
+        try target.insert(value: element, prevCreatedAt: prev.createdAt)
+        self.context.registerElement(element, parent: self.target)
+        self.context.push(
+            operation: AddOperation(
+                parentCreatedAt: self.target.createdAt,
+                previousCreatedAt: prev.createdAt,
+                value: element.deepcopy(),
+                executedAt: ticket
+            )
+        )
+
+        return toWrappedElement(from: self.target)
+    }
+
+    /**
+     * `moveAfterByIndex` moves the element after the given index.
+     */
+    @discardableResult
+    func moveAfterByIndex(
+        prevIndex: Int,
+        targetIndex: Int
+    ) throws {
+        guard let prevElem = try? self.target.get(index: prevIndex) else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "index out of bounds: \(prevIndex)"
+            )
+        }
+        guard let targetElem = try? target.get(index: targetIndex) else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "index out of bounds: \(targetIndex)"
+            )
+        }
+        let ticket = self.context.issueTimeTicket
+        let operation = MoveOperation(
+            parentCreatedAt: self.target.createdAt,
+            previousCreatedAt: prevElem.createdAt,
+            createdAt: targetElem.createdAt,
+            executedAt: ticket
+        )
+
+        self.context.push(operation: operation)
+
+        try self.target.move(
+            createdAt: targetElem.createdAt,
+            afterCreatedAt: prevElem.createdAt,
+            executedAt: ticket
+        )
+    }
+
+    /**
      * `getLast` returns the last element of this array.
      */
     func getLast() -> Any? {
@@ -87,6 +179,7 @@ public class JSONArray: CustomDebugStringConvertible {
     /**
      * `insertAfter` inserts a value after the given previous element.
      */
+    @discardableResult
     func insertAfter(previousID: TimeTicket, value: Any) throws -> Any? {
         let inserted = try insertAfterInternal(previousCreatedAt: previousID, value: value)
         return toWrappedElement(from: inserted)
@@ -222,7 +315,12 @@ public class JSONArray: CustomDebugStringConvertible {
         let ticket = self.context.issueTimeTicket
         let previousCreatedAt = try target.getPreviousCreatedAt(createdAt: nextCreatedAt)
         try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
-        let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
+        let operation = MoveOperation(
+            parentCreatedAt: target.createdAt,
+            previousCreatedAt: previousCreatedAt,
+            createdAt: createdAt,
+            executedAt: ticket
+        )
         self.context.push(operation: operation)
     }
 
@@ -232,9 +330,19 @@ public class JSONArray: CustomDebugStringConvertible {
      */
     private func moveAfterInternal(previousCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
-        try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
-        let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: previousCreatedAt, createdAt: createdAt, executedAt: ticket)
+        let operation = MoveOperation(
+            parentCreatedAt: self.target.createdAt,
+            previousCreatedAt: previousCreatedAt,
+            createdAt: createdAt,
+            executedAt: ticket
+        )
         self.context.push(operation: operation)
+
+        try self.target.move(
+            createdAt: createdAt,
+            afterCreatedAt: previousCreatedAt,
+            executedAt: ticket
+        )
     }
 
     /**
@@ -272,7 +380,7 @@ public class JSONArray: CustomDebugStringConvertible {
             let primitive = Primitive(value: value, createdAt: ticket)
             let clone = primitive.deepcopy()
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: primitive, executedAt: ticket)
@@ -285,7 +393,7 @@ public class JSONArray: CustomDebugStringConvertible {
                 throw YorkieError(code: .errUnexpected, message: "Failed to cast array.deepcopy() to CRDTArray")
             }
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
@@ -302,7 +410,7 @@ public class JSONArray: CustomDebugStringConvertible {
                 throw YorkieError(code: .errUnexpected, message: "Failed to cast array.deepcopy() to CRDTArray")
             }
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
@@ -312,7 +420,7 @@ public class JSONArray: CustomDebugStringConvertible {
         } else if value is JSONObject {
             let crdtObject = CRDTObject(createdAt: ticket)
 
-            try self.target.insert(value: crdtObject, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: crdtObject, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(crdtObject, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
@@ -324,7 +432,7 @@ public class JSONArray: CustomDebugStringConvertible {
 
             let clone = counter.deepcopy()
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
@@ -337,7 +445,7 @@ public class JSONArray: CustomDebugStringConvertible {
 
             let clone = counter.deepcopy()
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
@@ -350,7 +458,7 @@ public class JSONArray: CustomDebugStringConvertible {
 
             let clone = text.deepcopy()
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: text, executedAt: ticket)
@@ -366,7 +474,7 @@ public class JSONArray: CustomDebugStringConvertible {
 
             let clone = tree.deepcopy()
 
-            try self.target.insert(value: clone, afterCreatedAt: previousCreatedAt)
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
             self.context.registerElement(clone, parent: self.target)
 
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: tree, executedAt: ticket)

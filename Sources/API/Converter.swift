@@ -480,6 +480,14 @@ extension Converter {
             pbTreeStyleOperation.attributesToRemove = treeStyleOperation.attributesToRemove
             pbTreeStyleOperation.executedAt = toTimeTicket(treeStyleOperation.executedAt)
             pbOperation.treeStyle = pbTreeStyleOperation
+        } else if let arraySet = operation as? ArraySetOperation {
+            var pbArraySetOperation = PbOperation.ArraySet()
+            pbArraySetOperation.parentCreatedAt = toTimeTicket(arraySet.parentCreatedAt)
+            pbArraySetOperation.createdAt = toTimeTicket(arraySet.createdAt)
+            pbArraySetOperation.value = toElementSimple(arraySet.getValue())
+            pbArraySetOperation.executedAt = toTimeTicket(arraySet.executedAt)
+            
+            pbOperation.body = .arraySet(pbArraySetOperation)
         } else {
             throw YorkieError(code: .errUnimplemented, message: "unimplemented operation \(operation)")
         }
@@ -558,6 +566,13 @@ extension Converter {
                                               attributesToRemove: [],
                                               executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
                 }
+            } else if case let .arraySet(pdArraySetOperation) = pbOperation.body {
+                return ArraySetOperation(
+                    parentCreatedAt: fromTimeTicket(pdArraySetOperation.parentCreatedAt),
+                    createdAt: fromTimeTicket(pdArraySetOperation.createdAt),
+                    value: try fromElementSimple(pbElementSimple: pdArraySetOperation.value),
+                    executedAt: fromTimeTicket(pdArraySetOperation.executedAt)
+                )
             } else {
                 throw YorkieError(code: .errUnimplemented, message: "unimplemented operation \(pbOperation)")
             }

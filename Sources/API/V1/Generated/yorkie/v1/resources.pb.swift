@@ -361,14 +361,6 @@ public struct Yorkie_V1_Operation: Sendable {
     set {body = .edit(newValue)}
   }
 
-  public var select: Yorkie_V1_Operation.Select {
-    get {
-      if case .select(let v)? = body {return v}
-      return Yorkie_V1_Operation.Select()
-    }
-    set {body = .select(newValue)}
-  }
-
   public var style: Yorkie_V1_Operation.Style {
     get {
       if case .style(let v)? = body {return v}
@@ -417,7 +409,6 @@ public struct Yorkie_V1_Operation: Sendable {
     case move(Yorkie_V1_Operation.Move)
     case remove(Yorkie_V1_Operation.Remove)
     case edit(Yorkie_V1_Operation.Edit)
-    case select(Yorkie_V1_Operation.Select)
     case style(Yorkie_V1_Operation.Style)
     case increase(Yorkie_V1_Operation.Increase)
     case treeEdit(Yorkie_V1_Operation.TreeEdit)
@@ -672,61 +663,6 @@ public struct Yorkie_V1_Operation: Sendable {
     public init() {}
 
     fileprivate var _storage = _StorageClass.defaultInstance
-  }
-
-  /// NOTE(hackerwins): Select Operation is not used in the current version.
-  /// In the previous version, it was used to represent selection of Text.
-  /// However, it has been replaced by Presence now. It is retained for backward
-  /// compatibility purposes.
-  public struct Select: Sendable {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _parentCreatedAt ?? Yorkie_V1_TimeTicket()}
-      set {_parentCreatedAt = newValue}
-    }
-    /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return self._parentCreatedAt != nil}
-    /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
-    public mutating func clearParentCreatedAt() {self._parentCreatedAt = nil}
-
-    public var from: Yorkie_V1_TextNodePos {
-      get {return _from ?? Yorkie_V1_TextNodePos()}
-      set {_from = newValue}
-    }
-    /// Returns true if `from` has been explicitly set.
-    public var hasFrom: Bool {return self._from != nil}
-    /// Clears the value of `from`. Subsequent reads from it will return its default value.
-    public mutating func clearFrom() {self._from = nil}
-
-    public var to: Yorkie_V1_TextNodePos {
-      get {return _to ?? Yorkie_V1_TextNodePos()}
-      set {_to = newValue}
-    }
-    /// Returns true if `to` has been explicitly set.
-    public var hasTo: Bool {return self._to != nil}
-    /// Clears the value of `to`. Subsequent reads from it will return its default value.
-    public mutating func clearTo() {self._to = nil}
-
-    public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _executedAt ?? Yorkie_V1_TimeTicket()}
-      set {_executedAt = newValue}
-    }
-    /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return self._executedAt != nil}
-    /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
-    public mutating func clearExecutedAt() {self._executedAt = nil}
-
-    public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    public init() {}
-
-    fileprivate var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
-    fileprivate var _from: Yorkie_V1_TextNodePos? = nil
-    fileprivate var _to: Yorkie_V1_TextNodePos? = nil
-    fileprivate var _executedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public struct Style: @unchecked Sendable {
@@ -1955,7 +1891,7 @@ public struct Yorkie_V1_DocumentSummary: Sendable {
 
   public var key: String = String()
 
-  public var snapshot: String = String()
+  public var root: String = String()
 
   public var attachedClients: Int32 = 0
 
@@ -1969,6 +1905,8 @@ public struct Yorkie_V1_DocumentSummary: Sendable {
   public mutating func clearDocumentSize() {self._documentSize = nil}
 
   public var schemaKey: String = String()
+
+  public var presences: Dictionary<String,Yorkie_V1_Presence> = [:]
 
   public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
     get {return _createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
@@ -2518,7 +2456,7 @@ extension Yorkie_V1_VersionVector: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Operation"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}set\0\u{1}add\0\u{1}move\0\u{1}remove\0\u{1}edit\0\u{1}select\0\u{1}style\0\u{1}increase\0\u{3}tree_edit\0\u{3}tree_style\0\u{3}array_set\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}set\0\u{1}add\0\u{1}move\0\u{1}remove\0\u{1}edit\0\u{2}\u{2}style\0\u{1}increase\0\u{3}tree_edit\0\u{3}tree_style\0\u{3}array_set\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2589,19 +2527,6 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.body = .edit(v)
-        }
-      }()
-      case 6: try {
-        var v: Yorkie_V1_Operation.Select?
-        var hadOneofValue = false
-        if let current = self.body {
-          hadOneofValue = true
-          if case .select(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.body = .select(v)
         }
       }()
       case 7: try {
@@ -2699,10 +2624,6 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     case .edit?: try {
       guard case .edit(let v)? = self.body else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    }()
-    case .select?: try {
-      guard case .select(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
     }()
     case .style?: try {
       guard case .style(let v)? = self.body else { preconditionFailure() }
@@ -3118,55 +3039,6 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
       }
       if !storagesAreEqual {return false}
     }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_Operation.Select: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".Select"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}executed_at\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._parentCreatedAt) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._from) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._to) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._executedAt) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._parentCreatedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._from {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._to {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._executedAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Yorkie_V1_Operation.Select, rhs: Yorkie_V1_Operation.Select) -> Bool {
-    if lhs._parentCreatedAt != rhs._parentCreatedAt {return false}
-    if lhs._from != rhs._from {return false}
-    if lhs._to != rhs._to {return false}
-    if lhs._executedAt != rhs._executedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5072,7 +4944,7 @@ extension Yorkie_V1_UpdatableProjectFields.AllowedOrigins: SwiftProtobuf.Message
 
 extension Yorkie_V1_DocumentSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DocumentSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}key\0\u{1}snapshot\0\u{3}created_at\0\u{3}accessed_at\0\u{3}updated_at\0\u{3}attached_clients\0\u{3}document_size\0\u{3}schema_key\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}key\0\u{1}root\0\u{3}created_at\0\u{3}accessed_at\0\u{3}updated_at\0\u{3}attached_clients\0\u{3}document_size\0\u{3}schema_key\0\u{1}presences\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5082,13 +4954,14 @@ extension Yorkie_V1_DocumentSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.key) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.snapshot) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.root) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._accessedAt) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.attachedClients) }()
       case 8: try { try decoder.decodeSingularMessageField(value: &self._documentSize) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.schemaKey) }()
+      case 10: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_Presence>.self, value: &self.presences) }()
       default: break
       }
     }
@@ -5105,8 +4978,8 @@ extension Yorkie_V1_DocumentSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if !self.key.isEmpty {
       try visitor.visitSingularStringField(value: self.key, fieldNumber: 2)
     }
-    if !self.snapshot.isEmpty {
-      try visitor.visitSingularStringField(value: self.snapshot, fieldNumber: 3)
+    if !self.root.isEmpty {
+      try visitor.visitSingularStringField(value: self.root, fieldNumber: 3)
     }
     try { if let v = self._createdAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
@@ -5126,16 +4999,20 @@ extension Yorkie_V1_DocumentSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if !self.schemaKey.isEmpty {
       try visitor.visitSingularStringField(value: self.schemaKey, fieldNumber: 9)
     }
+    if !self.presences.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_Presence>.self, value: self.presences, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_DocumentSummary, rhs: Yorkie_V1_DocumentSummary) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs.key != rhs.key {return false}
-    if lhs.snapshot != rhs.snapshot {return false}
+    if lhs.root != rhs.root {return false}
     if lhs.attachedClients != rhs.attachedClients {return false}
     if lhs._documentSize != rhs._documentSize {return false}
     if lhs.schemaKey != rhs.schemaKey {return false}
+    if lhs.presences != rhs.presences {return false}
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._accessedAt != rhs._accessedAt {return false}
     if lhs._updatedAt != rhs._updatedAt {return false}

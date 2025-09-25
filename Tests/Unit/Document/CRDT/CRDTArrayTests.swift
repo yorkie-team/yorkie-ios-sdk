@@ -25,13 +25,13 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
+        try target.insert(value: e1, prevCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(value: e2, afterCreatedAt: e1.createdAt)
+        try target.insert(value: e2, prevCreatedAt: e1.createdAt)
 
         let e3 = Primitive(value: .string("33"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(value: e3, afterCreatedAt: e2.createdAt)
+        try target.insert(value: e3, prevCreatedAt: e2.createdAt)
 
         XCTAssertEqual(target.toJSON(), "[\"11\",\"22\",\"33\"]")
 
@@ -50,13 +50,13 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
+        try target.insert(value: e1, prevCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(value: e2, afterCreatedAt: e1.createdAt)
+        try target.insert(value: e2, prevCreatedAt: e1.createdAt)
 
         let e3 = Primitive(value: .string("33"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(value: e3, afterCreatedAt: e2.createdAt)
+        try target.insert(value: e3, prevCreatedAt: e2.createdAt)
 
         var elemetJsons: [String] = []
         target.getDescendants { element, _ in
@@ -72,13 +72,13 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
+        try target.insert(value: e1, prevCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(value: e2, afterCreatedAt: e1.createdAt)
+        try target.insert(value: e2, prevCreatedAt: e1.createdAt)
 
         let e3 = Primitive(value: .string("33"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(value: e3, afterCreatedAt: e2.createdAt)
+        try target.insert(value: e3, prevCreatedAt: e2.createdAt)
 
         var elemetJsons: [String] = []
         target.getDescendants { element, _ in
@@ -94,13 +94,13 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
+        try target.insert(value: e1, prevCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(value: e2, afterCreatedAt: e1.createdAt)
+        try target.insert(value: e2, prevCreatedAt: e1.createdAt)
 
         let e3 = Primitive(value: .string("33"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(value: e3, afterCreatedAt: e2.createdAt)
+        try target.insert(value: e3, prevCreatedAt: e2.createdAt)
 
         XCTAssertEqual(target.toJSON(), "[\"11\",\"22\",\"33\"]")
     }
@@ -110,13 +110,13 @@ class CRDTArrayTests: XCTestCase {
         let target = CRDTArray(createdAt: time)
 
         let e1 = Primitive(value: .string("11"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        try target.insert(value: e1, afterCreatedAt: TimeTicket.initial)
+        try target.insert(value: e1, prevCreatedAt: TimeTicket.initial)
 
         let e2 = Primitive(value: .string("22"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        try target.insert(value: e2, afterCreatedAt: e1.createdAt)
+        try target.insert(value: e2, prevCreatedAt: e1.createdAt)
 
         let e3 = Primitive(value: .string("33"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        try target.insert(value: e3, afterCreatedAt: e2.createdAt)
+        try target.insert(value: e3, prevCreatedAt: e2.createdAt)
 
         var elemetJsons: [String] = []
         for each in target {

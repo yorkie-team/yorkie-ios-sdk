@@ -300,7 +300,7 @@ class ConverterTests: XCTestCase {
         let array = CRDTArray(createdAt: TimeTicket.initial)
 
         do {
-            try array.insert(value: object, afterCreatedAt: TimeTicket.initial)
+            try array.insert(value: object, prevCreatedAt: TimeTicket.initial)
             let converted = try Converter.fromElement(pbElement: Converter.toElement(array)) as? CRDTArray
             XCTAssertEqual(try array.get(index: 0).toSortedJSON(), try converted?.get(index: 0).toSortedJSON())
         } catch {
@@ -351,7 +351,7 @@ class ConverterTests: XCTestCase {
             // Array
             let array = CRDTArray(createdAt: TimeTicket.initial)
 
-            try array.insert(value: object, afterCreatedAt: TimeTicket.initial)
+            try array.insert(value: object, prevCreatedAt: TimeTicket.initial)
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(array))
             XCTAssertEqual(CRDTArray(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
         } catch {

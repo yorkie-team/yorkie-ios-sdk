@@ -35,8 +35,16 @@ class CRDTArray: CRDTContainer {
     /**
      * `insert` adds a new node after the the given node.
      */
-    func insert(value: CRDTElement, afterCreatedAt: TimeTicket) throws {
-        try self.elements.insert(value, afterCreatedAt: afterCreatedAt)
+    func insert(
+        value: CRDTElement,
+        prevCreatedAt: TimeTicket,
+        executedAt: TimeTicket? = nil
+    ) throws {
+        try self.elements.insert(
+            value,
+            prevCreatedAt: prevCreatedAt,
+            executedAt: executedAt
+        )
     }
 
     /**
@@ -95,6 +103,18 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
+     * `set` sets the given element at the given position of the creation time.
+     */
+    @discardableResult
+    func set(
+        createdAt: TimeTicket,
+        value: CRDTElement,
+        executedAt: TimeTicket
+    ) throws -> CRDTElement {
+        return try self.elements.set(createdAt: createdAt, element: value, executedAt: executedAt)
+    }
+
+    /**
      * `getLastCreatedAt` get last created element.
      */
     func getLastCreatedAt() -> TimeTicket {
@@ -143,7 +163,10 @@ extension CRDTArray {
     func deepcopy() -> CRDTElement {
         let result = CRDTArray(createdAt: self.createdAt)
         for node in self.elements {
-            try? result.elements.insert(node.value.deepcopy(), afterCreatedAt: result.getLastCreatedAt())
+            try? result.elements.insert(
+                node.value.deepcopy(),
+                prevCreatedAt: result.getLastCreatedAt()
+            )
         }
         result.remove(self.removedAt)
         return result

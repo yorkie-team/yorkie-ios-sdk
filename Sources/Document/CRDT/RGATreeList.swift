@@ -22,6 +22,7 @@ import Foundation
 final class RGATreeListNode: SplayNode<CRDTElement> {
     fileprivate private(set) var previous: RGATreeListNode?
     fileprivate var next: RGATreeListNode?
+    fileprivate var movedFrom: RGATreeListNode?
 
     override init(_ value: CRDTElement) {
         super.init(value)
@@ -95,6 +96,20 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     fileprivate var isRemoved: Bool {
         return self.value.isRemoved
     }
+
+    /**
+     * `getMovedFrom` returns the previous element before the element moved.
+     */
+    public func getMovedFrom() -> RGATreeListNode? {
+        return self.movedFrom
+    }
+
+    /**
+     * `setMovedFrom` sets the previous element before the element moved.
+     */
+    public func setMovedFrom(_ movedFrom: RGATreeListNode?) {
+        self.movedFrom = movedFrom
+    }
 }
 
 /**
@@ -139,10 +154,15 @@ class RGATreeList {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        while true {
-            guard let next = node.next, next.positionedAt.after(executedAt) else {
-                break
-            }
+        while
+            let movedAt = node.value.movedAt,
+            movedAt.after(executedAt),
+            let movedFrom = node.getMovedFrom()
+        {
+            node = movedFrom
+        }
+
+        while let next = node.next, next.positionedAt.after(executedAt) {
             node = next
         }
 
@@ -162,7 +182,12 @@ class RGATreeList {
     /**
      * `insert` adds a new node with the value after the given node.
      */
-    func insert(_ value: CRDTElement, afterCreatedAt createdAt: TimeTicket, executedAt: TimeTicket? = nil) throws {
+    @discardableResult
+    func insert(
+        _ value: CRDTElement,
+        prevCreatedAt createdAt: TimeTicket,
+        executedAt: TimeTicket? = nil
+    ) throws -> RGATreeListNode {
         let executedAt: TimeTicket = executedAt ?? value.createdAt
 
         let previousNode = try findNode(fromCreatedAt: createdAt, executedAt: executedAt)
@@ -173,6 +198,7 @@ class RGATreeList {
 
         self.nodeMapByIndex.insert(previousNode: previousNode, newNode: newNode)
         self.nodeMapByCreatedAt[newNode.createdAt] = newNode
+        return newNode
     }
 
     /**
@@ -180,41 +206,51 @@ class RGATreeList {
      * after the `previousCreatedAt` element.
      */
     func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
-        guard let previsousNode = self.nodeMapByCreatedAt[afterCreatedAt] else {
+        guard var prevNode = self.nodeMapByCreatedAt[afterCreatedAt] else {
             let log = "can't find the given node: \(afterCreatedAt)"
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        guard let movingNode = self.nodeMapByCreatedAt[createdAt] else {
+        guard var node = self.nodeMapByCreatedAt[createdAt] else {
             let log = "can't find the given node: \(createdAt)"
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        guard previsousNode !== movingNode else {
-            return
-        }
+        if prevNode !== node, executedAt > node.positionedAt {
+            let movedFrom = node.previous
+            var nextNode = node.next
+            self.release(node: node)
 
-        var needToMove = false
-        if movingNode.value.movedAt == nil {
-            needToMove = true
-        } else if let movedAt = movingNode.value.movedAt, executedAt.after(movedAt) {
-            needToMove = true
-        }
+            node = try self.insert(
+                node.value,
+                prevCreatedAt: prevNode.createdAt,
+                executedAt: executedAt
+            )
+            node.value.setMovedAt(executedAt)
+            node.setMovedFrom(movedFrom)
 
-        guard needToMove else {
-            return
-        }
+            while let next = nextNode, next.positionedAt > executedAt {
+                prevNode = node
+                node = next
+                nextNode = node.next
 
-        self.release(node: movingNode)
-        try self.insert(movingNode.value, afterCreatedAt: previsousNode.createdAt, executedAt: executedAt)
-        movingNode.value.setMovedAt(executedAt)
+                self.release(node: node)
+                node = try self.insert(
+                    node.value,
+                    prevCreatedAt: prevNode.createdAt,
+                    executedAt: executedAt
+                )
+                node.value.setMovedAt(executedAt)
+                node.setMovedFrom(movedFrom)
+            }
+        }
     }
 
     /**
      * `insert` adds the given element after the last node.
      */
     func insert(_ value: CRDTElement) throws {
-        try self.insert(value, afterCreatedAt: self.last.createdAt)
+        try self.insert(value, prevCreatedAt: self.last.createdAt)
     }
 
     /**
@@ -251,6 +287,26 @@ class RGATreeList {
         }
 
         self.release(node: node)
+    }
+
+    /**
+     * `set` sets the given element at the given creation time.
+     */
+    @discardableResult
+    func set(
+        createdAt: TimeTicket,
+        element: CRDTElement,
+        executedAt: TimeTicket
+    ) throws -> CRDTElement {
+        guard let node = nodeMapByCreatedAt[createdAt] else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "cant find the given node: \(createdAt.toIDString)"
+            )
+        }
+
+        try self.insert(element, prevCreatedAt: node.createdAt, executedAt: executedAt)
+        return try self.delete(createdAt: createdAt, executedAt: executedAt)
     }
 
     /**
