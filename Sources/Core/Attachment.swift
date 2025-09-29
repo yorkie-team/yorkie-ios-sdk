@@ -64,6 +64,7 @@ final class Attachment: @unchecked Sendable {
     func connectStream(_ stream: (any YorkieServerStream)?) {
         self.remoteWatchStream = stream
         self.isDisconnected = false
+        self.cancelled = false
     }
 
     func disconnectStream() {

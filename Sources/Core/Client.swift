@@ -871,11 +871,11 @@ public class Client {
         }
     }
 
-    private func disconnectWatchStream(_: DocKey, with attachment: Attachment) throws {
+    private func disconnectWatchStream(_: DocKey, with attachment: Attachment) {
         guard !attachment.isDisconnectedStream else {
             return
         }
-        attachment.cancelWatchStream()
+        attachment.disconnectStream()
         attachment.resetWatchLoopTimer()
 
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
@@ -883,8 +883,7 @@ public class Client {
 
     private func onStreamDisconnect(_ docKey: DocKey, with attachment: Attachment) throws {
         let cancelled = attachment.cancelled
-        try self.disconnectWatchStream(docKey, with: attachment)
-
+        self.disconnectWatchStream(docKey, with: attachment)
         // check if watch loop is stopped
         guard self.attachmentMap[docKey] != nil, attachment.syncMode != .manual else {
             return
