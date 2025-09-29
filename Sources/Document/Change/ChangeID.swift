@@ -110,7 +110,6 @@ struct ChangeID {
 
         // clone another vector before mutating
         var vector = vector
-        vector.unset(actorID: ActorIDs.initial)
 
         var maxVersionVector = self.versionVector.max(other: vector)
         maxVersionVector.set(actorID: self.actor, lamport: lamport)
