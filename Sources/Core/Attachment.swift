@@ -79,7 +79,7 @@ final class Attachment: @unchecked Sendable {
      */
     func cancelWatchStream() {
         self.cancelled = true
-
+        self.resetWatchLoopTimer()
         self.disconnectStream()
     }
 
