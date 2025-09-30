@@ -1967,6 +1967,7 @@ class GCIntegrationTests: XCTestCase {
         await assertTrue(versionVector: vectors, actorDatas: [
             ActorData(actor: client1.id!, lamport: 998),
             ActorData(actor: client2.id!, lamport: 1000),
+            ActorData(actor: ActorIDs.initial, lamport: 1002),
             ActorData(actor: client3.id!, lamport: 1003)
         ])
 

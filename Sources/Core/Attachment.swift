@@ -24,15 +24,24 @@ final class Attachment: @unchecked Sendable {
     var remoteChangeEventReceived: Bool
     var remoteWatchStream: (any YorkieServerStream)?
     var watchLoopReconnectTimer: Timer?
+    var cancelled: Bool
     private var isDisconnected: Bool
 
-    init(doc: Document, docID: String, syncMode: SyncMode, remoteChangeEventReceived: Bool, watchLoopReconnectTimer: Timer? = nil) {
+    init(
+        doc: Document,
+        docID: String,
+        syncMode: SyncMode,
+        remoteChangeEventReceived: Bool,
+        watchLoopReconnectTimer: Timer? = nil,
+        cancelled: Bool = false
+    ) {
         self.doc = doc
         self.docID = docID
         self.syncMode = syncMode
         self.remoteChangeEventReceived = remoteChangeEventReceived
         self.watchLoopReconnectTimer = watchLoopReconnectTimer
         self.isDisconnected = false
+        self.cancelled = cancelled
     }
 
     /**
@@ -55,6 +64,7 @@ final class Attachment: @unchecked Sendable {
     func connectStream(_ stream: (any YorkieServerStream)?) {
         self.remoteWatchStream = stream
         self.isDisconnected = false
+        self.cancelled = false
     }
 
     func disconnectStream() {
@@ -62,6 +72,15 @@ final class Attachment: @unchecked Sendable {
         self.remoteWatchStream = nil
 
         self.isDisconnected = true
+    }
+
+    /**
+     * `cancelWatchStream` cancels the watch stream.
+     */
+    func cancelWatchStream() {
+        self.cancelled = true
+        self.resetWatchLoopTimer()
+        self.disconnectStream()
     }
 
     func resetWatchLoopTimer() {
