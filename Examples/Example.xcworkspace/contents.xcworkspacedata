@@ -7,4 +7,7 @@
    <FileRef
       location = "group:KanbanApp/KanbanApp.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:Todomvc/Todomvc.xcodeproj">
+   </FileRef>
 </Workspace>
