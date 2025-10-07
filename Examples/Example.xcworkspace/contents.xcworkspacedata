@@ -13,4 +13,7 @@
    <FileRef
       location = "group:SimutaneousCurcors/SimutaneousCursors.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:Scheduler/Scheduler.xcodeproj">
+   </FileRef>
 </Workspace>
