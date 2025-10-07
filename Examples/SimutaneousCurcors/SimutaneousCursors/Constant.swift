@@ -17,9 +17,7 @@ import Foundation
 
 enum Constant {
     static let serverAddress = "http://localhost:8080"
-    static var documentKey: String = {
-        "simultaneous-cursors-1"
-    }()
+    static var documentKey: String = "simultaneous-cursors"
 }
 
 enum TDError: Error {

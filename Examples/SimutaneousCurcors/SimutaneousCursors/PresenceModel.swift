@@ -32,7 +32,7 @@ enum CursorShape: String, Codable {
     case thumbs
     case pen
     case cursor
-    
+
     var systemImageName: String {
         switch self {
         case .heart: return "heart.fill"
@@ -44,8 +44,8 @@ enum CursorShape: String, Codable {
 }
 
 struct Model: Codable, Identifiable {
-    var id: String { clientID }
-    
+    var id: String { self.clientID }
+
     let clientID: String
     let presence: PresenceModel
 }

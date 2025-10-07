@@ -21,54 +21,55 @@ struct ContentView: View {
     @State var viewModel = ContentViewModel()
     @State private var dragOffset: CGSize = .zero
     @State var currentPosition = CGPoint(x: 0, y: 0)
-    
+
     init(name: String) {
         self.name = name
     }
+
     var body: some View {
         ZStack {
             Color.white.opacity(0.1)
                 .onTapGesture { location in
-                    changePosition(location)
-                    currentPosition = location
+                    self.changePosition(location)
+                    self.currentPosition = location
                 }
-                .gesture(dragGesture)
-            
-            canvasView
-            menuView
-            
+                .gesture(self.dragGesture)
+
+            self.canvasView
+            self.menuView
+
             VStack {
-                Text(name)
+                Text(self.name)
                     .foregroundStyle(Color.white)
                     .padding(3)
                     .background(Color.red)
                     .cornerRadius(2)
-                Image(systemName: viewModel.currentCursor.systemImageName)
+                Image(systemName: self.viewModel.currentCursor.systemImageName)
             }
-            .position(currentPosition)
+            .position(self.currentPosition)
         }
         .ignoresSafeArea()
         .task {
-            await viewModel.initializeClient(with: name)
+            await self.viewModel.initializeClient(with: self.name)
         }
         .onDisappear {
             Task {
-                await viewModel.deactivate()
+                await self.viewModel.deactivate()
             }
         }
     }
-    
+
     private var loadingView: some View {
         ProgressView()
     }
-    
+
     private func errorView(_ error: TDError) -> some View {
         Text("Error occur: \(error.localizedDescription)")
     }
-    
+
     var canvasView: some View {
         VStack {
-            ForEach(viewModel.uiPresenecs) { peer in
+            ForEach(self.viewModel.uiPresenecs) { peer in
                 VStack {
                     Text(peer.presence.name)
                         .foregroundStyle(Color.white)
@@ -88,29 +89,29 @@ struct ContentView: View {
             }
         }
     }
-    
+
     var dragGesture: some Gesture {
-           DragGesture()
-               .onChanged { value in
-                   dragOffset = value.translation
-                   currentPosition = value.location
-                   changePosition(currentPosition)
-               }
-               .onEnded { value in
-                   withAnimation(.bouncy) {
-                       dragOffset = .zero
-                   }
-               }
-       }
-    
+        DragGesture()
+            .onChanged { value in
+                self.dragOffset = value.translation
+                self.currentPosition = value.location
+                self.changePosition(self.currentPosition)
+            }
+            .onEnded { _ in
+                withAnimation(.bouncy) {
+                    self.dragOffset = .zero
+                }
+            }
+    }
+
     var menuView: some View {
         VStack {
             Spacer()
-            
+
             HStack {
                 Group {
                     Button {
-                        viewModel.currentCursor = .heart
+                        self.viewModel.currentCursor = .heart
                     } label: {
                         Image(systemName: CursorShape.heart.systemImageName)
                             .resizable()
@@ -119,7 +120,7 @@ struct ContentView: View {
                             .background(Color.white)
                     }
                     Button {
-                        viewModel.currentCursor = .thumbs
+                        self.viewModel.currentCursor = .thumbs
                     } label: {
                         Image(systemName: CursorShape.thumbs.systemImageName)
                             .resizable()
@@ -129,7 +130,7 @@ struct ContentView: View {
                     }
 
                     Button {
-                        viewModel.currentCursor = .pen
+                        self.viewModel.currentCursor = .pen
                     } label: {
                         Image(systemName: CursorShape.pen.systemImageName)
                             .resizable()
@@ -137,9 +138,9 @@ struct ContentView: View {
                             .foregroundStyle(Color.black)
                             .background(Color.white)
                     }
-                    
+
                     Button {
-                        viewModel.currentCursor = .cursor
+                        self.viewModel.currentCursor = .cursor
                     } label: {
                         Image(systemName: CursorShape.cursor.systemImageName)
                             .resizable()
@@ -155,13 +156,13 @@ struct ContentView: View {
                         .stroke(Color.red, lineWidth: 2)
                 )
             }
-            
-            Text("\(viewModel.uiPresenecs.count + 1) users here!")
+
+            Text("\(self.viewModel.uiPresenecs.count + 1) users here!")
         }
     }
-    
+
     func changePosition(_ position: CGPoint) {
-        viewModel.updatePosition(position)
+        self.viewModel.updatePosition(position)
     }
 }
 
