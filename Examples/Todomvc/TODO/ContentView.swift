@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import Combine
 import SwiftUI
 
 struct ContentView: View {
@@ -29,7 +28,7 @@ struct ContentView: View {
     @State private var viewModel = ContentViewModel()
     @State private var selectedStatus = Status.all
     @State private var showAdding = false
-    @State private var showEdditing = false
+    @State private var showEditing = false
     @State private var selectedAll = false
     @State private var newTaskName = ""
     @State private var updatingModel: TodoModel? = nil
@@ -37,7 +36,6 @@ struct ContentView: View {
     private let status: [Status] = [.all, .active, .completed]
     var body: some View {
         Group {
-            let _ = Self._printChanges()
             switch self.viewModel.state {
             case .error(let error):
                 errorView(error)
@@ -87,7 +85,7 @@ extension ContentView {
 
                             Button {
                                 self.updatingModel = model
-                                self.showEdditing = true
+                                self.showEditing = true
                                 self.newTaskName = model.text
                             } label: {
                                 Text("\(model.text)")
@@ -152,13 +150,12 @@ extension ContentView {
             } message: {
                 Text("Add new task to do here!")
             }
-            .alert("Edit task name", isPresented: self.$showEdditing) {
+            .alert("Edit task name", isPresented: self.$showEditing) {
                 TextField("What needs to be done?", text: self.$newTaskName)
                 HStack {
                     Button(role: .close, action: update)
-                    // Button(role: .confirm, action: update)
                     Button(role: .cancel) {
-                        self.showEdditing = false
+                        self.showEditing = false
                     }
                 }
             } message: {
