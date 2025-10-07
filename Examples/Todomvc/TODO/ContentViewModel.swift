@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
+import Combine
 import Foundation
 import Yorkie
-import Combine
 
 enum ContentState {
     case loading
@@ -30,14 +30,15 @@ extension ContentView {
         private let jsonDecoder = JSONDecoder()
         private(set) var models = [TodoModel]() {
             didSet {
-                itemsLeft = models.count(where: { $0.completed == false })
+                self.itemsLeft = self.models.count(where: { $0.completed == false })
             }
         }
+
         private(set) var itemsLeft = 0
         private(set) var state = ContentState.loading
         @ObservationIgnored private var client: Client
         @ObservationIgnored private let document: Document
-        
+
         init() {
             self.client = Client(Constant.serverAddress)
             self.document = Document(key: Constant.documentKey)
@@ -50,29 +51,29 @@ extension ContentView.ContentViewModel {
         state = .loading
         do {
             try await client.activate()
-            
+
             let doc = try await client.attach(self.document)
-            updateDoc(doc)
-            
+            self.updateDoc(doc)
+
             state = .success
-            
-            await watch()
+
+            await self.watch()
         } catch {
             state = .error(.cannotInitClient("\(error.localizedDescription)"))
         }
     }
-    
+
     func watch() async {
         document.subscribe { [weak self]
             event,
-            document in
+                document in
             if case .syncStatusChanged = event.type {
                 self?.updateDoc(document)
             }
         }
     }
-    
-    func updateDoc(_ doc: Document) {
+
+    func updateDoc(_: Document) {
         if let root = document.getRoot().get(key: "todos") as? JSONArray {
             var _models = [TodoModel]()
             let iterator = root.makeIterator()
@@ -87,7 +88,7 @@ extension ContentView.ContentViewModel {
             //
         }
     }
-    
+
     func markAllAsComplete(_ value: Bool) {
         try? self.document.update { root, _ in
             guard let lists = root.todos as? JSONArray else { return }
@@ -97,7 +98,7 @@ extension ContentView.ContentViewModel {
             }
         }
     }
-    
+
     func deleteItem(_ id: String) {
         try? self.document.update { root, _ in
             guard let lists = root.todos as? JSONArray else { return }
@@ -110,7 +111,7 @@ extension ContentView.ContentViewModel {
             }
         }
     }
-    
+
     func addNewTask(_ name: String) {
         try? self.document.update { root, _ in
             let lists = root.todos as? JSONArray
@@ -119,11 +120,11 @@ extension ContentView.ContentViewModel {
             }
             guard let lists = root.todos as? JSONArray else { return }
             let model = TodoModel.makeTodo(with: name)
-            
+
             lists.append(model)
         }
     }
-    
+
     func updateTask(_ task: String, _ withNewName: String) {
         try? self.document.update { root, _ in
             guard let lists = root.todos as? JSONArray else { return }
@@ -136,7 +137,7 @@ extension ContentView.ContentViewModel {
             }
         }
     }
-    
+
     func updateTask(_ task: String, complete: Bool) {
         try? self.document.update { root, _ in
             guard let lists = root.todos as? JSONArray else { return }
@@ -149,7 +150,7 @@ extension ContentView.ContentViewModel {
             }
         }
     }
-    
+
     func removeAllCompleted() {
         try? self.document.update { root, _ in
             guard let lists = root.todos as? JSONArray else { return }
