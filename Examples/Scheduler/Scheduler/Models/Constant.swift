@@ -27,7 +27,7 @@ enum Constant {
         let result = "next.js-Scheduler-\(formattedDate)"
         return result
     }()
-    
+
     enum Format {
         static let dateFormat = "dd-MM-yy"
         static let local = Locale(identifier: "en_US_POSIX")

@@ -18,34 +18,34 @@ import SwiftUI
 
 struct EventDetailView: View {
     let event: String
-    var updateEvent: ((String) -> Void)
-    var deleteEvent: (() -> Void)
-    
+    var updateEvent: (String) -> Void
+    var deleteEvent: () -> Void
+
     @State var isEditing = false
     @State var textEditing = ""
     @FocusState var forcusField: Bool
-    
+
     var body: some View {
         HStack {
-            if isEditing {
-                TextField("", text: $textEditing)
-                    .focused($forcusField)
+            if self.isEditing {
+                TextField("", text: self.$textEditing)
+                    .focused(self.$forcusField)
             } else {
-                Text(event)
+                Text(self.event)
             }
-            
+
             Spacer()
-            if isEditing {
+            if self.isEditing {
                 HStack {
                     Button {
-                        updateEvent(textEditing)
-                        toggleEditing(false)
+                        self.updateEvent(self.textEditing)
+                        self.toggleEditing(false)
                     } label: {
                         Text("Save")
                     }
-                    
+
                     Button {
-                        toggleEditing(false)
+                        self.toggleEditing(false)
                     } label: {
                         Text("Cancel")
                     }
@@ -53,16 +53,16 @@ struct EventDetailView: View {
             } else {
                 HStack {
                     Button {
-                        toggleEditing(true)
+                        self.toggleEditing(true)
                     } label: {
                         Image(systemName: "highlighter.badge.ellipsis")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 20, height: 20, alignment: .center)
                     }
-                    
+
                     Button {
-                        deleteEvent()
+                        self.deleteEvent()
                     } label: {
                         Image(systemName: "trash")
                             .resizable()
@@ -78,25 +78,23 @@ struct EventDetailView: View {
                 .stroke(Color.gray, lineWidth: 2)
         )
     }
-    
+
     func toggleEditing(_ _isEditing: Bool) {
         withAnimation {
-            isEditing = _isEditing
-            forcusField = true
+            self.isEditing = _isEditing
+            self.forcusField = true
         }
-        
-        if isEditing {
-            textEditing = event
+
+        if self.isEditing {
+            self.textEditing = self.event
         } else {
-            textEditing = ""
+            self.textEditing = ""
         }
     }
 }
 
 #Preview {
     EventDetailView(event: "Go to work or Not?") { _ in
-        
-    } deleteEvent: {
-        
-    }
+
+    } deleteEvent: {}
 }

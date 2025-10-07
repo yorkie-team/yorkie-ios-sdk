@@ -35,38 +35,38 @@ class ViewModel {
         dateFormatter.locale = Constant.Format.local
         return dateFormatter
     }()
-    
+
     var scheduledDates = [Date]()
-    
+
     init() {
         self.client = Client(Constant.serverAddress)
         self.document = Document(key: Constant.documentKey)
     }
-    
+
     func initializeClient() async {
-        state = .loading
+        self.state = .loading
         do {
-            try await client.activate()
-            
+            try await self.client.activate()
+
             let doc = try await client.attach(self.document)
             self.updateScheduler(from: doc)
-            state = .success
-            
-            await watch()
+            self.state = .success
+
+            await self.watch()
         } catch {
-            state = .error(.cannotInitClient("\(error.localizedDescription)"))
+            self.state = .error(.cannotInitClient("\(error.localizedDescription)"))
         }
     }
-    
+
     func watch() async {
-        document.subscribe { [weak self] event, document in
+        self.document.subscribe { [weak self] event, document in
             guard let self else { return }
             if case .syncStatusChanged = event.type {
                 self.updateScheduler(from: document)
             }
         }
     }
-    
+
     func updateScheduler(from document: Document) {
         guard let array = document.getRoot().content as? JSONArray else { return }
         let iterator = array.makeIterator()
@@ -76,42 +76,42 @@ class ViewModel {
             let text = object.get(key: "text") as? String
             guard let date, let text else { fatalError() }
             guard let d = dateFormater.date(from: date) else { return }
-            
+
             if dates[d] == nil {
                 dates[d] = [.init(id: object.getID(), text: text)]
             } else {
                 dates[d]?.append(.init(id: object.getID(), text: text))
             }
         }
-        
+
         self.schedulers = dates
-        updateScheduledDates()
+        self.updateScheduledDates()
     }
-    
+
     func deleteEvent(_ event: Event, date: Date) {
         try? self.document.update { root, _ in
             guard let lists = root.content as? JSONArray else { return }
             lists.remove(byID: event.id)
         }
     }
-    
+
     func addEvent(
         _ name: String,
         at date: Date
     ) {
         try? self.document.update { root, _ in
             guard let lists = root.content as? JSONArray else { return }
-            let formattedDate = dateFormater.string(from: date)
+            let formattedDate = self.dateFormater.string(from: date)
             let model = ScheduleModel(date: formattedDate, text: name)
-            
+
             lists.append(model)
         }
     }
-    
+
     func updateScheduledDates() {
-        self.scheduledDates = [Date](schedulers.keys)
+        self.scheduledDates = [Date](self.schedulers.keys)
     }
-    
+
     func updateEvent(
         _ event: Event,
         at date: Date,
@@ -121,7 +121,7 @@ class ViewModel {
             guard let lists = root.content as? JSONArray else { return }
             let iterator = lists.makeIterator()
             let formattedDate = self.dateFormater.string(from: date)
-            
+
             while let next = iterator.next() as? JSONObject {
                 if next.getID() == event.id, (next.get(key: "date") as? String ?? "") == formattedDate {
                     next.set(key: "text", value: text)

@@ -19,8 +19,8 @@ import Yorkie
 struct Event {
     let id: TimeTicket
     let text: String
-    
+
     var uuid: String {
-        id.description + text
+        self.id.description + self.text
     }
 }

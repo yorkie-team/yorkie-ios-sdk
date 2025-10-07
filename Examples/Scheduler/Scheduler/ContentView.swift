@@ -20,40 +20,40 @@ struct ContentView: View {
     @State var viewModel = ViewModel()
     @State private var selectedDate: Date?
     @State private var newEvent = ""
-    
+
     var body: some View {
         VStack {
             CalendarViewWrapper(
                 selectedDate: $selectedDate,
-                eventDates: $viewModel.scheduledDates
+                eventDates: self.$viewModel.scheduledDates
             )
             .frame(height: 450)
-            
+
             Spacer()
-            
+
             if let selectedDate {
                 VStack {
                     ScrollView {
-                        makeDateDetail(selectedDate)
+                        self.makeDateDetail(selectedDate)
                             .padding()
                     }
                     .scrollIndicators(.hidden, axes: .vertical)
-                    
+
                     Spacer()
-                    eventEditing
+                    self.eventEditing
                 }
             }
         }
         .padding()
         .task {
-            await viewModel.initializeClient()
+            await self.viewModel.initializeClient()
         }
     }
-    
+
     @ViewBuilder
     func makeDateDetail(_ date: Date) -> some View {
-        let events = viewModel.schedulers[date] ?? []
-        
+        let events = self.viewModel.schedulers[date] ?? []
+
         VStack {
             ForEach(events, id: \.uuid) { event in
                 EventDetailView(event: event.text, updateEvent: { updated in
@@ -66,18 +66,18 @@ struct ContentView: View {
             }
         }
     }
-    
+
     var eventEditing: some View {
         VStack {
             if let date = selectedDate {
-                let stringDate = viewModel.dateFormater.string(from: date)
+                let stringDate = self.viewModel.dateFormater.string(from: date)
                 Text("Date: \(stringDate)")
             }
-            
-            TextField("Add Event", text: $newEvent)
-            
+
+            TextField("Add Event", text: self.$newEvent)
+
             Button {
-                addEvent(newEvent, to: selectedDate)
+                addEvent(self.newEvent, to: self.selectedDate)
             } label: {
                 Text("Add Event")
             }
@@ -88,21 +88,21 @@ struct ContentView: View {
 extension ContentView {
     func addEvent(_ event: String, to date: Date?) {
         guard let date else { return }
-        viewModel.addEvent(event, at: date)
+        self.viewModel.addEvent(event, at: date)
         // clear event name after adding
-        newEvent = ""
+        self.newEvent = ""
     }
-    
+
     func deleteEvent(_ event: Event, date: Date) {
-        viewModel.deleteEvent(event, date: date)
+        self.viewModel.deleteEvent(event, date: date)
     }
-    
+
     func updateEvent(
         _ event: Event,
         at date: Date,
         withNewText text: String
     ) {
-        viewModel.updateEvent(event, at: date, withNewText: text)
+        self.viewModel.updateEvent(event, at: date, withNewText: text)
     }
 }
 
