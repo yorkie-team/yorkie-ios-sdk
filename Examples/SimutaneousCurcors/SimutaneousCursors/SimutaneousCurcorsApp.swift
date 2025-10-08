@@ -22,15 +22,15 @@ struct SimutaneousCurcorsApp: App {
     @State var name = ""
     var body: some Scene {
         WindowGroup {
-            NavigationStack(path: $path) {
+            NavigationStack(path: self.$path) {
                 VStack {
                     Text("Welcome")
                         .font(.headline)
-                    TextField("Input name:", text: $name)
+                    TextField("Input name:", text: self.$name)
                     NavigationLink("Enter room") {
-                        ContentView(name: name)
+                        ContentView(name: self.name)
                     }
-                    .disabled(name.isEmpty)
+                    .disabled(self.name.isEmpty)
                 }
             }
         }

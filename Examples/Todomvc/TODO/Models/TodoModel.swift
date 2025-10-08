@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-import Yorkie
 import Combine
 import Foundation
+import Yorkie
 
 struct TodoModel: Identifiable, Equatable, JSONObjectable {
     let completed: Bool

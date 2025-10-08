@@ -15,29 +15,28 @@
  */
 
 import SwiftUI
-import Combine
 
 struct ContentView: View {
     enum Status: String, Identifiable {
         var id: String { rawValue }
-        
+
         case all = "All"
         case active = "Active"
         case completed = "Completed"
     }
+
     @State private var viewModel = ContentViewModel()
     @State private var selectedStatus = Status.all
     @State private var showAdding = false
-    @State private var showEdditing = false
+    @State private var showEditing = false
     @State private var selectedAll = false
     @State private var newTaskName = ""
     @State private var updatingModel: TodoModel? = nil
-    
+
     private let status: [Status] = [.all, .active, .completed]
     var body: some View {
         Group {
-            let _ = Self._printChanges()
-            switch viewModel.state {
+            switch self.viewModel.state {
             case .error(let error):
                 errorView(error)
             case .loading:
@@ -47,29 +46,30 @@ struct ContentView: View {
             }
         }
         .task {
-            await viewModel.initializeClient()
+            await self.viewModel.initializeClient()
         }
     }
 }
 
 // MARK: - Views
+
 extension ContentView {
     private var content: some View {
         NavigationStack {
             VStack {
-                headerView
-                
+                self.headerView
+
                 Spacer()
-                
+
                 ScrollView {
                     let filteredModels: [TodoModel] = {
-                        switch selectedStatus {
+                        switch self.selectedStatus {
                         case .all:
-                            return viewModel.models
+                            return self.viewModel.models
                         case .active:
-                            return viewModel.models.filter { !$0.completed }
+                            return self.viewModel.models.filter { !$0.completed }
                         case .completed:
-                            return viewModel.models.filter { $0.completed }
+                            return self.viewModel.models.filter { $0.completed }
                         }
                     }()
                     ForEach(filteredModels) { model in
@@ -82,19 +82,19 @@ extension ContentView {
                                     .scaledToFit()
                                     .frame(width: 25, height: 25, alignment: .center)
                             }
-                            
+
                             Button {
-                                updatingModel = model
-                                showEdditing = true
-                                newTaskName = model.text
+                                self.updatingModel = model
+                                self.showEditing = true
+                                self.newTaskName = model.text
                             } label: {
                                 Text("\(model.text)")
                                     .strikethrough(model.completed)
                             }
-                            
+
                             Spacer()
                             Button {
-                                viewModel.deleteItem(model.id)
+                                self.viewModel.deleteItem(model.id)
                             } label: {
                                 Image(systemName: "delete.left")
                                     .resizable()
@@ -106,18 +106,17 @@ extension ContentView {
                         .padding(.horizontal, 20)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 HStack {
-                    if viewModel.itemsLeft > 0 {
-                        Text("\(viewModel.itemsLeft) item(s) left")
+                    if self.viewModel.itemsLeft > 0 {
+                        Text("\(self.viewModel.itemsLeft) item(s) left")
                     } else {
-                        
                         Text("No items left")
                     }
-                    
-                    if viewModel.models.contains(where: { $0.completed }) {
+
+                    if self.viewModel.models.contains(where: { $0.completed }) {
                         Button {
                             removeAllCompleted()
                         } label: {
@@ -140,62 +139,61 @@ extension ContentView {
                 }
             }
             .padding()
-            .alert("Add New Todo", isPresented: $showAdding) {
-                TextField("What needs to be done?", text: $newTaskName)
+            .alert("Add New Todo", isPresented: self.$showAdding) {
+                TextField("What needs to be done?", text: self.$newTaskName)
                 HStack {
                     Button(role: .confirm, action: addTask)
                     Button(role: .cancel) {
-                        showAdding = false
+                        self.showAdding = false
                     }
                 }
             } message: {
                 Text("Add new task to do here!")
             }
-            .alert("Edit task name", isPresented: $showEdditing) {
-                TextField("What needs to be done?", text: $newTaskName)
+            .alert("Edit task name", isPresented: self.$showEditing) {
+                TextField("What needs to be done?", text: self.$newTaskName)
                 HStack {
                     Button(role: .close, action: update)
-                    // Button(role: .confirm, action: update)
                     Button(role: .cancel) {
-                        showEdditing = false
+                        self.showEditing = false
                     }
                 }
             } message: {
                 Text("Add new task to do here!")
             }
             .navigationTitle("Todo")
-            .onChange(of: viewModel.models) { _, newValue in
+            .onChange(of: self.viewModel.models) { _, newValue in
                 let hasChanged = newValue.contains(where: { $0.completed == false })
-                selectedAll = !hasChanged
+                self.selectedAll = !hasChanged
             }
-            .onChange(of: selectedAll) { oldValue, newValue in
-                viewModel.markAllAsComplete(newValue)
+            .onChange(of: self.selectedAll) { _, newValue in
+                self.viewModel.markAllAsComplete(newValue)
             }
         }
     }
-    
+
     private func errorView(_ error: TDError) -> some View {
         Text("Error occur: \(error.localizedDescription)")
     }
-    
+
     private var loadingView: some View {
         ProgressView()
     }
-    
+
     var headerView: some View {
         VStack {
             HStack {
-                Picker("", selection: $selectedStatus) {
-                    ForEach(status) { pickerStatus in
+                Picker("", selection: self.$selectedStatus) {
+                    ForEach(self.status) { pickerStatus in
                         Text("\(pickerStatus.rawValue)")
                             .tag(pickerStatus)
                     }
                 }
                 .pickerStyle(.palette)
-                
+
                 Spacer()
                 Button {
-                    showAdding = true
+                    self.showAdding = true
                 } label: {
                     Image(systemName: "plus")
                         .resizable()
@@ -207,9 +205,9 @@ extension ContentView {
                         .cornerRadius(20)
                 }
             }
-            
-            if !viewModel.models.isEmpty {
-                Toggle(isOn: $selectedAll) {
+
+            if !self.viewModel.models.isEmpty {
+                Toggle(isOn: self.$selectedAll) {
                     Text("Marked all as complete!")
                 }
             }
@@ -218,23 +216,24 @@ extension ContentView {
 }
 
 // MARK: - Functions
+
 extension ContentView {
     private func addTask() {
-        viewModel.addNewTask(newTaskName)
-        newTaskName = ""
+        self.viewModel.addNewTask(self.newTaskName)
+        self.newTaskName = ""
     }
-    
+
     private func update() {
         guard let model = updatingModel else { return }
-        viewModel.updateTask(model.id, newTaskName)
+        self.viewModel.updateTask(model.id, self.newTaskName)
     }
-    
+
     private func complete(_ taskID: String, complete: Bool) {
-        viewModel.updateTask(taskID, complete: complete)
+        self.viewModel.updateTask(taskID, complete: complete)
     }
-    
+
     private func removeAllCompleted() {
-        viewModel.removeAllCompleted()
+        self.viewModel.removeAllCompleted()
     }
 }
 

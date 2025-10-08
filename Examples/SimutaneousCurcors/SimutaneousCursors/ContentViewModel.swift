@@ -16,43 +16,44 @@
 
 import Combine
 import Foundation
-import Yorkie
 import SwiftUI
+import Yorkie
 
 @Observable
 class ContentViewModel {
     let width = UIScreen.current!.bounds.size.width
     let height = UIScreen.current!.bounds.size.height
-    
+
     @ObservationIgnored private var client: Client
     @ObservationIgnored private let document: Document
     @ObservationIgnored var presenecs = [Presence]()
-    
+
     var uiPresenecs = [Model]()
     var currentCursor: CursorShape = .heart {
         didSet {
-            updateCursor()
+            self.updateCursor()
         }
     }
+
     private(set) var state = ContentState.loading
-    
+
     init() {
         self.client = Client(Constant.serverAddress)
         self.document = Document(key: Constant.documentKey)
     }
-    
+
     func initializeClient(with name: String) async {
-        state = .loading
+        self.state = .loading
         do {
-            try await client.activate()
-            
+            try await self.client.activate()
+
             let doc = try await client.attach(self.document, [
                 "name": name,
                 "cursorShape": "heart",
                 "cursor": ["xPos": 0.5, "yPos": 0.5],
                 "pointerDown": "false"
             ])
-            try self.document.update { root, presence in
+            try self.document.update { root, _ in
                 var text = root.content as? JSONText
                 if text == nil {
                     root.content = JSONText()
@@ -60,25 +61,23 @@ class ContentViewModel {
                 }
             }
             let pres = doc.getPresences()
-            mapFromPrecenscToUI(pres)
-            state = .success
-            
-            await watch()
+            self.mapFromPrecenscToUI(pres)
+            self.state = .success
+
+            await self.watch()
         } catch {
-            state = .error(.cannotInitClient("\(error.localizedDescription)"))
+            self.state = .error(.cannotInitClient("\(error.localizedDescription)"))
         }
     }
-    
+
     func deactivate() async {
         do {
-            try await client.deactivate()
-        } catch {
-            
-        }
+            try await self.client.deactivate()
+        } catch {}
     }
-    
+
     func watch() async {
-        document.subscribe { [weak self] event, document in
+        self.document.subscribe { [weak self] event, document in
             if case .syncStatusChanged = event.type {
                 let presences = document.getPresences()
                 self?.mapFromPrecenscToUI(presences)
@@ -88,11 +87,11 @@ class ContentViewModel {
             }
         }
     }
-    
+
     @MainActor
     private func mapFromPrecenscToUI(_ peers: [PeerElement]) {
         var _uiPresenecs = [Model]()
-        
+
         for peer in peers {
             let id = peer.clientID
             let presentModel = peer.presence
@@ -100,15 +99,15 @@ class ContentViewModel {
             let pointerDown = presentModel["pointerDown"] as? Int
             let cursor = presentModel["cursor"] as? [String: Double]
             let cursorShape = presentModel["cursorShape"] as? String
-            
+
             guard let name, let pointerDown, let cursor, let cursorShape, let cursorShape = CursorShape(rawValue: cursorShape) else {
                 continue
             }
-            
+
             guard let xPos = cursor["xPos"], let yPos = cursor["yPos"] else { fatalError() }
-            let realxPos = xPos * width
-            let realyPos = yPos * height
-            
+            let realxPos = xPos * self.width
+            let realyPos = yPos * self.height
+
             let model = Model(
                 clientID: id,
                 presence: .init(
@@ -118,33 +117,33 @@ class ContentViewModel {
                     cursor: .init(xPos: realxPos, yPos: realyPos)
                 )
             )
-            
+
             _uiPresenecs.append(model)
         }
-        
-        uiPresenecs.removeAll()
-        uiPresenecs = _uiPresenecs
-        
-        print(uiPresenecs)
+
+        self.uiPresenecs.removeAll()
+        self.uiPresenecs = _uiPresenecs
+
+        print(self.uiPresenecs)
     }
-    
+
     func updatePosition(_ position: CGPoint) {
         do {
-            try document.update { root, presence in
-                presence.set(["cursor": ["xPos": position.x / width, "yPos": position.y / height]])
+            try self.document.update { _, presence in
+                presence.set(["cursor": ["xPos": position.x / self.width, "yPos": position.y / self.height]])
             }
         } catch {
-            state = .error(.cannotInitClient("\(error.localizedDescription)"))
+            self.state = .error(.cannotInitClient("\(error.localizedDescription)"))
         }
     }
-    
+
     func updateCursor() {
         do {
-            try document.update { root, presence in
-                presence.set(["cursorShape": currentCursor])
+            try self.document.update { _, presence in
+                presence.set(["cursorShape": self.currentCursor])
             }
         } catch {
-            state = .error(.cannotInitClient("\(error.localizedDescription)"))
+            self.state = .error(.cannotInitClient("\(error.localizedDescription)"))
         }
     }
 }
