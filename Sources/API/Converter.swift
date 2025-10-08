@@ -308,9 +308,18 @@ extension Converter {
     static func fromElementSimple(pbElementSimple: PbJSONElementSimple) throws -> CRDTElement {
         switch pbElementSimple.type {
         case .jsonObject:
-            return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            if  pbElementSimple.value.isEmpty {
+                return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            } else {
+                return try Self.fromObject(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonObject)
+            }
         case .jsonArray:
-            return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            if pbElementSimple.value.isEmpty {
+                return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
+            } else {
+                return try Self.fromArray(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonArray)
+            }
+            
         case .text:
             return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
