@@ -39,13 +39,13 @@ public class JSONObject {
         self.context = context
     }
 
-    func set(_ values: [String: Any]) {
+    public func set(_ values: [String: Any]) {
         for (key, value) in values {
             self.set(key: key, value: value)
         }
     }
 
-    func set<T>(key: String, value: T) {
+    public func set<T>(key: String, value: T) {
         guard self.isValidKey(key) else {
             assertionFailure("The key \(key) doesn't have the reserved characters: \(self.reservedCharacterForKey)")
             return
