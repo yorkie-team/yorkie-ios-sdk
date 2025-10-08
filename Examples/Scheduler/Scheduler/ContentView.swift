@@ -81,6 +81,7 @@ struct ContentView: View {
             } label: {
                 Text("Add Event")
             }
+            .disabled(self.newEvent.isEmpty)
         }
     }
 }
