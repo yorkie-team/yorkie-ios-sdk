@@ -16,6 +16,7 @@
 		5849C6F12E94CABA00B2C53E /* CalendarViewWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5849C6F02E94CAB900B2C53E /* CalendarViewWrapper.swift */; };
 		5849C6F42E94E52100B2C53E /* Event.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5849C6F32E94E52100B2C53E /* Event.swift */; };
 		5849C6F62E94E53600B2C53E /* Constant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5849C6F52E94E53500B2C53E /* Constant.swift */; };
+		58EA2CEA2EA9F9690030F3B3 /* BuildInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58EA2CE92EA9F9690030F3B3 /* BuildInfo.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 		5849C6F02E94CAB900B2C53E /* CalendarViewWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarViewWrapper.swift; sourceTree = "<group>"; };
 		5849C6F32E94E52100B2C53E /* Event.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Event.swift; sourceTree = "<group>"; };
 		5849C6F52E94E53500B2C53E /* Constant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constant.swift; sourceTree = "<group>"; };
+		58EA2CE92EA9F9690030F3B3 /* BuildInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BuildInfo.plist; sourceTree = "<group>"; };
 		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -46,6 +48,7 @@
 		5849C6E62E93B0F500B2C53E /* Scheduler */ = {
 			isa = PBXGroup;
 			children = (
+				58EA2CE92EA9F9690030F3B3 /* BuildInfo.plist */,
 				5849C6F22E94E51600B2C53E /* Models */,
 				5849C6F02E94CAB900B2C53E /* CalendarViewWrapper.swift */,
 				5849C6EE2E94CAA000B2C53E /* EventDetailView.swift */,
@@ -106,6 +109,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5849C6DA2E93B0EB00B2C53E /* Build configuration list for PBXNativeTarget "Scheduler" */;
 			buildPhases = (
+				58EA2CEB2EA9F97D0030F3B3 /* Run IP Server */,
 				5849C6B82E93B0EA00B2C53E /* Sources */,
 				5849C6B92E93B0EA00B2C53E /* Frameworks */,
 				5849C6BA2E93B0EA00B2C53E /* Resources */,
@@ -164,6 +168,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5849C6E72E93B0F500B2C53E /* Assets.xcassets in Resources */,
+				58EA2CEA2EA9F9690030F3B3 /* BuildInfo.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -188,6 +193,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftformat > /dev/null; then\n  swiftformat .\nelse\n  echo \"warning: SwiftFormat not installed, download from https://github.com/nicklockwood/SwiftFormat\"\nfi\n\n";
+		};
+		58EA2CEB2EA9F97D0030F3B3 /* Run IP Server */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run IP Server";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\n# Get current IP address of Mac (Wi-Fi interface en0)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Path to your target plist file (adjust if needed)\nPLIST_PATH=\"${SRCROOT}/Scheduler/BuildInfo.plist\"\n\n# Key to inject the IP address under\nPLIST_KEY=\"CurrentIPAddress\"\n\n# Inject IP address into plist\n/usr/libexec/PlistBuddy -c \"Set :$PLIST_KEY $IP_ADDRESS\" \"$PLIST_PATH\" || \\\n/usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n\necho \"Injected Mac IP address ($IP_ADDRESS) into $PLIST_PATH\"\n\nif [ $? -eq 0 ]; then\n  echo \"✅ Successfully updated $PLIST_KEY in $PLIST_PATH\"\n  /usr/libexec/PlistBuddy -c \"Print \" \"${PLIST_PATH}\"\nelse\n  echo \"ℹ️ Key not found, trying to add it...\"\n  /usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n  if [ $? -eq 0 ]; then\n    echo \"✅ Successfully added $PLIST_KEY to $PLIST_PATH\"\n  else\n    echo \"❌ Failed to update or add $PLIST_KEY to $PLIST_PATH\"\n    exit 1\n  fi\nfi\n";
+			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -229,7 +254,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -271,7 +296,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
