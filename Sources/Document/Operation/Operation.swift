@@ -142,7 +142,7 @@ public struct StyleOpInfo: OperationInfo {
 
         return false
     }
-    
+
     public init(
         path: String = "",
         from: Int,
