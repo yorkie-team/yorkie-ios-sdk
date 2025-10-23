@@ -147,7 +147,7 @@ public struct StyleOpInfo: OperationInfo {
         path: String = "",
         from: Int,
         to: Int,
-        attributes: [String : Any]?
+        attributes: [String: Any]?
     ) {
         self.path = path
         self.from = from
