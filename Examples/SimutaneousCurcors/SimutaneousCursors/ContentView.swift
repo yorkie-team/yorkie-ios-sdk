@@ -16,11 +16,35 @@
 
 import SwiftUI
 
+struct LineShape: Shape {
+    var points: [CGPoint]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard self.points.count > 1 else { return path }
+
+        path.move(to: self.points[0])
+        for point in self.points.dropFirst() {
+            path.addLine(to: point)
+        }
+        return path
+    }
+}
+
+struct LineDrawingView: View {
+    let positions: [CGPoint]
+    var body: some View {
+        LineShape(points: self.positions)
+            .stroke(Color.black, lineWidth: 3)
+    }
+}
+
 struct ContentView: View {
     let name: String
     @State var viewModel = ContentViewModel()
     @State private var dragOffset: CGSize = .zero
     @State var currentPosition = CGPoint(x: 0, y: 0)
+    @State var isTouchDown = false
 
     init(name: String) {
         self.name = name
@@ -30,11 +54,11 @@ struct ContentView: View {
         ZStack {
             Color.white.opacity(0.1)
                 .onTapGesture { location in
-                    self.changePosition(location)
+                    self.isTouchDown = true
+                    self.changePosition(location, isTouchDown: false)
                     self.currentPosition = location
                 }
                 .gesture(self.dragGesture)
-
             self.canvasView
             self.menuView
 
@@ -45,8 +69,34 @@ struct ContentView: View {
                     .background(Color.red)
                     .cornerRadius(2)
                 Image(systemName: self.viewModel.currentCursor.systemImageName)
+                    .foregroundStyle(
+                        Color(
+                            uiColor: .init(
+                                red: self.viewModel.currentCursor.color.r,
+                                green: self.viewModel.currentCursor.color.g,
+                                blue: self.viewModel.currentCursor.color.b,
+                                alpha: 1
+                            )
+                        )
+                    )
             }
-            .position(self.currentPosition)
+            .position(self.viewModel.currentCursor == .pen ? .init(x: self.currentPosition.x + 20, y: self.currentPosition.y - 20) : self.currentPosition)
+            .overlay {
+                if self.isTouchDown, self.viewModel.currentCursor != .cursor, self.viewModel.currentCursor != .pen {
+                    AnimationView(
+                        shape: self.viewModel.currentCursor,
+                        position: .init(
+                            x: self.currentPosition.x,
+                            y: self.currentPosition.y
+                        )
+                    )
+                }
+            }
+
+            ForEach(self.viewModel.drawingNames, id: \.self) { name in
+                let drawingPath = self.viewModel.paths[name] ?? []
+                LineDrawingView(positions: drawingPath)
+            }
         }
         .ignoresSafeArea()
         .task {
@@ -68,7 +118,7 @@ struct ContentView: View {
     }
 
     var canvasView: some View {
-        VStack {
+        Group {
             ForEach(self.viewModel.uiPresenecs) { peer in
                 VStack {
                     Text(peer.presence.name)
@@ -79,13 +129,33 @@ struct ContentView: View {
                     Image(systemName: peer.presence.cursorShape.systemImageName)
                         .resizable()
                         .scaledToFit()
-                        .foregroundStyle(Color.red)
+                        .foregroundStyle(
+                            Color(
+                                uiColor: .init(
+                                    red: peer.presence.cursorShape.color.r,
+                                    green: peer.presence.cursorShape.color.g,
+                                    blue: peer.presence.cursorShape.color.b,
+                                    alpha: 1
+                                )
+                            )
+                        )
                         .frame(width: 20, height: 20)
                 }
                 .position(
-                    x: peer.presence.cursor.xPos,
-                    y: peer.presence.cursor.yPos
+                    x: peer.presence.cursor.xPos + (peer.presence.cursorShape == .pen ? 20 : 0),
+                    y: peer.presence.cursor.yPos + (peer.presence.cursorShape == .pen ? -20 : 0)
                 )
+                .overlay {
+                    if peer.presence.pointerDown, peer.presence.cursorShape != .cursor, peer.presence.cursorShape != .pen {
+                        AnimationView(
+                            shape: peer.presence.cursorShape,
+                            position: .init(
+                                x: peer.presence.cursor.xPos,
+                                y: peer.presence.cursor.yPos
+                            )
+                        )
+                    }
+                }
             }
         }
     }
@@ -95,12 +165,14 @@ struct ContentView: View {
             .onChanged { value in
                 self.dragOffset = value.translation
                 self.currentPosition = value.location
-                self.changePosition(self.currentPosition)
+                self.changePosition(self.currentPosition, isTouchDown: true)
             }
             .onEnded { _ in
                 withAnimation(.bouncy) {
                     self.dragOffset = .zero
                 }
+                self.isTouchDown = false
+                self.changePosition(self.currentPosition, isTouchDown: false)
             }
     }
 
@@ -157,15 +229,64 @@ struct ContentView: View {
                 )
             }
 
-            Text("\(self.viewModel.uiPresenecs.count + 1) users here!")
+            Text("\(self.viewModel.uiPresenecs.count) users here!")
         }
     }
 
-    func changePosition(_ position: CGPoint) {
-        self.viewModel.updatePosition(position)
+    func changePosition(_ position: CGPoint, isTouchDown: Bool) {
+        self.viewModel.updatePosition(position, isTouchDown: isTouchDown)
     }
 }
 
-#Preview {
-    ContentView(name: "iOS")
+struct HeartView: View {
+    let shape: CursorShape
+    let position: CGPoint
+    init(shape: CursorShape, position: CGPoint) {
+        self.shape = shape
+        self.position = position
+    }
+
+    @State var offsetY: CGFloat = 0
+    @State var opacity: CGFloat = 1
+    var body: some View {
+        Image(systemName: self.shape.systemImageName)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(Color(uiColor: .init(red: self.shape.color.r, green: self.shape.color.g, blue: self.shape.color.b, alpha: 1)))
+            .frame(width: 20, height: 20)
+            .opacity(self.opacity)
+            .position(x: self.position.x, y: self.position.y + self.offsetY)
+            .onAppear {
+                withAnimation(.easeOut(duration: 5)) {
+                    self.offsetY = -100
+                    self.opacity = 0
+                }
+            }
+    }
+}
+
+struct AnimationView: View {
+    let shape: CursorShape
+    let position: CGPoint
+    @State var timer: Timer?
+
+    @State private var hearts: [UUID] = []
+    var body: some View {
+        VStack {
+            ZStack {
+                ForEach(self.hearts, id: \.self) { _ in
+                    HeartView(shape: self.shape, position: .init(x: self.position.x + .random(in: 0 ... 20), y: self.position.y + .random(in: 0 ... 20)))
+                }
+            }
+        }
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                if self.hearts.count <= 10 {
+                    withAnimation {
+                        self.hearts.append(.init())
+                    }
+                }
+            }
+        }
+    }
 }

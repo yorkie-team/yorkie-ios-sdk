@@ -129,7 +129,7 @@ class CRDTRoot {
     /**
      * `createPath` creates path of the given element.
      */
-    func createPath(createdAt: TimeTicket) throws -> String {
+    public func createPath(createdAt: TimeTicket) throws -> String {
         return try self.createSubPaths(createdAt: createdAt).joined(separator: self.subPathSeparator)
     }
 

@@ -22,7 +22,7 @@ struct Cursor: Codable {
 
 struct PresenceModel: Codable {
     let name: String
-    let pointerDown: Int
+    let pointerDown: Bool
     let cursorShape: CursorShape
     let cursor: Cursor
 }
@@ -36,9 +36,22 @@ enum CursorShape: String, Codable {
     var systemImageName: String {
         switch self {
         case .heart: return "heart.fill"
-        case .thumbs: return "hand.draw.badge.ellipsis"
-        case .pen: return "pencil.and.scribble"
-        case .cursor: return "location.fill"
+        case .thumbs: return "hand.thumbsup.fill"
+        case .pen: return "paintbrush.pointed.fill"
+        case .cursor: return "pointer.arrow.ipad"
+        }
+    }
+
+    var color: ColorModel {
+        switch self {
+        case .heart:
+            return .init(r: 1, g: 0, b: 0, a: 1)
+        case .thumbs:
+            return .init(r: 1, g: 1, b: 0, a: 1)
+        case .pen:
+            return .init(r: 0, g: 0, b: 0, a: 1)
+        case .cursor:
+            return .init(r: 0, g: 0, b: 0, a: 0)
         }
     }
 }
@@ -48,4 +61,8 @@ struct Model: Codable, Identifiable {
 
     let clientID: String
     let presence: PresenceModel
+}
+
+struct ColorModel {
+    let r, g, b, a: CGFloat
 }

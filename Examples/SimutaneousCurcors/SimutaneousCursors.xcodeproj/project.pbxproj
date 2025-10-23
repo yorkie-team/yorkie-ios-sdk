@@ -96,6 +96,7 @@
 				58D2A3362E935F9D00E23597 /* Frameworks */,
 				58D2A3372E935F9D00E23597 /* Resources */,
 				5849C72C2E94FA0500B2C53E /* SwiftFormat */,
+				584145FA2EA9C03E00558E35 /* Run IP Server */,
 			);
 			buildRules = (
 			);
@@ -155,6 +156,26 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		584145FA2EA9C03E00558E35 /* Run IP Server */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run IP Server";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\n# Get current IP address from en0 (Wi-Fi)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Fallback to en1 if en0 is empty\nif [ -z \"$IP_ADDRESS\" ]; then\n  IP_ADDRESS=$(ipconfig getifaddr en1)\nfi\n\n# Path to Info.plist (adjust if needed)\nPLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n\n# Key to store IP address\nKEY=\"CurrentIPAddress\"\n\n# Add or update the key in Info.plist\n/usr/libexec/PlistBuddy -c \"Delete :$KEY\" \"$PLIST\" 2>/dev/null\n/usr/libexec/PlistBuddy -c \"Add :$KEY string $IP_ADDRESS\" \"$PLIST\"\n\necho \"✅ Injected IP address ($IP_ADDRESS) into Info.plist\"\n";
+			showEnvVarsInLog = 0;
+		};
 		5849C72C2E94FA0500B2C53E /* SwiftFormat */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;

@@ -167,6 +167,12 @@ extension ContentView {
                 self.selectedAll = !hasChanged
             }
             .onChange(of: self.selectedAll) { _, newValue in
+                if newValue == false {
+                    if self.viewModel.models.allSatisfy({ $0.completed == true }) {
+                        self.viewModel.markAllAsComplete(newValue)
+                    }
+                    return
+                }
                 self.viewModel.markAllAsComplete(newValue)
             }
         }
