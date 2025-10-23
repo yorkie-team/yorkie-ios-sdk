@@ -95,12 +95,12 @@ class ContentViewModel {
         for peer in peers {
             let id = peer.clientID
             let presentModel = peer.presence
-            let name = presentModel["name"] as? String
+            let name = presentModel["name"] as? String ?? "Anonymous"
             let pointerDown = presentModel["pointerDown"] as? Int
             let cursor = presentModel["cursor"] as? [String: Double]
             let cursorShape = presentModel["cursorShape"] as? String
 
-            guard let name, let pointerDown, let cursor, let cursorShape, let cursorShape = CursorShape(rawValue: cursorShape) else {
+            guard let pointerDown, let cursor, let cursorShape, let cursorShape = CursorShape(rawValue: cursorShape) else {
                 continue
             }
 
