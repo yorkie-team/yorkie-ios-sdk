@@ -21,6 +21,7 @@ import Yorkie
 
 @Observable
 class ContentViewModel {
+    @ObservationIgnored var currentTimer: Timer?
     let width = UIScreen.current!.bounds.size.width
     let height = UIScreen.current!.bounds.size.height
 

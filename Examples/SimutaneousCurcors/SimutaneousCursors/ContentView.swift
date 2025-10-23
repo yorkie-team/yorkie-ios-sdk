@@ -54,8 +54,18 @@ struct ContentView: View {
         ZStack {
             Color.white.opacity(0.1)
                 .onTapGesture { location in
+                    self.viewModel.currentTimer?.invalidate()
+                    self.viewModel.currentTimer = nil
+
+                    let isTouchDownInsideX = location.x > self.currentPosition.x - 40 && location.x < self.currentPosition.x + 40
+                    let isTouchDownInsideY = location.y > self.currentPosition.y - 40 && location.y < self.currentPosition.y + 40
                     self.isTouchDown = true
-                    self.changePosition(location, isTouchDown: false)
+                    self.changePosition(location, isTouchDown: isTouchDownInsideX && isTouchDownInsideY)
+                    if isTouchDownInsideX && isTouchDownInsideY {
+                        self.viewModel.currentTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { _ in
+                            self.changePosition(location, isTouchDown: false)
+                        }
+                    }
                     self.currentPosition = location
                 }
                 .gesture(self.dragGesture)
@@ -165,7 +175,7 @@ struct ContentView: View {
             .onChanged { value in
                 self.dragOffset = value.translation
                 self.currentPosition = value.location
-                self.changePosition(self.currentPosition, isTouchDown: true)
+                self.changePosition(self.currentPosition, isTouchDown: self.viewModel.currentCursor == .pen)
             }
             .onEnded { _ in
                 withAnimation(.bouncy) {
