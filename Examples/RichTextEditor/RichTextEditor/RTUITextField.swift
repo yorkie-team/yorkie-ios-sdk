@@ -66,29 +66,30 @@ struct RTUITextField: UIViewRepresentable {
             uiView.selectedRange = NSRange(location: location, length: length)
         } else {
             var currentRange = uiView.selectedRange
+            let difference = abs(self.text.string.count - uiView.attributedText.string.count)
             if self.text.string.count < uiView.attributedText.string.count {
                 // if edit locally, there is no edit style change, then move backward the cursor after deleting text
                 if self.lastEditStyle == context.coordinator.lastEditStyle {
-                    currentRange.location -= 1
+                    currentRange.location -= difference
                 } else {
                     // in case deleting from remote, calculate the cursor of deleting text and
                     // then move backward if the text index is smaller than current cursor
                     if case .remove(let startIndex, _) = self.lastEditStyle, startIndex < currentRange.location {
-                        currentRange.location -= 1
+                        currentRange.location -= difference
                     }
                 }
             } else if self.text.string.count > uiView.attributedText.string.count {
                 // if edit locally, there is no edit style change, then move forward the cursor after adding text
                 if self.lastEditStyle == context.coordinator.lastEditStyle {
-                    currentRange.location += 1
+                    currentRange.location += difference
                 } else {
                     // in case adding from remote, calculate the cursor of adding text and
                     // then move forward if the text index is greater than current cursor
                     if case .add(let startIndex, _, _) = self.lastEditStyle, currentRange.location > startIndex {
-                        currentRange.location += 1
+                        currentRange.location += difference
                     }
                 }
-                // adding text after the cursor can lead to the cursor is moving forward! +1
+                // adding text after the cursor can lead to the cursor is moving forward! += (difference)
             }
 
             uiView.attributedText = self.text

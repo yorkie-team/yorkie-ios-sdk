@@ -78,7 +78,6 @@ extension ContentViewModel {
     }
 
     func updateText(ranges: [NSValue], value: String, fonts: [CustomFont]) {
-        // TODO: - Crash!
         try? self.document.update { [weak self] root, _ in
             guard let self, let content = root.content as? JSONText else {
                 return
@@ -148,6 +147,16 @@ extension ContentViewModel {
             } else if let event = event as? SyncStatusChangedEvent {
                 // for debug only
                 print(event)
+            } else if let event = event as? UnwatchedEvent {
+                if let name = event.value.presence["username"] as? String {
+                    var peers = self?.peers ?? []
+                    peers.removeAll(where: { $0.name == name })
+                    self?.update(peers: peers)
+                } else {
+                    Log.log("Can not get this peer name :\(event)", level: .error)
+                }
+            } else if let event = event as? WatchedEvent {
+                self?.decodeEvent(event.value)
             }
         }
     }
@@ -217,7 +226,6 @@ extension ContentViewModel {
     }
 
     func applyEvents(_ events: [EditStyle]?) {
-        print("[debug] -> apply events: \(events)")
         guard let events else { return }
         for event in events {
             self.lastEditStyle = event
@@ -257,7 +265,6 @@ extension ContentViewModel {
     func remove(startIndex: Int, toIndex: Int) {
         guard self.attributeString.string.count >= toIndex else { return }
         let attributeStringss = self.mutableAttributeString
-        // TODO: - Crashs
         attributeStringss.deleteCharacters(in: .init(location: startIndex, length: toIndex - startIndex))
         self.updateAttribute(attributeStringss)
     }
@@ -502,7 +509,7 @@ extension ContentViewModel {
         self.updateAttribute(attributesString)
         // notify the view to trigger view to update
         let peers = self.document.getPresences(false)
-        print(peers)
+
         for peer in peers {
             self.decodeEvent(peer)
         }
@@ -538,6 +545,11 @@ extension ContentViewModel {
     }
 
     func placeCursor(at index: Int, in textView: UITextView, with peer: Peer) {
+        let subviews = textView.subviews.filter { $0.accessibilityLabel == peer.name } ?? []
+        for subview in subviews {
+            subview.removeFromSuperview()
+        }
+
         guard index <= textView.text.count else { return }
 
         // get UITextPosition from character offset
@@ -552,7 +564,7 @@ extension ContentViewModel {
                 frame: CGRect(x: caretRect.origin.x, y: caretRect.origin.y, width: 2, height: caretRect.height),
                 color: color
             )
-            cursor.accessibilityLabel = peer.clientID
+            cursor.accessibilityLabel = peer.name
 
             // Remove old cursor if needed
             textView.subviews.filter { $0.accessibilityLabel == peer.clientID }.forEach { $0.removeFromSuperview() }
@@ -575,7 +587,7 @@ extension ContentViewModel {
                 width: contentView.frame.width + 12,
                 height: contentView.frame.height + 6
             )
-            contentView.accessibilityLabel = peer.clientID
+            contentView.accessibilityLabel = peer.name
             textView.addSubview(contentView)
         }
     }
@@ -585,7 +597,6 @@ extension ContentViewModel {
         let attribute: NSMutableAttributedString = self.mutableAttributeString
         // guard !self.content.isEmpty else { return }
         if let previous, previous.position.length + previous.position.location <= self.mutableAttributeString.string.count {
-            // TODO: - this crashs!
             attribute.removeAttribute(.backgroundColor, range: previous.position)
             self.removeStyle(startIndex: previous.position.location, toIndex: previous.position.length + previous.position.location)
         }
@@ -603,14 +614,6 @@ extension ContentViewModel {
                 toIndex: peer.position.length + peer.position.location,
                 styles: [.selection(r: color.r, g: color.g, b: color.b)]
             )
-        }
-    }
-}
-
-extension Collection where Element == CustomFont {
-    var attributes: [String: Bool] {
-        self.reduce(into: [String: Bool]()) { partialResult, element in
-            partialResult[element.rawValue] = true
         }
     }
 }

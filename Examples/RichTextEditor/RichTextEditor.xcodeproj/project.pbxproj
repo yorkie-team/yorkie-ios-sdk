@@ -17,6 +17,7 @@
 		584145F42EA6377500558E35 /* PTSerif-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145EB2EA6377500558E35 /* PTSerif-Bold.ttf */; };
 		584145F62EA7C60F00558E35 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584145F52EA7C60D00558E35 /* Log.swift */; };
 		584146002EA9CC4700558E35 /* BuildInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 584145FF2EA9CC4700558E35 /* BuildInfo.plist */; };
+		584F410A2EAA650100B472F4 /* Collection+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584F41092EAA64FF00B472F4 /* Collection+Ex.swift */; };
 		5858D7EC2E9E035C003F6D4E /* Constant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7EB2E9E035B003F6D4E /* Constant.swift */; };
 		5858D7EE2E9E038E003F6D4E /* RTUITextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7ED2E9E038D003F6D4E /* RTUITextField.swift */; };
 		5858D7F22E9E0456003F6D4E /* String+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7F12E9E0454003F6D4E /* String+Ex.swift */; };
@@ -41,6 +42,7 @@
 		584145EE2EA6377500558E35 /* PTSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PTSerif-Regular.ttf"; sourceTree = "<group>"; };
 		584145F52EA7C60D00558E35 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		584145FF2EA9CC4700558E35 /* BuildInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BuildInfo.plist; sourceTree = "<group>"; };
+		584F41092EAA64FF00B472F4 /* Collection+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Collection+Ex.swift"; sourceTree = "<group>"; };
 		5858D7EB2E9E035B003F6D4E /* Constant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constant.swift; sourceTree = "<group>"; };
 		5858D7ED2E9E038D003F6D4E /* RTUITextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RTUITextField.swift; sourceTree = "<group>"; };
 		5858D7F12E9E0454003F6D4E /* String+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Ex.swift"; sourceTree = "<group>"; };
@@ -100,6 +102,7 @@
 		587BA7FD2E964B55007FF45B /* RichTextEditor */ = {
 			isa = PBXGroup;
 			children = (
+				584F41092EAA64FF00B472F4 /* Collection+Ex.swift */,
 				584145FF2EA9CC4700558E35 /* BuildInfo.plist */,
 				584145F52EA7C60D00558E35 /* Log.swift */,
 				584145E92EA635E100558E35 /* Info.plist */,
@@ -283,6 +286,7 @@
 				5858D7EE2E9E038E003F6D4E /* RTUITextField.swift in Sources */,
 				587BA8002E964B55007FF45B /* RichTextEditorApp.swift in Sources */,
 				587BA8052E964C50007FF45B /* ContentViewModel.swift in Sources */,
+				584F410A2EAA650100B472F4 /* Collection+Ex.swift in Sources */,
 				5858D7EC2E9E035C003F6D4E /* Constant.swift in Sources */,
 				5858D7F42E9E05C6003F6D4E /* Peer.swift in Sources */,
 				5858D7F62E9E05D7003F6D4E /* UIFont+Ex.swift in Sources */,
