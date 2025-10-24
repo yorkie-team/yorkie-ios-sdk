@@ -38,7 +38,7 @@ enum CursorShape: String, Codable {
         case .heart: return "heart.fill"
         case .thumbs: return "hand.thumbsup.fill"
         case .pen: return "paintbrush.pointed.fill"
-        case .cursor: return "pointer.arrow.ipad"
+        case .cursor: return "cursorarrow"
         }
     }
 
