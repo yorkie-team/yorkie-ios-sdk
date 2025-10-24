@@ -122,6 +122,18 @@ struct RTUITextField: UIViewRepresentable {
             }
         }
 
+        // iOS 18 and earlier
+        func textView(
+            _ textView: UITextView,
+            shouldChangeTextIn range: NSRange,
+            replacementText text: String
+        ) -> Bool {
+            let ranges = range as NSValue
+            self.parent.didChangeText([ranges], text)
+            return false
+        }
+
+        // iOS 26.0+ and later
         func textView(
             _ textView: UITextView,
             shouldChangeTextInRanges ranges: [NSValue],
