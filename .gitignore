@@ -119,4 +119,7 @@ tags
 # Test
 lcov.info
 
+# Internet local changes
+*/BuildInfo.plist
+
 # End of https://www.toptal.com/developers/gitignore/api/vim
