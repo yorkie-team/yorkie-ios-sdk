@@ -142,6 +142,18 @@ public struct StyleOpInfo: OperationInfo {
 
         return false
     }
+
+    public init(
+        path: String = "",
+        from: Int,
+        to: Int,
+        attributes: [String: Any]?
+    ) {
+        self.path = path
+        self.from = from
+        self.to = to
+        self.attributes = attributes
+    }
 }
 
 public struct TreeEditOpInfo: OperationInfo {

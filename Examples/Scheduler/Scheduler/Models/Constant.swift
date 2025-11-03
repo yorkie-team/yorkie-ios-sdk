@@ -18,7 +18,19 @@ import Foundation
 import Yorkie
 
 enum Constant {
-    static let serverAddress = "http://localhost:8080"
+    private static var currentYorkieServerIP: String {
+        if let url = Bundle.main.url(forResource: "BuildInfo", withExtension: "plist"),
+           let data = try? Data(contentsOf: url),
+           let dict = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+           let ip = dict["CurrentIPAddress"] as? String,
+           ip != "0.0.0.0"
+        {
+            return "http://\(ip):8080"
+        }
+        return "http://localhost:8080"
+    }
+
+    static var serverAddress = currentYorkieServerIP
     static var documentKey: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = Format.dateFormat

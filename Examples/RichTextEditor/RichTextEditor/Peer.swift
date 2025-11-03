@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 
-import SwiftUI
+import Foundation
 
-@main
-struct SimutaneousCurcorsApp: App {
-    @State var path = NavigationPath()
-    @State var name = ""
-    var body: some Scene {
-        WindowGroup {
-            NavigationStack(path: self.$path) {
-                ContentView(name: "iOS")
-            }
-        }
+struct Peer: Identifiable {
+    var id: String { self.name + self.color }
+    let clientID: String
+    let name: String
+    var position: NSRange
+    let color: String
+
+    mutating func updatePosition(with range: NSRange) {
+        self.position = range
     }
 }

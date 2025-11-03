@@ -190,7 +190,7 @@ public struct SnapshotInfo {
  * `ChangeEvent` is an event that occurs when the document is changed
  * by local or remote changes.
  */
-protocol ChangeEvent: DocEvent {
+public protocol ChangeEvent: DocEvent {
     var type: DocEventType { get }
     var value: ChangeInfo { get }
 }

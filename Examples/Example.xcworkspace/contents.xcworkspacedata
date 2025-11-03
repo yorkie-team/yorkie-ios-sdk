@@ -16,4 +16,7 @@
    <FileRef
       location = "group:Scheduler/Scheduler.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "container:RichTextEditor/RichTextEditor.xcodeproj">
+   </FileRef>
 </Workspace>

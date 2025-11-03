@@ -15,6 +15,7 @@
 		585ACE532E8D094E006D7FFE /* Constant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 585ACE522E8D094D006D7FFE /* Constant.swift */; };
 		585ACE552E8D095F006D7FFE /* TDError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 585ACE542E8D095E006D7FFE /* TDError.swift */; };
 		58A3FDD92E8A6B3F00DE90EB /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 58A3FDD82E8A6B3F00DE90EB /* Yorkie */; };
+		58EA2CEE2EA9FAAC0030F3B3 /* BuildInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58EA2CED2EA9FAAC0030F3B3 /* BuildInfo.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -39,6 +40,7 @@
 		585ACE522E8D094D006D7FFE /* Constant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constant.swift; sourceTree = "<group>"; };
 		585ACE542E8D095E006D7FFE /* TDError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TDError.swift; sourceTree = "<group>"; };
 		58A3FDAB2E8A6B2100DE90EB /* Todomvc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Todomvc.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		58EA2CED2EA9FAAC0030F3B3 /* BuildInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BuildInfo.plist; sourceTree = "<group>"; };
 		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -57,6 +59,7 @@
 		5832D8062E8B841D002FF7D4 /* TODO */ = {
 			isa = PBXGroup;
 			children = (
+				58EA2CED2EA9FAAC0030F3B3 /* BuildInfo.plist */,
 				585ACE4F2E8D0934006D7FFE /* Models */,
 				5832D8072E8BC0D2002FF7D4 /* ContentViewModel.swift */,
 				5832D7FE2E8B6E69002FF7D4 /* Assets.xcassets */,
@@ -116,6 +119,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 58A3FDCF2E8A6B2200DE90EB /* Build configuration list for PBXNativeTarget "Todomvc" */;
 			buildPhases = (
+				58EA2CEC2EA9FA8E0030F3B3 /* Run IP Server */,
 				58A3FDA72E8A6B2100DE90EB /* Sources */,
 				58A3FDA82E8A6B2100DE90EB /* Frameworks */,
 				58A3FDA92E8A6B2100DE90EB /* Resources */,
@@ -175,6 +179,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5832D8012E8B6E69002FF7D4 /* Assets.xcassets in Resources */,
+				58EA2CEE2EA9FAAC0030F3B3 /* BuildInfo.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,6 +204,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftformat > /dev/null; then\n  swiftformat .\nelse\n  echo \"warning: SwiftFormat not installed, download from https://github.com/nicklockwood/SwiftFormat\"\nfi\n\n";
+		};
+		58EA2CEC2EA9FA8E0030F3B3 /* Run IP Server */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run IP Server";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\n# Get current IP address of Mac (Wi-Fi interface en0)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Path to your target plist file (adjust if needed)\nPLIST_PATH=\"${SRCROOT}/TODO/BuildInfo.plist\"\n\n# Key to inject the IP address under\nPLIST_KEY=\"CurrentIPAddress\"\n\n# Inject IP address into plist\n/usr/libexec/PlistBuddy -c \"Set :$PLIST_KEY $IP_ADDRESS\" \"$PLIST_PATH\" || \\\n/usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n\necho \"Injected Mac IP address ($IP_ADDRESS) into $PLIST_PATH\"\n\nif [ $? -eq 0 ]; then\n  echo \"✅ Successfully updated $PLIST_KEY in $PLIST_PATH\"\n  /usr/libexec/PlistBuddy -c \"Print \" \"${PLIST_PATH}\"\nelse\n  echo \"ℹ️ Key not found, trying to add it...\"\n  /usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n  if [ $? -eq 0 ]; then\n    echo \"✅ Successfully added $PLIST_KEY to $PLIST_PATH\"\n  else\n    echo \"❌ Failed to update or add $PLIST_KEY to $PLIST_PATH\"\n    exit 1\n  fi\nfi\n";
+			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -225,8 +250,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -243,25 +270,28 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.PlaygroundApp.Todomvc;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.todo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
@@ -272,8 +302,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -290,24 +322,27 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.PlaygroundApp.Todomvc;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.todo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = "1,2";
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;

@@ -1,0 +1,529 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		584145E42EA635B500558E35 /* SpaceMono-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145E12EA635B500558E35 /* SpaceMono-Italic.ttf */; };
+		584145E52EA635B500558E35 /* SpaceMono-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145E02EA635B500558E35 /* SpaceMono-BoldItalic.ttf */; };
+		584145E62EA635B500558E35 /* SpaceMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145DF2EA635B500558E35 /* SpaceMono-Bold.ttf */; };
+		584145E72EA635B500558E35 /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145E22EA635B500558E35 /* SpaceMono-Regular.ttf */; };
+		584145F02EA6377500558E35 /* PTSerif-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145ED2EA6377500558E35 /* PTSerif-Italic.ttf */; };
+		584145F22EA6377500558E35 /* PTSerif-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145EC2EA6377500558E35 /* PTSerif-BoldItalic.ttf */; };
+		584145F32EA6377500558E35 /* PTSerif-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145EE2EA6377500558E35 /* PTSerif-Regular.ttf */; };
+		584145F42EA6377500558E35 /* PTSerif-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 584145EB2EA6377500558E35 /* PTSerif-Bold.ttf */; };
+		584145F62EA7C60F00558E35 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584145F52EA7C60D00558E35 /* Log.swift */; };
+		584146002EA9CC4700558E35 /* BuildInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 584145FF2EA9CC4700558E35 /* BuildInfo.plist */; };
+		584F410A2EAA650100B472F4 /* Collection+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 584F41092EAA64FF00B472F4 /* Collection+Ex.swift */; };
+		5858D7EC2E9E035C003F6D4E /* Constant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7EB2E9E035B003F6D4E /* Constant.swift */; };
+		5858D7EE2E9E038E003F6D4E /* RTUITextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7ED2E9E038D003F6D4E /* RTUITextField.swift */; };
+		5858D7F22E9E0456003F6D4E /* String+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7F12E9E0454003F6D4E /* String+Ex.swift */; };
+		5858D7F42E9E05C6003F6D4E /* Peer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7F32E9E05C5003F6D4E /* Peer.swift */; };
+		5858D7F62E9E05D7003F6D4E /* UIFont+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5858D7F52E9E05D5003F6D4E /* UIFont+Ex.swift */; };
+		587BA7FE2E964B55007FF45B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 587BA7FA2E964B55007FF45B /* Assets.xcassets */; };
+		587BA7FF2E964B55007FF45B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587BA7FB2E964B55007FF45B /* ContentView.swift */; };
+		587BA8002E964B55007FF45B /* RichTextEditorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587BA7FC2E964B55007FF45B /* RichTextEditorApp.swift */; };
+		587BA8022E964B5F007FF45B /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 587BA8012E964B5F007FF45B /* Yorkie */; };
+		587BA8052E964C50007FF45B /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587BA8042E964C4E007FF45B /* ContentViewModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		584145DF2EA635B500558E35 /* SpaceMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Bold.ttf"; sourceTree = "<group>"; };
+		584145E02EA635B500558E35 /* SpaceMono-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-BoldItalic.ttf"; sourceTree = "<group>"; };
+		584145E12EA635B500558E35 /* SpaceMono-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Italic.ttf"; sourceTree = "<group>"; };
+		584145E22EA635B500558E35 /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Regular.ttf"; sourceTree = "<group>"; };
+		584145E92EA635E100558E35 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		584145EB2EA6377500558E35 /* PTSerif-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PTSerif-Bold.ttf"; sourceTree = "<group>"; };
+		584145EC2EA6377500558E35 /* PTSerif-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PTSerif-BoldItalic.ttf"; sourceTree = "<group>"; };
+		584145ED2EA6377500558E35 /* PTSerif-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PTSerif-Italic.ttf"; sourceTree = "<group>"; };
+		584145EE2EA6377500558E35 /* PTSerif-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "PTSerif-Regular.ttf"; sourceTree = "<group>"; };
+		584145F52EA7C60D00558E35 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		584145FF2EA9CC4700558E35 /* BuildInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BuildInfo.plist; sourceTree = "<group>"; };
+		584F41092EAA64FF00B472F4 /* Collection+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Collection+Ex.swift"; sourceTree = "<group>"; };
+		5858D7EB2E9E035B003F6D4E /* Constant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constant.swift; sourceTree = "<group>"; };
+		5858D7ED2E9E038D003F6D4E /* RTUITextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RTUITextField.swift; sourceTree = "<group>"; };
+		5858D7F12E9E0454003F6D4E /* String+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Ex.swift"; sourceTree = "<group>"; };
+		5858D7F32E9E05C5003F6D4E /* Peer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Peer.swift; sourceTree = "<group>"; };
+		5858D7F52E9E05D5003F6D4E /* UIFont+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIFont+Ex.swift"; sourceTree = "<group>"; };
+		587BA7D32E964B44007FF45B /* RichTextEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RichTextEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		587BA7FA2E964B55007FF45B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		587BA7FB2E964B55007FF45B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		587BA7FC2E964B55007FF45B /* RichTextEditorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditorApp.swift; sourceTree = "<group>"; };
+		587BA8042E964C4E007FF45B /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
+		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		587BA7D02E964B44007FF45B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				587BA8022E964B5F007FF45B /* Yorkie in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		584145DD2EA635A300558E35 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				584145E32EA635B500558E35 /* Space_Mono */,
+				584145EF2EA6377500558E35 /* PT_Serif */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		584145E32EA635B500558E35 /* Space_Mono */ = {
+			isa = PBXGroup;
+			children = (
+				584145DF2EA635B500558E35 /* SpaceMono-Bold.ttf */,
+				584145E02EA635B500558E35 /* SpaceMono-BoldItalic.ttf */,
+				584145E12EA635B500558E35 /* SpaceMono-Italic.ttf */,
+				584145E22EA635B500558E35 /* SpaceMono-Regular.ttf */,
+			);
+			path = Space_Mono;
+			sourceTree = "<group>";
+		};
+		584145EF2EA6377500558E35 /* PT_Serif */ = {
+			isa = PBXGroup;
+			children = (
+				584145EB2EA6377500558E35 /* PTSerif-Bold.ttf */,
+				584145EC2EA6377500558E35 /* PTSerif-BoldItalic.ttf */,
+				584145ED2EA6377500558E35 /* PTSerif-Italic.ttf */,
+				584145EE2EA6377500558E35 /* PTSerif-Regular.ttf */,
+			);
+			path = PT_Serif;
+			sourceTree = "<group>";
+		};
+		587BA7FD2E964B55007FF45B /* RichTextEditor */ = {
+			isa = PBXGroup;
+			children = (
+				584F41092EAA64FF00B472F4 /* Collection+Ex.swift */,
+				584145FF2EA9CC4700558E35 /* BuildInfo.plist */,
+				584145F52EA7C60D00558E35 /* Log.swift */,
+				584145E92EA635E100558E35 /* Info.plist */,
+				584145DD2EA635A300558E35 /* Fonts */,
+				5858D7F52E9E05D5003F6D4E /* UIFont+Ex.swift */,
+				5858D7F32E9E05C5003F6D4E /* Peer.swift */,
+				5858D7F12E9E0454003F6D4E /* String+Ex.swift */,
+				5858D7ED2E9E038D003F6D4E /* RTUITextField.swift */,
+				5858D7EB2E9E035B003F6D4E /* Constant.swift */,
+				587BA8042E964C4E007FF45B /* ContentViewModel.swift */,
+				587BA7FA2E964B55007FF45B /* Assets.xcassets */,
+				587BA7FB2E964B55007FF45B /* ContentView.swift */,
+				587BA7FC2E964B55007FF45B /* RichTextEditorApp.swift */,
+			);
+			path = RichTextEditor;
+			sourceTree = "<group>";
+		};
+		9AC7CB93298CFEA60040D504 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		9AC7CB95298CFEC90040D504 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		9AEA80DF297134A1000672FC = {
+			isa = PBXGroup;
+			children = (
+				9AC7CB93298CFEA60040D504 /* Packages */,
+				587BA7FD2E964B55007FF45B /* RichTextEditor */,
+				9AEA80E9297134A1000672FC /* Products */,
+				9AC7CB95298CFEC90040D504 /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		9AEA80E9297134A1000672FC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				587BA7D32E964B44007FF45B /* RichTextEditor.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		587BA7D22E964B44007FF45B /* RichTextEditor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 587BA7F12E964B45007FF45B /* Build configuration list for PBXNativeTarget "RichTextEditor" */;
+			buildPhases = (
+				584145FB2EA9C1A000558E35 /* Run IP Server */,
+				587BA7CF2E964B44007FF45B /* Sources */,
+				587BA7D02E964B44007FF45B /* Frameworks */,
+				587BA7D12E964B44007FF45B /* Resources */,
+				587BA8032E964B63007FF45B /* SwiftFormat */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RichTextEditor;
+			packageProductDependencies = (
+				587BA8012E964B5F007FF45B /* Yorkie */,
+			);
+			productName = RichTextEditor;
+			productReference = 587BA7D32E964B44007FF45B /* RichTextEditor.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		9AEA80E0297134A1000672FC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 1420;
+				TargetAttributes = {
+					587BA7D22E964B44007FF45B = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+				};
+			};
+			buildConfigurationList = 9AEA80E3297134A1000672FC /* Build configuration list for PBXProject "RichTextEditor" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 9AEA80DF297134A1000672FC;
+			packageReferences = (
+			);
+			productRefGroup = 9AEA80E9297134A1000672FC /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				587BA7D22E964B44007FF45B /* RichTextEditor */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		587BA7D12E964B44007FF45B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				587BA7FE2E964B55007FF45B /* Assets.xcassets in Resources */,
+				584145E42EA635B500558E35 /* SpaceMono-Italic.ttf in Resources */,
+				584145E52EA635B500558E35 /* SpaceMono-BoldItalic.ttf in Resources */,
+				584146002EA9CC4700558E35 /* BuildInfo.plist in Resources */,
+				584145E62EA635B500558E35 /* SpaceMono-Bold.ttf in Resources */,
+				584145E72EA635B500558E35 /* SpaceMono-Regular.ttf in Resources */,
+				584145F02EA6377500558E35 /* PTSerif-Italic.ttf in Resources */,
+				584145F22EA6377500558E35 /* PTSerif-BoldItalic.ttf in Resources */,
+				584145F32EA6377500558E35 /* PTSerif-Regular.ttf in Resources */,
+				584145F42EA6377500558E35 /* PTSerif-Bold.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		584145FB2EA9C1A000558E35 /* Run IP Server */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 12;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run IP Server";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\n# Get current IP address of Mac (Wi-Fi interface en0)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Path to your target plist file (adjust if needed)\nPLIST_PATH=\"${SRCROOT}/RichTextEditor/BuildInfo.plist\"\n\n# Key to inject the IP address under\nPLIST_KEY=\"CurrentIPAddress\"\n\n# Inject IP address into plist\n/usr/libexec/PlistBuddy -c \"Set :$PLIST_KEY $IP_ADDRESS\" \"$PLIST_PATH\" || \\\n/usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n\necho \"Injected Mac IP address ($IP_ADDRESS) into $PLIST_PATH\"\n";
+			showEnvVarsInLog = 0;
+		};
+		587BA8032E964B63007FF45B /* SwiftFormat */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = SwiftFormat;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftformat > /dev/null; then\n  swiftformat .\nelse\n  echo \"warning: SwiftFormat not installed, download from https://github.com/nicklockwood/SwiftFormat\"\nfi\n\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		587BA7CF2E964B44007FF45B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				587BA7FF2E964B55007FF45B /* ContentView.swift in Sources */,
+				5858D7F22E9E0456003F6D4E /* String+Ex.swift in Sources */,
+				584145F62EA7C60F00558E35 /* Log.swift in Sources */,
+				5858D7EE2E9E038E003F6D4E /* RTUITextField.swift in Sources */,
+				587BA8002E964B55007FF45B /* RichTextEditorApp.swift in Sources */,
+				587BA8052E964C50007FF45B /* ContentViewModel.swift in Sources */,
+				584F410A2EAA650100B472F4 /* Collection+Ex.swift in Sources */,
+				5858D7EC2E9E035C003F6D4E /* Constant.swift in Sources */,
+				5858D7F42E9E05C6003F6D4E /* Peer.swift in Sources */,
+				5858D7F62E9E05D7003F6D4E /* UIFont+Ex.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		587BA7F22E964B45007FF45B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RichTextEditor/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.richtext;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		587BA7F32E964B45007FF45B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RichTextEditor/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.richtext;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		9AEA80FA297134A2000672FC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		9AEA80FB297134A2000672FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		587BA7F12E964B45007FF45B /* Build configuration list for PBXNativeTarget "RichTextEditor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				587BA7F22E964B45007FF45B /* Debug */,
+				587BA7F32E964B45007FF45B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9AEA80E3297134A1000672FC /* Build configuration list for PBXProject "RichTextEditor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9AEA80FA297134A2000672FC /* Debug */,
+				9AEA80FB297134A2000672FC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		587BA8012E964B5F007FF45B /* Yorkie */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Yorkie;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 9AEA80E0297134A1000672FC /* Project object */;
+}

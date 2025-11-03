@@ -17,14 +17,10 @@
 import SwiftUI
 
 @main
-struct SimutaneousCurcorsApp: App {
-    @State var path = NavigationPath()
-    @State var name = ""
+struct RichTextEditorApp: App {
     var body: some Scene {
         WindowGroup {
-            NavigationStack(path: self.$path) {
-                ContentView(name: "iOS")
-            }
+            ContentView()
         }
     }
 }

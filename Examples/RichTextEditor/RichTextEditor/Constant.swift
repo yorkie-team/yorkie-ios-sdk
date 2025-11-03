@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import Foundation
 
 enum Constant {
@@ -29,15 +30,24 @@ enum Constant {
     }
 
     static var serverAddress = currentYorkieServerIP
-    static var documentKey: String = "simultaneous-cursors"
+    static var documentKey: String = {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: Date())
+        let documentKey = "vanilla-quill-\(dateString)"
+        return documentKey
+    }()
+
+    enum Format {
+        static let dateFormat = "dd-MM-yy"
+        static let local = Locale(identifier: "en_US_POSIX")
+    }
+
+    enum TextInfo {
+        static let fontSize: CGFloat = 17
+    }
 }
 
-enum TDError: Error {
-    case cannotInitClient(String)
-}
-
-enum ContentState {
-    case loading
-    case error(TDError)
-    case success
+enum CustomFont: String {
+    case bold, underline, italic, strike
 }

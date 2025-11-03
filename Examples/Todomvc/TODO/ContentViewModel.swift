@@ -63,9 +63,7 @@ extension ContentView.ContentViewModel {
     }
 
     func watch() async {
-        document.subscribe { [weak self]
-            event,
-                document in
+        self.document.subscribe { [weak self] event, document in
             if case .syncStatusChanged = event.type {
                 self?.updateDoc(document)
             }
@@ -140,10 +138,9 @@ extension ContentView.ContentViewModel {
     func updateTask(_ task: String, complete: Bool) {
         try? self.document.update { root, _ in
             guard let lists = root.todos as? JSONArray else { return }
-            let iterator = lists.makeIterator()
-            while let next = iterator.next() as? JSONObject {
-                if (next.get(key: "id") as? String) == task {
-                    next.set(key: "completed", value: complete)
+            for i in lists {
+                if let object = i as? JSONObject, object.get(key: "id") as! String == task {
+                    object.set(key: "completed", value: complete)
                     break
                 }
             }

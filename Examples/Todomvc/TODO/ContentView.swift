@@ -142,9 +142,17 @@ extension ContentView {
             .alert("Add New Todo", isPresented: self.$showAdding) {
                 TextField("What needs to be done?", text: self.$newTaskName)
                 HStack {
-                    Button(role: .confirm, action: addTask)
-                    Button(role: .cancel) {
+                    Button {
+                        addTask()
                         self.showAdding = false
+                    } label: {
+                        Text("Confirm")
+                    }
+
+                    Button {
+                        self.showAdding = false
+                    } label: {
+                        Text("Cancel")
                     }
                 }
             } message: {
@@ -153,9 +161,17 @@ extension ContentView {
             .alert("Edit task name", isPresented: self.$showEditing) {
                 TextField("What needs to be done?", text: self.$newTaskName)
                 HStack {
-                    Button(role: .close, action: update)
-                    Button(role: .cancel) {
+                    Button {
+                        update()
                         self.showEditing = false
+                    } label: {
+                        Text("Close")
+                    }
+
+                    Button {
+                        self.showEditing = false
+                    } label: {
+                        Text("Cancel")
                     }
                 }
             } message: {
@@ -167,6 +183,12 @@ extension ContentView {
                 self.selectedAll = !hasChanged
             }
             .onChange(of: self.selectedAll) { _, newValue in
+                if newValue == false {
+                    if self.viewModel.models.allSatisfy({ $0.completed == true }) {
+                        self.viewModel.markAllAsComplete(newValue)
+                    }
+                    return
+                }
                 self.viewModel.markAllAsComplete(newValue)
             }
         }

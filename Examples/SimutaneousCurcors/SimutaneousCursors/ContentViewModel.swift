@@ -21,12 +21,15 @@ import Yorkie
 
 @Observable
 class ContentViewModel {
+    @ObservationIgnored var currentTimer: Timer?
     let width = UIScreen.current!.bounds.size.width
     let height = UIScreen.current!.bounds.size.height
 
     @ObservationIgnored private var client: Client
     @ObservationIgnored private let document: Document
     @ObservationIgnored var presenecs = [Presence]()
+    var paths: [String: [CGPoint]] = [:]
+    var drawingNames: [String] = []
 
     var uiPresenecs = [Model]()
     var currentCursor: CursorShape = .heart {
@@ -51,7 +54,7 @@ class ContentViewModel {
                 "name": name,
                 "cursorShape": "heart",
                 "cursor": ["xPos": 0.5, "yPos": 0.5],
-                "pointerDown": "false"
+                "pointerDown": false
             ])
             try self.document.update { root, _ in
                 var text = root.content as? JSONText
@@ -95,8 +98,8 @@ class ContentViewModel {
         for peer in peers {
             let id = peer.clientID
             let presentModel = peer.presence
-            let name = presentModel["name"] as? String ?? "Anonymous"
-            let pointerDown = presentModel["pointerDown"] as? Int
+            let name = presentModel["name"] as? String ?? "anonymous"
+            let pointerDown = presentModel["pointerDown"] as? Bool
             let cursor = presentModel["cursor"] as? [String: Double]
             let cursorShape = presentModel["cursorShape"] as? String
 
@@ -118,19 +121,28 @@ class ContentViewModel {
                 )
             )
 
+            if cursorShape == .pen, pointerDown {
+                self.drawingNames.append(name)
+                self.paths[name]?.append(.init(x: realxPos, y: realyPos))
+            } else {
+                self.drawingNames.removeAll(where: { $0 == name })
+                self.paths[name] = []
+            }
+
             _uiPresenecs.append(model)
         }
 
         self.uiPresenecs.removeAll()
         self.uiPresenecs = _uiPresenecs
-
-        print(self.uiPresenecs)
     }
 
-    func updatePosition(_ position: CGPoint) {
+    func updatePosition(_ position: CGPoint, isTouchDown: Bool) {
         do {
             try self.document.update { _, presence in
-                presence.set(["cursor": ["xPos": position.x / self.width, "yPos": position.y / self.height]])
+                presence.set([
+                    "cursor": ["xPos": position.x / self.width, "yPos": position.y / self.height],
+                    "pointerDown": isTouchDown
+                ])
             }
         } catch {
             self.state = .error(.cannotInitClient("\(error.localizedDescription)"))

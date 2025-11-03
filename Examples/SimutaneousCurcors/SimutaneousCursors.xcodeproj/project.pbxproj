@@ -14,6 +14,7 @@
 		58D2A3752E93A2CD00E23597 /* UIWindow+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D2A3742E93A2C700E23597 /* UIWindow+Ex.swift */; };
 		58D2A3772E93A2E400E23597 /* PresenceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D2A3762E93A2E300E23597 /* PresenceModel.swift */; };
 		58D2A3792E93A2FC00E23597 /* Constant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D2A3782E93A2FB00E23597 /* Constant.swift */; };
+		58EA2CF02EA9FBE80030F3B3 /* BuildInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 58EA2CEF2EA9FBE80030F3B3 /* BuildInfo.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		58D2A3742E93A2C700E23597 /* UIWindow+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIWindow+Ex.swift"; sourceTree = "<group>"; };
 		58D2A3762E93A2E300E23597 /* PresenceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceModel.swift; sourceTree = "<group>"; };
 		58D2A3782E93A2FB00E23597 /* Constant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constant.swift; sourceTree = "<group>"; };
+		58EA2CEF2EA9FBE80030F3B3 /* BuildInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = BuildInfo.plist; sourceTree = "<group>"; };
 		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -48,6 +50,7 @@
 				58D2A3702E93600A00E23597 /* ContentViewModel.swift */,
 				58D2A36E2E935FCA00E23597 /* ContentView.swift */,
 				58D2A36B2E935FBE00E23597 /* SimutaneousCurcorsApp.swift */,
+				58EA2CEF2EA9FBE80030F3B3 /* BuildInfo.plist */,
 			);
 			path = SimutaneousCursors;
 			sourceTree = "<group>";
@@ -92,6 +95,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 58D2A3572E935F9E00E23597 /* Build configuration list for PBXNativeTarget "SimutaneousCursors" */;
 			buildPhases = (
+				584145FA2EA9C03E00558E35 /* Run IP Server */,
 				58D2A3352E935F9D00E23597 /* Sources */,
 				58D2A3362E935F9D00E23597 /* Frameworks */,
 				58D2A3372E935F9D00E23597 /* Resources */,
@@ -149,12 +153,33 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				58EA2CF02EA9FBE80030F3B3 /* BuildInfo.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		584145FA2EA9C03E00558E35 /* Run IP Server */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run IP Server";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "#!/bin/bash\n\n# Get current IP address of Mac (Wi-Fi interface en0)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Path to your target plist file (adjust if needed)\nPLIST_PATH=\"${SRCROOT}/SimutaneousCursors/BuildInfo.plist\"\n\n# Key to inject the IP address under\nPLIST_KEY=\"CurrentIPAddress\"\n\n# Inject IP address into plist\n/usr/libexec/PlistBuddy -c \"Set :$PLIST_KEY $IP_ADDRESS\" \"$PLIST_PATH\" || \\\n/usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n\necho \"Injected Mac IP address ($IP_ADDRESS) into $PLIST_PATH\"\n\nif [ $? -eq 0 ]; then\n  echo \"✅ Successfully updated $PLIST_KEY in $PLIST_PATH\"\n  /usr/libexec/PlistBuddy -c \"Print \" \"${PLIST_PATH}\"\nelse\n  echo \"ℹ️ Key not found, trying to add it...\"\n  /usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n  if [ $? -eq 0 ]; then\n    echo \"✅ Successfully added $PLIST_KEY to $PLIST_PATH\"\n  else\n    echo \"❌ Failed to update or add $PLIST_KEY to $PLIST_PATH\"\n    exit 1\n  fi\nfi\n";
+			showEnvVarsInLog = 0;
+		};
 		5849C72C2E94FA0500B2C53E /* SwiftFormat */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -199,8 +224,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -209,23 +237,29 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.PlaygroundApp.SimutaneousCurcors;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.contineouscursor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -235,8 +269,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -245,22 +282,28 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.PlaygroundApp.SimutaneousCurcors;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.contineouscursor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

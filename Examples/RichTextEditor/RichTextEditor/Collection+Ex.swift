@@ -14,17 +14,12 @@
  * limitations under the License.
  */
 
-import SwiftUI
+import Foundation
 
-@main
-struct SimutaneousCurcorsApp: App {
-    @State var path = NavigationPath()
-    @State var name = ""
-    var body: some Scene {
-        WindowGroup {
-            NavigationStack(path: self.$path) {
-                ContentView(name: "iOS")
-            }
+extension Collection where Element == CustomFont {
+    var attributes: [String: Bool] {
+        self.reduce(into: [String: Bool]()) { partialResult, element in
+            partialResult[element.rawValue] = true
         }
     }
 }
