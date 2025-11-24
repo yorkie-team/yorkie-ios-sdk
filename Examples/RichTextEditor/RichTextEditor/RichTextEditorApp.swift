@@ -18,9 +18,40 @@ import SwiftUI
 
 @main
 struct RichTextEditorApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) var scenePhase
+    @State var key = Constant.documentKey
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NavigationView {
+                VStack {
+                    Text("Input document key or use the default")
+                    TextField(text: self.$key) {
+                        Text("Input documentKey")
+                    }
+
+                    NavigationLink(destination: ContentView()) {
+                        Text("Go")
+                    }
+                }
+                .padding()
+            }
+            .navigationViewStyle(.stack)
+        }.onChange(of: self.scenePhase) { newPhase in
+            Log.log("[ChangePhase] -> \(newPhase)", level: .debug)
         }
+        .onChange(of: self.key) { newValue in
+            Constant.documentKey = newValue
+        }
+    }
+}
+
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        return true
     }
 }

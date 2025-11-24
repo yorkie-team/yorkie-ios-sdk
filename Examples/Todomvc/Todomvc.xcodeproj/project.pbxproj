@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		58080BF32EBC751200419F25 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58080BF22EBC751100419F25 /* Log.swift */; };
 		5832D8012E8B6E69002FF7D4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5832D7FE2E8B6E69002FF7D4 /* Assets.xcassets */; };
 		5832D8022E8B6E69002FF7D4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5832D7FF2E8B6E69002FF7D4 /* ContentView.swift */; };
 		5832D8032E8B6E69002FF7D4 /* TodomvcApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5832D8002E8B6E69002FF7D4 /* TodomvcApp.swift */; };
@@ -32,6 +33,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		58080BF22EBC751100419F25 /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
 		5832D7FE2E8B6E69002FF7D4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5832D7FF2E8B6E69002FF7D4 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		5832D8002E8B6E69002FF7D4 /* TodomvcApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodomvcApp.swift; sourceTree = "<group>"; };
@@ -59,6 +61,7 @@
 		5832D8062E8B841D002FF7D4 /* TODO */ = {
 			isa = PBXGroup;
 			children = (
+				58080BF22EBC751100419F25 /* Log.swift */,
 				58EA2CED2EA9FAAC0030F3B3 /* BuildInfo.plist */,
 				585ACE4F2E8D0934006D7FFE /* Models */,
 				5832D8072E8BC0D2002FF7D4 /* ContentViewModel.swift */,
@@ -79,6 +82,13 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
+		8CAB5E0279DEDFA11C80940C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		9AC7CB93298CFEA60040D504 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
@@ -87,20 +97,13 @@
 			name = Packages;
 			sourceTree = "<group>";
 		};
-		9AC7CB95298CFEC90040D504 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		9AEA80DF297134A1000672FC = {
 			isa = PBXGroup;
 			children = (
 				5832D8062E8B841D002FF7D4 /* TODO */,
 				9AC7CB93298CFEA60040D504 /* Packages */,
 				9AEA80E9297134A1000672FC /* Products */,
-				9AC7CB95298CFEC90040D504 /* Frameworks */,
+				8CAB5E0279DEDFA11C80940C /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -233,6 +236,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5832D8022E8B6E69002FF7D4 /* ContentView.swift in Sources */,
+				58080BF32EBC751200419F25 /* Log.swift in Sources */,
 				585ACE512E8D093C006D7FFE /* TodoModel.swift in Sources */,
 				585ACE532E8D094E006D7FFE /* Constant.swift in Sources */,
 				5832D8032E8B6E69002FF7D4 /* TodomvcApp.swift in Sources */,
@@ -251,7 +255,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
 				ENABLE_APP_SANDBOX = YES;
@@ -270,12 +274,18 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 15;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.todo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -302,10 +312,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 7GAGL39NQD;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = A2YJ9ZX2DS;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -322,16 +334,22 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 15;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.yorkie.ios.todo;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.navercorp.todomvc.ent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Yorkie Demo";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Realtime Collab Todo Ent InHouse PP";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

@@ -22,12 +22,11 @@ enum LogLevel {
 }
 
 struct Log {
-    static let printLog = false
     private static let `default` = Self(category: "DEBUG")
     private let logger: Logger
 
     private init(
-        subsystem: String = Bundle.main.bundleIdentifier ?? "com.example.app.richtext",
+        subsystem: String = Bundle.main.bundleIdentifier ?? "com.example.app.todo",
         category: String
     ) {
         self.logger = Logger(subsystem: subsystem, category: category)
@@ -57,38 +56,26 @@ extension Log {
     }
 
     private func debug(_ message: String, _ function: String = #function, _ line: Int = #line, _ file: String = #file) {
-        if Self.printLog {
-            self.logger.debug("\(self.messageCentralize(message, function, line, file), privacy: .public)")
-        }
+        self.logger.debug("\(self.messageCentralize(message, function, line, file), privacy: .public)")
     }
 
     private func info(_ message: String, _ function: String = #function, _ line: Int = #line, _ file: String = #file) {
-        if Self.printLog {
-            self.logger.info("\(self.messageCentralize(message, function, line, file), privacy: .public)")
-        }
+        self.logger.info("\(self.messageCentralize(message, function, line, file), privacy: .public)")
     }
 
     private func notice(_ message: String, _ function: String = #function, _ line: Int = #line, _ file: String = #file) {
-        if Self.printLog {
-            self.logger.notice("\(self.messageCentralize(message, function, line, file), privacy: .public)")
-        }
+        self.logger.notice("\(self.messageCentralize(message, function, line, file), privacy: .public)")
     }
 
     private func warning(_ message: String, _ function: String = #function, _ line: Int = #line, _ file: String = #file) {
-        if Self.printLog {
-            self.logger.warning("\(self.messageCentralize(message, function, line, file), privacy: .public)")
-        }
+        self.logger.warning("\(self.messageCentralize(message, function, line, file), privacy: .public)")
     }
 
     private func error(_ message: String, _ function: String = #function, _ line: Int = #line, _ file: String = #file) {
-        if Self.printLog {
-            self.logger.error("\(self.messageCentralize(message, function, line, file), privacy: .public)")
-        }
+        self.logger.error("\(self.messageCentralize(message, function, line, file), privacy: .public)")
     }
 
     private func fault(_ message: String, _ function: String = #function, _ line: Int = #line, _ file: String = #file) {
-        if Self.printLog {
-            self.logger.fault("\(self.messageCentralize(message, function, line, file), privacy: .public)")
-        }
+        self.logger.fault("\(self.messageCentralize(message, function, line, file), privacy: .public)")
     }
 }
