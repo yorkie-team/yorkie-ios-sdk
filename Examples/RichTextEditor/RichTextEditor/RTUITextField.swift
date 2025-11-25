@@ -52,6 +52,12 @@ struct RTUITextField: UIViewRepresentable {
             // compare this style to make sure that is not local change
             context.coordinator.lastEditStyle = lastEditStyle
         }
+
+        // Don't update while composing (Hangul, emoji, etc.)
+        if context.coordinator.isComposing {
+            return
+        }
+
         UIView.setAnimationsEnabled(false)
         if let selectedRange = context.coordinator.selectRange, !selectedRange.isEmpty {
             uiView.attributedText = self.text
@@ -66,19 +72,24 @@ struct RTUITextField: UIViewRepresentable {
             uiView.selectedRange = NSRange(location: location, length: length)
         } else {
             var currentRange = uiView.selectedRange
-            let difference = abs(self.text.string.count - uiView.attributedText.string.count)
-            if self.text.string.count < uiView.attributedText.string.count {
+
+            // Use NSString for proper UTF-16 character counting (handles emoji correctly)
+            let oldText = uiView.attributedText.string as NSString
+            let newText = self.text.string as NSString
+            let difference = abs(newText.length - oldText.length)
+
+            if newText.length < oldText.length {
                 // if edit locally, there is no edit style change, then move backward the cursor after deleting text
                 if self.lastEditStyle == context.coordinator.lastEditStyle {
-                    currentRange.location -= difference
+                    currentRange.location = max(0, currentRange.location - difference)
                 } else {
                     // in case deleting from remote, calculate the cursor of deleting text and
                     // then move backward if the text index is smaller than current cursor
                     if case .remove(let startIndex, _) = self.lastEditStyle, startIndex < currentRange.location {
-                        currentRange.location -= difference
+                        currentRange.location = max(0, currentRange.location - difference)
                     }
                 }
-            } else if self.text.string.count > uiView.attributedText.string.count {
+            } else if newText.length > oldText.length {
                 // if edit locally, there is no edit style change, then move forward the cursor after adding text
                 if self.lastEditStyle == context.coordinator.lastEditStyle {
                     currentRange.location += difference
@@ -93,6 +104,8 @@ struct RTUITextField: UIViewRepresentable {
             }
 
             uiView.attributedText = self.text
+            // Ensure cursor position doesn't exceed text bounds
+            currentRange.location = min(currentRange.location, newText.length)
             uiView.selectedRange = currentRange
         }
         UIView.setAnimationsEnabled(true)
@@ -108,6 +121,9 @@ struct RTUITextField: UIViewRepresentable {
         var parent: RTUITextField
         var selectRange: UITextRange?
         var lastEditStyle: EditStyle?
+        var isComposing: Bool = false // Track IME composition state
+        var textBeforeComposition: String = "" // Store text before composition started
+        var compositionDebounceTimer: Timer?
 
         init(_ parent: RTUITextField) {
             self.parent = parent
@@ -122,12 +138,97 @@ struct RTUITextField: UIViewRepresentable {
             }
         }
 
+        func textViewDidChange(_ textView: UITextView) {
+            let isCurrentlyComposing = textView.markedTextRange != nil
+
+            // Cancel any existing debounce timer
+            self.compositionDebounceTimer?.invalidate()
+
+            if isCurrentlyComposing {
+                // Composition started or in progress
+                if !self.isComposing {
+                    // Composition just started
+                    self.isComposing = true
+                    self.textBeforeComposition = textView.text
+                }
+                // Don't send updates during composition
+                return
+            }
+
+            // Composition might have ended, use debounce to ensure we capture final text
+            if self.isComposing {
+                self.compositionDebounceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
+                    guard let self = self else { return }
+                    self.handleCompositionEnd(textView)
+                }
+                return
+            }
+
+            // Normal text change (not during composition) - including emoji input
+            // Emoji don't trigger markedTextRange, so they come through here
+            self.handleDirectTextChange(textView)
+        }
+
+        private func handleCompositionEnd(_ textView: UITextView) {
+            self.isComposing = false
+
+            let currentText = textView.text ?? ""
+            let previousText = self.textBeforeComposition
+
+            // Find what changed
+            let currentNS = currentText as NSString
+            let previousNS = previousText as NSString
+
+            // Find the range that changed
+            var changeStart = 0
+            let minLength = min(currentNS.length, previousNS.length)
+
+            // Find where strings start to differ
+            for i in 0 ..< minLength {
+                if currentNS.character(at: i) != previousNS.character(at: i) {
+                    changeStart = i
+                    break
+                }
+            }
+
+            // If we didn't find a difference in common part, change is at the end
+            if changeStart == 0, minLength > 0 {
+                changeStart = minLength
+            }
+
+            if currentNS.length > previousNS.length {
+                // Text was inserted
+                let insertedLength = currentNS.length - previousNS.length
+                let insertedText = currentNS.substring(with: NSRange(location: changeStart, length: insertedLength))
+                let range = NSRange(location: changeStart, length: 0)
+                self.parent.didChangeText([range as NSValue], insertedText)
+            } else if currentNS.length < previousNS.length {
+                // Text was deleted
+                let deletedLength = previousNS.length - currentNS.length
+                let range = NSRange(location: changeStart, length: deletedLength)
+                self.parent.didChangeText([range as NSValue], "")
+            }
+
+            self.textBeforeComposition = ""
+        }
+
+        private func handleDirectTextChange(_: UITextView) {
+            // This handles direct text changes including emoji
+            // The shouldChangeTextIn already notified the parent, so we don't need to do anything here
+            // This method is kept for future enhancements if needed
+        }
+
         // iOS 18 and earlier
         func textView(
             _ textView: UITextView,
             shouldChangeTextIn range: NSRange,
             replacementText text: String
         ) -> Bool {
+            // Allow IME composition (markedText) to proceed
+            if textView.markedTextRange != nil || self.isComposing {
+                return true
+            }
+
             let ranges = range as NSValue
             self.parent.didChangeText([ranges], text)
             return false
@@ -139,6 +240,11 @@ struct RTUITextField: UIViewRepresentable {
             shouldChangeTextInRanges ranges: [NSValue],
             replacementText text: String
         ) -> Bool {
+            // Allow IME composition (markedText) to proceed
+            if textView.markedTextRange != nil || self.isComposing {
+                return true
+            }
+
             self.parent.didChangeText(ranges, text)
             return false
         }

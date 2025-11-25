@@ -30,6 +30,7 @@ enum Constant {
     }
 
     static var serverAddress = currentYorkieServerIP
+    static let apiKey = "39HrKEHnMkAdXw6ZkCJQd4"
     static var documentKey: String = {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd"

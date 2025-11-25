@@ -25,13 +25,16 @@ struct ContentView: View {
         case completed = "Completed"
     }
 
-    @State private var viewModel = ContentViewModel()
+    @StateObject private var viewModel = ContentViewModel()
     @State private var selectedStatus = Status.all
     @State private var showAdding = false
     @State private var showEditing = false
     @State private var selectedAll = false
     @State private var newTaskName = ""
     @State private var updatingModel: TodoModel? = nil
+    @State var showSetting = false
+    @State var key = ""
+    @Environment(\.scenePhase) var scenePhase
 
     private let status: [Status] = [.all, .active, .completed]
     var body: some View {
@@ -45,8 +48,41 @@ struct ContentView: View {
                 content
             }
         }
+        .onChange(of: self.scenePhase) { newPhase in
+            if newPhase == .active {
+                self.viewModel.refreshDocument()
+            }
+        }
         .task {
             await self.viewModel.initializeClient()
+        }
+        .sheet(isPresented: self.$showSetting) {
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        self.showSetting = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 30, height: 30)
+                    }
+                }
+                TextField(text: self.$key) {
+                    Text("Input new key")
+                }
+
+                Button {
+                    self.showSetting = false
+                    self.viewModel.updateKeys(self.key)
+                } label: {
+                    Text("DONE")
+                }
+
+                Spacer()
+            }
+            .padding()
         }
     }
 }
@@ -55,142 +91,151 @@ struct ContentView: View {
 
 extension ContentView {
     private var content: some View {
-        NavigationStack {
-            VStack {
-                self.headerView
+        VStack {
+            self.headerView
 
-                Spacer()
+            Spacer()
 
-                ScrollView {
-                    let filteredModels: [TodoModel] = {
-                        switch self.selectedStatus {
-                        case .all:
-                            return self.viewModel.models
-                        case .active:
-                            return self.viewModel.models.filter { !$0.completed }
-                        case .completed:
-                            return self.viewModel.models.filter { $0.completed }
-                        }
-                    }()
-                    ForEach(filteredModels) { model in
-                        HStack(spacing: 20) {
-                            Button {
-                                complete(model.id, complete: !model.completed)
-                            } label: {
-                                Image(systemName: model.completed ? "checkmark.circle" : "circle")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 25, height: 25, alignment: .center)
-                            }
-
-                            Button {
-                                self.updatingModel = model
-                                self.showEditing = true
-                                self.newTaskName = model.text
-                            } label: {
-                                Text("\(model.text)")
-                                    .strikethrough(model.completed)
-                            }
-
-                            Spacer()
-                            Button {
-                                self.viewModel.deleteItem(model.id)
-                            } label: {
-                                Image(systemName: "delete.left")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 20, height: 20, alignment: .center)
-                                    .foregroundStyle(Color.red)
-                            }
-                        }
-                        .padding(.horizontal, 20)
+            ScrollView {
+                let filteredModels: [TodoModel] = {
+                    switch self.selectedStatus {
+                    case .all:
+                        return self.viewModel.models
+                    case .active:
+                        return self.viewModel.models.filter { !$0.completed }
+                    case .completed:
+                        return self.viewModel.models.filter { $0.completed }
                     }
-                }
-
-                Spacer()
-
-                HStack {
-                    if self.viewModel.itemsLeft > 0 {
-                        Text("\(self.viewModel.itemsLeft) item(s) left")
-                    } else {
-                        Text("No items left")
-                    }
-
-                    if self.viewModel.models.contains(where: { $0.completed }) {
+                }()
+                ForEach(filteredModels) { model in
+                    HStack(spacing: 20) {
                         Button {
-                            removeAllCompleted()
+                            Log.log("[UI] -> task complete -> model.id: \(model.id), complete: \(!model.completed)", level: .info)
+                            complete(model.id, complete: !model.completed)
                         } label: {
-                            HStack {
-                                Image(systemName: "trash")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 20, height: 20, alignment: .center)
-                                    .padding(.trailing, 10)
-                                Text("Clear all completed task!")
-                            }
-                            .foregroundStyle(Color.red)
-                            .padding(5)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.red, lineWidth: 2)
-                            )
+                            Image(systemName: model.completed ? "checkmark.circle" : "circle")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 25, height: 25, alignment: .center)
+                        }
+
+                        Button {
+                            self.updatingModel = model
+                            self.showEditing = true
+                            self.newTaskName = model.text
+                        } label: {
+                            Text("\(model.text)")
+                                .strikethrough(model.completed)
+                                .multilineTextAlignment(.leading)
+                        }
+
+                        Spacer()
+                        Button {
+                            Log.log("[UI] -> delete task -> model.id: \(model.id)", level: .info)
+                            self.viewModel.deleteItem(model.id)
+                        } label: {
+                            Image(systemName: "delete.left")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20, alignment: .center)
+                                .foregroundStyle(Color.red)
                         }
                     }
+                    .padding(.horizontal, 20)
                 }
             }
-            .padding()
-            .alert("Add New Todo", isPresented: self.$showAdding) {
-                TextField("What needs to be done?", text: self.$newTaskName)
-                HStack {
-                    Button {
-                        addTask()
-                        self.showAdding = false
-                    } label: {
-                        Text("Confirm")
-                    }
 
-                    Button {
-                        self.showAdding = false
-                    } label: {
-                        Text("Cancel")
-                    }
-                }
-            } message: {
-                Text("Add new task to do here!")
-            }
-            .alert("Edit task name", isPresented: self.$showEditing) {
-                TextField("What needs to be done?", text: self.$newTaskName)
-                HStack {
-                    Button {
-                        update()
-                        self.showEditing = false
-                    } label: {
-                        Text("Close")
-                    }
+            Spacer()
 
+            HStack {
+                if self.viewModel.itemsLeft > 0 {
+                    Text("\(self.viewModel.itemsLeft) item(s) left")
+                } else {
+                    Text("No items left")
+                }
+
+                if self.viewModel.models.contains(where: { $0.completed }) {
                     Button {
-                        self.showEditing = false
+                        Log.log("[UI] -> remove all completed task", level: .info)
+                        removeAllCompleted()
                     } label: {
-                        Text("Cancel")
+                        HStack {
+                            Image(systemName: "trash")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20, alignment: .center)
+                                .padding(.trailing, 10)
+                            Text("Clear all completed task!")
+                        }
+                        .foregroundStyle(Color.red)
+                        .padding(5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.red, lineWidth: 2)
+                        )
                     }
                 }
-            } message: {
-                Text("Add new task to do here!")
             }
-            .navigationTitle("Todo")
-            .onChange(of: self.viewModel.models) { _, newValue in
-                let hasChanged = newValue.contains(where: { $0.completed == false })
-                self.selectedAll = !hasChanged
-            }
-            .onChange(of: self.selectedAll) { _, newValue in
-                if newValue == false {
-                    if self.viewModel.models.allSatisfy({ $0.completed == true }) {
-                        self.viewModel.markAllAsComplete(newValue)
-                    }
-                    return
+        }
+        .padding()
+        .alert("Add New Todo", isPresented: self.$showAdding) {
+            TextField("What needs to be done?", text: self.$newTaskName)
+            HStack {
+                Button {
+                    addTask()
+                    Log.log("[UI] -> Add new task: \(self.newTaskName)", level: .info)
+                    self.showAdding = false
+                } label: {
+                    Text("Confirm")
                 }
-                self.viewModel.markAllAsComplete(newValue)
+                .disabled(self.newTaskName.isEmpty)
+
+                Button {
+                    Log.log("[UI] -> Cancel Add new task: \(self.newTaskName)", level: .info)
+                    self.showAdding = false
+                } label: {
+                    Text("Cancel")
+                }
             }
+        } message: {
+            Text("Add new task to do here!")
+        }
+        .alert("Edit task name", isPresented: self.$showEditing) {
+            TextField("What needs to be done?", text: self.$newTaskName)
+            HStack {
+                Button {
+                    Log.log("[UI] -> Update task: \(self.newTaskName)", level: .info)
+                    update()
+                    self.showEditing = false
+                } label: {
+                    Text("Close")
+                }
+
+                Button {
+                    Log.log("[UI] -> Cancel update task: \(self.newTaskName)", level: .info)
+                    self.showEditing = false
+                } label: {
+                    Text("Cancel")
+                }
+            }
+        } message: {
+            Text("Add new task to do here!")
+        }
+        .navigationTitle("Todo")
+        .onChange(of: self.viewModel.models) { newValue in
+            Log.log("[UI] [VM] -> models: \(newValue)", level: .info)
+            let hasChanged = newValue.contains(where: { $0.completed == false })
+            self.selectedAll = !hasChanged
+        }
+        .onChange(of: self.selectedAll) { newValue in
+            Log.log("[UI] [VM] -> selectedAll: \(newValue)", level: .info)
+            if newValue == false {
+                if self.viewModel.models.allSatisfy({ $0.completed == true }) {
+                    self.viewModel.markAllAsComplete(newValue)
+                }
+                return
+            }
+            self.viewModel.markAllAsComplete(newValue)
         }
     }
 
@@ -205,16 +250,21 @@ extension ContentView {
     var headerView: some View {
         VStack {
             HStack {
+                Spacer()
+                Text(self.viewModel.appVersion)
+            }
+            HStack {
                 Picker("", selection: self.$selectedStatus) {
                     ForEach(self.status) { pickerStatus in
                         Text("\(pickerStatus.rawValue)")
                             .tag(pickerStatus)
                     }
                 }
-                .pickerStyle(.palette)
+                // .pickerStyle(.palette)
 
                 Spacer()
                 Button {
+                    Log.log("[UI] -> Show add new task", level: .info)
                     self.showAdding = true
                 } label: {
                     Image(systemName: "plus")
@@ -241,20 +291,26 @@ extension ContentView {
 
 extension ContentView {
     private func addTask() {
+        Log.log("[UI] -> addTask", level: .info)
         self.viewModel.addNewTask(self.newTaskName)
         self.newTaskName = ""
     }
 
     private func update() {
+        Log.log("[UI] -> update task", level: .info)
         guard let model = updatingModel else { return }
         self.viewModel.updateTask(model.id, self.newTaskName)
+
+        self.newTaskName = ""
     }
 
     private func complete(_ taskID: String, complete: Bool) {
+        Log.log("[UI] -> marks as compled task", level: .info)
         self.viewModel.updateTask(taskID, complete: complete)
     }
 
     private func removeAllCompleted() {
+        Log.log("[UI] -> remove all completed task", level: .info)
         self.viewModel.removeAllCompleted()
     }
 }
