@@ -19,18 +19,7 @@
 		9AEA810229713DBB000672FC /* TextEditorViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AEA810129713DBB000672FC /* TextEditorViewController.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		5809CCD22EDD3AF30011A949 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 5809CCCC2EDD3AF30011A949 /* SimultaneousCursors.xcodeproj */;
-			proxyType = 2;
-			remoteGlobalIDString = 58D2A3392E935F9D00E23597;
-			remoteInfo = SimultaneousCursors;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
-		5809CCCC2EDD3AF30011A949 /* SimultaneousCursors.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = SimultaneousCursors.xcodeproj; path = ../SimultaneousCursors/SimultaneousCursors.xcodeproj; sourceTree = SOURCE_ROOT; };
 		9A15BB12298BDA130072612B /* TextViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewModel.swift; sourceTree = "<group>"; };
 		9A636A2E29A6F4FB006C1A23 /* PeerSelectionDisplayLayoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerSelectionDisplayLayoutManager.swift; sourceTree = "<group>"; };
 		9AC7CB94298CFEA60040D504 /* yorkie-ios-sdk */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "yorkie-ios-sdk"; path = ../..; sourceTree = "<group>"; };
@@ -57,14 +46,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		5809CCCF2EDD3AF30011A949 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				5809CCD32EDD3AF30011A949 /* SimultaneousCursors.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
 		9AC7CB93298CFEA60040D504 /* Packages */ = {
 			isa = PBXGroup;
 			children = (
@@ -87,7 +68,6 @@
 				9AEA80EA297134A1000672FC /* TextEditorApp */,
 				9AEA80E9297134A1000672FC /* Products */,
 				9AC7CB95298CFEC90040D504 /* Frameworks */,
-				5809CCCC2EDD3AF30011A949 /* SimultaneousCursors.xcodeproj */,
 			);
 			sourceTree = "<group>";
 		};
@@ -183,28 +163,12 @@
 			);
 			productRefGroup = 9AEA80E9297134A1000672FC /* Products */;
 			projectDirPath = "";
-			projectReferences = (
-				{
-					ProductGroup = 5809CCCF2EDD3AF30011A949 /* Products */;
-					ProjectRef = 5809CCCC2EDD3AF30011A949 /* SimultaneousCursors.xcodeproj */;
-				},
-			);
 			projectRoot = "";
 			targets = (
 				9AEA80E7297134A1000672FC /* TextEditorApp */,
 			);
 		};
 /* End PBXProject section */
-
-/* Begin PBXReferenceProxy section */
-		5809CCD32EDD3AF30011A949 /* SimultaneousCursors.app */ = {
-			isa = PBXReferenceProxy;
-			fileType = wrapper.application;
-			path = SimultaneousCursors.app;
-			remoteRef = 5809CCD22EDD3AF30011A949 /* PBXContainerItemProxy */;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-/* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
 		9AEA80E6297134A1000672FC /* Resources */ = {
