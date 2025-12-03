@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		58D2A36D2E935FBE00E23597 /* SimutaneousCurcorsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D2A36B2E935FBE00E23597 /* SimutaneousCurcorsApp.swift */; };
+		5809CCCB2EDD394B0011A949 /* SimultaneousCursorsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5809CCCA2EDD394B0011A949 /* SimultaneousCursorsApp.swift */; };
 		58D2A36F2E935FCB00E23597 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D2A36E2E935FCA00E23597 /* ContentView.swift */; };
 		58D2A3712E93600C00E23597 /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58D2A3702E93600A00E23597 /* ContentViewModel.swift */; };
 		58D2A3732E93650300E23597 /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 58D2A3722E93650300E23597 /* Yorkie */; };
@@ -18,8 +18,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		58D2A3392E935F9D00E23597 /* SimutaneousCursors.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimutaneousCursors.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		58D2A36B2E935FBE00E23597 /* SimutaneousCurcorsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimutaneousCurcorsApp.swift; sourceTree = "<group>"; };
+		5809CCCA2EDD394B0011A949 /* SimultaneousCursorsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimultaneousCursorsApp.swift; sourceTree = "<group>"; };
+		58D2A3392E935F9D00E23597 /* SimultaneousCursors.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimultaneousCursors.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		58D2A36E2E935FCA00E23597 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		58D2A3702E93600A00E23597 /* ContentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentViewModel.swift; sourceTree = "<group>"; };
 		58D2A3742E93A2C700E23597 /* UIWindow+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIWindow+Ex.swift"; sourceTree = "<group>"; };
@@ -41,7 +41,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		58D2A36C2E935FBE00E23597 /* SimutaneousCursors */ = {
+		58D2A36C2E935FBE00E23597 /* SimultaneousCursors */ = {
 			isa = PBXGroup;
 			children = (
 				58D2A3782E93A2FB00E23597 /* Constant.swift */,
@@ -49,10 +49,10 @@
 				58D2A3742E93A2C700E23597 /* UIWindow+Ex.swift */,
 				58D2A3702E93600A00E23597 /* ContentViewModel.swift */,
 				58D2A36E2E935FCA00E23597 /* ContentView.swift */,
-				58D2A36B2E935FBE00E23597 /* SimutaneousCurcorsApp.swift */,
+				5809CCCA2EDD394B0011A949 /* SimultaneousCursorsApp.swift */,
 				58EA2CEF2EA9FBE80030F3B3 /* BuildInfo.plist */,
 			);
-			path = SimutaneousCursors;
+			path = SimultaneousCursors;
 			sourceTree = "<group>";
 		};
 		9AC7CB93298CFEA60040D504 /* Packages */ = {
@@ -74,7 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				9AC7CB93298CFEA60040D504 /* Packages */,
-				58D2A36C2E935FBE00E23597 /* SimutaneousCursors */,
+				58D2A36C2E935FBE00E23597 /* SimultaneousCursors */,
 				9AEA80E9297134A1000672FC /* Products */,
 				9AC7CB95298CFEC90040D504 /* Frameworks */,
 			);
@@ -83,7 +83,7 @@
 		9AEA80E9297134A1000672FC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				58D2A3392E935F9D00E23597 /* SimutaneousCursors.app */,
+				58D2A3392E935F9D00E23597 /* SimultaneousCursors.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -91,9 +91,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		58D2A3382E935F9D00E23597 /* SimutaneousCursors */ = {
+		58D2A3382E935F9D00E23597 /* SimultaneousCursors */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 58D2A3572E935F9E00E23597 /* Build configuration list for PBXNativeTarget "SimutaneousCursors" */;
+			buildConfigurationList = 58D2A3572E935F9E00E23597 /* Build configuration list for PBXNativeTarget "SimultaneousCursors" */;
 			buildPhases = (
 				584145FA2EA9C03E00558E35 /* Run IP Server */,
 				58D2A3352E935F9D00E23597 /* Sources */,
@@ -105,12 +105,12 @@
 			);
 			dependencies = (
 			);
-			name = SimutaneousCursors;
+			name = SimultaneousCursors;
 			packageProductDependencies = (
 				58D2A3722E93650300E23597 /* Yorkie */,
 			);
-			productName = SimutaneousCurcors;
-			productReference = 58D2A3392E935F9D00E23597 /* SimutaneousCursors.app */;
+			productName = SimultaneousCursors;
+			productReference = 58D2A3392E935F9D00E23597 /* SimultaneousCursors.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -128,7 +128,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 9AEA80E3297134A1000672FC /* Build configuration list for PBXProject "SimutaneousCursors" */;
+			buildConfigurationList = 9AEA80E3297134A1000672FC /* Build configuration list for PBXProject "SimultaneousCursors" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -143,7 +143,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				58D2A3382E935F9D00E23597 /* SimutaneousCursors */,
+				58D2A3382E935F9D00E23597 /* SimultaneousCursors */,
 			);
 		};
 /* End PBXProject section */
@@ -177,7 +177,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "#!/bin/bash\n\n# Get current IP address of Mac (Wi-Fi interface en0)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Path to your target plist file (adjust if needed)\nPLIST_PATH=\"${SRCROOT}/SimutaneousCursors/BuildInfo.plist\"\n\n# Key to inject the IP address under\nPLIST_KEY=\"CurrentIPAddress\"\n\n# Inject IP address into plist\n/usr/libexec/PlistBuddy -c \"Set :$PLIST_KEY $IP_ADDRESS\" \"$PLIST_PATH\" || \\\n/usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n\necho \"Injected Mac IP address ($IP_ADDRESS) into $PLIST_PATH\"\n\nif [ $? -eq 0 ]; then\n  echo \"✅ Successfully updated $PLIST_KEY in $PLIST_PATH\"\n  /usr/libexec/PlistBuddy -c \"Print \" \"${PLIST_PATH}\"\nelse\n  echo \"ℹ️ Key not found, trying to add it...\"\n  /usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n  if [ $? -eq 0 ]; then\n    echo \"✅ Successfully added $PLIST_KEY to $PLIST_PATH\"\n  else\n    echo \"❌ Failed to update or add $PLIST_KEY to $PLIST_PATH\"\n    exit 1\n  fi\nfi\n";
+			shellScript = "#!/bin/bash\n\n# Get current IP address of Mac (Wi-Fi interface en0)\nIP_ADDRESS=$(ipconfig getifaddr en0)\n\n# Path to your target plist file (adjust if needed)\nPLIST_PATH=\"${SRCROOT}/SimultaneousCursors/BuildInfo.plist\"\n\n# Key to inject the IP address under\nPLIST_KEY=\"CurrentIPAddress\"\n\n# Inject IP address into plist\n/usr/libexec/PlistBuddy -c \"Set :$PLIST_KEY $IP_ADDRESS\" \"$PLIST_PATH\" || \\\n/usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n\necho \"Injected Mac IP address ($IP_ADDRESS) into $PLIST_PATH\"\n\nif [ $? -eq 0 ]; then\n  echo \"✅ Successfully updated $PLIST_KEY in $PLIST_PATH\"\n  /usr/libexec/PlistBuddy -c \"Print \" \"${PLIST_PATH}\"\nelse\n  echo \"ℹ️ Key not found, trying to add it...\"\n  /usr/libexec/PlistBuddy -c \"Add :$PLIST_KEY string $IP_ADDRESS\" \"$PLIST_PATH\"\n  if [ $? -eq 0 ]; then\n    echo \"✅ Successfully added $PLIST_KEY to $PLIST_PATH\"\n  else\n    echo \"❌ Failed to update or add $PLIST_KEY to $PLIST_PATH\"\n    exit 1\n  fi\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 		5849C72C2E94FA0500B2C53E /* SwiftFormat */ = {
@@ -206,8 +206,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5809CCCB2EDD394B0011A949 /* SimultaneousCursorsApp.swift in Sources */,
 				58D2A36F2E935FCB00E23597 /* ContentView.swift in Sources */,
-				58D2A36D2E935FBE00E23597 /* SimutaneousCurcorsApp.swift in Sources */,
 				58D2A3752E93A2CD00E23597 /* UIWindow+Ex.swift in Sources */,
 				58D2A3712E93600C00E23597 /* ContentViewModel.swift in Sources */,
 				58D2A3772E93A2E400E23597 /* PresenceModel.swift in Sources */,
@@ -424,7 +424,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		58D2A3572E935F9E00E23597 /* Build configuration list for PBXNativeTarget "SimutaneousCursors" */ = {
+		58D2A3572E935F9E00E23597 /* Build configuration list for PBXNativeTarget "SimultaneousCursors" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				58D2A3582E935F9E00E23597 /* Debug */,
@@ -433,7 +433,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		9AEA80E3297134A1000672FC /* Build configuration list for PBXProject "SimutaneousCursors" */ = {
+		9AEA80E3297134A1000672FC /* Build configuration list for PBXProject "SimultaneousCursors" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				9AEA80FA297134A2000672FC /* Debug */,

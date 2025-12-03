@@ -17,7 +17,7 @@
 import SwiftUI
 
 @main
-struct SimutaneousCurcorsApp: App {
+struct SimultaneousCursorsApp: App {
     @State var path = NavigationPath()
     @State var name = ""
     var body: some Scene {

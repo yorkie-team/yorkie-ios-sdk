@@ -2,6 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "container:SimultaneousCursors/SimultaneousCursors.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "group:TextEditorApp/TextEditorApp.xcodeproj">
    </FileRef>
    <FileRef
@@ -9,9 +12,6 @@
    </FileRef>
    <FileRef
       location = "group:Todomvc/Todomvc.xcodeproj">
-   </FileRef>
-   <FileRef
-      location = "group:SimutaneousCurcors/SimutaneousCursors.xcodeproj">
    </FileRef>
    <FileRef
       location = "group:Scheduler/Scheduler.xcodeproj">
