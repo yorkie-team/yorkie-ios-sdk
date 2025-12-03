@@ -1414,7 +1414,7 @@
 			repositoryURL = "https://github.com/connectrpc/connect-swift.git";
 			requirement = {
 				kind = exactVersion;
-				version = 1.0.3;
+				version = 1.2.0;
 			};
 		};
 		9A5D9DDA2A710FB40096C40C /* XCRemoteSwiftPackageReference "Semaphore" */ = {
