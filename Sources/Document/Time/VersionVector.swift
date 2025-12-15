@@ -54,6 +54,13 @@ public struct VersionVector: Sendable {
     public func get(_ actorID: ActorID) -> Int64? {
         return self.vector[actorID]
     }
+    
+    /**
+     * `has` checks if the given actor exists in the VersionVector.
+     */
+    public func has(_ actorID: String) -> Bool {
+        return self.vector.contains(where: { $0.key == actorID })
+    }
 
     /**
      * `maxLamport` returns max lamport value from vector

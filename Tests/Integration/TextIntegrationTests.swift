@@ -677,4 +677,142 @@ final class TextIntegrationConcurrentTests: XCTestCase {
             XCTAssertEqual(d1JSON, d2JSON)
         }
     }
+    
+    // causal deletion preserves original timestamps
+    func test_causal_deletion_preserves_original_timestamps() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.k1 = JSONText()
+                (root.k1 as? JSONText)?.edit(0, 0, "abcd")
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1JSON = await d1.toSortedJSON()
+            var d2JSON = await d2.toSortedJSON()
+
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"abcd\"}]}")
+            XCTAssertEqual(d1JSON, d2JSON)
+            
+            try await d1.update { root, _ in
+                (root.k1 as? JSONText)?.edit(1, 3, "")
+            }
+            
+            try await c1.sync()
+            try await c2.sync()
+            
+            try await d2.update { root, _ in
+                (root.k1 as? JSONText)?.edit(0, 2, "")
+            }
+            
+            func getAllNodes(from doc: Document) async -> RGATreeSplit<CRDTTextValue>? {
+                // Access the root and get the text field (k1 in the test)
+                guard let text = await doc.getRoot().k1 as? JSONText else {
+                    return nil
+                }
+                
+                // Access the internal RGATreeSplit structure
+                // Note: This assumes a similar internal structure in Swift
+                let rga = text.text?.rgaTreeSplit
+                
+                // Convert the iterator/sequence to an array
+                return rga
+            }
+            
+            let text = await getAllNodes(from: d2)
+            let node = text?.makeIterator()
+            print("----------------------------")
+            var (aNode, bcNode, dNode): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = node?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode = node
+                case "bc":
+                    bcNode = node
+                case "d":
+                    dNode = node
+                default:
+                    continue
+                }
+            }
+            
+            XCTAssertTrue(aNode!.removedAt!.after(bcNode!.removedAt!))
+            XCTAssertTrue(dNode!.removedAt!.after(bcNode!.removedAt!))
+            
+            // Final sync and ensure convergence
+            try await c2.sync()
+            try await c1.sync()
+            
+            d1JSON = await d1.toSortedJSON()
+            d2JSON = await d2.toSortedJSON()
+            
+            XCTAssertEqual(d1JSON, d2JSON)
+        }
+    }
+    
+    // concurrent deletion test for LWW behavior
+    func test_concurrent_deletion_test_for_LWW_behavior() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.k1 = JSONText()
+                (root.k1 as? JSONText)?.edit(0, 0, "abcd")
+            }
+            
+            try await c1.sync()
+            try await c2.sync()
+            
+            var d1JSON = await d1.toSortedJSON()
+            var d2JSON = await d2.toSortedJSON()
+            
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"abcd\"}]}")
+            XCTAssertEqual(d1JSON, d2JSON)
+            
+            try await d1.update { root, _ in
+                (root.k1 as? JSONText)?.edit(1, 3, "")
+            }
+            
+            try await d2.update { root, _ in
+                (root.k1 as? JSONText)?.edit(0, 4, "")
+            }
+            
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+            
+            d1JSON = await d1.toSortedJSON()
+            d2JSON = await d2.toSortedJSON()
+            
+            XCTAssertEqual(d1JSON, d2JSON)
+            
+            func getAllNodes(from doc: Document) async -> RGATreeSplit<CRDTTextValue>? {
+                // Access the root and get the text field (k1 in the test)
+                guard let text = await doc.getRoot().k1 as? JSONText else {
+                    return nil
+                }
+                
+                // Access the internal RGATreeSplit structure
+                // Note: This assumes a similar internal structure in Swift
+                let rga = text.text?.rgaTreeSplit
+                
+                // Convert the iterator/sequence to an array
+                return rga
+            }
+            
+            func checkAllRemove(document: Document) async -> Bool {
+                let text = await getAllNodes(from: document)
+                let node = text?.makeIterator()
+                while let node = node?.next(), node.createdAt != .initial {
+                    if !node.isRemoved {
+                        return false
+                    }
+                }
+                return true
+            }
+            let removeAllD1 = await checkAllRemove(document: d1)
+            let removeAllD2 = await checkAllRemove(document: d2)
+            XCTAssertTrue(removeAllD1)
+            XCTAssertTrue(removeAllD2)
+        }
+    }
 }
