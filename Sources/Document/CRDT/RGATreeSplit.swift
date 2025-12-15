@@ -352,7 +352,6 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     func canRemove(
         _ creationKnown: Bool
     ) -> Bool {
-        
         if !creationKnown {
             return false
         }
@@ -391,8 +390,8 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
             self.removedAt = removeAt
             return
         }
-        
-        if !tombstoneKnown && removeAt.after(self.removedAt!) {
+
+        if !tombstoneKnown, removeAt.after(self.removedAt!) {
             self.removedAt = removeAt
         }
     }
@@ -782,7 +781,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var nodesToKeep: [RGATreeSplitNode<T>?] = []
         let (leftEdge, rightEdge) = try findEdgesOfCandidates(candidates)
         nodesToKeep.append(leftEdge)
-        
+
         for node in candidates {
             if node.canRemove(isLocal || vector!.afterOrEqual(other: node.createdAt)) {
                 nodesToRemove.append(node)
@@ -791,10 +790,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             }
         }
         nodesToKeep.append(rightEdge)
-        
+
         // 02. Create value changes with previous indexes before deletion.
         let changes = try makeChanges(nodesToKeep, editedAt)
-        
+
         // 03. Mark tombstones for removal.
         var removedNodes: [String: RGATreeSplitNode<T>] = [:]
         for node in nodesToRemove {
@@ -802,16 +801,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             node.remove(
                 editedAt,
                 node.isRemoved &&
-                (isLocal || vector!.afterOrEqual(other: node.removedAt!))
+                    (isLocal || vector!.afterOrEqual(other: node.removedAt!))
             )
         }
-        
+
         // 04. Clear the index tree of the given deletion boundaries.
-        deleteIndexNodes(nodesToKeep)
-        
+        self.deleteIndexNodes(nodesToKeep)
+
         return (changes, removedNodes)
     }
-    
+
     /**
      * `findEdgesOfCandidates` finds the edges outside `candidates`,
      * (which has not already been deleted, or be undefined but not yet implemented)

@@ -54,7 +54,7 @@ public struct VersionVector: Sendable {
     public func get(_ actorID: ActorID) -> Int64? {
         return self.vector[actorID]
     }
-    
+
     /**
      * `has` checks if the given actor exists in the VersionVector.
      */
