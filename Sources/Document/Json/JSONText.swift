@@ -31,7 +31,7 @@ public typealias TextPosStructRange = (TextPosStruct, TextPosStruct)
 
 public class JSONText {
     private var context: ChangeContext?
-    private var text: CRDTText?
+    private(set) var text: CRDTText?
 
     public convenience init() {
         self.init(context: nil, text: nil)

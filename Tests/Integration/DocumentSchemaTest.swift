@@ -263,7 +263,7 @@ extension DocumentSchemaTest {
             if case .invalidResponse(let status) = error {
                 XCTAssertEqual(
                     status["message"] as? String ?? "",
-                    "schema validation failed: Expected integer at path $.title"
+                    "schema validation failed: expected integer at path $.title"
                 )
             } else {
                 XCTFail("Wrong returned message")
@@ -415,7 +415,7 @@ extension DocumentSchemaTest {
             if case .invalidResponse(let status) = error {
                 XCTAssertEqual(
                     status["message"] as? String ?? "",
-                    "schema validation failed: Expected integer at path $.title"
+                    "schema validation failed: expected integer at path $.title"
                 )
             } else {
                 XCTFail("Wrong returned message")
@@ -506,7 +506,7 @@ extension DocumentSchemaTest {
             guard let error = error as? YorkieProjectError, case .invalidResponse(let status) = error else { fatalError() }
             XCTAssertEqual(
                 status["message"] as? String ?? "",
-                "schema validation failed: Expected integer at path $.title"
+                "schema validation failed: expected integer at path $.title"
             )
         }
         try await client.deactivate()

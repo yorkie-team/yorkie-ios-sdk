@@ -917,7 +917,7 @@ public class Client {
         }
 
         attachment.unsubscribeBroadcastEvent()
-
+        attachment.doc.resetOnlineClients()
         try self.stopWatchLoop(docKey, with: attachment)
 
         self.attachmentMap.removeValue(forKey: docKey)

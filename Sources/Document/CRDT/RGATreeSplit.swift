@@ -64,11 +64,11 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     /**
      * `createdAt` the creation time of this ID.
      */
-    public let createdAt: TimeTicket
+    let createdAt: TimeTicket
     /**
      * `offset` the offset of this ID.
      */
-    public let offset: Int32
+    let offset: Int32
 
     init(_ createdAt: TimeTicket, _ offset: Int32) {
         self.createdAt = createdAt
@@ -78,11 +78,11 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     /**
      * `==` returns whether given ID equals to this ID or not.
      */
-    public static func == (lhs: RGATreeSplitNodeID, rhs: RGATreeSplitNodeID) -> Bool {
+    static func == (lhs: RGATreeSplitNodeID, rhs: RGATreeSplitNodeID) -> Bool {
         lhs.createdAt == rhs.createdAt && lhs.offset == rhs.offset
     }
 
-    public static func < (lhs: RGATreeSplitNodeID, rhs: RGATreeSplitNodeID) -> Bool {
+    static func < (lhs: RGATreeSplitNodeID, rhs: RGATreeSplitNodeID) -> Bool {
         if lhs.createdAt == rhs.createdAt {
             return lhs.offset < rhs.offset
         } else {
@@ -93,14 +93,14 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
     /**
      * `hasSameCreatedAt` returns whether given ID has same creation time with this ID.
      */
-    public func hasSameCreatedAt(_ other: RGATreeSplitNodeID) -> Bool {
+    func hasSameCreatedAt(_ other: RGATreeSplitNodeID) -> Bool {
         self.createdAt == other.createdAt
     }
 
     /**
      * `split` creates a new ID with an offset from this ID.
      */
-    public func split(_ offset: Int32) -> RGATreeSplitNodeID {
+    func split(_ offset: Int32) -> RGATreeSplitNodeID {
         RGATreeSplitNodeID(self.createdAt, self.offset + offset)
     }
 
@@ -108,14 +108,14 @@ class RGATreeSplitNodeID: Equatable, Comparable, CustomDebugStringConvertible {
      * `toTestString` returns a String containing
      * the meta data of the node id for debugging purpose.
      */
-    public var toTestString: String {
+    var toTestString: String {
         "\(self.createdAt.toTestString):\(self.offset)"
     }
 
     /**
      * `toIDString` returns a string that can be used as an ID for this node id.
      */
-    public var toIDString: String {
+    var toIDString: String {
         "\(self.createdAt.toIDString):\(self.offset)"
     }
 
@@ -177,7 +177,7 @@ class RGATreeSplitPos: Equatable {
     /**
      * `==` returns whether given pos equal to this pos or not.
      */
-    public static func == (lhs: RGATreeSplitPos, rhs: RGATreeSplitPos) -> Bool {
+    static func == (lhs: RGATreeSplitPos, rhs: RGATreeSplitPos) -> Bool {
         lhs.id == rhs.id && lhs.relativeOffset == rhs.relativeOffset
     }
 }
@@ -207,7 +207,7 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `id` returns the ID of this RGATreeSplitNode.
      */
-    public let id: RGATreeSplitNodeID
+    let id: RGATreeSplitNodeID
 
     /**
      * `removedAt` returns the remove time of this node.
@@ -246,14 +246,14 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `createdAt` returns creation time of the Id of RGATreeSplitNode.
      */
-    public var createdAt: TimeTicket {
+    var createdAt: TimeTicket {
         self.id.createdAt
     }
 
     /**
      * `length` returns the length of this node.
      */
-    override public var length: Int {
+    override var length: Int {
         guard self.removedAt == nil else {
             return 0
         }
@@ -264,21 +264,21 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `contentLength` returns the length of this value.
      */
-    public var contentLength: Int {
+    var contentLength: Int {
         self.value.count
     }
 
     /**
      * `insPrevID` returns a ID of previous node insertion.
      */
-    public var insPrevID: RGATreeSplitNodeID? {
+    var insPrevID: RGATreeSplitNodeID? {
         self.insPrev?.id
     }
 
     /**
      * `setPrev` sets a previous node of this node.
      */
-    public func setPrev(_ node: RGATreeSplitNode<T>?) {
+    func setPrev(_ node: RGATreeSplitNode<T>?) {
         self.prev = node
         node?.next = self
     }
@@ -286,7 +286,7 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `setNext`  sets a next node of this node.
      */
-    public func setNext(_ node: RGATreeSplitNode<T>?) {
+    func setNext(_ node: RGATreeSplitNode<T>?) {
         self.next = node
         node?.prev = self
     }
@@ -294,7 +294,7 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `setInsPrev` sets a previous node of this node insertion.
      */
-    public func setInsPrev(_ node: RGATreeSplitNode<T>?) {
+    func setInsPrev(_ node: RGATreeSplitNode<T>?) {
         self.insPrev = node
         node?.insNext = self
     }
@@ -302,7 +302,7 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `setInsNext` sets a next node of this node insertion.
      */
-    public func setInsNext(_ node: RGATreeSplitNode<T>?) {
+    func setInsNext(_ node: RGATreeSplitNode<T>?) {
         self.insNext = node
         node?.insPrev = self
     }
@@ -310,35 +310,35 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `hasNext` checks if next node exists.
      */
-    public var hasNext: Bool {
+    var hasNext: Bool {
         self.next != nil
     }
 
     /**
      * `hasInsPrev` checks if previous insertion node exists.
      */
-    public var hasInsPrev: Bool {
+    var hasInsPrev: Bool {
         self.insPrev != nil
     }
 
     /**
      * `hasInsPrev` checks if previous insertion node exists.
      */
-    public var hasInsNext: Bool {
+    var hasInsNext: Bool {
         self.insNext != nil
     }
 
     /**
      * `isRemoved` checks if removed time exists.
      */
-    public var isRemoved: Bool {
+    var isRemoved: Bool {
         self.removedAt != nil
     }
 
     /**
      * `split` creates a new split node of the given offset.
      */
-    public func split(_ offset: Int32) -> RGATreeSplitNode<T> {
+    func split(_ offset: Int32) -> RGATreeSplitNode<T> {
         RGATreeSplitNode(
             self.id.split(offset),
             self.splitValue(offset),
@@ -349,24 +349,22 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `canDelete` checks if node is able to delete.
      */
-    public func canDelete(
-        _ editedAt: TimeTicket,
-        clientLamportAtChange: Int64
+    func canRemove(
+        _ creationKnown: Bool
     ) -> Bool {
-        let justRemoved = self.removedAt == nil
-        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-
-        if nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!)) {
-            return justRemoved
+        if !creationKnown {
+            return false
         }
-
+        if self.removedAt == nil {
+            return true
+        }
         return false
     }
 
     /**
      * `canStyle` checks if node is able to set style.
      */
-    public func canStyle(
+    func canStyle(
         _ editedAt: TimeTicket,
         clientLamportAtChange: Int64
     ) -> Bool {
@@ -375,23 +373,40 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
+     * `setRemovedAt` sets the remove time of this node.
+     */
+    func setRemoveAt(_ removeAt: TimeTicket?) {
+        self.removedAt = removeAt
+    }
+
+    /**
      * `remove` removes node of given edited time.
      */
-    public func remove(_ editedAt: TimeTicket?) {
-        self.removedAt = editedAt
+    func remove(
+        _ removeAt: TimeTicket,
+        _ tombstoneKnown: Bool
+    ) {
+        if self.removedAt == nil {
+            self.removedAt = removeAt
+            return
+        }
+
+        if !tombstoneKnown, removeAt.after(self.removedAt!) {
+            self.removedAt = removeAt
+        }
     }
 
     /**
      * `createRange` creates ranges of RGATreeSplitNodePos.
      */
-    public var createPosRange: RGATreeSplitPosRange {
+    var createPosRange: RGATreeSplitPosRange {
         (RGATreeSplitPos(self.id, 0), RGATreeSplitPos(self.id, Int32(self.length)))
     }
 
     /**
      * `deepcopy` returns a new instance of this RGATreeSplitNode without structural info.
      */
-    public func deepcopy() -> RGATreeSplitNode<T> {
+    func deepcopy() -> RGATreeSplitNode<T> {
         RGATreeSplitNode(self.id, self.value, self.removedAt)
     }
 
@@ -399,7 +414,7 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      * `toTestString` returns a String containing
      * the meta data of the node for debugging purpose.
      */
-    public var toTestString: String {
+    var toTestString: String {
         "\(self.id.toTestString) \(String(describing: self.value))"
     }
 
@@ -468,7 +483,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * @returns `(RGATreeSplitNodePos, [String: TimeTicket], [GCPair], [Change])`
      */
     @discardableResult
-    public func edit(
+    func edit(
         _ range: RGATreeSplitPosRange,
         _ editedAt: TimeTicket,
         _ value: T?,
@@ -524,7 +539,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodePos` finds RGATreeSplitNodePos of given offset.
      */
-    public func indexToPos(_ idx: Int) throws -> RGATreeSplitPos {
+    func indexToPos(_ idx: Int) throws -> RGATreeSplitPos {
         let (node, offset) = try self.treeByIndex.find(idx)
         guard let splitNode = node as? RGATreeSplitNode<T> else {
             throw YorkieError(code: .errInvalidArgument, message: "no element for index \(idx)")
@@ -536,7 +551,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findIndexesFromRange` finds indexes based on range.
      */
-    public func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
+    func findIndexesFromRange(_ range: RGATreeSplitPosRange) throws -> (Int, Int) {
         let (fromPos, toPos) = range
         return try (self.posToIndex(fromPos, false), self.posToIndex(toPos, true))
     }
@@ -544,7 +559,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `posToIndex` finds index based on node position.
      */
-    public func posToIndex(_ pos: RGATreeSplitPos, _ preferToLeft: Bool) throws -> Int {
+    func posToIndex(_ pos: RGATreeSplitPos, _ preferToLeft: Bool) throws -> Int {
         let absoluteID = pos.absoluteID
         guard let node = preferToLeft ? try? self.findFloorNodePreferToLeft(absoluteID) : self.findFloorNode(absoluteID) else {
             let message = "the node of the given id should be found: \(absoluteID.toTestString)"
@@ -559,35 +574,35 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNode` finds node of given id.
      */
-    public func findNode(_ id: RGATreeSplitNodeID) -> RGATreeSplitNode<T>? {
+    func findNode(_ id: RGATreeSplitNodeID) -> RGATreeSplitNode<T>? {
         self.findFloorNode(id)
     }
 
     /**
      * `length` returns size of RGATreeList.
      */
-    public var length: Int {
+    var length: Int {
         self.treeByIndex.length
     }
 
     /**
      * `getTreeByIndex` returns the tree by index for debugging purpose.
      */
-    public func getTreeByIndex() -> SplayTree<T> {
+    func getTreeByIndex() -> SplayTree<T> {
         return self.treeByIndex
     }
 
     /**
      * `getTreeByID` returns the tree by ID for debugging purpose.
      */
-    public func getTreeByID() -> LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>> {
+    func getTreeByID() -> LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>> {
         return self.treeByID
     }
 
     /**
      * `toJSON` returns the JSON encoding of this Array.
      */
-    public var toJSON: String {
+    var toJSON: String {
         var result = [String]()
 
         for item in self where !item.isRemoved {
@@ -600,7 +615,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `deepcopy` copies itself deeply.
      */
-    public func deepcopy() -> RGATreeSplit<T> {
+    func deepcopy() -> RGATreeSplit<T> {
         let clone = RGATreeSplit<T>()
 
         var node: RGATreeSplitNode<T>? = self.head.next
@@ -624,7 +639,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * `toTestString` returns a String containing the meta data of the node
      * for debugging purpose.
      */
-    public var toTestString: String {
+    var toTestString: String {
         var result = [String]()
 
         for item in self {
@@ -642,7 +657,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * `insertAfter` inserts the given node after the given previous node.
      */
     @discardableResult
-    public func insertAfter(_ prevNode: RGATreeSplitNode<T>, _ newNode: RGATreeSplitNode<T>) -> RGATreeSplitNode<T> {
+    func insertAfter(_ prevNode: RGATreeSplitNode<T>, _ newNode: RGATreeSplitNode<T>) -> RGATreeSplitNode<T> {
         let next = prevNode.next
         newNode.setPrev(prevNode)
 
@@ -659,7 +674,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findNodeWithSplit` splits and return nodes of the given position.
      */
-    public func findNodeWithSplit(
+    func findNodeWithSplit(
         _ pos: RGATreeSplitPos,
         _ editedAt: TimeTicket
     ) throws -> (RGATreeSplitNode<T>, DataSize, RGATreeSplitNode<T>?) {
@@ -707,7 +722,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `findBetween` returns nodes between fromNode and toNode.
      */
-    public func findBetween(_ fromNode: RGATreeSplitNode<T>?, _ toNode: RGATreeSplitNode<T>?) -> [RGATreeSplitNode<T>] {
+    func findBetween(_ fromNode: RGATreeSplitNode<T>?, _ toNode: RGATreeSplitNode<T>?) -> [RGATreeSplitNode<T>] {
         var nodes = [RGATreeSplitNode<T>]()
 
         var current: RGATreeSplitNode<T>? = fromNode
@@ -753,76 +768,47 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     private func deleteNodes(
         _ candidates: [RGATreeSplitNode<T>],
         _ editedAt: TimeTicket,
-        _ versionVector: VersionVector? = nil
+        _ vector: VersionVector? = nil
     ) throws -> ([ContentChange<T>],
                  [String: RGATreeSplitNode<T>])
     {
         guard !candidates.isEmpty else {
             return ([], [:])
         }
-
-        // There are 2 types of nodes in `candidates`: should delete, should not delete.
-        // `nodesToKeep` contains nodes should not delete,
-        // then is used to find the boundary of the range to be deleted.
-        let (nodesToDelete, nodesToKeep) = try self.filterNodes(
-            candidates,
-            editedAt,
-            versionVector
-        )
-
-        var createdAtMapByActor = [ActorID: TimeTicket]()
-        var removedNodes = [ActorID: RGATreeSplitNode<T>]()
-        // First we need to collect indexes for change.
-        let changes = try self.makeChanges(nodesToKeep, editedAt)
-
-        for node in nodesToDelete {
-            // Then make nodes be tombstones and map that.
-            let actorID = node.createdAt.actorID
-            if createdAtMapByActor[actorID] == nil ||
-                node.id.createdAt.after(createdAtMapByActor[actorID]!)
-            {
-                createdAtMapByActor[actorID] = node.id.createdAt
-            }
-
-            removedNodes[node.id.toIDString] = node
-            node.remove(editedAt)
-        }
-        // Finally remove index nodes of tombstones.
-        self.deleteIndexNodes(nodesToKeep)
-
-        return (changes, removedNodes)
-    }
-
-    private func filterNodes(
-        _ candidates: [RGATreeSplitNode<T>],
-        _ editedAt: TimeTicket,
-        _ versionVector: VersionVector? = nil
-    ) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>?]) {
-        var nodesToDelete = [RGATreeSplitNode<T>]()
-        var nodesToKeep = [RGATreeSplitNode<T>?]()
-
-        let (leftEdge, rightEdge) = try self.findEdgesOfCandidates(candidates)
+        let isLocal = vector == nil
+        // 01. Collect nodes to remove and keep.
+        var nodesToRemove: [RGATreeSplitNode<T>] = []
+        var nodesToKeep: [RGATreeSplitNode<T>?] = []
+        let (leftEdge, rightEdge) = try findEdgesOfCandidates(candidates)
         nodesToKeep.append(leftEdge)
 
         for node in candidates {
-            let actorID = node.createdAt.actorID
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            if node.canDelete(
-                editedAt,
-                clientLamportAtChange: clientLamportAtChange
-            ) {
-                nodesToDelete.append(node)
+            if node.canRemove(isLocal || vector!.afterOrEqual(other: node.createdAt)) {
+                nodesToRemove.append(node)
             } else {
                 nodesToKeep.append(node)
             }
         }
         nodesToKeep.append(rightEdge)
 
-        return (nodesToDelete, nodesToKeep)
+        // 02. Create value changes with previous indexes before deletion.
+        let changes = try makeChanges(nodesToKeep, editedAt)
+
+        // 03. Mark tombstones for removal.
+        var removedNodes: [String: RGATreeSplitNode<T>] = [:]
+        for node in nodesToRemove {
+            removedNodes[node.id.toIDString] = node
+            node.remove(
+                editedAt,
+                node.isRemoved &&
+                    (isLocal || vector!.afterOrEqual(other: node.removedAt!))
+            )
+        }
+
+        // 04. Clear the index tree of the given deletion boundaries.
+        self.deleteIndexNodes(nodesToKeep)
+
+        return (changes, removedNodes)
     }
 
     /**
@@ -918,11 +904,11 @@ extension RGATreeSplit: GCParent {
 }
 
 extension RGATreeSplit: Sequence {
-    public func makeIterator() -> NodeIterator {
+    func makeIterator() -> NodeIterator {
         NodeIterator(head: self.head)
     }
 
-    public class NodeIterator: IteratorProtocol {
+    class NodeIterator: IteratorProtocol {
         // swiftlint: disable nesting
         typealias Element = RGATreeSplitNode<T>
 
@@ -932,7 +918,7 @@ extension RGATreeSplit: Sequence {
             self.head = head
         }
 
-        public func next() -> Element? {
+        func next() -> Element? {
             let next = self.head
             self.head = self.head?.next
             return next
