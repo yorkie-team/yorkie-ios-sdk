@@ -186,7 +186,6 @@ class TextEditorViewController: UIViewController {
                 self.peerSelection = self.peerSelection.filter { $0.value.0.length > 0 }
 
             case .select(let range, let actorID):
-
                 print("#### select \(range) \(self.textView.textStorage.length)")
 
                 let newColor = UIColor(red: CGFloat.random(in: 0 ... 1), green: CGFloat.random(in: 0 ... 1), blue: CGFloat.random(in: 0 ... 1), alpha: 0.2)

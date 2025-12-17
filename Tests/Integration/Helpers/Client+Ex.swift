@@ -17,7 +17,11 @@
 import Yorkie
 
 extension Client {
-    static func makeMock() -> Client {
-        Client(ServerInfo.rpcAddress)
+    static func makeMock(apiKey: String = "") -> Client {
+//        self.client = Client(
+//            "https://yorkie-api-qa.navercorp.com",
+//            .init(apiKey: self.apiKey)
+//        )
+        return .init(ServerInfo.rpcAddress, .init(apiKey: apiKey))
     }
 }

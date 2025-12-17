@@ -18,16 +18,16 @@
 #if SWIFT_TEST
 @testable import YorkieTestHelper
 #endif
+import Foundation
 
 enum ServerInfo {
     static let rpcAddress = "http://localhost:8080"
     static let testAPIID = "admin"
     static let testAPIPW = "admin"
-    static let port = 3004
-    static let allAuthWebhookMethods = ["ActivateClient"]
 
     static func setUpServer() async throws -> (WebhookServer, YorkieProjectContext) {
-        let webhookServer = WebhookServer(port: ServerInfo.port)
+        let webhookServer = WebhookServer(port: 3004)
+        let projectName = "auth-webhook-\(Int(Date().timeIntervalSince1970))"
         do {
             try webhookServer.start()
             let context = try await YorkieProjectHelper.initializeProject(
@@ -35,7 +35,8 @@ enum ServerInfo {
                 username: ServerInfo.testAPIID,
                 password: ServerInfo.testAPIPW,
                 webhookURL: webhookServer.authWebhookUrl,
-                webhookMethods: ServerInfo.allAuthWebhookMethods
+                webhookMethods: [],
+                projectName: projectName
             )
             return (webhookServer, context)
         } catch {

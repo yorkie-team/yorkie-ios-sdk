@@ -22,17 +22,19 @@ import XCTest
 
 class DocumentSchemaTest: XCTestCase {
     var apiKey: String {
-        self.context.adminToken
+        self.context.publicKey
+    }
+
+    var secretKey: String {
+        self.context.secretKey
     }
 
     var webhookServer: WebhookServer!
     var context: YorkieProjectContext!
-    var token: String = ""
 
     override func setUp() async throws {
         try await super.setUp()
         (self.webhookServer, self.context) = try await ServerInfo.setUpServer()
-        self.token = self.context.adminToken
     }
 
     override func tearDown() async throws {
@@ -42,15 +44,17 @@ class DocumentSchemaTest: XCTestCase {
     }
 
     func test_initialize_project_successfully() async throws {
-        XCTAssertTrue(!self.apiKey.isEmpty)
+        XCTAssertTrue(!self.context.publicKey.isEmpty)
+        XCTAssertTrue(!self.context.secretKey.isEmpty)
     }
 
     func whenSetUpSchema(time: String) async {
         do {
             try await YorkieProjectHelper.createSchema(
                 rpcAddress: ServerInfo.rpcAddress,
-                token: self.token,
-                date: time
+                date: time,
+                projectApiKey: self.context.publicKey,
+                projectSecretKey: self.secretKey
             )
         } catch {
             fatalError("Fail create schema!")
@@ -60,12 +64,12 @@ class DocumentSchemaTest: XCTestCase {
 
 extension DocumentSchemaTest {
     // can attach document with schema
-    func check_testAttachDocumentWithSchema() async throws {
+    func testCanAttachDocumentWithSchema() async throws {
         let docKey = "\(#function)-\(Date().timeIntervalSince1970)".toDocKey
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -74,7 +78,7 @@ extension DocumentSchemaTest {
             try await client.attach(doc, [:], .manual, "noexist@1")
             XCTFail("Expected an error to be thrown")
         } catch {
-            XCTAssertEqual(error.localizedDescription, "noexist: schema not found")
+            XCTAssertEqual(error.localizedDescription, "find schema of noexist@1: schema not found")
         }
 
         let schema = "schema1-" + time + "@1"
@@ -84,12 +88,12 @@ extension DocumentSchemaTest {
     }
 
     // should reject local update that violates schema
-    func check_testShouldRejectLocalUpdateThatViolatesSchema() async throws {
+    func testShouldRejectLocalUpdateThatViolatesSchema() async throws {
         let docKey = "doc-size-\(Date().description)".toDocKey
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -131,7 +135,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -162,7 +166,7 @@ extension DocumentSchemaTest {
             rpcAddress: ServerInfo.rpcAddress,
             updateBody: updateBody,
             time: time,
-            token: self.token
+            token: self.secretKey
         )
         let doc2 = Document(key: docKey)
         try await client.attach(doc2, [:], .manual)
@@ -182,7 +186,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -202,7 +206,7 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: updateBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
@@ -224,7 +228,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -255,7 +259,7 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: updateBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
@@ -277,7 +281,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -307,7 +311,7 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: detachBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
@@ -327,7 +331,7 @@ extension DocumentSchemaTest {
             rpcAddress: ServerInfo.rpcAddress,
             updateBody: detachBody,
             time: time,
-            token: self.token
+            token: self.secretKey
         )
 
         let doc2 = Document(key: docKey)
@@ -355,7 +359,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -385,7 +389,7 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: attachBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
@@ -407,7 +411,7 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: attachBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
@@ -433,7 +437,7 @@ extension DocumentSchemaTest {
             rpcAddress: ServerInfo.rpcAddress,
             updateBody: reattachBody,
             time: time,
-            token: self.token
+            token: self.secretKey
         )
 
         let doc2 = Document(key: docKey)
@@ -467,7 +471,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -499,7 +503,7 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: updateBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
@@ -518,7 +522,7 @@ extension DocumentSchemaTest {
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -545,7 +549,7 @@ extension DocumentSchemaTest {
             rpcAddress: ServerInfo.rpcAddress,
             updateBody: updateBody,
             time: time,
-            token: self.token
+            token: self.secretKey
         )
         try await client.detach(doc)
         let doc2 = Document(key: docKey)
@@ -557,12 +561,12 @@ extension DocumentSchemaTest {
     }
 
     // can update root only when document has attached schema
-    func check_testCanUpdateRootOnlyWhenDocumentHasAttachedSchema() async throws {
+    func testCanUpdateRootOnlyWhenDocumentHasAttachedSchema() async throws {
         let docKey = "doc-size-\(Date().description)".toDocKey
         let time = "\(Date().timeIntervalSince1970)"
         await self.whenSetUpSchema(time: time)
 
-        let client = await Client.makeMock()
+        let client = await Client.makeMock(apiKey: self.apiKey)
         try await client.activate()
 
         let doc = Document(key: docKey)
@@ -592,14 +596,14 @@ extension DocumentSchemaTest {
                 rpcAddress: ServerInfo.rpcAddress,
                 updateBody: updateBody,
                 time: time,
-                token: self.token
+                token: self.secretKey
             )
             XCTFail("The API should not be success!")
         } catch {
             guard let error = error as? YorkieProjectError, case .invalidResponse(let status) = error else { fatalError() }
             XCTAssertEqual(
                 status["message"] as? String ?? "",
-                "schema validation failed: Expected string at path $.title"
+                "schema validation failed: expected string at path $.title"
             )
         }
 
@@ -613,7 +617,7 @@ extension DocumentSchemaTest {
             rpcAddress: ServerInfo.rpcAddress,
             updateBody: updateBody2,
             time: time,
-            token: self.token
+            token: self.secretKey
         )
         let doc2 = Document(key: docKey)
         try await client.attach(doc2, [:], .manual)

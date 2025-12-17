@@ -69,6 +69,8 @@ public struct Yorkie_V1_DeactivateClientRequest: Sendable {
 
   public var clientID: String = String()
 
+  public var synchronous: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -437,7 +439,7 @@ extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DeactivateClientRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}synchronous\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -446,6 +448,7 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.synchronous) }()
       default: break
       }
     }
@@ -455,11 +458,15 @@ extension Yorkie_V1_DeactivateClientRequest: SwiftProtobuf.Message, SwiftProtobu
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
+    if self.synchronous != false {
+      try visitor.visitSingularBoolField(value: self.synchronous, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_DeactivateClientRequest, rhs: Yorkie_V1_DeactivateClientRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.synchronous != rhs.synchronous {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

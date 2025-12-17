@@ -940,7 +940,8 @@ final class TreeIntegrationEditTests: XCTestCase {
             XCTAssertThrowsError(try (root.t as? JSONTree)?.editBulk(3, 3, [
                 JSONTreeElementNode(type: "p", children: [
                     JSONTreeTextNode(value: "c"),
-                    JSONTreeTextNode(value: "")]),
+                    JSONTreeTextNode(value: "")
+                ]),
                 JSONTreeTextNode(value: "d")
             ]))
         }

@@ -24,7 +24,7 @@ import Foundation
 class TextView {
     private var value: String = ""
 
-    public func applyChanges(operations: [any OperationInfo], enableLog: Bool = false) {
+    func applyChanges(operations: [any OperationInfo], enableLog: Bool = false) {
         let oldValue = self.value
         var changeLogs = [String]()
         for operation in operations {
@@ -44,7 +44,7 @@ class TextView {
         }
     }
 
-    public var toString: String {
+    var toString: String {
         self.value
     }
 }

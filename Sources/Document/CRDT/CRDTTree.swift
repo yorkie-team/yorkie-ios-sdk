@@ -153,7 +153,7 @@ struct CRDTTreeNodeID: Equatable, Comparable {
     /**
      * `initial` is the initial position of the tree.
      */
-    public static let initial = CRDTTreeNodeID(createdAt: .initial, offset: 0)
+    static let initial = CRDTTreeNodeID(createdAt: .initial, offset: 0)
 
     /**
      * `createdAt` is the creation time of the node.
@@ -336,7 +336,7 @@ final class CRDTTreeNode: IndexTreeNode {
     /**
      * `isRemoved` returns whether the node is removed or not.
      */
-    public var isRemoved: Bool {
+    var isRemoved: Bool {
         self.removedAt != nil
     }
 
@@ -996,7 +996,7 @@ class CRDTTree: CRDTElement {
     /**
      * `pathToTreePos` converts the given path of the node to the TreePos.
      */
-    public func pathToTreePos(_ path: [Int]) throws -> TreePos<CRDTTreeNode> {
+    func pathToTreePos(_ path: [Int]) throws -> TreePos<CRDTTreeNode> {
         return try self.indexTree.pathToTreePos(path)
     }
 

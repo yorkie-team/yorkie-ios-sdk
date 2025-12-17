@@ -95,6 +95,5 @@ struct EventDetailView: View {
 
 #Preview {
     EventDetailView(event: "Go to work or Not?") { _ in
-
     } deleteEvent: {}
 }

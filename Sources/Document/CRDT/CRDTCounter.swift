@@ -60,7 +60,7 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
     /**
      * `toBytes` creates an array representing the value.
      */
-    public func toBytes() -> Data {
+    func toBytes() -> Data {
         return withUnsafeBytes(of: self.value.littleEndian) { Data($0) }
     }
 
@@ -68,7 +68,7 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
      * `increase` increases numeric data.
      */
     @discardableResult
-    public func increase(_ primitive: Primitive) throws -> CRDTCounter {
+    func increase(_ primitive: Primitive) throws -> CRDTCounter {
         switch primitive.value {
         case .integer(let int32Value):
             self.value &+= T(int32Value)

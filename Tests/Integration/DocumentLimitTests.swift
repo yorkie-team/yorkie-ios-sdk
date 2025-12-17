@@ -88,7 +88,7 @@ class DocumentSizeLimitTest: XCTestCase {
             webhookMethods: [],
             projectName: self.projectName
         )
-        self.apiKey = self.context.apiKey
+        self.apiKey = self.context.publicKey
     }
 
     override func tearDown() async throws {

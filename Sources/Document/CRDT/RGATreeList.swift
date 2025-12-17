@@ -100,14 +100,14 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     /**
      * `getMovedFrom` returns the previous element before the element moved.
      */
-    public func getMovedFrom() -> RGATreeListNode? {
+    func getMovedFrom() -> RGATreeListNode? {
         return self.movedFrom
     }
 
     /**
      * `setMovedFrom` sets the previous element before the element moved.
      */
-    public func setMovedFrom(_ movedFrom: RGATreeListNode?) {
+    func setMovedFrom(_ movedFrom: RGATreeListNode?) {
         self.movedFrom = movedFrom
     }
 }

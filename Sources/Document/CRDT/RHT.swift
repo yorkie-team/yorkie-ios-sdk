@@ -202,7 +202,7 @@ class RHT {
     /**
      * `toXML` converts the given RHT to XML string.
      */
-    public func toXML() -> String {
+    func toXML() -> String {
         if self.nodeMapByKey.isEmpty {
             return ""
         }
@@ -223,7 +223,7 @@ class RHT {
     /**
      * `size` returns the size of RHT
      */
-    public var size: Int {
+    var size: Int {
         self.nodeMapByKey.count - self.numberOfRemovedElement
     }
 

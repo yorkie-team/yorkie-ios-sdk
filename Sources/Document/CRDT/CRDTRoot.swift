@@ -129,7 +129,7 @@ class CRDTRoot {
     /**
      * `createPath` creates path of the given element.
      */
-    public func createPath(createdAt: TimeTicket) throws -> String {
+    func createPath(createdAt: TimeTicket) throws -> String {
         return try self.createSubPaths(createdAt: createdAt).joined(separator: self.subPathSeparator)
     }
 
@@ -250,7 +250,7 @@ class CRDTRoot {
     /**
      * `getDocSize` returns the size of the document.
      */
-    public func getDocSize() -> DocSize {
+    func getDocSize() -> DocSize {
         return self.docSize
     }
 
@@ -337,7 +337,7 @@ class CRDTRoot {
     /**
      * `acc` accumulates the given DataSize to Live.
      */
-    public func acc(_ diff: DataSize) {
+    func acc(_ diff: DataSize) {
         self.docSize.live.addDataSizes(others: diff)
     }
 }

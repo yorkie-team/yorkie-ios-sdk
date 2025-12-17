@@ -823,14 +823,14 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * findTreePos finds the position of the given index in the tree.
      */
-    public func findTreePos(_ index: Int, _ preferText: Bool = true) throws -> TreePos<T> {
+    func findTreePos(_ index: Int, _ preferText: Bool = true) throws -> TreePos<T> {
         try Yorkie.findTreePos(node: self.root, index: index, preferText: preferText)
     }
 
     /**
      * `treePosToPath` returns path from given treePos
      */
-    public func treePosToPath(_ treePos: TreePos<T>) throws -> [Int] {
+    func treePosToPath(_ treePos: TreePos<T>) throws -> [Int] {
         var path = [Int]()
         var node = treePos.node
 
@@ -868,7 +868,7 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `pathToIndex` returns index from given path
      */
-    public func pathToIndex(_ path: [Int]) throws -> Int {
+    func pathToIndex(_ path: [Int]) throws -> Int {
         let treePos = try self.pathToTreePos(path)
 
         return try self.indexOf(treePos)
@@ -877,7 +877,7 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `pathToTreePos` returns treePos from given path
      */
-    public func pathToTreePos(_ path: [Int]) throws -> TreePos<T> {
+    func pathToTreePos(_ path: [Int]) throws -> TreePos<T> {
         guard path.isEmpty != true else {
             throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
         }
@@ -912,7 +912,7 @@ class IndexTree<T: IndexTreeNode> {
      * `findPostorderRight` finds right node of the given tree position with
      *  postorder traversal.
      */
-    public func findPostorderRight(_ treePos: TreePos<T>) -> T {
+    func findPostorderRight(_ treePos: TreePos<T>) -> T {
         let node = treePos.node
         let offset = Int(treePos.offset)
 
@@ -938,7 +938,7 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `indexOf` returns the index of the given tree position.
      */
-    public func indexOf(_ pos: TreePos<T>) throws -> Int {
+    func indexOf(_ pos: TreePos<T>) throws -> Int {
         var node = pos.node
         let offset = Int(pos.offset)
 
@@ -978,7 +978,7 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `indexToPath` returns the path of the given index.
      */
-    public func indexToPath(_ index: Int) throws -> [Int] {
+    func indexToPath(_ index: Int) throws -> [Int] {
         let treePos = try self.findTreePos(index)
         return try self.treePosToPath(treePos)
     }

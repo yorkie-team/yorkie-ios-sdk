@@ -28,7 +28,8 @@ final class DocumentBenchmarkTests: XCTestCase {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc", children: [
-                        JSONTreeElementNode(type: "p")])
+                        JSONTreeElementNode(type: "p")
+                    ])
                 )
 
                 for index in 1 ..< size {
@@ -47,7 +48,8 @@ final class DocumentBenchmarkTests: XCTestCase {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc", children: [
-                        JSONTreeElementNode(type: "p")])
+                        JSONTreeElementNode(type: "p")
+                    ])
                 )
 
                 for index in 1 ..< size {
@@ -74,7 +76,8 @@ final class DocumentBenchmarkTests: XCTestCase {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc", children: [
-                        JSONTreeElementNode(type: "p")])
+                        JSONTreeElementNode(type: "p")
+                    ])
                 )
 
                 for index in 1 ... size {
@@ -107,7 +110,8 @@ final class DocumentBenchmarkTests: XCTestCase {
             try await doc.update { root, _ in
                 root.tree = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc", children: [
-                        JSONTreeElementNode(type: "p")])
+                        JSONTreeElementNode(type: "p")
+                    ])
                 )
 
                 for index in 1 ... size {
