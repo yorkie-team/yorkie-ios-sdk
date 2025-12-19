@@ -47,8 +47,8 @@ public enum OperationInfoType: String {
 /**
  * `OperationInfo` represents the information of an operation.
  * It is used to inform to the user what kind of operation was executed.
+ * In JS, the 'OperationInfo' has been changed to 'OpInfo'
  */
-// JS version: OpInfo
 public protocol OperationInfo: Equatable {
     var type: OperationInfoType { get }
     var path: String { get }
