@@ -83,7 +83,7 @@ final class WebhookIntegrationTests: XCTestCase {
             webhookURL: self.webhookServer.authWebhookUrl,
             webhookMethods: self.allAuthWebhookMethods
         )
-        self.apiKey = self.context.apiKey
+        self.apiKey = self.context.publicKey
     }
 
     override func tearDown() async throws {
@@ -276,7 +276,7 @@ final class WebhookIntegrationTests: XCTestCase {
                                                                        password: self.testAPIPW,
                                                                        webhookURL: self.webhookServer.authWebhookUrl,
                                                                        webhookMethods: ["PushPull"])
-        self.apiKey = self.context.apiKey
+        self.apiKey = self.context.publicKey
 
         struct TestAuthTokenInjector: AuthTokenInjector {
             // set the token expiration time considering the sum of sync loop delay(100ms) and stream reconnection delay(1000ms).
@@ -345,7 +345,7 @@ final class WebhookIntegrationTests: XCTestCase {
                                                                        password: self.testAPIPW,
                                                                        webhookURL: self.webhookServer.authWebhookUrl,
                                                                        webhookMethods: ["WatchDocuments"])
-        self.apiKey = self.context.apiKey
+        self.apiKey = self.context.publicKey
 
         struct TestAuthTokenInjector: AuthTokenInjector {
             let name: String

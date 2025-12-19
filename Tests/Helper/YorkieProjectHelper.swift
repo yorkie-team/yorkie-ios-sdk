@@ -19,7 +19,8 @@ import Foundation
 public struct YorkieProjectContext {
     public let rpcAddress: String
     public let adminToken: String
-    public let apiKey: String
+    public let publicKey: String
+    public let secretKey: String
     public let projectID: String
 }
 
@@ -40,14 +41,24 @@ public enum YorkieProjectHelper {
     ) async throws -> YorkieProjectContext {
         let token = try await logIn(rpcAddress: rpcAddress, username: username, password: password)
 
-        let (projectID, publicKey) = try await createProject(rpcAddress: rpcAddress, token: token, name: projectName)
+        let (projectID, publicKey, secretKey) = try await createProject(rpcAddress: rpcAddress, token: token, name: projectName)
 
         try await updateProjectWebhook(rpcAddress: rpcAddress, token: token, projectID: projectID, webhookURL: webhookURL, webhookMethods: webhookMethods)
 
-        return YorkieProjectContext(rpcAddress: rpcAddress, adminToken: token, apiKey: publicKey, projectID: projectID)
+        return YorkieProjectContext(
+            rpcAddress: rpcAddress,
+            adminToken: token,
+            publicKey: publicKey,
+            secretKey: secretKey,
+            projectID: projectID
+        )
     }
 
-    public static func logIn(rpcAddress: String, username: String, password: String) async throws -> String {
+    public static func logIn(
+        rpcAddress: String,
+        username: String,
+        password: String
+    ) async throws -> String {
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/LogIn")!
         let body = ["username": username, "password": password]
         let data = try await postJSON(to: url, body: body)
@@ -57,20 +68,25 @@ public enum YorkieProjectHelper {
         return token
     }
 
-    public static func createProject(rpcAddress: String, token: String, name: String) async throws -> (id: String, publicKey: String) {
+    public static func createProject(
+        rpcAddress: String,
+        token: String,
+        name: String
+    ) async throws -> (id: String, publicKey: String, secretKey: String) {
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/CreateProject")!
         let body = ["name": name]
-        let headers = ["Authorization": token]
+        let headers = ["Authorization": "Bearer " + token]
         let responseJSON = try await postJSON(to: url, body: body, headers: headers)
 
         guard let project = responseJSON["project"] as? [String: Any],
               let id = project["id"] as? String,
-              let publicKey = project["publicKey"] as? String
+              let publicKey = project["publicKey"] as? String,
+              let secretKey = project["secretKey"] as? String
         else {
             throw YorkieProjectError.invalidProjectResponse(responseJSON)
         }
 
-        return (id: id, publicKey: publicKey)
+        return (id: id, publicKey: publicKey, secretKey)
     }
 
     @discardableResult
@@ -102,7 +118,7 @@ public enum YorkieProjectHelper {
             "fields": fields
         ]
 
-        let headers = ["Authorization": token]
+        let headers = ["Authorization": "Bearer " + token]
         return try await self.postJSON(to: url, body: body, headers: headers)
     }
 
@@ -110,11 +126,15 @@ public enum YorkieProjectHelper {
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/GetProject")!
         let body = ["name": projectName]
 
-        let headers = ["Authorization": token]
+        let headers = ["Authorization": "Bearer " + token]
         return try await self.postJSON(to: url, body: body, headers: headers)
     }
 
-    private static func postJSON(to url: URL, body: [String: Any], headers: [String: String] = [:]) async throws -> [String: Any] {
+    private static func postJSON(
+        to url: URL,
+        body: [String: Any],
+        headers: [String: String] = [:]
+    ) async throws -> [String: Any] {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -138,12 +158,13 @@ extension YorkieProjectHelper {
     @discardableResult
     static func createSchema(
         rpcAddress: String,
-        token: String,
-        date: String
+        date: String,
+        projectApiKey: String,
+        projectSecretKey: String
     ) async throws -> [String: Any] {
         var result = [String: Any]()
         let schema1Body: [String: Any] = [
-            "projectName": "default",
+            // "projectName": "default",
             "schemaName": "schema1-" + date,
             "schemaVersion": 1,
             "schemaBody": "type Document = {title: string;};",
@@ -153,7 +174,7 @@ extension YorkieProjectHelper {
         ]
 
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/CreateSchema")!
-        let headers = ["Authorization": token]
+        let headers = ["Authorization": "API-Key \(projectSecretKey)"]
         let result1 = try await Self.postJSON(to: url, body: schema1Body, headers: headers)
         result["\("schema1-" + date)"] = result1
 
@@ -178,7 +199,7 @@ extension YorkieProjectHelper {
         time: String,
         token: String
     ) async throws -> [String: Any] {
-        let headers = ["Authorization": token]
+        let headers = ["Authorization": "API-Key " + token]
         let url = URL(string: "\(rpcAddress)/yorkie.v1.AdminService/UpdateDocument")!
         let result = try await Self.postJSON(to: url, body: updateBody, headers: headers)
         return result

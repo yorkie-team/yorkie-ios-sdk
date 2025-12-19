@@ -206,7 +206,7 @@ class EditOperationType: OperationInterface {
                 let xml = (root.t as? JSONTree)!.toXML()
                 let mergeInterval = getMergeRange(xml, interval)
                 let st = mergeInterval.from, ed = mergeInterval.to
-                if st != -1 && ed != -1 && st < ed {
+                if st != -1, ed != -1, st < ed {
                     try (root.t as? JSONTree)?.edit(st, ed, self.content, self.splitLevel)
                 }
             } else if self.op == .splitUpdate {

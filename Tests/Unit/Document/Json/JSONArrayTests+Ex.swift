@@ -74,7 +74,6 @@ extension JSONArrayTests {
                 try await withTwoClientsAndDocuments(
                     op1.opName + op2.opName
                 ) { client1, document1, client2, document2 in
-
                     try await document1.update { root, _ in
                         root.a = initArr
                     }
@@ -197,7 +196,6 @@ extension JSONArrayTests {
 
         for operation in operations {
             try await withTwoClientsAndDocuments(operation.opName) { client1, document1, client2, document2 in
-
                 try await document1.update { root, _ in
                     root.a = initArr
                     XCTAssertEqual(root.toJSON(), initMarshal)

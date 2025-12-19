@@ -56,7 +56,7 @@ struct TreeEditOperation: Operation {
      * `execute` executes this operation on the given `CRDTRoot`.
      */
     @discardableResult
-    public func execute(
+    func execute(
         root: CRDTRoot,
         versionVector: VersionVector?
     ) throws -> [any OperationInfo] {
@@ -121,14 +121,14 @@ struct TreeEditOperation: Operation {
     /**
      * `effectedCreatedAt` returns the creation time of the effected element.
      */
-    public var effectedCreatedAt: TimeTicket {
+    var effectedCreatedAt: TimeTicket {
         self.parentCreatedAt
     }
 
     /**
      * `toTestString` returns a string containing the meta data.
      */
-    public var toTestString: String {
+    var toTestString: String {
         let parent = self.parentCreatedAt.toTestString
         let fromPos = "\(self.fromPos.leftSiblingID):\(self.fromPos.leftSiblingID.offset)"
         let toPos = "\(self.toPos.leftSiblingID):\(self.toPos.leftSiblingID.offset)"

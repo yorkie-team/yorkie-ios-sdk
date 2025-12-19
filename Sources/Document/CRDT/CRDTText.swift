@@ -21,17 +21,17 @@ class TextChange {
     /**
      * `TextChangeType` is the type of TextChange.
      */
-    public enum TextChangeType {
+    enum TextChangeType {
         case content
         case style
     }
 
-    public let type: TextChangeType
-    public let actor: ActorID
-    public let from: Int
-    public let to: Int
-    public var content: String?
-    public var attributes: Codable?
+    let type: TextChangeType
+    let actor: ActorID
+    let from: Int
+    let to: Int
+    var content: String?
+    var attributes: Codable?
 
     init(type: TextChangeType, actor: ActorID, from: Int, to: Int, content: String? = nil, attributes: Codable? = nil) {
         self.type = type
@@ -198,7 +198,7 @@ final class CRDTText: CRDTElement {
         )
     }
 
-    public typealias TextVal = (attributes: Codable, content: String)
+    typealias TextVal = (attributes: Codable, content: String)
 
     var createdAt: TimeTicket
     var movedAt: TimeTicket?

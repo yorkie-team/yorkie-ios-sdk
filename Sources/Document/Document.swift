@@ -936,6 +936,26 @@ public class Document {
         return self.presences[id]?.mapValues { $0.toJSONObject }
     }
 
+    /// Returns the presences of all other clients (excluding the current client)
+    /// - Returns: Array of tuples containing client IDs and their presence information
+    public func getOthersPresences() -> [(clientID: ActorID, presence: Any)] {
+        var others: [(clientID: ActorID, presence: Any)] = []
+        let myClientID = self.changeID.getActorID()
+
+        for clientID in self.onlineClients {
+            if clientID != myClientID, self.presences.keys.contains(clientID) {
+                guard let preseneces = self.presences[clientID] else { continue }
+                others.append((
+                    clientID: clientID,
+                    presence: preseneces.mapValues { $0.toJSONObject }
+                )
+                )
+            }
+        }
+
+        return others
+    }
+
     /**
      * `getPresence` returns the presence of the given clientID.
      */
