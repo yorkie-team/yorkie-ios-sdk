@@ -286,6 +286,9 @@ class CRDTRoot {
         for pair in self.gcPairMap.values {
             if let child = pair.child, let removedAt = child.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
                 pair.parent?.purge(node: child)
+                if let datasize = pair.child?.getDataSize() {
+                    self.docSize.gc.subDataSize(others: datasize)
+                }
                 self.gcPairMap.removeValue(forKey: child.toIDString)
                 count += 1
             }

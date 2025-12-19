@@ -672,4 +672,75 @@ final class GCTestsForText: XCTestCase {
             XCTAssertEqual(len, 0)
         }
     }
+    
+    // should update gc size correctly after text garbage collection
+    func test_should_update_gc_size_correctly_after_text_garbage_collection() async throws {
+        let doc = Document(key: "test-doc")
+        
+        func garbagelen() async -> Int {
+            await doc.getGarbageLength()
+        }
+        
+        let result = await doc.toSortedJSON()
+        XCTAssertEqual("{}", result)
+
+        try await doc.update { root, _ in
+            root.t = JSONText()
+        }
+        var gc = await doc.getDocSize().gc
+        XCTAssertEqual(gc, .init(data: 0, meta: 0))
+        
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.edit(0, 0, "Hello world")
+            (root.t as? JSONText)?.edit(6, 11, "")
+        }
+        
+        gc = await doc.getDocSize().gc
+        var garbageLen = await garbagelen()
+        XCTAssertEqual(gc, .init(data: 10, meta: 48))
+        XCTAssertEqual(garbageLen, 1)
+        
+        let len = await doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [doc.changeID.getActorID()]))
+        XCTAssertEqual(len, 1)
+        
+        gc = await doc.getDocSize().gc
+        XCTAssertEqual(gc, .init(data: 0, meta: 0))
+        
+        garbageLen = await garbagelen()
+        XCTAssertEqual(garbageLen, 0)
+    }
+    
+    // should update gc size correctly after multiple text operations and gc
+    func test_should_update_gc_size_correctly_after_multiple_text_operations_and_gc() async throws {
+        let doc = Document(key: "test-doc")
+        
+        let result = await doc.toSortedJSON()
+        XCTAssertEqual("{}", result)
+
+        try await doc.update { root, _ in
+            root.t = JSONText()
+        }
+        
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.edit(0, 0, "ABC")
+            (root.t as? JSONText)?.edit(1, 2, "X")
+            (root.t as? JSONText)?.edit(2, 3, "")
+        }
+        
+        let sizeBeforeGC = await doc.getDocSize()
+        var garbageLen = await doc.getGarbageLength()
+        
+        XCTAssertEqual(sizeBeforeGC.gc, .init(data: 4, meta: 96))
+        XCTAssertEqual(garbageLen, 2)
+        
+        let collected = await doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [doc.changeID.getActorID()]))
+        XCTAssertEqual(collected, garbageLen)
+        
+        let gc = await doc.getDocSize().gc
+        XCTAssertEqual(gc, .init(data: 0, meta: 0))
+        
+        garbageLen = await doc.getGarbageLength()
+        XCTAssertEqual(garbageLen, 0)
+        
+    }
 }
