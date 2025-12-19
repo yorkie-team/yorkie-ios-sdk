@@ -808,7 +808,6 @@ final class TextIntegrationConcurrentTests: XCTestCase {
                         return (false, timeStampSet.count)
                     }
                     if let removed = node.removedAt {
-                        
                         timeStampSet.insert(removed.toIDString)
                     }
                 }
@@ -818,14 +817,13 @@ final class TextIntegrationConcurrentTests: XCTestCase {
             var removeAllD2 = await checkAllRemove(document: d2)
             XCTAssertTrue(removeAllD1.0)
             XCTAssertTrue(removeAllD2.0)
-            
+
             try await c2.sync()
             try await c1.sync()
-            
+
             removeAllD1 = await checkAllRemove(document: d1)
             removeAllD2 = await checkAllRemove(document: d2)
             XCTAssertTrue(removeAllD2.1 + removeAllD1.1 == 1)
-            
         }
     }
 }
