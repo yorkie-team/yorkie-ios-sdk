@@ -799,20 +799,31 @@ final class TextIntegrationConcurrentTests: XCTestCase {
                 return rga
             }
 
-            func checkAllRemove(document: Document) async -> Bool {
+            func checkAllRemove(document: Document) async -> (Bool, Int) {
                 let text = await getAllNodes(from: document)
                 let node = text?.makeIterator()
-                while let node = node?.next(), node.createdAt != .initial {
-                    if !node.isRemoved {
-                        return false
+                var timeStampSet = Set<String>()
+                while let node = node?.next() {
+                    if !node.isRemoved, node.createdAt != .initial {
+                        return (false, timeStampSet.count)
+                    }
+                    if let removed = node.removedAt {
+                        timeStampSet.insert(removed.toIDString)
                     }
                 }
-                return true
+                return (true, timeStampSet.count)
             }
-            let removeAllD1 = await checkAllRemove(document: d1)
-            let removeAllD2 = await checkAllRemove(document: d2)
-            XCTAssertTrue(removeAllD1)
-            XCTAssertTrue(removeAllD2)
+            var removeAllD1 = await checkAllRemove(document: d1)
+            var removeAllD2 = await checkAllRemove(document: d2)
+            XCTAssertTrue(removeAllD1.0)
+            XCTAssertTrue(removeAllD2.0)
+
+            try await c2.sync()
+            try await c1.sync()
+
+            removeAllD1 = await checkAllRemove(document: d1)
+            removeAllD2 = await checkAllRemove(document: d2)
+            XCTAssertTrue(removeAllD2.1 + removeAllD1.1 == 1)
         }
     }
 }
