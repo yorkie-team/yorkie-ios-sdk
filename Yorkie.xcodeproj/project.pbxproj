@@ -17,6 +17,9 @@
 		58B566962E6972950032FDB0 /* RulesetValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B566952E6972890032FDB0 /* RulesetValidator.swift */; };
 		58B566982E6972BE0032FDB0 /* RulesetValidatorTests.swift.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58B566972E6972B90032FDB0 /* RulesetValidatorTests.swift.swift */; };
 		58BC89C52E813EE5008B3F17 /* JSONArrayTests+Ex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58BC89C42E813EE5008B3F17 /* JSONArrayTests+Ex.swift */; };
+		58FC5A6D2EFB91230014792B /* Presence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FC5A6C2EFB91230014792B /* Presence.swift */; };
+		58FC5A6F2EFB91670014792B /* Attachable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FC5A6E2EFB91670014792B /* Attachable.swift */; };
+		58FC5A712EFB91FF0014792B /* DocPresence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FC5A702EFB91FF0014792B /* DocPresence.swift */; };
 		58FD63132E2DF400000A4DC0 /* DocumentSizeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FD63122E2DF400000A4DC0 /* DocumentSizeTest.swift */; };
 		96DA808C28C5B7B400E2C1DA /* Yorkie.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 96DA808228C5B7B400E2C1DA /* Yorkie.framework */; };
 		96DA809128C5B7B400E2C1DA /* GRPCTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DA809028C5B7B400E2C1DA /* GRPCTests.swift */; };
@@ -52,7 +55,6 @@
 		9A8150522967FCD700DFADFB /* Helper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A8150512967FCD700DFADFB /* Helper.swift */; };
 		9A82C47E2A6126570002D09A /* CRDTTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */; };
 		9A93DB692A67B9C800A0F449 /* TreeIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */; };
-		9A97C18C2A8F32CE002AEFC5 /* Presence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A97C18B2A8F32CE002AEFC5 /* Presence.swift */; };
 		9AB38FD42A9337DF006FA879 /* PresenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB38FD32A9337DF006FA879 /* PresenceTests.swift */; };
 		9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E88BB2A495F7F00AF8997 /* CRDTTree.swift */; };
 		9AB6744D2A525BA800EBD282 /* IndexTreeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */; };
@@ -172,6 +174,9 @@
 		58B566952E6972890032FDB0 /* RulesetValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesetValidator.swift; sourceTree = "<group>"; };
 		58B566972E6972B90032FDB0 /* RulesetValidatorTests.swift.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulesetValidatorTests.swift.swift; sourceTree = "<group>"; };
 		58BC89C42E813EE5008B3F17 /* JSONArrayTests+Ex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JSONArrayTests+Ex.swift"; sourceTree = "<group>"; };
+		58FC5A6C2EFB91230014792B /* Presence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presence.swift; sourceTree = "<group>"; };
+		58FC5A6E2EFB91670014792B /* Attachable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attachable.swift; sourceTree = "<group>"; };
+		58FC5A702EFB91FF0014792B /* DocPresence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocPresence.swift; sourceTree = "<group>"; };
 		58FD63122E2DF400000A4DC0 /* DocumentSizeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentSizeTest.swift; sourceTree = "<group>"; };
 		96DA808228C5B7B400E2C1DA /* Yorkie.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Yorkie.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		96DA808628C5B7B400E2C1DA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -207,7 +212,6 @@
 		9A8150512967FCD700DFADFB /* Helper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Helper.swift; sourceTree = "<group>"; };
 		9A82C47D2A6126570002D09A /* CRDTTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CRDTTreeTests.swift; sourceTree = "<group>"; };
 		9A93DB682A67B9C800A0F449 /* TreeIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeIntegrationTests.swift; sourceTree = "<group>"; };
-		9A97C18B2A8F32CE002AEFC5 /* Presence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Presence.swift; sourceTree = "<group>"; };
 		9AB38FD32A9337DF006FA879 /* PresenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresenceTests.swift; sourceTree = "<group>"; };
 		9AB6744C2A525BA800EBD282 /* IndexTreeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndexTreeTests.swift; sourceTree = "<group>"; };
 		9AC4814F2BFB164900C51338 /* TreeConcurrencyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TreeConcurrencyTests.swift; sourceTree = "<group>"; };
@@ -442,7 +446,8 @@
 		9A97C18A2A8F32BA002AEFC5 /* Presence */ = {
 			isa = PBXGroup;
 			children = (
-				9A97C18B2A8F32CE002AEFC5 /* Presence.swift */,
+				58FC5A702EFB91FF0014792B /* DocPresence.swift */,
+				58FC5A6C2EFB91230014792B /* Presence.swift */,
 			);
 			path = Presence;
 			sourceTree = "<group>";
@@ -661,6 +666,7 @@
 		CE8C22E328C9E53400432DE5 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				58FC5A6E2EFB91670014792B /* Attachable.swift */,
 				9A5A80D72BD0BD180047B978 /* Attachment.swift */,
 				CE8C230428C9F1BD00432DE5 /* Client.swift */,
 				9A20CE85299F61CD00E4CE7E /* Auth.swift */,
@@ -977,7 +983,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftformat > /dev/null; then\n  swiftformat .\nelse\n  echo \"warning: SwiftFormat not installed, download from https://github.com/nicklockwood/SwiftFormat\"\nfi\n\n";
+			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftformat > /dev/null; then\n  # swiftformat .\n  echo \"\"\nelse\n  echo \"warning: SwiftFormat not installed, download from https://github.com/nicklockwood/SwiftFormat\"\nfi\n\n";
 		};
 		CEEB17ED28C898E4004988DD /* SwiftLint */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -996,7 +1002,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftlint > /dev/null; then\n  swiftlint\nelse\n  echo \"warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint\"\nfi\n\n\n\n";
+			shellScript = "export PATH=\"$PATH:/opt/homebrew/bin\"\nif which swiftlint > /dev/null; then\n  # swiftlint\n    echo \"\"\nelse\n  echo \"warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint\"\nfi\n\n\n\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1027,6 +1033,7 @@
 				CE8C230728D1514900432DE5 /* Logger.swift in Sources */,
 				9A4DC737292273D200C89478 /* CRDTCounter.swift in Sources */,
 				9AB532232A52DB450098FD25 /* CRDTTree.swift in Sources */,
+				58FC5A6D2EFB91230014792B /* Presence.swift in Sources */,
 				CE72E85228EE531C00D1331C /* Collection+Extensions.swift in Sources */,
 				CE3EC97528D41903009471BC /* Primitive.swift in Sources */,
 				9AD11BF52A544362005C84D2 /* TreeSytleOperation.swift in Sources */,
@@ -1038,7 +1045,6 @@
 				CE8C230528C9F1BD00432DE5 /* Client.swift in Sources */,
 				CEA2DA5128F69D3800431B61 /* ChangeContext.swift in Sources */,
 				CEA2DA4F28F6967500431B61 /* Checkpoint.swift in Sources */,
-				9A97C18C2A8F32CE002AEFC5 /* Presence.swift in Sources */,
 				CE8C22F528C9E88500432DE5 /* Operation.swift in Sources */,
 				CE8BB74328FE59240020F62A /* ChangePack.swift in Sources */,
 				CEF6437A290A4F0B00C32B99 /* Optional+Extensions.swift in Sources */,
@@ -1053,10 +1059,12 @@
 				CEC631D728EFFE6A00915A85 /* CRDTRoot.swift in Sources */,
 				9A569CBB2C060150007EF118 /* GC.swift in Sources */,
 				CE7B997428E1766F00D56198 /* Converter.swift in Sources */,
+				58FC5A712EFB91FF0014792B /* DocPresence.swift in Sources */,
 				9ADAEE5829657696007E9F9F /* JSONText.swift in Sources */,
 				CE8C22F728C9E89100432DE5 /* TimeTicket.swift in Sources */,
 				CEDD01572DE467F80074CF4F /* AuthTokenInjector.swift in Sources */,
 				CE72E85628EE6D1600D1331C /* RHT.swift in Sources */,
+				58FC5A6F2EFB91670014792B /* Attachable.swift in Sources */,
 				58B566962E6972950032FDB0 /* RulesetValidator.swift in Sources */,
 				9A4DC73E2923203700C89478 /* JSONCounter.swift in Sources */,
 				CE8ED32728F6470D009A5419 /* MoveOperation.swift in Sources */,

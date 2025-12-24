@@ -338,7 +338,7 @@ public struct AuthErrorValue: Equatable {
             case .pushPull:
                 return "PushPull"
             case .watchDocuments:
-                return "WatchDocuments"
+                return "WatchDocument"
             case .other(let name):
                 return name
             case .broadcast:

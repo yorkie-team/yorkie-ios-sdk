@@ -81,6 +81,7 @@ func syncTwoTreeDocsAndAssertEqual(_ doc1: Document, _ doc2: Document, _ expecte
 }
 
 final class TreeIntegrationTests: XCTestCase {
+    @MainActor
     func test_can_be_created() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -109,6 +110,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_be_created_from_JSON() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -131,6 +133,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_be_created_from_JSON_with_attrebutes() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -148,6 +151,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_edit_its_content() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -192,6 +196,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_be_subscribed_by_handler() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -225,6 +230,7 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(treeOperations[0].value as? [JSONTreeTextNode], [JSONTreeTextNode(value: "X")])
     }
 
+    @MainActor
     func test_can_be_subscribed_by_handler_path() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -274,6 +280,7 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(treeOperations[0].value as? [JSONTreeTextNode], [JSONTreeTextNode(value: "X")])
     }
 
+    @MainActor
     func test_can_edit_its_content_with_path() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -327,6 +334,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_edit_its_content_with_path_2() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -377,6 +385,7 @@ final class TreeIntegrationTests: XCTestCase {
     }
 
     // Can edit its content by split
+    @MainActor
     func test_can_edit_content_by_split() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -419,6 +428,7 @@ final class TreeIntegrationTests: XCTestCase {
     }
 
     // Can edit its content by merge
+    @MainActor
     func test_can_edit_its_content_by_merge() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -452,6 +462,7 @@ final class TreeIntegrationTests: XCTestCase {
     }
 
     // Can sync its split with other clients
+    @MainActor
     func test_can_sync_its_split_with_other_clients() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -510,6 +521,7 @@ final class TreeIntegrationTests: XCTestCase {
     }
 
     // Can sync its merge with other clients
+    @MainActor
     func test_can_sync_its_merge_with_other_clients() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -568,6 +580,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_sync_its_content_with_other_clients() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -598,6 +611,7 @@ final class TreeIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_get_correct_range_from_index() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -640,6 +654,7 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(resultRange?.1, 7)
     }
 
+    @MainActor
     func test_get_correct_range_from_path() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -682,6 +697,7 @@ final class TreeIntegrationTests: XCTestCase {
         XCTAssertEqual(resultRange?.1, [1])
     }
 
+    @MainActor
     func test_should_return_correct_range_from_index_within_doc_subscribe() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -746,6 +762,7 @@ final class TreeIntegrationTests: XCTestCase {
 }
 
 final class TreeIntegrationEditTests: XCTestCase {
+    @MainActor
     func test_can_insert_multiple_text_nodes() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -773,6 +790,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>abcd</p></doc>")
     }
 
+    @MainActor
     func test_can_insert_multiple_element_nodes() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -800,6 +818,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p>ab</p><p>cd</p><i>fg</i></doc>")
     }
 
+    @MainActor
     func test_can_edit_its_content_with_path_when_multi_tree_nodes_passed() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -869,6 +888,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_detecting_error_for_empty_text() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -894,6 +914,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_detecting_error_for_mixed_type_insertion() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -919,6 +940,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_detecting_correct_error_order_1() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -947,6 +969,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_detecting_correct_error_order_2() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -976,6 +999,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_detecting_correct_error_order_3() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -1003,6 +1027,7 @@ final class TreeIntegrationEditTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_delete_nodes_in_a_multi_level_range_test() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -1050,6 +1075,7 @@ final class TreeIntegrationEditTests: XCTestCase {
 }
 
 final class TreeIntegrationStyleTests: XCTestCase {
+    @MainActor
     func test_can_be_inserted_with_attributes() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -1068,6 +1094,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         XCTAssertEqual(docXML, /* html */ "<doc><p><span bold=true>hello</span></p></doc>")
     }
 
+    @MainActor
     func test_can_be_edited_with_index() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -1105,6 +1132,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_be_edited_with_path() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -1134,6 +1162,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_sync_its_content_containing_attributes_with_other_replicas() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1168,6 +1197,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_style_node_with_element_attributes_test() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -1211,6 +1241,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_sync_its_content_with_remove_style() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1246,6 +1277,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_return_correct_range_path_within_doc_subscribe() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1342,6 +1374,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
     }
 
     // swiftlint: disable function_body_length
+    @MainActor
     func test_can_handle_client_reload_case() async throws {
         let rpcAddress = "http://localhost:8080"
 
@@ -1520,6 +1553,7 @@ final class TreeIntegrationStyleTests: XCTestCase {
 }
 
 final class TreeIntegrationOverlappingRange: XCTestCase {
+    @MainActor
     func test_can_concurrently_delete_overlapping_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1566,6 +1600,7 @@ final class TreeIntegrationOverlappingRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_overlapping_text() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1616,6 +1651,7 @@ final class TreeIntegrationOverlappingRange: XCTestCase {
 }
 
 final class TreeIntegrationContainedRange: XCTestCase {
+    @MainActor
     func test_can_concurrently_insert_and_delete_contained_elements_of_the_same_depth() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1667,6 +1703,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_multiple_insert_and_delete_contained_elements_of_the_same_depth() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1730,6 +1767,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_detecting_error_when_inserting_and_deleting_contained_elements_at_different_depths() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1778,6 +1816,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_contained_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1828,6 +1867,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_insert_and_delete_contained_text() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1876,6 +1916,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_contained_text() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1924,6 +1965,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_insert_and_delete_contained_text_and_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1972,6 +2014,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_contained_text_and_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2022,6 +2065,7 @@ final class TreeIntegrationContainedRange: XCTestCase {
 }
 
 final class TreeIntegrationSideBySideRange: XCTestCase {
+    @MainActor
     func test_can_concurrently_insert_side_by_side_elements_left() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2068,6 +2112,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_insert_side_by_side_elements_middle() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2114,6 +2159,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_insert_side_by_side_elements_right() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2160,6 +2206,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_insert_and_delete_side_by_side_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2208,6 +2255,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_and_insert_side_by_side_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2256,6 +2304,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_side_by_side_elements() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2305,6 +2354,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_insert_text_to_the_same_position_left_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2353,6 +2403,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_insert_text_to_the_same_position_middle_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2401,6 +2452,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_insert_text_content_to_the_same_position_right_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2449,6 +2501,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_insert_and_delete_side_by_side_text() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2497,6 +2550,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_and_insert_side_by_side_text() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2545,6 +2599,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_delete_side_by_side_text_blocks() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2593,6 +2648,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_delete_text_content_at_the_same_position_left_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2641,6 +2697,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_delete_text_content_at_the_same_position_middle_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2689,6 +2746,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_delete_text_content_at_the_same_position_right_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2739,6 +2797,7 @@ final class TreeIntegrationSideBySideRange: XCTestCase {
 }
 
 final class TreeIntegrationComplexCases: XCTestCase {
+    @MainActor
     func test_can_delete_text_content_anchored_to_another_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2787,6 +2846,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_produce_complete_deletion_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2835,6 +2895,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_block_delete_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2883,6 +2944,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_insert_within_block_delete_concurrently() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2931,6 +2993,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_insert_within_block_delete_concurrently_2() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -2979,6 +3042,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_block_element_insertion_within_delete_2() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3033,6 +3097,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_concurrent_element_insert_deletion_left() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3084,6 +3149,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_concurrent_element_insert_deletion_right() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3135,6 +3201,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_deletion_of_insertion_anchor_concurreltly() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3183,6 +3250,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_deletion_after_insertion_concurreltly() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3231,6 +3299,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_handle_deletion_before_insertion_concurreltly() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3281,6 +3350,7 @@ final class TreeIntegrationComplexCases: XCTestCase {
 }
 
 final class TreeIntegrationEdgeCases: XCTestCase {
+    @MainActor
     func test_can_delete_very_first_text_when_there_is_tombstone_in_front_of_target_text() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -3317,6 +3387,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_delete_node_when_there_is_more_than_one_text_node_in_front_which_has_size_bigger_than_1() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
         let doc = Document(key: docKey)
@@ -3351,6 +3422,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_split_link_can_transmitted_through_rpc() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3405,6 +3477,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_calculate_size_of_index_tree_correctly() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3447,6 +3520,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_calculate_size_of_index_tree_correctly_during_concurrent_editing() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3503,6 +3577,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_keep_index_tree_consistent_from_snapshot() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3584,6 +3659,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_split_and_merge_with_empty_paragraph_left() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3625,6 +3701,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_split_and_merge_with_empty_paragraph_right() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3666,6 +3743,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_split_and_merge_with_empty_paragraph_and_multiple_split_level_left() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3709,6 +3787,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_split_at_the_same_offset_multiple_times() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3764,6 +3843,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_split_and_insert_into_original_node() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3811,6 +3891,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
         }
     }
 
+    @MainActor
     func test_can_concurrently_split_and_insert_into_split_node() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3860,6 +3941,7 @@ final class TreeIntegrationEdgeCases: XCTestCase {
 }
 
 final class TreeIntegrationTreeChangeGeneration: XCTestCase {
+    @MainActor
     func test_concurrent_delete_and_delete() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3909,6 +3991,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_delete_and_insert() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -3959,6 +4042,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_delete_and_insert_when_parent_removed() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -4008,6 +4092,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_delete_with_contents_and_insert() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -4058,6 +4143,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_insert_and_style() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -4107,6 +4193,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_insert_and_removeStyle() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -4156,6 +4243,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_delete_and_style() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -4199,6 +4287,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_concurrent_style_and_style() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -4245,6 +4334,7 @@ final class TreeIntegrationTreeChangeGeneration: XCTestCase {
         }
     }
 
+    @MainActor
     func test_emoji() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in

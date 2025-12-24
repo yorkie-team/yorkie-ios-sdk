@@ -84,10 +84,11 @@ public enum PresenceSubscriptionType: String {
 /**
  * A CRDT-based data type. We can representing the model
  * of the application. And we can edit it even while offline.
+ * It implements Attachable interface to be managed by Attachment.
  *
  */
 @MainActor
-public class Document {
+public class Document: Attachable {
     public typealias SubscribeCallback = @MainActor (DocEvent, Document) -> Void
 
     private let key: DocKey
@@ -136,7 +137,7 @@ public class Document {
      * `update` executes the given updater to update this document.
      */
     public func update(
-        _ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void,
+        _ updater: (_ root: JSONObject, _ presence: inout DocPresence) throws -> Void,
         _ message: String? = nil
     ) throws {
         guard self.status != .removed else {
@@ -161,7 +162,7 @@ public class Document {
             self.clone?.presences[actorID] = [:]
         }
 
-        var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
+        var presence = DocPresence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
 
         try updater(proxy, &presence)
 
@@ -380,7 +381,7 @@ public class Document {
      * `hasLocalChanges` returns whether this document has local changes or not.
      *
      */
-    func hasLocalChanges() -> Bool {
+    public func hasLocalChanges() async -> Bool {
         return self.localChanges.isEmpty == false
     }
 
@@ -417,7 +418,7 @@ public class Document {
      * changes the document has.
      *
      */
-    func setActor(_ actorID: ActorID) {
+    public func setActor(_ actorID: ActorID) {
         let changes = self.localChanges.map {
             var new = $0
             new.setActor(actorID)
@@ -439,8 +440,22 @@ public class Document {
      * `getKey` returns the key of this document.
      *
      */
-    nonisolated func getKey() -> String {
+    public nonisolated func getKey() -> String {
         return self.key
+    }
+
+    /**
+     * `getStatus` returns the status of this document.
+     */
+    public func getStatus() -> ResourceStatus {
+        switch self.status {
+        case .detached:
+            return .detached
+        case .attached:
+            return .attached
+        case .removed:
+            return .removed
+        }
     }
 
     /**
@@ -775,7 +790,7 @@ public class Document {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    private func publish(_ event: DocEvent) {
+    func publish(_ event: DocEvent) {
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
         if presenceEvents.contains(event.type) {

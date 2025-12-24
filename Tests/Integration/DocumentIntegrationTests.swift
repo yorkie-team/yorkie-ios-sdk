@@ -32,6 +32,7 @@ final class DocumentIntegrationTests: XCTestCase {
     var d2: Document!
     var d3: Document!
 
+    @MainActor
     func test_single_client_document_deletion() async throws {
         let options = ClientOptions()
         let docKey = "\(self.description)-\(Date().description)".toDocKey
@@ -98,6 +99,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.deactivate()
     }
 
+    @MainActor
     func test_removed_document_creation() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -138,6 +140,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.deactivate()
     }
 
+    @MainActor
     func test_removed_document_pushpull() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -187,6 +190,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
+    @MainActor
     func test_removed_document_detachment() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -231,6 +235,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
+    @MainActor
     func test_removed_document_removal() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -282,6 +287,7 @@ final class DocumentIntegrationTests: XCTestCase {
     //           ▲           │ │     ▲
     //           └───────────┘ └─────┘
     //              Detach     PushPull
+    @MainActor
     func test_document_state_transition() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -364,6 +370,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.deactivate()
     }
 
+    @MainActor
     func test_specify_the_topic_to_subscribe_to() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -474,6 +481,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
+    @MainActor
     func test_subscribe_document_status_changed_event() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -543,6 +551,7 @@ final class DocumentIntegrationTests: XCTestCase {
         XCTAssertEqual(eventCount4, eventCollectorD4.count)
     }
 
+    @MainActor
     func test_document_status_changes_to_detached_when_deactivating() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -578,6 +587,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await c1.deactivate()
     }
 
+    @MainActor
     func test_document_with_initialRoot() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -618,6 +628,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_can_handle_concurrent_attach_with_initialRoot() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -660,6 +671,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_can_support_various_types() async throws {
         struct TestCase {
             let name: String
@@ -728,6 +740,7 @@ final class DocumentIntegrationTests: XCTestCase {
     }
 
     // This test was moved to the integration tests for the Yorkie server, but it remains a unit test in yorkie-js-sdk.
+    @MainActor
     func test_should_publish_snapshot_event_with_up_to_date_document() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             let eventCollector = EventCollector<Int32>(doc: d2)

@@ -93,6 +93,34 @@ public final class YorkieService {
         }
         return await self.rpcClient.broadcast(request: request, headers: headers)
     }
+
+    @available(iOS 15, *)
+    public func attachPresence(request: Yorkie_V1_AttachPresenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_AttachPresenceResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.attachPresence) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.attachPresence(request: request, headers: headers)
+    }
+
+    @available(iOS 15, *)
+    public func detachPresence(request: Yorkie_V1_DetachPresenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_DetachPresenceResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.detachPresence) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.detachPresence(request: request, headers: headers)
+    }
+
+    @available(iOS 15, *)
+    public func refreshPresence(request: Yorkie_V1_RefreshPresenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_RefreshPresenceResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.refreshPresence) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.refreshPresence(request: request, headers: headers)
+    }
+
+    public func watchPresence(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchPresenceResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchPresenceRequest> {
+        return self.rpcClient.watchPresence(headers: headers, onResult: onResult)
+    }
 }
 
 extension YorkieService {

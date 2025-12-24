@@ -21,6 +21,7 @@ import XCTest
 #endif
 
 final class TextIntegrationTests: XCTestCase {
+    @MainActor
     func test_should_handle_edit_operations() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -54,6 +55,7 @@ final class TextIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_handle_concurrent_edit_operations() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -128,6 +130,7 @@ final class TextIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_handle_concurrent_insertion_and_deletion() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -169,6 +172,7 @@ final class TextIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_handle_concurrent_block_deletions() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -212,6 +216,7 @@ final class TextIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_maintain_the_correct_weight_for_nodes_newly_created_then_concurrently_removed() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -250,6 +255,7 @@ final class TextIntegrationTests: XCTestCase {
 }
 
 final class TextIntegrationConcurrentTests: XCTestCase {
+    @MainActor
     func test_ex1_concurrent_insertions_on_plain_text() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -291,6 +297,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex2_concurrent_formatting_and_insertion() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -331,6 +338,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex3_overlapping_formatting_bold() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -372,6 +380,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex4_overlapping_different_formatting_bold_and_italic() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -413,6 +422,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex5_conflicting_overlaps_highlighting() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -455,6 +465,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
     }
 
     // ex6. conflicting overlaps(bold) - 1
+    @MainActor
     func test_ex6_conflicting_overlaps_bold() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -503,6 +514,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex6_conflicting_overlaps_bold_2() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -553,6 +565,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex7_multiple_instances_of_the_same_mark() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -594,6 +607,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex8_text_insertion_at_span_boundaries_bold() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -636,6 +650,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_ex9_text_insertion_at_span_boundaries_link() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -679,6 +694,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
     }
 
     // causal deletion preserves original timestamps
+    @MainActor
     func test_causal_deletion_preserves_original_timestamps() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -752,6 +768,7 @@ final class TextIntegrationConcurrentTests: XCTestCase {
     }
 
     // concurrent deletion test for LWW behavior
+    @MainActor
     func test_concurrent_deletion_test_for_LWW_behavior() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in

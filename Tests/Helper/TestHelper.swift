@@ -226,6 +226,7 @@ struct BroadcastExpectValue: Equatable {
     }
 }
 
+@MainActor
 func withTwoClientsAndDocuments(_ title: String,
                                 mockingEnabled: Bool = false,
                                 syncMode: SyncMode = .manual,

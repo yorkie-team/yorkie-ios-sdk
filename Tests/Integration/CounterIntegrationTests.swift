@@ -26,6 +26,7 @@ final class CounterIntegrationTests: XCTestCase {
     var d1: Document!
     var d2: Document!
 
+    @MainActor
     func test_can_be_increased_by_Counter_type() async throws {
         let doc = Document(key: "test-doc")
 
@@ -58,6 +59,7 @@ final class CounterIntegrationTests: XCTestCase {
         XCTAssertEqual(result, "{\"age\":9,\"length\":17}")
     }
 
+    @MainActor
     func test_can_sync_counter() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -110,6 +112,7 @@ final class CounterIntegrationTests: XCTestCase {
         try await self.c2.deactivate()
     }
 
+    @MainActor
     func test_can_sync_counter_with_array() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 

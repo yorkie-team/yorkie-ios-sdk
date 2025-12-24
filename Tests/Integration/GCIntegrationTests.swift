@@ -25,6 +25,7 @@ class GCIntegrationTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
     // getGarbageLen should return the actual number of elements garbage-collected
+    @MainActor
     func test_getGarbageLength_should_return_the_actual_number_of_elements_garbage_collected() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -85,6 +86,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Can handle tree garbage collection for multi client
+    @MainActor
     func test_can_handle_tree_garbage_collection_for_multi_client() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -225,6 +227,7 @@ class GCIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_can_handle_garbage_collection_for_container_type() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -344,6 +347,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.deactivate()
     }
 
+    @MainActor
     func test_can_handle_garbage_collection_for_text_type() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -467,6 +471,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Can handle garbage collection with detached document test
+    @MainActor
     func test_can_handle_garbage_collection_with_detached_document_test() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -564,6 +569,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Can collect removed elements from both root and clone
+    @MainActor
     func test_can_collect_removed_elements_from_both_root_and_clone() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -604,6 +610,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Can collect removed elements from both root and clone for nested array
+    @MainActor
     func test_can_collect_removed_elements_from_both_root_and_clone_for_nested_array() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -656,6 +663,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Can purges removed elements after peers can not access them
+    @MainActor
     func test_can_purges_removed_elements_after_peers_can_not_access_them() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -778,6 +786,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // garbage collection test for nested object
+    @MainActor
     func test_garbage_collection_test_for_nested_object() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -804,6 +813,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Should work properly when there are multiple nodes to be collected in text type
+    @MainActor
     func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_text_type() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -933,6 +943,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // Should work properly when there are multiple nodes to be collected in tree type
+    @MainActor
     func test_should_work_properly_when_there_are_multiple_nodes_to_be_collected_in_tree_type() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1084,6 +1095,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // concurrent garbage collection test
+    @MainActor
     func test_concurrent_garbage_collection_test() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1194,6 +1206,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // concurrent garbage collection test(with pushonly
+    @MainActor
     func test_concurrent_garbage_collection_test_with_pushonly() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1360,6 +1373,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // gc targeting nodes made by deactivated client
+    @MainActor
     func test_gc_targeting_nodes_made_by_deactivated_client() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1434,6 +1448,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // attach > pushpull > detach lifecycle version vector test (run gc at last client detaches document, but no tombstone exsits)
+    @MainActor
     func test_gc_attach_pushpull_detach_lifecycle_version_vector_no_tombstone_exsits() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1572,6 +1587,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // attach > pushpull > detach lifecycle version vector test (run gc at last client detaches document)
+    @MainActor
     func test_gc_attach_pushpull_detach_lifecycle_version_vector() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1704,6 +1720,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // detach gc test
+    @MainActor
     func test_detach_gc() async throws {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
 
@@ -1883,6 +1900,7 @@ class GCIntegrationTests: XCTestCase {
     }
 
     // snapshot version vector test
+    @MainActor
     func test_snapshot_version_vector() async throws {
         let docKey = "\(#function)-\(Date().timeIntervalSince1970)".toDocKey
         let doc1 = Document(key: docKey)

@@ -23,6 +23,7 @@ import XCTest
 final class SnapshotTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
+    @MainActor
     func test_should_handle_snapshot() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             // 01. Updates changes over snapshot threshold.
@@ -52,6 +53,7 @@ final class SnapshotTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_handle_snapshot_for_text_object() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             for _ in 0 ..< defaultSnapshotThreshold {
@@ -84,6 +86,7 @@ final class SnapshotTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_handle_snapshot_for_text_with_attributes() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in

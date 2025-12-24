@@ -37,6 +37,11 @@ service YorkieService {
   rpc WatchDocument (WatchDocumentRequest) returns (stream WatchDocumentResponse) {}
 
   rpc Broadcast (BroadcastRequest) returns (BroadcastResponse) {}
+
+  rpc AttachPresence (AttachPresenceRequest) returns (AttachPresenceResponse) {}
+  rpc DetachPresence (DetachPresenceRequest) returns (DetachPresenceResponse) {}
+  rpc RefreshPresence (RefreshPresenceRequest) returns (RefreshPresenceResponse) {}
+  rpc WatchPresence (WatchPresenceRequest) returns (stream WatchPresenceResponse) {}
 }
 
 message ActivateClientRequest {
@@ -125,4 +130,51 @@ message BroadcastRequest {
 }
 
 message BroadcastResponse {
+}
+
+message AttachPresenceRequest {
+  string client_id = 1;
+  string presence_key = 2;
+}
+
+message AttachPresenceResponse {
+  string presence_id = 1;
+  int32 count = 2;
+  int64 seq = 3;
+}
+
+message DetachPresenceRequest {
+  string client_id = 1;
+  string presence_id = 2;
+}
+
+message DetachPresenceResponse {
+  int32 count = 1;
+  int64 seq = 2;
+}
+
+message RefreshPresenceRequest {
+  string client_id = 1;
+  string presence_id = 2;
+}
+
+message RefreshPresenceResponse {
+  int32 count = 1;
+  int64 seq = 2;
+}
+
+message WatchPresenceRequest {
+  string client_id = 1;
+  string presence_id = 2;
+}
+
+message WatchPresenceResponse {
+  message Initialization {
+    int32 count = 1;
+  }
+
+  oneof body {
+    Initialization initialization = 1;
+    PresenceEvent event = 2;
+  }
 }
