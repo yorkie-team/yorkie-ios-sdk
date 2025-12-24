@@ -383,9 +383,6 @@ final class PresenceSubscribeTests: XCTestCase {
             presence.set(["name": "B"])
         }
 
-        // Wait for both changes to be synced
-        try await Task.sleep(milliseconds: 200)
-
         for await _ in eventCollectorD1.waitStream(until: result1[2]) {
             await eventCollectorD1.verifyNthValue(at: 2, isEqualTo: result1[1])
             await eventCollectorD1.verifyNthValue(at: 3, isEqualTo: result1[2])
