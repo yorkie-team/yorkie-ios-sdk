@@ -946,10 +946,6 @@ public class Client {
             // Fallback on earlier versions
         }
 
-        if #available(iOS 16.0.0, *) {
-            // Fallback on earlier versions
-        }
-
         // Handle Document watch streams
         if let docAttachment = attachment as? Attachment<Document> {
             let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(key), onResult: { result in
