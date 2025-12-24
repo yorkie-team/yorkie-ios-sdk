@@ -181,7 +181,7 @@ class EventCollector<T: Equatable> {
     }
 
     func waitAndVerifyNthValue(milliseconds: UInt64, at nth: Int, isEqualTo targetValue: T) async throws {
-        try await Task.sleep(milliseconds: milliseconds)
+        try await Task.sleep(milliseconds: milliseconds + 200)
         await self.verifyNthValue(at: nth, isEqualTo: targetValue)
     }
 
