@@ -935,6 +935,21 @@ public class Client {
             )
         }
 
+        // NOTE: Don't create a new stream if one already exists and is connected
+        // This prevents duplicate streams when mode switching happens rapidly
+        if #available(iOS 16.0.0, *) {
+            if attachment.remoteWatchStream != nil, !attachment.isDisconnectedStream {
+                Logger.debug("[WL] c:\"\(self.key)\" stream already exists for \(key)")
+                return
+            }
+        } else {
+            // Fallback on earlier versions
+        }
+
+        if #available(iOS 16.0.0, *) {
+            // Fallback on earlier versions
+        }
+
         // Handle Document watch streams
         if let docAttachment = attachment as? Attachment<Document> {
             let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(key), onResult: { result in
@@ -991,8 +1006,12 @@ public class Client {
         self.setCondition(.watchLoop, value: true)
 
         if let docAttachment = anyAttachment as? Attachment<Document> {
+            // Reset cancelled flag when starting a new watch loop
+            docAttachment.cancelled = false
             try self.doWatchLoop(key, with: docAttachment)
         } else if let presenceAttachment = anyAttachment as? Attachment<Presence> {
+            // Reset cancelled flag when starting a new watch loop
+            presenceAttachment.cancelled = false
             try self.doWatchLoop(key, with: presenceAttachment)
         }
     }
@@ -1097,6 +1116,8 @@ public class Client {
         guard self.attachmentMap[key] != nil, attachment.syncMode != .manual else {
             return
         }
+        // NOTE: Only schedule reconnect if the stream was not explicitly cancelled
+        // The check in doWatchLoop will prevent duplicate streams
         if !cancelled {
             attachment.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
                 Task {

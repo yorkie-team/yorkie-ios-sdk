@@ -74,9 +74,15 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     }
 
     func connectStream(_ stream: (any YorkieServerStream)?) {
+        // Cancel the old stream if it exists to prevent it from interfering
+        if let oldStream = self.remoteWatchStream {
+            oldStream.cancel()
+        }
+
         self.remoteWatchStream = stream
         self.isDisconnected = false
-        self.cancelled = false
+        // NOTE: Don't reset cancelled here to prevent race conditions
+        // when an old stream completes after a new one is created
     }
 
     func disconnectStream() {
