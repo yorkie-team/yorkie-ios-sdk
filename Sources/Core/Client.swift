@@ -976,7 +976,6 @@ public class Client {
 
             docAttachment.resource.publishConnectionEvent(.connected)
         }
-        // TODO: Add Presence watch stream handling when needed
     }
 
     /**
@@ -1131,7 +1130,6 @@ public class Client {
                     presenceAttachment.resource.setStatus(.detached)
                 }
             }
-            
             try self.detachInternal(key)
         }
     }
