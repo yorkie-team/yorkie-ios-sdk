@@ -186,11 +186,11 @@ class EventCollector<T: Equatable> {
         return AsyncStream<T> { continuation in
             self.queue.sync {
                 let startIndex = self.lastStreamEndIndex
-                
+
                 // Check if the stopValue exists in unchecked values
                 if let stopIndex = self._values[startIndex...].firstIndex(where: { $0 == stopValue }) {
                     // Yield all values from startIndex to stopIndex
-                    for value in self._values[startIndex...stopIndex] {
+                    for value in self._values[startIndex ... stopIndex] {
                         continuation.yield(value)
                     }
                     continuation.finish()
@@ -199,13 +199,13 @@ class EventCollector<T: Equatable> {
                     }
                     return
                 }
-                
+
                 // If not found, set up to wait for future events
                 self.queue.async(flags: .barrier) {
                     // Double-check in case the value arrived between the check and now
                     let checkStartIndex = self.lastStreamEndIndex
                     if let stopIndex = self._values[checkStartIndex...].firstIndex(where: { $0 == stopValue }) {
-                        for value in self._values[checkStartIndex...stopIndex] {
+                        for value in self._values[checkStartIndex ... stopIndex] {
                             continuation.yield(value)
                         }
                         continuation.finish()
