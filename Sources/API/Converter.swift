@@ -1111,7 +1111,7 @@ extension Converter {
         }
         let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), textValue)
         if  pbTextNode.hasRemovedAt {
-            textNode.remove(fromTimeTicket(pbTextNode.removedAt), true)
+            textNode.remove(fromTimeTicket(pbTextNode.removedAt))
         }
         return textNode
     }

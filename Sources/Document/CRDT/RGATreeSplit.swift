@@ -347,15 +347,25 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
-     * `canDelete` checks if node is able to delete.
+     * `canRemove` checks if node is able to delete.
+     * Returns true if the node can be removed based on the editedAt time.
+     * If creationKnown is false, the node cannot be removed.
+     * If the node has no removedAt (alive), it can be removed.
+     * If tombstoneKnown is false and editedAt is after removedAt, allow overwrite.
      */
     func canRemove(
-        _ creationKnown: Bool
+        _ editedAt: TimeTicket,
+        _ creationKnown: Bool,
+        _ tombstoneKnown: Bool
     ) -> Bool {
         if !creationKnown {
             return false
         }
         if self.removedAt == nil {
+            return true
+        }
+        // Allow tombstone overwrite when tombstoneKnown is false and editedAt is newer
+        if !tombstoneKnown && editedAt.after(self.removedAt!) {
             return true
         }
         return false
@@ -380,19 +390,14 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
-     * `remove` removes node of given edited time.
+     * `remove` removes node with the given removedAt timestamp.
+     * Updates the timestamp only if the node is not yet removed or if the new timestamp is later (LWW).
      */
     func remove(
-        _ removeAt: TimeTicket,
-        _ tombstoneKnown: Bool
+        _ removedAt: TimeTicket
     ) {
-        if self.removedAt == nil {
-            self.removedAt = removeAt
-            return
-        }
-
-        if !tombstoneKnown, removeAt.after(self.removedAt!) {
-            self.removedAt = removeAt
+        if self.removedAt == nil || removedAt.after(self.removedAt!) {
+            self.removedAt = removedAt
         }
     }
 
@@ -783,7 +788,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         nodesToKeep.append(leftEdge)
 
         for node in candidates {
-            if node.canRemove(isLocal || vector!.afterOrEqual(other: node.createdAt)) {
+            let creationKnown = isLocal || vector!.afterOrEqual(other: node.createdAt)
+            let tombstoneKnown = node.isRemoved && (isLocal || vector!.afterOrEqual(other: node.removedAt!))
+
+            if node.canRemove(editedAt, creationKnown, tombstoneKnown) {
                 nodesToRemove.append(node)
             } else {
                 nodesToKeep.append(node)
@@ -798,11 +806,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var removedNodes: [String: RGATreeSplitNode<T>] = [:]
         for node in nodesToRemove {
             removedNodes[node.id.toIDString] = node
-            node.remove(
-                editedAt,
-                node.isRemoved &&
-                    (isLocal || vector!.afterOrEqual(other: node.removedAt!))
-            )
+            node.remove(editedAt)
         }
 
         // 04. Clear the index tree of the given deletion boundaries.

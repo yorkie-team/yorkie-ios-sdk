@@ -418,13 +418,27 @@ final class CRDTTreeNode: IndexTreeNode {
 
     /**
      * `canDelete` checks if node is able to delete.
+     * Returns true if the node can be deleted based on the editedAt time.
+     * If creationKnown is false, the node cannot be deleted.
+     * If the node has no removedAt (alive), it can be deleted.
+     * If tombstoneKnown is false and editedAt is after removedAt, allow overwrite.
      */
     func canDelete(
         _ editedAt: TimeTicket,
-        _ clientLamportAtChange: Int64
+        _ creationKnown: Bool,
+        _ tombstoneKnown: Bool
     ) -> Bool {
-        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-        return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
+        if !creationKnown {
+            return false
+        }
+        if self.removedAt == nil {
+            return true
+        }
+        // Allow tombstone overwrite when tombstoneKnown is false and editedAt is newer
+        if !tombstoneKnown && editedAt.after(self.removedAt!) {
+            return true
+        }
+        return false
     }
 
     /**
@@ -844,14 +858,20 @@ class CRDTTree: CRDTElement {
             // NOTE(sejongk): If the node is removable or its parent is going to
             // be removed, then this node should be removed.
 
-            var clientLamportAtChange: Int64 = .max
+            let isLocal = versionVector == nil
+            var creationKnown = isLocal
+            var tombstoneKnown = false
+
             if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
+                let clientLamportAtChange = versionVector.get(actorID) ?? 0
+                creationKnown = node.createdAt.lamport <= clientLamportAtChange
+                tombstoneKnown = node.isRemoved && (isLocal || versionVector.afterOrEqual(other: node.removedAt!))
             }
 
             if node.canDelete(
                 editedAt,
-                clientLamportAtChange
+                creationKnown,
+                tombstoneKnown
             ) || nodesToBeRemoved.contains(where: { $0 === node.parent }) {
                 // NOTE(hackerwins): If the node overlaps as an end token with the
                 // range then we need to keep the node.
