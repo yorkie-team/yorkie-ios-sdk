@@ -126,11 +126,13 @@ class EventCollector<T: Equatable> {
     struct WaitUntil {
         var continuation: AsyncStream<T>.Continuation
         var stopValue: T
+        var startIndex: Int
     }
 
     private let queue = DispatchQueue(label: "com.yorkie.eventcollector", attributes: .concurrent)
     private var _values: [T] = []
     private var waitUntil: WaitUntil?
+    private var lastStreamEndIndex: Int = 0
 
     let doc: Document
     var values: [T] {
@@ -150,9 +152,14 @@ class EventCollector<T: Equatable> {
             self._values.append(event)
 
             if let waitUntil = self.waitUntil {
-                waitUntil.continuation.yield(event)
-                if event == waitUntil.stopValue {
-                    waitUntil.continuation.finish()
+                let currentIndex = self._values.count - 1
+                if currentIndex >= waitUntil.startIndex {
+                    waitUntil.continuation.yield(event)
+                    if event == waitUntil.stopValue {
+                        waitUntil.continuation.finish()
+                        self.lastStreamEndIndex = currentIndex + 1
+                        self.waitUntil = nil
+                    }
                 }
             }
         }
@@ -162,6 +169,7 @@ class EventCollector<T: Equatable> {
         self.queue.async(flags: .barrier) {
             self._values.removeAll()
             self.waitUntil = nil
+            self.lastStreamEndIndex = 0
         }
     }
 
@@ -176,12 +184,41 @@ class EventCollector<T: Equatable> {
 
     func waitStream(until stopValue: T) -> AsyncStream<T> where T: Equatable {
         return AsyncStream<T> { continuation in
-            self.waitUntil = WaitUntil(continuation: continuation, stopValue: stopValue)
+            self.queue.sync {
+                let startIndex = self.lastStreamEndIndex
+
+                // Check if the stopValue exists in unchecked values
+                if let stopIndex = self._values[startIndex...].firstIndex(where: { $0 == stopValue }) {
+                    // Yield all values from startIndex to stopIndex
+                    for value in self._values[startIndex ... stopIndex] {
+                        continuation.yield(value)
+                    }
+                    continuation.finish()
+                    self.queue.async(flags: .barrier) {
+                        self.lastStreamEndIndex = stopIndex + 1
+                    }
+                    return
+                }
+
+                // If not found, set up to wait for future events
+                self.queue.async(flags: .barrier) {
+                    // Double-check in case the value arrived between the check and now
+                    let checkStartIndex = self.lastStreamEndIndex
+                    if let stopIndex = self._values[checkStartIndex...].firstIndex(where: { $0 == stopValue }) {
+                        for value in self._values[checkStartIndex ... stopIndex] {
+                            continuation.yield(value)
+                        }
+                        continuation.finish()
+                        self.lastStreamEndIndex = stopIndex + 1
+                    } else {
+                        self.waitUntil = WaitUntil(continuation: continuation, stopValue: stopValue, startIndex: checkStartIndex)
+                    }
+                }
+            }
         }
     }
 
     func waitAndVerifyNthValue(milliseconds: UInt64, at nth: Int, isEqualTo targetValue: T) async throws {
-        try await Task.sleep(milliseconds: milliseconds)
         await self.verifyNthValue(at: nth, isEqualTo: targetValue)
     }
 
@@ -226,6 +263,7 @@ struct BroadcastExpectValue: Equatable {
     }
 }
 
+@MainActor
 func withTwoClientsAndDocuments(_ title: String,
                                 mockingEnabled: Bool = false,
                                 syncMode: SyncMode = .manual,

@@ -160,6 +160,36 @@ public enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
+public enum Yorkie_V1_PresenceEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case countChanged // = 0
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .countChanged
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .countChanged
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .countChanged: return 0
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Yorkie_V1_PresenceEventType] = [
+    .countChanged,
+  ]
+
+}
+
 //////////////////////////////////////////
 /// Messages for Snapshot               //
 //////////////////////////////////////////
@@ -2116,6 +2146,22 @@ public struct Yorkie_V1_DocEvent: Sendable {
   fileprivate var _body: Yorkie_V1_DocEventBody? = nil
 }
 
+public struct Yorkie_V1_PresenceEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var type: Yorkie_V1_PresenceEventType = .countChanged
+
+  public var count: Int32 = 0
+
+  public var seq: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Yorkie_V1_DataSize: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2216,6 +2262,10 @@ extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
 
 extension Yorkie_V1_DocEventType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOC_EVENT_TYPE_DOCUMENT_CHANGED\0\u{1}DOC_EVENT_TYPE_DOCUMENT_WATCHED\0\u{1}DOC_EVENT_TYPE_DOCUMENT_UNWATCHED\0\u{1}DOC_EVENT_TYPE_DOCUMENT_BROADCAST\0")
+}
+
+extension Yorkie_V1_PresenceEventType: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PRESENCE_EVENT_TYPE_COUNT_CHANGED\0")
 }
 
 extension Yorkie_V1_Snapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -5287,6 +5337,46 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs.type != rhs.type {return false}
     if lhs.publisher != rhs.publisher {return false}
     if lhs._body != rhs._body {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_PresenceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PresenceEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}count\0\u{1}seq\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.count) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.type != .countChanged {
+      try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
+    }
+    if self.count != 0 {
+      try visitor.visitSingularInt32Field(value: self.count, fieldNumber: 2)
+    }
+    if self.seq != 0 {
+      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_PresenceEvent, rhs: Yorkie_V1_PresenceEvent) -> Bool {
+    if lhs.type != rhs.type {return false}
+    if lhs.count != rhs.count {return false}
+    if lhs.seq != rhs.seq {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

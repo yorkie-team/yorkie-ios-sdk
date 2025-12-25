@@ -43,6 +43,7 @@ class DocumentSchemaTest: XCTestCase {
         try await Task.sleep(milliseconds: 1000)
     }
 
+    @MainActor
     func test_initialize_project_successfully() async throws {
         XCTAssertTrue(!self.context.publicKey.isEmpty)
         XCTAssertTrue(!self.context.secretKey.isEmpty)

@@ -27,6 +27,7 @@ final class ClientIntegrationTests: XCTestCase {
 
     let rpcAddress = "http://localhost:8080"
 
+    @MainActor
     func test_can_be_activated_decativated() async throws {
         var options = ClientOptions()
         let clientKey = "\(self.description)-\(Date().description)"
@@ -61,6 +62,7 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertFalse(boolResult)
     }
 
+    @MainActor
     func test_can_attach_detach_document() async throws {
         let client = Client(rpcAddress)
         try await client.activate()
@@ -93,6 +95,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await client.deactivate()
     }
 
+    @MainActor
     func test_can_handle_sync() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -134,6 +137,7 @@ final class ClientIntegrationTests: XCTestCase {
     }
 
     /*
+     @MainActor
      func test_can_recover_from_temporary_disconnect_realtime_sync() async throws {
          let c1 = Client(rpcAddress)
          let c2 = Client(rpcAddress)
@@ -183,6 +187,7 @@ final class ClientIntegrationTests: XCTestCase {
      }
      */
 
+    @MainActor
     func test_can_change_sync_mode_realtime_manual() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -270,6 +275,7 @@ final class ClientIntegrationTests: XCTestCase {
     }
 
     // swiftlint: disable function_body_length
+    @MainActor
     func test_can_change_sync_mode_in_realtime() async throws {
         // |    | Step1    | Step2    | Step3    | Step4    |
         // | c1 | PushPull | PushOnly | SyncOff  | PushPull |
@@ -463,6 +469,7 @@ final class ClientIntegrationTests: XCTestCase {
 
     // swiftlint: enable function_body_length
 
+    @MainActor
     func test_should_apply_previous_changes_when_switching_to_realtime_sync() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -557,6 +564,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_should_not_include_changes_applied_in_push_only_mode_when_switching_to_realtime_sync() async throws {
         let c1 = Client(rpcAddress)
         try await c1.activate()
@@ -630,6 +638,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
     }
 
+    @MainActor
     func test_should_prevent_remote_changes_in_push_only_mode() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -716,6 +725,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_should_prevent_remote_changes_in_sync_off_mode() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -800,6 +810,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_should_avoid_unnecessary_syncs_in_push_only_mode() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -884,6 +895,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_should_handle_each_request_one_by_one() async throws {
         for index in 0 ..< 10 {
             let client = Client(rpcAddress)
@@ -902,6 +914,7 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_duplicated_local_changes_not_sent_to_server() async throws {
         try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -935,6 +948,7 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_handle_local_changes_correctly_when_receiving_snapshot() async throws {
         try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
@@ -1004,6 +1018,7 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertFalse(c1.getCondition(.syncLoop))
     }
 
+    @MainActor
     func test_should_successfully_broadcast_serializeable_payload() async throws {
         let c1 = Client(rpcAddress)
         try await c1.activate()
@@ -1029,6 +1044,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
     }
 
+    @MainActor
     func test_should_throw_error_when_broadcasting_unserializeable_payload() async throws {
         let c1 = Client(rpcAddress)
         try await c1.activate()
@@ -1070,6 +1086,7 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.deactivate()
     }
 
+    @MainActor
     func test_should_trigger_the_handler_for_a_subscribed_broadcast_event() async throws {
         try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
             let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
@@ -1103,6 +1120,7 @@ final class ClientIntegrationTests: XCTestCase {
     }
 
     // Renamed from `test_should_not_trigger_the_handler_for_an_unsubscribed_broadcast_event`
+    @MainActor
     func test_should_not_be_received_broadcast_event_when_not_subscribed() async throws {
         try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
             let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
@@ -1141,6 +1159,7 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_not_trigger_the_handler_for_a_broadcast_event_after_unsubscribing() async throws {
         try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
             let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
@@ -1177,6 +1196,7 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_not_trigger_the_handler_for_a_broadcast_event_sent_by_the_publisher_to_itself() async throws {
         try await withTwoClientsAndDocuments(self.description, syncMode: .realtime) { _, d1, _, d2 in
             let eventCollector1 = EventCollector<BroadcastExpectValue>(doc: d1)
@@ -1226,6 +1246,7 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_retry_broadcasting_on_network_failure_with_retry_option_and_succeeds_when_network_is_restored() async throws {
         try await withTwoClientsAndDocuments(self.description, mockingEnabled: true, syncMode: .realtime) { c1, d1, _, d2 in
             let eventCollector = EventCollector<BroadcastExpectValue>(doc: d2)
@@ -1264,6 +1285,7 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_not_retry_broadcasting_on_network_failure_when_maxRetries_is_set_to_zero() async throws {
         try await withTwoClientsAndDocuments(self.description, mockingEnabled: true, syncMode: .realtime) { c1, d1, _, d2 in
             let eventCollector1 = EventCollector<BroadcastExpectValue>(doc: d2)

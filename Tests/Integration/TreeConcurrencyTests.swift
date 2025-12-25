@@ -231,8 +231,8 @@ final class TreeConcurrencyTests: XCTestCase {
 
         let docKey = "\(Date().description)-\(desc)".toDocKey
 
-        let c1 = Client(rpcAddress)
-        let c2 = Client(rpcAddress)
+        let c1 = await Client(rpcAddress)
+        let c2 = await Client(rpcAddress)
 
         try await c1.activate()
         try await c2.activate()
@@ -318,6 +318,7 @@ final class TreeConcurrencyTests: XCTestCase {
     // swiftlint: enable function_parameter_count
 
     // swiftlint: disable function_body_length
+    @MainActor
     func test_concurrently_edit_edit_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
@@ -513,6 +514,7 @@ final class TreeConcurrencyTests: XCTestCase {
         print("\(self.description) Test Count: \(testCount)")
     }
 
+    @MainActor
     func test_concurrently_style_style_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
@@ -593,6 +595,7 @@ final class TreeConcurrencyTests: XCTestCase {
         print("\(self.description) Test Count: \(testCount)")
     }
 
+    @MainActor
     func test_concurrently_edit_style_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",

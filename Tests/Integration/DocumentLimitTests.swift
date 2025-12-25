@@ -35,7 +35,7 @@ class DocumentSizeLimitTest: XCTestCase {
         "DetachDocument",
         "RemoveDocument",
         "PushPull",
-        "WatchDocuments",
+        "WatchDocument",
         "Broadcast"
     ]
 
@@ -138,7 +138,7 @@ class DocumentSizeLimitTest: XCTestCase {
         let size = size ?? self.sizeLimit
         self.sizeLimit = size
         try await self.whenUpdateMaxSizeLimit(sizeLimit: size!)
-        let client1 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client1 = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
 
         try await client1.activate()
 
@@ -154,6 +154,7 @@ class DocumentSizeLimitTest: XCTestCase {
 
 extension DocumentSizeLimitTest {
     // should successfully assign size limit to document
+    @MainActor
     func test_should_successfully_assign_size_limit_to_document() async throws {
         // update the max size of document
         let (_, document) = try await activateClientAndDocument()
@@ -163,6 +164,7 @@ extension DocumentSizeLimitTest {
     }
 
     // should reject local update that exceeds document size limit
+    @MainActor
     func test_should_reject_local_update_that_exceeds_document_size_limit() async throws {
         let expectation = XCTestExpectation(description: "Must throws when update due to size limitation risk!")
         let (client, document) = try await activateClientAndDocument(size: 100)
@@ -194,10 +196,11 @@ extension DocumentSizeLimitTest {
     }
 
     // should allow remote updates even if they exceed document size limit
+    @MainActor
     func test_should_allow_remote_updates_even_if_they_exceed_document_size_limit() async throws {
         let (client1, doc1) = try await activateClientAndDocument(size: 100)
 
-        let client2 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client2 = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
 
         try await client2.activate()
         let doc2 = Document(key: docKey)

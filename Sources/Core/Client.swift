@@ -20,8 +20,6 @@ import Foundation
 import Logging
 import Semaphore
 
-public typealias PresenceMap = [ActorID: Presence]
-
 /**
  * `ClientStatus` represents the status of the client.
  */
@@ -172,7 +170,7 @@ enum DefaultBroadcastOptions {
  */
 @MainActor
 public class Client {
-    private var attachmentMap = [DocKey: Attachment]()
+    private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Presence>
     private var conditions: [ClientCondition: Bool] = [
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
@@ -182,12 +180,14 @@ public class Client {
     private let reconnectStreamDelay: Int
     private let retrySyncLoopDelay: Int
     private let maximumAttachmentTimeout: Int
+    private let presenceHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
 
     private var yorkieService: YorkieService
     private var authTokenInjector: AuthTokenInjector?
     private var authHeader: AuthHeader
-    private var semaphoresForInitialzation = [DocKey: DispatchSemaphore]()
+    private var semaphoresForInitialzation = [String: DispatchSemaphore]()
     private let syncSemaphore = AsyncSemaphore(value: 1)
+    private var presenceHeartbeatTimer: Timer?
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -197,11 +197,28 @@ public class Client {
 
     private(set) var metadata: [String: String]
 
+    // MARK: - Helper methods for typed attachments
+
+    private func getDocumentAttachment(_ key: String) -> Attachment<Document>? {
+        return self.attachmentMap[key] as? Attachment<Document>
+    }
+
+    private func getPresenceAttachment(_ key: String) -> Attachment<Presence>? {
+        return self.attachmentMap[key] as? Attachment<Presence>
+    }
+
+    /**
+     * `has` checks whether the given resource is attached to this client or not.
+     */
+    public func has(_ key: String) -> Bool {
+        return self.attachmentMap[key] != nil
+    }
+
     /**
      * @param rpcAddr - the address of the RPC server.
      * @param opts - the options of the client.
      */
-    public nonisolated init(
+    public init(
         _ urlString: String,
         _ options: ClientOptions = ClientOptions(),
         isMockingEnabled: Bool = false
@@ -384,10 +401,10 @@ public class Client {
 
             doc.applyStatus(.attached)
 
-            self.attachmentMap[doc.getKey()] = Attachment(doc: doc,
-                                                          docID: message.documentID,
-                                                          syncMode: syncMode,
-                                                          remoteChangeEventReceived: false)
+            self.attachmentMap[doc.getKey()] = Attachment<Document>(resource: doc,
+                                                                    resourceID: message.documentID,
+                                                                    syncMode: syncMode,
+                                                                    changeEventReceived: false)
 
             if syncMode != .manual {
                 try self.runWatchLoop(docKey)
@@ -433,7 +450,7 @@ public class Client {
             throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
-        guard let attachment = attachmentMap[doc.getKey()] else {
+        guard let attachment = getDocumentAttachment(doc.getKey()) else {
             throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
@@ -443,7 +460,7 @@ public class Client {
 
         var detachDocumentRequest = DetachDocumentRequest()
         detachDocumentRequest.clientID = clientID
-        detachDocumentRequest.documentID = attachment.docID
+        detachDocumentRequest.documentID = attachment.resourceID
         detachDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
 
         do {
@@ -487,13 +504,13 @@ public class Client {
             throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
-        guard let attachment = attachmentMap[doc.getKey()] else {
+        guard let attachment = getDocumentAttachment(doc.getKey()) else {
             throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         var removeDocumentRequest = RemoveDocumentRequest()
         removeDocumentRequest.clientID = clientID
-        removeDocumentRequest.documentID = attachment.docID
+        removeDocumentRequest.documentID = attachment.resourceID
         removeDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack(true))
 
         do {
@@ -520,6 +537,168 @@ public class Client {
         }
     }
 
+    // MARK: - Presence Methods
+
+    /**
+     * `attachPresence` attaches the given presence to this client.
+     */
+    @discardableResult
+    public func attachPresence(_ presence: Presence) async throws -> Presence {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard presence.getStatus() == .detached else {
+            throw YorkieError(code: .errDocumentNotDetached, message: "\(presence.getKey()) is not detached.")
+        }
+
+        presence.setActor(clientID)
+
+        var attachRequest = AttachPresenceRequest()
+        attachRequest.clientID = clientID
+        attachRequest.presenceKey = presence.getKey()
+
+        do {
+            let attachResponse = await self.yorkieService.attachPresence(request: attachRequest, headers: self.authHeader.makeHeader(presence.getKey()))
+
+            guard attachResponse.error == nil, let message = attachResponse.message else {
+                throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach presence error")
+            }
+
+            presence.setPresenceID(message.presenceID)
+            presence.setStatus(.attached)
+
+            // Initialize count from server
+            _ = presence.updateCount(Int(message.count), message.seq)
+
+            self.attachmentMap[presence.getKey()] = Attachment<Presence>(resource: presence,
+                                                                         resourceID: message.presenceID)
+
+            try self.runWatchLoop(presence.getKey())
+
+            // Start heartbeat timer if not already running
+            self.startHeartbeatTimer()
+
+            Logger.info("[AP] c:\"\(self.key)\" attaches p:\"\(presence.getKey())\"")
+
+            return presence
+        } catch {
+            Logger.error("Failed to attach presence(\(presence.getKey())).", error: error)
+            await self.handleConnectError(error)
+            throw error
+        }
+    }
+
+    /**
+     * `detachPresence` detaches the given presence from this client.
+     */
+    @discardableResult
+    public func detachPresence(_ presence: Presence) async throws -> Presence {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard let attachment = getPresenceAttachment(presence.getKey()) else {
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(presence.getKey()) is not attached when \(#function).")
+        }
+
+        var detachRequest = DetachPresenceRequest()
+        detachRequest.clientID = clientID
+        detachRequest.presenceID = attachment.resourceID
+
+        do {
+            let detachResponse = await self.yorkieService.detachPresence(request: detachRequest, headers: self.authHeader.makeHeader(presence.getKey()))
+
+            guard detachResponse.error == nil else {
+                throw self.handleErrorResponse(detachResponse.error, defaultMessage: "Unknown detach presence error")
+            }
+
+            try self.detachInternal(presence.getKey())
+            presence.setStatus(.detached)
+
+            Logger.info("[DP] c:\"\(self.key)\" detaches p:\"\(presence.getKey())\"")
+
+            return presence
+        } catch {
+            Logger.error("Failed to detach presence(\(presence.getKey())).", error: error)
+            await self.handleConnectError(error)
+            throw error
+        }
+    }
+
+    /**
+     * `refreshPresence` sends a heartbeat to keep the presence session alive.
+     */
+    private func refreshPresence(_ presence: Presence) async throws {
+        guard let clientID = self.id else {
+            return
+        }
+
+        guard let attachment = getPresenceAttachment(presence.getKey()) else {
+            return
+        }
+
+        var refreshRequest = RefreshPresenceRequest()
+        refreshRequest.clientID = clientID
+        refreshRequest.presenceID = attachment.resourceID
+
+        do {
+            let refreshResponse = await self.yorkieService.refreshPresence(request: refreshRequest, headers: self.authHeader.makeHeader(presence.getKey()))
+
+            guard refreshResponse.error == nil, let message = refreshResponse.message else {
+                throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh presence error")
+            }
+
+            // Update count and seq from heartbeat response
+            _ = presence.updateCount(Int(message.count), message.seq)
+
+            // Update last heartbeat time
+            attachment.lastHeartbeatTime = Date().timeIntervalSince1970
+        } catch {
+            Logger.error("Failed to refresh presence(\(presence.getKey())).", error: error)
+            // Don't throw - heartbeat failures shouldn't break the app
+        }
+    }
+
+    /**
+     * `startHeartbeatTimer` starts the periodic heartbeat timer for all attached presences.
+     */
+    private func startHeartbeatTimer() {
+        guard self.presenceHeartbeatTimer == nil else {
+            return // Timer already running
+        }
+
+        self.presenceHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: self.presenceHeartbeatInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                await self.sendHeartbeats()
+            }
+        }
+    }
+
+    /**
+     * `sendHeartbeats` sends heartbeats for all attached presences.
+     */
+    private func sendHeartbeats() async {
+        for (_, attachment) in self.attachmentMap {
+            if let presenceAttachment = attachment as? Attachment<Presence> {
+                let now = Date().timeIntervalSince1970
+                // Send heartbeat if enough time has passed
+                if now - presenceAttachment.lastHeartbeatTime >= self.presenceHeartbeatInterval {
+                    try? await self.refreshPresence(presenceAttachment.resource)
+                }
+            }
+        }
+    }
+
     /**
      * `getCondition` returns the condition of this client.
      */
@@ -542,7 +721,7 @@ public class Client {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
-        guard let attachment = self.attachmentMap[docKey] else {
+        guard let attachment = getDocumentAttachment(docKey) else {
             throw YorkieError(code: .errDocumentNotAttached, message: "\(docKey) is not attached when \(#function).")
         }
 
@@ -558,7 +737,7 @@ public class Client {
 
         var request = BroadcastRequest()
         request.clientID = clientID
-        request.documentID = attachment.docID
+        request.documentID = attachment.resourceID
         request.topic = topic
         request.payload = payloadData
 
@@ -576,29 +755,29 @@ public class Client {
             throw YorkieError(code: .errClientNotActivated, message: "\(docKey) is not active")
         }
 
-        guard let attachment = self.attachmentMap[docKey] else {
+        guard let docAttachment = getDocumentAttachment(docKey) else {
             throw YorkieError(code: .errDocumentNotAttached, message: "Can't find attachment by docKey! [\(docKey)]")
         }
 
-        let prevSyncMode = attachment.syncMode
+        let prevSyncMode = docAttachment.syncMode
         if prevSyncMode == syncMode {
             return doc
         }
 
-        self.attachmentMap[docKey]?.syncMode = syncMode
+        docAttachment.syncMode = syncMode
 
         // realtime to manual
         if syncMode == .manual {
-            try self.stopWatchLoop(docKey, with: attachment)
+            try self.stopWatchLoop(docKey, with: docAttachment)
             return doc
         }
 
         if syncMode == .realtime {
             // NOTE(hackerwins): In non-pushpull mode, the client does not receive change events
-            // from the server. Therefore, we need to set `remoteChangeEventReceived` to true
+            // from the server. Therefore, we need to set `changeEventReceived` to true
             // to sync the local and remote changes. This has limitations in that unnecessary
             // syncs occur if the client and server do not have any changes.
-            self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+            docAttachment.changeEventReceived = true
         }
 
         // manual to realtime
@@ -620,10 +799,10 @@ public class Client {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
-        var attachment: Attachment?
+        var attachment: Attachment<Document>?
 
         if let doc {
-            attachment = self.attachmentMap[doc.getKey()]
+            attachment = self.getDocumentAttachment(doc.getKey())
             guard attachment != nil else {
                 throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
             }
@@ -638,11 +817,18 @@ public class Client {
     }
 
     private func clearAttachmentRemoteChangeEventReceived(_ docKey: DocKey) {
-        self.attachmentMap[docKey]?.remoteChangeEventReceived = false
+        if let docAttachment = getDocumentAttachment(docKey) {
+            docAttachment.changeEventReceived = false
+        }
     }
 
     private func setSyncTimer(_ reconnect: Bool) {
-        let isDisconnectedWatchStream = self.attachmentMap.values.first(where: { $0.isDisconnectedStream }) != nil
+        let isDisconnectedWatchStream = self.attachmentMap.values.contains { value in
+            if let docAttachment = value as? Attachment<Document> {
+                return docAttachment.isDisconnectedStream
+            }
+            return false
+        }
         let syncLoopDuration = (reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration
 
         let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
@@ -655,7 +841,7 @@ public class Client {
     }
 
     @discardableResult
-    private func performSyncInternal(_ isRealtimeSync: Bool, _ attachment: Attachment? = nil) async throws -> [Document] {
+    private func performSyncInternal(_ isRealtimeSync: Bool, _ attachment: Attachment<Document>? = nil) async throws -> [Document] {
         await self.syncSemaphore.wait()
 
         defer {
@@ -666,19 +852,29 @@ public class Client {
 
         do {
             if isRealtimeSync {
-                for (key, attachment) in self.attachmentMap where await attachment.needRealtimeSync() {
-                    self.clearAttachmentRemoteChangeEventReceived(key)
-                    result.append(attachment.doc)
-                    try await self.syncInternal(attachment, attachment.syncMode)
+                for (key, anyAttachment) in self.attachmentMap {
+                    if let docAttachment = anyAttachment as? Attachment<Document>,
+                       await docAttachment.needRealtimeSync()
+                    {
+                        self.clearAttachmentRemoteChangeEventReceived(key)
+                        result.append(docAttachment.resource)
+                        if let syncMode = docAttachment.syncMode {
+                            try await self.syncInternal(docAttachment, syncMode)
+                        }
+                    }
                 }
             } else {
                 if let attachment {
-                    result.append(attachment.doc)
+                    result.append(attachment.resource)
                     try await self.syncInternal(attachment, .realtime)
                 } else {
-                    for (_, attachment) in self.attachmentMap {
-                        result.append(attachment.doc)
-                        try await self.syncInternal(attachment, attachment.syncMode)
+                    for (_, anyAttachment) in self.attachmentMap {
+                        if let docAttachment = anyAttachment as? Attachment<Document> {
+                            result.append(docAttachment.resource)
+                            if let syncMode = docAttachment.syncMode {
+                                try await self.syncInternal(docAttachment, syncMode)
+                            }
+                        }
                     }
                 }
             }
@@ -720,80 +916,104 @@ public class Client {
         await self.doSyncLoop()
     }
 
-    private func doWatchLoop(_ docKey: DocKey, with attachment: Attachment) throws {
+    private func doWatchLoop<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
         attachment.resetWatchLoopTimer()
 
         guard self.isActive, let id = self.id else {
             Logger.debug("[WL] c:\"\(self.key)\" exit watch loop")
             self.setCondition(.watchLoop, value: false)
-            throw YorkieError(code: .errClientNotActivated, message: "$\(docKey) is not active")
+            throw YorkieError(code: .errClientNotActivated, message: "$\(key) is not active")
         }
 
-        // NOTE: - Check if the document is still attached to prevent
+        // NOTE: - Check if the resource is still attached to prevent
         // watch stream creation after detachment.
-        if !self.attachmentMap.keys.contains(docKey) {
+        if !self.attachmentMap.keys.contains(key) {
             self.conditions[ClientCondition.watchLoop] = false
             throw YorkieError(
                 code: .errDocumentNotAttached,
-                message: "\(docKey) is not attached"
+                message: "\(key) is not attached"
             )
         }
-        let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(docKey), onResult: { result in
-            Task {
-                switch result {
-                case .headers:
-                    break
-                case .message(let message):
-                    await self.handleWatchDocumentsResponse(docKey: docKey, response: message)
-                case .complete(_, let error, _):
-                    if error != nil {
-                        await attachment.doc.resetOnlineClients()
-                        await attachment.doc.publishInitializedEvent()
-                        await attachment.doc.publishConnectionEvent(.disconnected)
-                    }
 
-                    Logger.debug("[WD] c:\"\(self.key)\" unwatches")
-
-                    if await self.handleConnectError(error) {
-                        Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
-                        await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .watchDocuments)
-                        try await self.onStreamDisconnect(docKey, with: attachment)
-                    } else {
-                        await self.setCondition(.watchLoop, value: false)
-                        try await self.onStreamDisconnect(docKey, with: attachment)
-                    }
-                }
+        // NOTE: Don't create a new stream if one already exists and is connected
+        // This prevents duplicate streams when mode switching happens rapidly
+        if #available(iOS 16.0.0, *) {
+            if attachment.remoteWatchStream != nil, !attachment.isDisconnectedStream {
+                Logger.debug("[WL] c:\"\(self.key)\" stream already exists for \(key)")
+                return
             }
-        })
-
-        let request = WatchDocumentRequest.with {
-            $0.clientID = id
-            $0.documentID = attachment.docID
+        } else {
+            // Fallback on earlier versions
         }
 
-        stream.send(request)
+        // Handle Document watch streams
+        if let docAttachment = attachment as? Attachment<Document> {
+            let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(key), onResult: { result in
+                Task {
+                    switch result {
+                    case .headers:
+                        break
+                    case .message(let message):
+                        await self.handleWatchDocumentsResponse(docKey: key, response: message)
+                    case .complete(_, let error, _):
+                        if error != nil {
+                            await docAttachment.resource.resetOnlineClients()
+                            await docAttachment.resource.publishInitializedEvent()
+                            await docAttachment.resource.publishConnectionEvent(.disconnected)
+                        }
 
-        attachment.connectStream(stream)
+                        Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
-        attachment.doc.publishConnectionEvent(.connected)
+                        if await self.handleConnectError(error) {
+                            Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
+                            await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: docAttachment, method: .watchDocuments)
+                            try await self.onStreamDisconnect(key, with: docAttachment)
+                        } else {
+                            await self.setCondition(.watchLoop, value: false)
+                            try await self.onStreamDisconnect(key, with: docAttachment)
+                        }
+                    }
+                }
+            })
+
+            let request = WatchDocumentRequest.with {
+                $0.clientID = id
+                $0.documentID = docAttachment.resourceID
+            }
+
+            stream.send(request)
+
+            docAttachment.connectStream(stream)
+
+            docAttachment.resource.publishConnectionEvent(.connected)
+        }
     }
 
     /**
-     * `runWatchLoop` runs the watch loop for the given document. The watch loop
-     * listens to the events of the given document from the server.
+     * `runWatchLoop` runs the watch loop for the given resource. The watch loop
+     * listens to the events of the given resource from the server.
      */
-    private func runWatchLoop(_ docKey: DocKey) throws {
+    private func runWatchLoop(_ key: String) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
-        guard let attachment = self.attachmentMap[docKey] else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(docKey) is not attached")
+        guard let anyAttachment = self.attachmentMap[key] else {
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(key) is not attached")
         }
 
         self.setCondition(.watchLoop, value: true)
-        try self.doWatchLoop(docKey, with: attachment)
+
+        if let docAttachment = anyAttachment as? Attachment<Document> {
+            // Reset cancelled flag when starting a new watch loop
+            docAttachment.cancelled = false
+            try self.doWatchLoop(key, with: docAttachment)
+        } else if let presenceAttachment = anyAttachment as? Attachment<Presence> {
+            // Reset cancelled flag when starting a new watch loop
+            presenceAttachment.cancelled = false
+            try self.doWatchLoop(key, with: presenceAttachment)
+        }
     }
 
-    private func stopWatchLoop(_ docKey: DocKey, with attachment: Attachment) throws {
-        try self.disconnectWatchStream(docKey, with: attachment)
+    private func stopWatchLoop<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
+        self.disconnectWatchStream(key, with: attachment)
     }
 
     private func waitForInitialization(_ semaphore: DispatchSemaphore, _ docKey: String) async throws {
@@ -818,10 +1038,14 @@ public class Client {
             return
         }
 
+        guard let docAttachment = getDocumentAttachment(docKey) else {
+            return
+        }
+
         switch body {
         case .initialization(let initialization):
             var onlineClients = Set<ActorID>()
-            let actorID = self.attachmentMap[docKey]?.doc.actorID
+            let actorID = docAttachment.resource.actorID
 
             for pbClientID in initialization.clientIds.filter({ $0 != actorID }) {
                 onlineClients.insert(pbClientID)
@@ -829,49 +1053,49 @@ public class Client {
 
             self.semaphoresForInitialzation[docKey]?.signal()
 
-            self.attachmentMap[docKey]?.doc.setOnlineClients(onlineClients)
-            self.attachmentMap[docKey]?.doc.publishPresenceEvent(.initialized)
+            docAttachment.resource.setOnlineClients(onlineClients)
+            docAttachment.resource.publishPresenceEvent(.initialized)
         case .event(let pbWatchEvent):
             let publisher = pbWatchEvent.publisher
 
             switch pbWatchEvent.type {
             case .documentChanged:
-                self.attachmentMap[docKey]?.remoteChangeEventReceived = true
+                docAttachment.changeEventReceived = true
             case .documentWatched:
-                if let doc = self.attachmentMap[docKey]?.doc,
-                   doc.onlineClients.contains(pbWatchEvent.publisher), doc.hasPresence(pbWatchEvent.publisher)
+                if docAttachment.resource.onlineClients.contains(pbWatchEvent.publisher),
+                   docAttachment.resource.hasPresence(pbWatchEvent.publisher)
                 {
                     return
                 }
 
-                self.attachmentMap[docKey]?.doc.addOnlineClient(publisher)
+                docAttachment.resource.addOnlineClient(publisher)
                 // NOTE(chacha912): We added to onlineClients, but we won't trigger watched event
                 // unless we also know their initial presence data at this point.
-                if let presence = self.attachmentMap[docKey]?.doc.getPresence(publisher) {
-                    self.attachmentMap[docKey]?.doc.publishPresenceEvent(.watched, publisher, presence)
+                if let presence = docAttachment.resource.getPresence(publisher) {
+                    docAttachment.resource.publishPresenceEvent(.watched, publisher, presence)
                 }
             case .documentUnwatched:
                 // NOTE(chacha912): There is no presence, when PresenceChange(clear) is applied before unwatching.
                 // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
-                let presence = self.attachmentMap[docKey]?.doc.getPresence(publisher)
+                let presence = docAttachment.resource.getPresence(publisher)
 
-                self.attachmentMap[docKey]?.doc.removeOnlineClient(publisher)
+                docAttachment.resource.removeOnlineClient(publisher)
 
                 if let presence {
-                    self.attachmentMap[docKey]?.doc.publishPresenceEvent(.unwatched, publisher, presence)
+                    docAttachment.resource.publishPresenceEvent(.unwatched, publisher, presence)
                 }
             case .documentBroadcast:
                 let topic = pbWatchEvent.body.topic
                 let payloadData = pbWatchEvent.body.payload
                 let payload = Payload(jsonData: payloadData)
-                self.attachmentMap[docKey]?.doc.publishBroadcastEvent(clientID: publisher, topic: topic, payload: payload)
+                docAttachment.resource.publishBroadcastEvent(clientID: publisher, topic: topic, payload: payload)
             default:
                 break
             }
         }
     }
 
-    private func disconnectWatchStream(_: DocKey, with attachment: Attachment) {
+    private func disconnectWatchStream<R: Attachable>(_: String, with attachment: Attachment<R>) {
         guard !attachment.isDisconnectedStream else {
             return
         }
@@ -881,18 +1105,20 @@ public class Client {
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
-    private func onStreamDisconnect(_ docKey: DocKey, with attachment: Attachment) throws {
+    private func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
         let cancelled = attachment.cancelled
-        self.disconnectWatchStream(docKey, with: attachment)
+        self.disconnectWatchStream(key, with: attachment)
         // check if watch loop is stopped
-        guard self.attachmentMap[docKey] != nil, attachment.syncMode != .manual else {
+        guard self.attachmentMap[key] != nil, attachment.syncMode != .manual else {
             return
         }
+        // NOTE: Only schedule reconnect if the stream was not explicitly cancelled
+        // The check in doWatchLoop will prevent duplicate streams
         if !cancelled {
             attachment.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
                 Task {
                     Logger.debug("[WL] c:\"\(self.key)\" reconnect timer fired. do watch loop")
-                    try await self.doWatchLoop(docKey, with: attachment)
+                    try await self.doWatchLoop(key, with: attachment)
                 }
             }
 
@@ -905,26 +1131,40 @@ public class Client {
     private func deactivateInternal() throws {
         self.status = .deactivated
 
-        for (key, attachment) in self.attachmentMap {
+        // Stop heartbeat timer
+        self.presenceHeartbeatTimer?.invalidate()
+        self.presenceHeartbeatTimer = nil
+
+        for (key, _) in self.attachmentMap {
+            // Update status based on resource type, but preserve removed status
+            // IMPORTANT: Do this BEFORE detachInternal which removes from attachmentMap
+            if let docAttachment = getDocumentAttachment(key) {
+                if docAttachment.resource.getStatus() != .removed {
+                    docAttachment.resource.applyStatus(.detached)
+                }
+            } else if let presenceAttachment = getPresenceAttachment(key) {
+                if presenceAttachment.resource.getStatus() != .removed {
+                    presenceAttachment.resource.setStatus(.detached)
+                }
+            }
             try self.detachInternal(key)
-            attachment.doc.applyStatus(.detached)
         }
     }
 
-    private func detachInternal(_ docKey: DocKey) throws {
-        guard let attachment = self.attachmentMap[docKey] else {
-            return
+    private func detachInternal(_ key: String) throws {
+        if let attachment = getDocumentAttachment(key) {
+            attachment.unsubscribeBroadcastEvent()
+            attachment.resource.resetOnlineClients()
+            try self.stopWatchLoop(key, with: attachment)
+        } else if let attachment = getPresenceAttachment(key) {
+            try self.stopWatchLoop(key, with: attachment)
         }
 
-        attachment.unsubscribeBroadcastEvent()
-        attachment.doc.resetOnlineClients()
-        try self.stopWatchLoop(docKey, with: attachment)
-
-        self.attachmentMap.removeValue(forKey: docKey)
+        self.attachmentMap.removeValue(forKey: key)
     }
 
     @discardableResult
-    private func syncInternal(_ attachment: Attachment, _ syncMode: SyncMode) async throws -> Document {
+    private func syncInternal(_ attachment: Attachment<Document>, _ syncMode: SyncMode) async throws -> Document {
         guard let clientID = self.id else {
             throw YorkieError(code: .errUnexpected, message: "Invalid Client ID!")
         }
@@ -932,12 +1172,12 @@ public class Client {
         var pushPullRequest = PushPullChangeRequest()
         pushPullRequest.clientID = clientID
 
-        let doc = attachment.doc
+        let doc = attachment.resource
         let requestPack = doc.createChangePack()
         let localSize = requestPack.getChangeSize()
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
-        pushPullRequest.documentID = attachment.docID
+        pushPullRequest.documentID = attachment.resourceID
         pushPullRequest.pushOnly = syncMode == .realtimePushOnly
 
         do {
@@ -1066,7 +1306,7 @@ public extension Client {
 
     private func broadcast(docKey: DocKey, request: BroadcastRequest, maxRetries: Int) async throws {
         var retryCount = 0
-        guard let attachment = self.attachmentMap[docKey] else {
+        guard let docAttachment = getDocumentAttachment(docKey) else {
             throw YorkieError(code: .errDocumentNotAttached, message: "document \(docKey) is not attached")
         }
 
@@ -1082,7 +1322,7 @@ public extension Client {
 
                 if await !self.handleConnectError(error) {
                     if YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errUnauthenticated {
-                        attachment.doc
+                        docAttachment.resource
                             .publishAuthErrorEvent(
                                 reason: errorMetadataOf(error: error)["reason"] ?? "AuthError",
                                 method: .broadcast
@@ -1108,7 +1348,7 @@ public extension Client {
         self.authHeader.updateToken(token)
     }
 
-    private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment?, method: AuthErrorValue.Method) {
+    private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
         guard let connectError = error, let attachment else { return }
         let rawValue = errorCodeOf(error: connectError)
         guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
@@ -1116,6 +1356,6 @@ public extension Client {
         }
 
         let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
-        attachment.doc.publishAuthErrorEvent(reason: reason, method: method)
+        attachment.resource.publishAuthErrorEvent(reason: reason, method: method)
     }
 }

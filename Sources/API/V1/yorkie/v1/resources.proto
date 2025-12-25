@@ -408,6 +408,17 @@ message DocEvent {
   DocEventBody body = 3;
 }
 
+enum PresenceEventType {
+  PRESENCE_EVENT_TYPE_COUNT_CHANGED = 0;
+}
+
+message PresenceEvent {
+  PresenceEventType type = 1;
+  int32 count = 2;
+  int64 seq = 3;
+}
+
+
 message DataSize {
   int32 data = 1;
   int32 meta = 2;

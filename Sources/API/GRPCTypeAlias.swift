@@ -38,6 +38,17 @@ typealias RemoveDocumentRequest = Yorkie_V1_RemoveDocumentRequest
 typealias RemoveDocumentResponse = Yorkie_V1_RemoveDocumentResponse
 typealias BroadcastRequest = Yorkie_V1_BroadcastRequest
 typealias BroadcastResponse = Yorkie_V1_BroadcastResponse
+typealias AttachPresenceRequest = Yorkie_V1_AttachPresenceRequest
+typealias AttachPresenceResponse = Yorkie_V1_AttachPresenceResponse
+typealias DetachPresenceRequest = Yorkie_V1_DetachPresenceRequest
+typealias DetachPresenceResponse = Yorkie_V1_DetachPresenceResponse
+typealias RefreshPresenceRequest = Yorkie_V1_RefreshPresenceRequest
+typealias RefreshPresenceResponse = Yorkie_V1_RefreshPresenceResponse
+typealias WatchPresenceRequest = Yorkie_V1_WatchPresenceRequest
+typealias WatchPresenceResponse = Yorkie_V1_WatchPresenceResponse
+typealias PresenceEvent = Yorkie_V1_PresenceEvent
+typealias PresenceEventType = Yorkie_V1_PresenceEventType
+
 
 typealias PbChange = Yorkie_V1_Change
 typealias PbChangeID = Yorkie_V1_ChangeID

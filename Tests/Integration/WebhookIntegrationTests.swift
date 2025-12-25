@@ -34,7 +34,7 @@ final class WebhookIntegrationTests: XCTestCase {
         "DetachDocument",
         "RemoveDocument",
         "PushPull",
-        "WatchDocuments",
+        "WatchDocument",
         "Broadcast"
     ]
 
@@ -95,10 +95,12 @@ final class WebhookIntegrationTests: XCTestCase {
         try await Task.sleep(milliseconds: 1000)
     }
 
+    @MainActor
     func test_initialize_project_successfully() async throws {
         XCTAssertTrue(!self.apiKey.isEmpty)
     }
 
+    @MainActor
     func test_should_successfully_authorize_with_valid_token_200() async throws {
         struct TestAuthTokenInjector: AuthTokenInjector {
             func getToken(reason: String?) async throws -> String {
@@ -106,8 +108,8 @@ final class WebhookIntegrationTests: XCTestCase {
             }
         }
 
-        let client1 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
-        let client2 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client1 = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client2 = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
 
         try await client1.activate()
         try await client2.activate()
@@ -141,8 +143,9 @@ final class WebhookIntegrationTests: XCTestCase {
         try await client2.deactivate()
     }
 
+    @MainActor
     func test_should_return_unauthenticated_error_for_client_with_empty_token_401() async throws {
-        let client = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: nil))
+        let client = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: nil))
 
         await assertThrows {
             try await client.activate()
@@ -151,6 +154,7 @@ final class WebhookIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_return_unauthenticated_error_for_client_with_invalid_token_401() async throws {
         struct InvalidAuthTokenInjector: AuthTokenInjector {
             func getToken(reason: String?) async throws -> String {
@@ -158,7 +162,7 @@ final class WebhookIntegrationTests: XCTestCase {
             }
         }
 
-        let client = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: InvalidAuthTokenInjector()))
+        let client = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: InvalidAuthTokenInjector()))
 
         await assertThrows {
             try await client.activate()
@@ -167,6 +171,7 @@ final class WebhookIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_return_permission_denied_error_for_client_with_not_allowed_token_403() async throws {
         struct NotAllowedAuthTokenInjector: AuthTokenInjector {
             func getToken(reason: String?) async throws -> String {
@@ -174,7 +179,7 @@ final class WebhookIntegrationTests: XCTestCase {
             }
         }
 
-        let client = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: NotAllowedAuthTokenInjector()))
+        let client = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: NotAllowedAuthTokenInjector()))
 
         await assertThrows {
             try await client.activate()
@@ -183,6 +188,7 @@ final class WebhookIntegrationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func test_should_refresh_token_when_unauthenticated_error_occurs_in_manual_sync() async throws {
         struct TestAuthTokenInjector: AuthTokenInjector {
             func getToken(reason: String?) async throws -> String {
@@ -196,7 +202,7 @@ final class WebhookIntegrationTests: XCTestCase {
             }
         }
 
-        let client = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
 
         await assertThrows {
             try await client.activate()
@@ -267,6 +273,7 @@ final class WebhookIntegrationTests: XCTestCase {
         try await client.deactivate()
     }
 
+    @MainActor
     func test_should_refresh_token_and_retry_realtime_sync() async throws {
         // Prevents duplication of project ID (based on timeInterval)
         try await Task.sleep(milliseconds: 1000)
@@ -293,7 +300,7 @@ final class WebhookIntegrationTests: XCTestCase {
         }
 
         let options = ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector(), retrySyncLoopDelay: 100)
-        let client = Client(rpcAddress, options)
+        let client = await Client(rpcAddress, options)
         try await client.activate()
 
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
@@ -336,6 +343,7 @@ final class WebhookIntegrationTests: XCTestCase {
         try await client.deactivate()
     }
 
+    @MainActor
     func test_should_refresh_token_and_retry_watch_document() async throws {
         // Prevents duplication of project ID (based on timeInterval)
         try await Task.sleep(milliseconds: 1000)
@@ -344,7 +352,7 @@ final class WebhookIntegrationTests: XCTestCase {
                                                                        username: self.testAPIID,
                                                                        password: self.testAPIPW,
                                                                        webhookURL: self.webhookServer.authWebhookUrl,
-                                                                       webhookMethods: ["WatchDocuments"])
+                                                                       webhookMethods: ["WatchDocument"])
         self.apiKey = self.context.publicKey
 
         struct TestAuthTokenInjector: AuthTokenInjector {
@@ -367,7 +375,7 @@ final class WebhookIntegrationTests: XCTestCase {
         let options = ClientOptions(apiKey: apiKey,
                                     authTokenInjector: TestAuthTokenInjector(name: "client", expirationInMils: expirationInMils),
                                     reconnectStreamDelay: 100)
-        let client = Client(rpcAddress, options)
+        let client = await Client(rpcAddress, options)
         try await client.activate()
 
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
@@ -382,7 +390,7 @@ final class WebhookIntegrationTests: XCTestCase {
         // Another client for verifying if the watchDocument is working properly
         let options2 = ClientOptions(apiKey: apiKey,
                                      authTokenInjector: TestAuthTokenInjector(name: "client2", expirationInMils: 1000 * 60 * 60))
-        let client2 = Client(rpcAddress, options2)
+        let client2 = await Client(rpcAddress, options2)
         try await client2.activate()
         let doc2 = Document(key: docKey)
         try await client2.attach(doc2)

@@ -114,6 +114,16 @@ func errorCodeOf(error: ConnectError) -> String {
     return errorMetadataOf(error: error)["code"] ?? ""
 }
 
+/**
+ * `isErrorCode` checks if the error is a ConnectError with the given error code.
+ */
+func isErrorCode(_ error: Error, _ code: String) -> Bool {
+    guard let connectError = error as? ConnectError else {
+        return false
+    }
+    return errorCodeOf(error: connectError) == code
+}
+
 func toYorkieErrorCode(from error: Error) -> YorkieError.Code? {
     guard let yorkieError = error as? YorkieError else {
         return nil

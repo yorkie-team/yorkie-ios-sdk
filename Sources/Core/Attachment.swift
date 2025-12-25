@@ -17,54 +17,72 @@
 import Connect
 import Foundation
 
-final class Attachment: @unchecked Sendable {
-    var doc: Document
-    var docID: String
-    var syncMode: SyncMode
-    var remoteChangeEventReceived: Bool
+/**
+ * `Attachment` is a class that manages the state of an attachable resource (Document or Presence).
+ */
+@MainActor
+final class Attachment<R: Attachable>: @unchecked Sendable {
+    var resource: R
+    var resourceID: String
+    var syncMode: SyncMode?
+    var changeEventReceived: Bool?
+    var lastHeartbeatTime: TimeInterval
     var remoteWatchStream: (any YorkieServerStream)?
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
     private var isDisconnected: Bool
 
     init(
-        doc: Document,
-        docID: String,
-        syncMode: SyncMode,
-        remoteChangeEventReceived: Bool,
+        resource: R,
+        resourceID: String,
+        syncMode: SyncMode? = nil,
+        changeEventReceived: Bool? = nil,
         watchLoopReconnectTimer: Timer? = nil,
         cancelled: Bool = false
     ) {
-        self.doc = doc
-        self.docID = docID
+        self.resource = resource
+        self.resourceID = resourceID
         self.syncMode = syncMode
-        self.remoteChangeEventReceived = remoteChangeEventReceived
+        self.changeEventReceived = changeEventReceived
+        self.lastHeartbeatTime = Date().timeIntervalSince1970
         self.watchLoopReconnectTimer = watchLoopReconnectTimer
         self.isDisconnected = false
         self.cancelled = cancelled
     }
 
     /**
-     * `needRealtimeSync` returns whether the document needs to be synced in real time.
+     * `needRealtimeSync` returns whether the resource needs to be synced in real time.
+     * Only applicable to Document resources with syncMode defined.
      */
     func needRealtimeSync() async -> Bool {
-        if self.syncMode == .realtimeSyncOff {
+        // If syncMode is not defined (e.g., for Presence), no sync is needed
+        guard let syncMode = self.syncMode else {
             return false
         }
 
-        if self.syncMode == .realtimePushOnly {
-            return await self.doc.hasLocalChanges()
+        if syncMode == .realtimeSyncOff {
+            return false
         }
 
-        let hasLocalChanges = await doc.hasLocalChanges()
+        if syncMode == .realtimePushOnly {
+            return await self.resource.hasLocalChanges()
+        }
 
-        return self.syncMode != .manual && (hasLocalChanges || self.remoteChangeEventReceived)
+        let hasLocalChanges = await self.resource.hasLocalChanges()
+
+        return syncMode != .manual && (hasLocalChanges || (self.changeEventReceived ?? false))
     }
 
     func connectStream(_ stream: (any YorkieServerStream)?) {
+        // Cancel the old stream if it exists to prevent it from interfering
+        if let oldStream = self.remoteWatchStream {
+            oldStream.cancel()
+        }
+
         self.remoteWatchStream = stream
         self.isDisconnected = false
-        self.cancelled = false
+        // NOTE: Don't reset cancelled here to prevent race conditions
+        // when an old stream completes after a new one is created
     }
 
     func disconnectStream() {
@@ -96,7 +114,13 @@ final class Attachment: @unchecked Sendable {
         }
     }
 
-    @MainActor func unsubscribeBroadcastEvent() {
-        self.doc.unsubscribeLocalBroadcast()
+    /**
+     * `unsubscribeBroadcastEvent` unsubscribes from broadcast events.
+     * Only applicable to Document resources.
+     */
+    func unsubscribeBroadcastEvent() {
+        if let doc = self.resource as? Document {
+            doc.unsubscribeLocalBroadcast()
+        }
     }
 }

@@ -23,6 +23,7 @@ import XCTest
 final class PresenceTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
+    @MainActor
     func test_can_be_built_from_a_snapshot() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -53,6 +54,7 @@ final class PresenceTests: XCTestCase {
         XCTAssertEqual(presence, defaultSnapshotThreshold - 1)
     }
 
+    @MainActor
     func test_can_be_set_initial_value_in_attach_and_be_removed_in_detach() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -87,6 +89,7 @@ final class PresenceTests: XCTestCase {
         XCTAssertFalse(hasPresence)
     }
 
+    @MainActor
     func test_should_be_initialized_as_an_empty_object_if_no_initial_value_is_set_during_attach() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -116,6 +119,7 @@ final class PresenceTests: XCTestCase {
         XCTAssertTrue(presence!.isEmpty)
     }
 
+    @MainActor
     func test_can_be_updated_partially_by_doc_update_function() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -146,6 +150,7 @@ final class PresenceTests: XCTestCase {
         XCTAssertEqual(presence?["cursor"] as? [String: Int], ["x": 1, "y": 1])
     }
 
+    @MainActor
     func test_should_return_only_online_clients() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -216,6 +221,7 @@ final class PresenceTests: XCTestCase {
         try await c3.deactivate()
     }
 
+    @MainActor
     func test_can_get_presence_value_using_p_get_within_doc_update_function() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
@@ -317,6 +323,7 @@ final class PresenceSubscribeTests: XCTestCase {
         return true
     }
 
+    @MainActor
     func test_should_be_synced_eventually() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -403,6 +410,7 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_should_not_be_accessible_to_other_clients_presence_when_the_stream_is_disconnected() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -459,6 +467,7 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_should_receive_presence_changed_event_for_final_presence_if_there_are_multiple_presence_changes_within_doc_update() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -530,6 +539,7 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_can_receive_unwatched_event_when_a_client_detaches() async throws {
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -595,6 +605,7 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c2.deactivate()
     }
 
+    @MainActor
     func test_can_receive_presence_related_event_only_when_using_realtime_sync() async throws {
         let c1 = Client(rpcAddress)
         let c2 = Client(rpcAddress)
