@@ -767,9 +767,9 @@ final class TextIntegrationConcurrentTests: XCTestCase {
         }
     }
 
-    // concurrent deletion test for LWW behavior
+    // concurrent deletion test for LWW behavior - complete inclusion (larger range later)
     @MainActor
-    func test_concurrent_deletion_test_for_LWW_behavior() async throws {
+    func test_concurrent_deletion_test_for_LWW_behavior_complete_inclusion_larger_range_later() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             try await d1.update { root, _ in
                 root.k1 = JSONText()
@@ -816,31 +816,240 @@ final class TextIntegrationConcurrentTests: XCTestCase {
                 return rga
             }
 
-            func checkAllRemove(document: Document) async -> (Bool, Int) {
-                let text = await getAllNodes(from: document)
-                let node = text?.makeIterator()
-                var timeStampSet = Set<String>()
-                while let node = node?.next() {
-                    if !node.isRemoved, node.createdAt != .initial {
-                        return (false, timeStampSet.count)
-                    }
-                    if let removed = node.removedAt {
-                        timeStampSet.insert(removed.toIDString)
-                    }
+            let text = await getAllNodes(from: d1)
+            var iterator = text?.makeIterator()
+            var (aNode1, bcNode1, dNode1): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = iterator?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode1 = node
+                case "bc":
+                    bcNode1 = node
+                case "d":
+                    dNode1 = node
+                default:
+                    continue
                 }
-                return (true, timeStampSet.count)
             }
-            var removeAllD1 = await checkAllRemove(document: d1)
-            var removeAllD2 = await checkAllRemove(document: d2)
-            XCTAssertTrue(removeAllD1.0)
-            XCTAssertTrue(removeAllD2.0)
 
+            let text2 = await getAllNodes(from: d2)
+            var iterator2 = text2?.makeIterator()
+            var (aNode2, bcNode2, dNode2): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = iterator2?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode2 = node
+                case "bc":
+                    bcNode2 = node
+                case "d":
+                    dNode2 = node
+                default:
+                    continue
+                }
+            }
+
+            XCTAssertNotNil(aNode1?.removedAt)
+            XCTAssertNotNil(bcNode1?.removedAt)
+            XCTAssertNotNil(dNode1?.removedAt)
+            XCTAssertNotNil(aNode2?.removedAt)
+            XCTAssertNotNil(bcNode2?.removedAt)
+            XCTAssertNotNil(dNode2?.removedAt)
+
+            let removedAt = aNode1!.removedAt!
+            XCTAssertEqual(removedAt.toIDString, bcNode1!.removedAt!.toIDString)
+            XCTAssertEqual(removedAt.toIDString, dNode1!.removedAt!.toIDString)
+            XCTAssertEqual(removedAt.toIDString, aNode2!.removedAt!.toIDString)
+            XCTAssertEqual(removedAt.toIDString, bcNode2!.removedAt!.toIDString)
+            XCTAssertEqual(removedAt.toIDString, dNode2!.removedAt!.toIDString)
+
+            XCTAssertEqual(d1JSON, "{\"k1\":[]}")
+            XCTAssertEqual(d2JSON, "{\"k1\":[]}")
+        }
+    }
+
+    // concurrent deletion test for LWW behavior - complete inclusion (smaller range later)
+    @MainActor
+    func test_concurrent_deletion_test_for_LWW_behavior_complete_inclusion_smaller_range_later() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.k1 = JSONText()
+                (root.k1 as? JSONText)?.edit(0, 0, "abcd")
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1JSON = await d1.toSortedJSON()
+            var d2JSON = await d2.toSortedJSON()
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"abcd\"}]}")
+            XCTAssertEqual(d2JSON, d1JSON)
+
+            // Concurrent deletions
+            try await d1.update { root, _ in
+                (root.k1 as? JSONText)?.edit(0, 4, "")
+            }
+
+            try await d2.update { root, _ in
+                (root.k1 as? JSONText)?.edit(1, 3, "")
+            }
+
+            try await c1.sync()
             try await c2.sync()
             try await c1.sync()
 
-            removeAllD1 = await checkAllRemove(document: d1)
-            removeAllD2 = await checkAllRemove(document: d2)
-            XCTAssertTrue(removeAllD2.1 + removeAllD1.1 == 1)
+            func getAllNodes(from doc: Document) async -> RGATreeSplit<CRDTTextValue>? {
+                guard let text = await doc.getRoot().k1 as? JSONText else {
+                    return nil
+                }
+                return text.text?.rgaTreeSplit
+            }
+
+            let text = await getAllNodes(from: d1)
+            var iterator = text?.makeIterator()
+            var (aNode1, bcNode1, dNode1): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = iterator?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode1 = node
+                case "bc":
+                    bcNode1 = node
+                case "d":
+                    dNode1 = node
+                default:
+                    continue
+                }
+            }
+
+            let text2 = await getAllNodes(from: d2)
+            var iterator2 = text2?.makeIterator()
+            var (aNode2, bcNode2, dNode2): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = iterator2?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode2 = node
+                case "bc":
+                    bcNode2 = node
+                case "d":
+                    dNode2 = node
+                default:
+                    continue
+                }
+            }
+
+            XCTAssertNotNil(aNode1?.removedAt)
+            XCTAssertNotNil(bcNode1?.removedAt)
+            XCTAssertNotNil(dNode1?.removedAt)
+            XCTAssertNotNil(aNode2?.removedAt)
+            XCTAssertNotNil(bcNode2?.removedAt)
+            XCTAssertNotNil(dNode2?.removedAt)
+
+            let earlierExpectedRemovedAt = aNode1!.removedAt!
+            let laterExpectedRemovedAt = bcNode1!.removedAt!
+            XCTAssertTrue(laterExpectedRemovedAt.after(earlierExpectedRemovedAt))
+
+            XCTAssertEqual(earlierExpectedRemovedAt.toIDString, dNode1!.removedAt!.toIDString)
+            XCTAssertEqual(earlierExpectedRemovedAt.toIDString, aNode2!.removedAt!.toIDString)
+            XCTAssertEqual(earlierExpectedRemovedAt.toIDString, dNode2!.removedAt!.toIDString)
+
+            XCTAssertEqual(laterExpectedRemovedAt.toIDString, bcNode2!.removedAt!.toIDString)
+
+            d1JSON = await d1.toSortedJSON()
+            d2JSON = await d2.toSortedJSON()
+            XCTAssertEqual(d1JSON, "{\"k1\":[]}")
+            XCTAssertEqual(d2JSON, "{\"k1\":[]}")
+        }
+    }
+
+    // concurrent deletion test for LWW behavior - partial overlap
+    @MainActor
+    func test_concurrent_deletion_test_for_LWW_behavior_partial_overlap() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try await d1.update { root, _ in
+                root.k1 = JSONText()
+                (root.k1 as? JSONText)?.edit(0, 0, "abcd")
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            var d1JSON = await d1.toSortedJSON()
+            var d2JSON = await d2.toSortedJSON()
+            XCTAssertEqual(d1JSON, "{\"k1\":[{\"val\":\"abcd\"}]}")
+            XCTAssertEqual(d2JSON, d1JSON)
+
+            // Concurrent deletions
+            try await d1.update { root, _ in
+                (root.k1 as? JSONText)?.edit(0, 3, "")
+            }
+
+            try await d2.update { root, _ in
+                (root.k1 as? JSONText)?.edit(1, 4, "")
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            func getAllNodes(from doc: Document) async -> RGATreeSplit<CRDTTextValue>? {
+                guard let text = await doc.getRoot().k1 as? JSONText else {
+                    return nil
+                }
+                return text.text?.rgaTreeSplit
+            }
+
+            let text = await getAllNodes(from: d1)
+            var iterator = text?.makeIterator()
+            var (aNode1, bcNode1, dNode1): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = iterator?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode1 = node
+                case "bc":
+                    bcNode1 = node
+                case "d":
+                    dNode1 = node
+                default:
+                    continue
+                }
+            }
+
+            let text2 = await getAllNodes(from: d2)
+            var iterator2 = text2?.makeIterator()
+            var (aNode2, bcNode2, dNode2): (RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?, RGATreeSplitNode<CRDTTextValue>?) = (nil, nil, nil)
+            while let node = iterator2?.next() {
+                switch node.value.toString {
+                case "a":
+                    aNode2 = node
+                case "bc":
+                    bcNode2 = node
+                case "d":
+                    dNode2 = node
+                default:
+                    continue
+                }
+            }
+
+            XCTAssertNotNil(aNode1?.removedAt)
+            XCTAssertNotNil(bcNode1?.removedAt)
+            XCTAssertNotNil(dNode1?.removedAt)
+            XCTAssertNotNil(aNode2?.removedAt)
+            XCTAssertNotNil(bcNode2?.removedAt)
+            XCTAssertNotNil(dNode2?.removedAt)
+
+            let earlierExpectedRemovedAt = aNode1!.removedAt!
+            let laterExpectedRemovedAt = bcNode1!.removedAt!
+            XCTAssertTrue(laterExpectedRemovedAt.after(earlierExpectedRemovedAt))
+
+            XCTAssertEqual(earlierExpectedRemovedAt.toIDString, aNode2!.removedAt!.toIDString)
+
+            XCTAssertEqual(laterExpectedRemovedAt.toIDString, bcNode2!.removedAt!.toIDString)
+            XCTAssertEqual(laterExpectedRemovedAt.toIDString, dNode1!.removedAt!.toIDString)
+            XCTAssertEqual(laterExpectedRemovedAt.toIDString, dNode2!.removedAt!.toIDString)
+
+            d1JSON = await d1.toSortedJSON()
+            d2JSON = await d2.toSortedJSON()
+            XCTAssertEqual(d1JSON, "{\"k1\":[]}")
+            XCTAssertEqual(d2JSON, "{\"k1\":[]}")
         }
     }
 }

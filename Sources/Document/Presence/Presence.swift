@@ -69,18 +69,21 @@ public class Presence: Attachable, @unchecked Sendable {
     private var presenceID: String?
     private var count: Int
     private var seq: Int64
+    private var isRealtimeSync: Bool
     private var eventHandlers: [LocalPresenceEventType: [(LocalPresenceEvent) -> Void]] = [:]
 
     /**
      * Creates a new instance of Presence.
      *
      * @param key - The key of the presence.
+     * @param isRealtime - Whether to sync presence in realtime (default: true).
      */
-    public init(key: String) {
+    public init(key: String, isRealtime: Bool = true) {
         self.key = key
         self.status = .detached
         self.count = 0
         self.seq = 0
+        self.isRealtimeSync = isRealtime
     }
 
     /**
@@ -153,6 +156,13 @@ public class Presence: Attachable, @unchecked Sendable {
      */
     func setStatus(_ status: PresenceStatus) {
         self.status = status
+    }
+
+    /**
+     * `isRealtime` returns whether this presence uses realtime sync.
+     */
+    public func isRealtime() -> Bool {
+        return self.isRealtimeSync
     }
 
     /**

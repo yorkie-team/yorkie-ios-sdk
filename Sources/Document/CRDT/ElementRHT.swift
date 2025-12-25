@@ -151,13 +151,35 @@ class ElementRHT {
     func get(key: String) -> CRDTElement? {
         self.nodeMapByKey[key]?.value
     }
+
+    /**
+     * `deepcopy` returns a deep copy of this ElementRHT.
+     */
+    func deepcopy() -> ElementRHT {
+        let clone = ElementRHT()
+
+        // Deep copy all nodes from nodeMapByCreatedAt to preserve tombstones
+        for (key, node) in self.nodeMapByCreatedAt {
+            let copiedValue = node.value.deepcopy()
+            clone.nodeMapByCreatedAt[key] = ElementRHTNode(key: node.key, value: copiedValue)
+        }
+
+        // Copy nodeMapByKey references
+        for (key, node) in self.nodeMapByKey {
+            if let createdAtKey = self.nodeMapByCreatedAt.first(where: { $0.value.key == key && $0.value.value.createdAt == node.value.createdAt })?.key {
+                clone.nodeMapByKey[key] = clone.nodeMapByCreatedAt[createdAtKey]
+            }
+        }
+
+        return clone
+    }
 }
 
 extension ElementRHT: Sequence {
     typealias Element = ElementRHTNode
 
     func makeIterator() -> ElementRHTIterator {
-        return ElementRHTIterator(self.nodeMapByKey)
+        return ElementRHTIterator(self.nodeMapByCreatedAt)
     }
 }
 
@@ -166,7 +188,8 @@ class ElementRHTIterator: IteratorProtocol {
     private var currentNodes: [ElementRHTNode] = []
 
     init(_ target: [String: ElementRHTNode]) {
-        self.target = Array(target.values)
+        // Use sorted array to ensure consistent iteration order
+        self.target = Array(target.values).sorted { $0.value.createdAt < $1.value.createdAt }
     }
 
     func next() -> ElementRHTNode? {

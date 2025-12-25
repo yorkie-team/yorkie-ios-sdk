@@ -690,13 +690,34 @@ public class Client {
     private func sendHeartbeats() async {
         for (_, attachment) in self.attachmentMap {
             if let presenceAttachment = attachment as? Attachment<Presence> {
-                let now = Date().timeIntervalSince1970
-                // Send heartbeat if enough time has passed
-                if now - presenceAttachment.lastHeartbeatTime >= self.presenceHeartbeatInterval {
-                    try? await self.refreshPresence(presenceAttachment.resource)
+                // Only send heartbeats for realtime presences
+                if presenceAttachment.resource.isRealtime() {
+                    let now = Date().timeIntervalSince1970
+                    // Send heartbeat if enough time has passed
+                    if now - presenceAttachment.lastHeartbeatTime >= self.presenceHeartbeatInterval {
+                        try? await self.refreshPresence(presenceAttachment.resource)
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * `syncPresence` manually refreshes the presence count for manual mode presences.
+     * Returns the updated count.
+     */
+    @discardableResult
+    public func syncPresence(_ presence: Presence) async throws -> Int {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard self.has(presence.getKey()) else {
+            throw YorkieError(code: .errDocumentNotAttached, message: "\(presence.getKey()) is not attached")
+        }
+
+        try await self.refreshPresence(presence)
+        return presence.getCount()
     }
 
     /**
