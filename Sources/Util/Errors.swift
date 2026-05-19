@@ -47,11 +47,11 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrDummy is used to verify errors for testing purposes.
         case errDummy = "ErrDummy"
 
-        /// ErrDocumentNotAttached is returned when the document is not attached.
-        case errDocumentNotAttached = "ErrDocumentNotAttached"
+        /// ErrNotAttached is returned when the resource is not attached.
+        case errNotAttached = "ErrNotAttached"
 
-        /// ErrDocumentNotDetached is returned when the document is not detached.
-        case errDocumentNotDetached = "ErrDocumentNotDetached"
+        /// ErrNotDetached is returned when the resource is not detached.
+        case errNotDetached = "ErrNotDetached"
 
         /// ErrDocumentRemoved is returned when the document is removed.
         case errDocumentRemoved = "ErrDocumentRemoved"

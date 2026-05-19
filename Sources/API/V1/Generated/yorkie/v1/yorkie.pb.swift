@@ -23,7 +23,11 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -94,11 +98,11 @@ public struct Yorkie_V1_AttachDocumentRequest: Sendable {
   public var clientID: String = String()
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -119,11 +123,11 @@ public struct Yorkie_V1_AttachDocumentResponse: Sendable {
   public var documentID: String = String()
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -148,11 +152,11 @@ public struct Yorkie_V1_DetachDocumentRequest: Sendable {
   public var documentID: String = String()
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -171,11 +175,11 @@ public struct Yorkie_V1_DetachDocumentResponse: Sendable {
   // methods supported on all messages.
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -256,11 +260,11 @@ public struct Yorkie_V1_RemoveDocumentRequest: Sendable {
   public var documentID: String = String()
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -277,11 +281,11 @@ public struct Yorkie_V1_RemoveDocumentResponse: Sendable {
   // methods supported on all messages.
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -302,11 +306,11 @@ public struct Yorkie_V1_PushPullChangesRequest: Sendable {
   public var documentID: String = String()
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -325,11 +329,11 @@ public struct Yorkie_V1_PushPullChangesResponse: Sendable {
   // methods supported on all messages.
 
   public var changePack: Yorkie_V1_ChangePack {
-    get {return _changePack ?? Yorkie_V1_ChangePack()}
+    get {_changePack ?? Yorkie_V1_ChangePack()}
     set {_changePack = newValue}
   }
   /// Returns true if `changePack` has been explicitly set.
-  public var hasChangePack: Bool {return self._changePack != nil}
+  public var hasChangePack: Bool {self._changePack != nil}
   /// Clears the value of `changePack`. Subsequent reads from it will return its default value.
   public mutating func clearChangePack() {self._changePack = nil}
 
@@ -340,6 +344,152 @@ public struct Yorkie_V1_PushPullChangesResponse: Sendable {
   fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
 }
 
+public struct Yorkie_V1_AttachChannelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var clientID: String = String()
+
+  public var channelKey: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_AttachChannelResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionID: String = String()
+
+  public var count: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_DetachChannelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var clientID: String = String()
+
+  public var channelKey: String = String()
+
+  public var sessionID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_DetachChannelResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var count: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_RefreshChannelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var clientID: String = String()
+
+  public var channelKey: String = String()
+
+  public var sessionID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_RefreshChannelResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var count: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_WatchChannelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var clientID: String = String()
+
+  public var channelKey: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_WatchChannelResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var body: Yorkie_V1_WatchChannelResponse.OneOf_Body? = nil
+
+  public var initialized: Yorkie_V1_WatchChannelInitialized {
+    get {
+      if case .initialized(let v)? = body {return v}
+      return Yorkie_V1_WatchChannelInitialized()
+    }
+    set {body = .initialized(newValue)}
+  }
+
+  public var event: Yorkie_V1_ChannelEvent {
+    get {
+      if case .event(let v)? = body {return v}
+      return Yorkie_V1_ChannelEvent()
+    }
+    set {body = .event(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Body: Equatable, Sendable {
+    case initialized(Yorkie_V1_WatchChannelInitialized)
+    case event(Yorkie_V1_ChannelEvent)
+
+  }
+
+  public init() {}
+}
+
+public struct Yorkie_V1_WatchChannelInitialized: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var count: Int64 = 0
+
+  public var seq: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Yorkie_V1_BroadcastRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -347,7 +497,7 @@ public struct Yorkie_V1_BroadcastRequest: Sendable {
 
   public var clientID: String = String()
 
-  public var documentID: String = String()
+  public var channelKey: String = String()
 
   public var topic: String = String()
 
@@ -364,152 +514,6 @@ public struct Yorkie_V1_BroadcastResponse: Sendable {
   // methods supported on all messages.
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_AttachPresenceRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var clientID: String = String()
-
-  public var presenceKey: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_AttachPresenceResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var presenceID: String = String()
-
-  public var count: Int32 = 0
-
-  public var seq: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_DetachPresenceRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var clientID: String = String()
-
-  public var presenceID: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_DetachPresenceResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var count: Int32 = 0
-
-  public var seq: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_RefreshPresenceRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var clientID: String = String()
-
-  public var presenceID: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_RefreshPresenceResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var count: Int32 = 0
-
-  public var seq: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_WatchPresenceRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var clientID: String = String()
-
-  public var presenceID: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_WatchPresenceResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var body: Yorkie_V1_WatchPresenceResponse.OneOf_Body? = nil
-
-  public var initialization: Yorkie_V1_WatchPresenceResponse.Initialization {
-    get {
-      if case .initialization(let v)? = body {return v}
-      return Yorkie_V1_WatchPresenceResponse.Initialization()
-    }
-    set {body = .initialization(newValue)}
-  }
-
-  public var event: Yorkie_V1_PresenceEvent {
-    get {
-      if case .event(let v)? = body {return v}
-      return Yorkie_V1_PresenceEvent()
-    }
-    set {body = .event(newValue)}
-  }
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Body: Equatable, Sendable {
-    case initialization(Yorkie_V1_WatchPresenceResponse.Initialization)
-    case event(Yorkie_V1_PresenceEvent)
-
-  }
-
-  public struct Initialization: Sendable {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    public var count: Int32 = 0
-
-    public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    public init() {}
-  }
 
   public init() {}
 }
@@ -1106,9 +1110,9 @@ extension Yorkie_V1_PushPullChangesResponse: SwiftProtobuf.Message, SwiftProtobu
   }
 }
 
-extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".BroadcastRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{1}topic\0\u{1}payload\0")
+extension Yorkie_V1_AttachChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AttachChannelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1117,9 +1121,7 @@ extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.topic) }()
-      case 4: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
       default: break
       }
     }
@@ -1129,50 +1131,23 @@ extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
-    if !self.documentID.isEmpty {
-      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
-    }
-    if !self.topic.isEmpty {
-      try visitor.visitSingularStringField(value: self.topic, fieldNumber: 3)
-    }
-    if !self.payload.isEmpty {
-      try visitor.visitSingularBytesField(value: self.payload, fieldNumber: 4)
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_BroadcastRequest, rhs: Yorkie_V1_BroadcastRequest) -> Bool {
+  public static func ==(lhs: Yorkie_V1_AttachChannelRequest, rhs: Yorkie_V1_AttachChannelRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
-    if lhs.documentID != rhs.documentID {return false}
-    if lhs.topic != rhs.topic {return false}
-    if lhs.payload != rhs.payload {return false}
+    if lhs.channelKey != rhs.channelKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_BroadcastResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".BroadcastResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Yorkie_V1_BroadcastResponse, rhs: Yorkie_V1_BroadcastResponse) -> Bool {
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_AttachPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".AttachPresenceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}presence_key\0")
+extension Yorkie_V1_AttachChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".AttachChannelResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{1}count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1180,74 +1155,34 @@ extension Yorkie_V1_AttachPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.presenceKey) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.count) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.clientID.isEmpty {
-      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
-    }
-    if !self.presenceKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.presenceKey, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Yorkie_V1_AttachPresenceRequest, rhs: Yorkie_V1_AttachPresenceRequest) -> Bool {
-    if lhs.clientID != rhs.clientID {return false}
-    if lhs.presenceKey != rhs.presenceKey {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_AttachPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".AttachPresenceResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}presence_id\0\u{1}count\0\u{1}seq\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.presenceID) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.count) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.presenceID.isEmpty {
-      try visitor.visitSingularStringField(value: self.presenceID, fieldNumber: 1)
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 1)
     }
     if self.count != 0 {
-      try visitor.visitSingularInt32Field(value: self.count, fieldNumber: 2)
-    }
-    if self.seq != 0 {
-      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 3)
+      try visitor.visitSingularInt64Field(value: self.count, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_AttachPresenceResponse, rhs: Yorkie_V1_AttachPresenceResponse) -> Bool {
-    if lhs.presenceID != rhs.presenceID {return false}
+  public static func ==(lhs: Yorkie_V1_AttachChannelResponse, rhs: Yorkie_V1_AttachChannelResponse) -> Bool {
+    if lhs.sessionID != rhs.sessionID {return false}
     if lhs.count != rhs.count {return false}
-    if lhs.seq != rhs.seq {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_DetachPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DetachPresenceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}presence_id\0")
+extension Yorkie_V1_DetachChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DetachChannelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0\u{3}session_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1256,7 +1191,8 @@ extension Yorkie_V1_DetachPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.presenceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
       default: break
       }
     }
@@ -1266,23 +1202,27 @@ extension Yorkie_V1_DetachPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
-    if !self.presenceID.isEmpty {
-      try visitor.visitSingularStringField(value: self.presenceID, fieldNumber: 2)
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 2)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_DetachPresenceRequest, rhs: Yorkie_V1_DetachPresenceRequest) -> Bool {
+  public static func ==(lhs: Yorkie_V1_DetachChannelRequest, rhs: Yorkie_V1_DetachChannelRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
-    if lhs.presenceID != rhs.presenceID {return false}
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_DetachPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".DetachPresenceResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}count\0\u{1}seq\0")
+extension Yorkie_V1_DetachChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DetachChannelResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1290,8 +1230,7 @@ extension Yorkie_V1_DetachPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.count) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.count) }()
       default: break
       }
     }
@@ -1299,25 +1238,21 @@ extension Yorkie_V1_DetachPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.count != 0 {
-      try visitor.visitSingularInt32Field(value: self.count, fieldNumber: 1)
-    }
-    if self.seq != 0 {
-      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 2)
+      try visitor.visitSingularInt64Field(value: self.count, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_DetachPresenceResponse, rhs: Yorkie_V1_DetachPresenceResponse) -> Bool {
+  public static func ==(lhs: Yorkie_V1_DetachChannelResponse, rhs: Yorkie_V1_DetachChannelResponse) -> Bool {
     if lhs.count != rhs.count {return false}
-    if lhs.seq != rhs.seq {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_RefreshPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RefreshPresenceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}presence_id\0")
+extension Yorkie_V1_RefreshChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RefreshChannelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0\u{3}session_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1326,7 +1261,8 @@ extension Yorkie_V1_RefreshPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.presenceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
       default: break
       }
     }
@@ -1336,23 +1272,27 @@ extension Yorkie_V1_RefreshPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
-    if !self.presenceID.isEmpty {
-      try visitor.visitSingularStringField(value: self.presenceID, fieldNumber: 2)
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 2)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_RefreshPresenceRequest, rhs: Yorkie_V1_RefreshPresenceRequest) -> Bool {
+  public static func ==(lhs: Yorkie_V1_RefreshChannelRequest, rhs: Yorkie_V1_RefreshChannelRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
-    if lhs.presenceID != rhs.presenceID {return false}
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_RefreshPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RefreshPresenceResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}count\0\u{1}seq\0")
+extension Yorkie_V1_RefreshChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RefreshChannelResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1360,8 +1300,7 @@ extension Yorkie_V1_RefreshPresenceResponse: SwiftProtobuf.Message, SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.count) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.count) }()
       default: break
       }
     }
@@ -1369,25 +1308,21 @@ extension Yorkie_V1_RefreshPresenceResponse: SwiftProtobuf.Message, SwiftProtobu
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.count != 0 {
-      try visitor.visitSingularInt32Field(value: self.count, fieldNumber: 1)
-    }
-    if self.seq != 0 {
-      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 2)
+      try visitor.visitSingularInt64Field(value: self.count, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_RefreshPresenceResponse, rhs: Yorkie_V1_RefreshPresenceResponse) -> Bool {
+  public static func ==(lhs: Yorkie_V1_RefreshChannelResponse, rhs: Yorkie_V1_RefreshChannelResponse) -> Bool {
     if lhs.count != rhs.count {return false}
-    if lhs.seq != rhs.seq {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchPresenceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}presence_id\0")
+extension Yorkie_V1_WatchChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchChannelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1396,7 +1331,7 @@ extension Yorkie_V1_WatchPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf._
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.presenceID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
       default: break
       }
     }
@@ -1406,23 +1341,23 @@ extension Yorkie_V1_WatchPresenceRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
-    if !self.presenceID.isEmpty {
-      try visitor.visitSingularStringField(value: self.presenceID, fieldNumber: 2)
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_WatchPresenceRequest, rhs: Yorkie_V1_WatchPresenceRequest) -> Bool {
+  public static func ==(lhs: Yorkie_V1_WatchChannelRequest, rhs: Yorkie_V1_WatchChannelRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
-    if lhs.presenceID != rhs.presenceID {return false}
+    if lhs.channelKey != rhs.channelKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchPresenceResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialization\0\u{1}event\0")
+extension Yorkie_V1_WatchChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchChannelResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialized\0\u{1}event\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1431,20 +1366,20 @@ extension Yorkie_V1_WatchPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try {
-        var v: Yorkie_V1_WatchPresenceResponse.Initialization?
+        var v: Yorkie_V1_WatchChannelInitialized?
         var hadOneofValue = false
         if let current = self.body {
           hadOneofValue = true
-          if case .initialization(let m) = current {v = m}
+          if case .initialized(let m) = current {v = m}
         }
         try decoder.decodeSingularMessageField(value: &v)
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.body = .initialization(v)
+          self.body = .initialized(v)
         }
       }()
       case 2: try {
-        var v: Yorkie_V1_PresenceEvent?
+        var v: Yorkie_V1_ChannelEvent?
         var hadOneofValue = false
         if let current = self.body {
           hadOneofValue = true
@@ -1467,8 +1402,8 @@ extension Yorkie_V1_WatchPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf.
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
     switch self.body {
-    case .initialization?: try {
-      guard case .initialization(let v)? = self.body else { preconditionFailure() }
+    case .initialized?: try {
+      guard case .initialized(let v)? = self.body else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     }()
     case .event?: try {
@@ -1480,16 +1415,16 @@ extension Yorkie_V1_WatchPresenceResponse: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_WatchPresenceResponse, rhs: Yorkie_V1_WatchPresenceResponse) -> Bool {
+  public static func ==(lhs: Yorkie_V1_WatchChannelResponse, rhs: Yorkie_V1_WatchChannelResponse) -> Bool {
     if lhs.body != rhs.body {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchPresenceResponse.Initialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = Yorkie_V1_WatchPresenceResponse.protoMessageName + ".Initialization"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}count\0")
+extension Yorkie_V1_WatchChannelInitialized: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchChannelInitialized"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}count\0\u{1}seq\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1497,7 +1432,8 @@ extension Yorkie_V1_WatchPresenceResponse.Initialization: SwiftProtobuf.Message,
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self.count) }()
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.count) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
       default: break
       }
     }
@@ -1505,13 +1441,81 @@ extension Yorkie_V1_WatchPresenceResponse.Initialization: SwiftProtobuf.Message,
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if self.count != 0 {
-      try visitor.visitSingularInt32Field(value: self.count, fieldNumber: 1)
+      try visitor.visitSingularInt64Field(value: self.count, fieldNumber: 1)
+    }
+    if self.seq != 0 {
+      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_WatchPresenceResponse.Initialization, rhs: Yorkie_V1_WatchPresenceResponse.Initialization) -> Bool {
+  public static func ==(lhs: Yorkie_V1_WatchChannelInitialized, rhs: Yorkie_V1_WatchChannelInitialized) -> Bool {
     if lhs.count != rhs.count {return false}
+    if lhs.seq != rhs.seq {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_BroadcastRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".BroadcastRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0\u{1}topic\0\u{1}payload\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.topic) }()
+      case 4: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.clientID.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
+    }
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 2)
+    }
+    if !self.topic.isEmpty {
+      try visitor.visitSingularStringField(value: self.topic, fieldNumber: 3)
+    }
+    if !self.payload.isEmpty {
+      try visitor.visitSingularBytesField(value: self.payload, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_BroadcastRequest, rhs: Yorkie_V1_BroadcastRequest) -> Bool {
+    if lhs.clientID != rhs.clientID {return false}
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs.topic != rhs.topic {return false}
+    if lhs.payload != rhs.payload {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_BroadcastResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".BroadcastResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_BroadcastResponse, rhs: Yorkie_V1_BroadcastResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

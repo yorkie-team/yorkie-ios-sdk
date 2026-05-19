@@ -146,11 +146,12 @@ final class SplayTreeBenchmarkTests: XCTestCase {
     }
 
     private func loadEditTraceData() -> [[Any]]? {
-        guard let path = Bundle(for: type(of: self)).path(forResource: "editing-trace", ofType: "json") else {
+        guard let url = Bundle.module.url(forResource: "editing-trace", withExtension: "json") else {
             return nil
         }
+
         do {
-            let data = try Data(contentsOf: URL(fileURLWithPath: path))
+            let data = try Data(contentsOf: url)
             if let jsonResult = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                let edits = jsonResult["edits"] as? [[Any]]
             {

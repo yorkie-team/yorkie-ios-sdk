@@ -2,6 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:Channel/Channel.xcodeproj">
+   </FileRef>
+   <FileRef
       location = "container:SimultaneousCursors/SimultaneousCursors.xcodeproj">
    </FileRef>
    <FileRef

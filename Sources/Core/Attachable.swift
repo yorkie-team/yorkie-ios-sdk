@@ -48,7 +48,7 @@ protocol Attachable: Sendable {
     /**
      * `hasLocalChanges` returns whether this resource has local changes to be synchronized.
      * Returns true for Document when there are uncommitted changes.
-     * Returns false for Presence as it is server-managed.
+     * Returns false for Channel as it is server-managed.
      */
     func hasLocalChanges() async -> Bool
 

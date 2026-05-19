@@ -170,7 +170,7 @@ enum DefaultBroadcastOptions {
  */
 @MainActor
 public class Client {
-    private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Presence>
+    private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
     private var conditions: [ClientCondition: Bool] = [
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
@@ -180,14 +180,14 @@ public class Client {
     private let reconnectStreamDelay: Int
     private let retrySyncLoopDelay: Int
     private let maximumAttachmentTimeout: Int
-    private let presenceHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
+    private let channelHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
 
     private var yorkieService: YorkieService
     private var authTokenInjector: AuthTokenInjector?
     private var authHeader: AuthHeader
     private var semaphoresForInitialzation = [String: DispatchSemaphore]()
     private let syncSemaphore = AsyncSemaphore(value: 1)
-    private var presenceHeartbeatTimer: Timer?
+    private var channelHeartbeatTimer: Timer?
 
     // Public variables.
     public private(set) var id: ActorID?
@@ -203,8 +203,8 @@ public class Client {
         return self.attachmentMap[key] as? Attachment<Document>
     }
 
-    private func getPresenceAttachment(_ key: String) -> Attachment<Presence>? {
-        return self.attachmentMap[key] as? Attachment<Presence>
+    private func getChannelAttachment(_ key: String) -> Attachment<Channel>? {
+        return self.attachmentMap[key] as? Attachment<Channel>
     }
 
     /**
@@ -339,7 +339,7 @@ public class Client {
         }
 
         guard doc.status == .detached else {
-            throw YorkieError(code: .errDocumentNotDetached, message: "\(self.key) is not detached.")
+            throw YorkieError(code: .errNotDetached, message: "\(self.key) is not detached.")
         }
 
         doc.setActor(clientID)
@@ -347,30 +347,11 @@ public class Client {
             presence.set(initialPresence)
         }
 
-        // 02. Subscribe local broadcast event.
-        doc.subscribeLocalBroadcast { [weak self] event, doc in
-            guard let self else { return }
-            guard let broadcastEvent = event as? LocalBroadcastEvent else {
-                return
-            }
-            let topic = broadcastEvent.value.topic
-            let payload = broadcastEvent.value.payload
-            let errorFn = broadcastEvent.options?.error
-
-            Task {
-                do {
-                    try await self.broadcast(doc.getKey(), topic: topic, payload: payload, options: broadcastEvent.options)
-                } catch {
-                    errorFn?(error)
-                }
-            }
-        }
-
         var attachRequest = AttachDocumentRequest()
         attachRequest.clientID = clientID
         attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
         attachRequest.schemaKey = schema
-        // 03. Attach the document to the client.
+        // 02. Attach the document to the client.
         do {
             let docKey = doc.getKey()
             let semaphore = DispatchSemaphore(value: 0)
@@ -451,7 +432,7 @@ public class Client {
         }
 
         guard let attachment = getDocumentAttachment(doc.getKey()) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         try doc.update { _, presence in
@@ -505,7 +486,7 @@ public class Client {
         }
 
         guard let attachment = getDocumentAttachment(doc.getKey()) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         var removeDocumentRequest = RemoveDocumentRequest()
@@ -537,13 +518,14 @@ public class Client {
         }
     }
 
-    // MARK: - Presence Methods
+    // MARK: - Channel Methods
 
     /**
-     * `attachPresence` attaches the given presence to this client.
+     * `attachChannel` attaches the given channel to this client.
+     * It tells the server that this client will track the channel.
      */
     @discardableResult
-    public func attachPresence(_ presence: Presence) async throws -> Presence {
+    public func attachChannel(_ channel: Channel) async throws -> Channel {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -552,52 +534,73 @@ public class Client {
             throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
-        guard presence.getStatus() == .detached else {
-            throw YorkieError(code: .errDocumentNotDetached, message: "\(presence.getKey()) is not detached.")
+        guard channel.getStatus() == .detached else {
+            throw YorkieError(code: .errNotDetached, message: "\(channel.getKey()) is not detached.")
         }
 
-        presence.setActor(clientID)
+        channel.setActor(clientID)
 
-        var attachRequest = AttachPresenceRequest()
+        var attachRequest = AttachChannelRequest()
         attachRequest.clientID = clientID
-        attachRequest.presenceKey = presence.getKey()
+        attachRequest.channelKey = channel.getKey()
 
         do {
-            let attachResponse = await self.yorkieService.attachPresence(request: attachRequest, headers: self.authHeader.makeHeader(presence.getKey()))
+            let attachResponse = await self.yorkieService.attachChannel(request: attachRequest, headers: self.authHeader.makeHeader(channel.getKey()))
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
-                throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach presence error")
+                throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach channel error")
             }
 
-            presence.setPresenceID(message.presenceID)
-            presence.setStatus(.attached)
+            channel.setSessionID(message.sessionID)
+            channel.setStatus(.attached)
 
             // Initialize count from server
-            _ = presence.updateCount(Int(message.count), message.seq)
+            _ = channel.updateSessionCount(Int(message.count), 0)
 
-            self.attachmentMap[presence.getKey()] = Attachment<Presence>(resource: presence,
-                                                                         resourceID: message.presenceID)
+            self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel,
+                                                                       resourceID: message.sessionID)
 
-            try self.runWatchLoop(presence.getKey())
+            // Forward local broadcasts to the server. The Channel publishes a
+            // local-broadcast event when its `broadcast` method is called; here we
+            // bridge that event to the Broadcast RPC.
+            channel.subscribeLocalBroadcast { [weak self, weak channel] event in
+                guard let channel else { return }
+                let topic = event.topic
+                let payload = event.payload
+                let errorFn = event.options?.error
+                let channelKey = channel.getKey()
+
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        try await self.broadcast(channelKey, topic: topic, payload: payload, options: event.options)
+                    } catch {
+                        errorFn?(error)
+                    }
+                }
+            }
+
+            try self.runWatchLoop(channel.getKey())
 
             // Start heartbeat timer if not already running
             self.startHeartbeatTimer()
 
-            Logger.info("[AP] c:\"\(self.key)\" attaches p:\"\(presence.getKey())\"")
+            Logger.info("[AP] c:\"\(self.key)\" attaches p:\"\(channel.getKey())\"")
 
-            return presence
+            return channel
         } catch {
-            Logger.error("Failed to attach presence(\(presence.getKey())).", error: error)
+            Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
             await self.handleConnectError(error)
             throw error
         }
     }
 
     /**
-     * `detachPresence` detaches the given presence from this client.
+     * `detachChannel` detaches the given channel from this client.
+     * It tells the server that this client will no longer track the channel.
      */
     @discardableResult
-    public func detachPresence(_ presence: Presence) async throws -> Presence {
+    public func detachChannel(_ channel: Channel) async throws -> Channel {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -606,77 +609,71 @@ public class Client {
             throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
         }
 
-        guard let attachment = getPresenceAttachment(presence.getKey()) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(presence.getKey()) is not attached when \(#function).")
+        guard let attachment = getChannelAttachment(channel.getKey()) else {
+            throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached when \(#function).")
         }
 
-        var detachRequest = DetachPresenceRequest()
+        var detachRequest = DetachChannelRequest()
         detachRequest.clientID = clientID
-        detachRequest.presenceID = attachment.resourceID
+        detachRequest.channelKey = channel.getKey()
+        detachRequest.sessionID = attachment.resourceID
 
         do {
-            let detachResponse = await self.yorkieService.detachPresence(request: detachRequest, headers: self.authHeader.makeHeader(presence.getKey()))
+            let detachResponse = await self.yorkieService.detachChannel(request: detachRequest, headers: self.authHeader.makeHeader(channel.getKey()))
 
             guard detachResponse.error == nil else {
-                throw self.handleErrorResponse(detachResponse.error, defaultMessage: "Unknown detach presence error")
+                throw self.handleErrorResponse(detachResponse.error, defaultMessage: "Unknown detach channel error")
             }
 
-            try self.detachInternal(presence.getKey())
-            presence.setStatus(.detached)
+            try self.detachInternal(channel.getKey())
+            channel.setStatus(.detached)
 
-            Logger.info("[DP] c:\"\(self.key)\" detaches p:\"\(presence.getKey())\"")
+            Logger.info("[DP] c:\"\(self.key)\" detaches p:\"\(channel.getKey())\"")
 
-            return presence
+            return channel
         } catch {
-            Logger.error("Failed to detach presence(\(presence.getKey())).", error: error)
+            Logger.error("Failed to detach channel(\(channel.getKey())).", error: error)
             await self.handleConnectError(error)
             throw error
         }
     }
 
     /**
-     * `refreshPresence` sends a heartbeat to keep the presence session alive.
+     * `refreshChannel` sends a heartbeat to keep the channel session alive.
      */
-    private func refreshPresence(_ presence: Presence) async throws {
+    private func refreshChannel(_ channel: Channel) async throws {
         guard let clientID = self.id else {
             return
         }
 
-        guard let attachment = getPresenceAttachment(presence.getKey()) else {
+        guard let attachment = getChannelAttachment(channel.getKey()) else {
             return
         }
 
-        var refreshRequest = RefreshPresenceRequest()
+        var refreshRequest = RefreshChannelRequest()
         refreshRequest.clientID = clientID
-        refreshRequest.presenceID = attachment.resourceID
+        refreshRequest.channelKey = channel.getKey()
+        refreshRequest.sessionID = attachment.resourceID
 
-        do {
-            let refreshResponse = await self.yorkieService.refreshPresence(request: refreshRequest, headers: self.authHeader.makeHeader(presence.getKey()))
+        let refreshResponse = await self.yorkieService.refreshChannel(request: refreshRequest, headers: self.authHeader.makeHeader(channel.getKey()))
 
-            guard refreshResponse.error == nil, let message = refreshResponse.message else {
-                throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh presence error")
-            }
-
-            // Update count and seq from heartbeat response
-            _ = presence.updateCount(Int(message.count), message.seq)
-
-            // Update last heartbeat time
-            attachment.lastHeartbeatTime = Date().timeIntervalSince1970
-        } catch {
-            Logger.error("Failed to refresh presence(\(presence.getKey())).", error: error)
-            // Don't throw - heartbeat failures shouldn't break the app
+        guard refreshResponse.error == nil, let message = refreshResponse.message else {
+            throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh channel error")
         }
+
+        _ = channel.updateSessionCount(Int(message.count), 0)
+        attachment.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
     /**
-     * `startHeartbeatTimer` starts the periodic heartbeat timer for all attached presences.
+     * `startHeartbeatTimer` starts the periodic heartbeat timer for all attached channels.
      */
     private func startHeartbeatTimer() {
-        guard self.presenceHeartbeatTimer == nil else {
+        guard self.channelHeartbeatTimer == nil else {
             return // Timer already running
         }
 
-        self.presenceHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: self.presenceHeartbeatInterval, repeats: true) { [weak self] _ in
+        self.channelHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: self.channelHeartbeatInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 guard let self = self else { return }
                 await self.sendHeartbeats()
@@ -685,17 +682,20 @@ public class Client {
     }
 
     /**
-     * `sendHeartbeats` sends heartbeats for all attached presences.
+     * `sendHeartbeats` sends heartbeats for all attached channels.
      */
     private func sendHeartbeats() async {
         for (_, attachment) in self.attachmentMap {
-            if let presenceAttachment = attachment as? Attachment<Presence> {
-                // Only send heartbeats for realtime presences
-                if presenceAttachment.resource.isRealtime() {
+            if let channelAttachment = attachment as? Attachment<Channel> {
+                // Only send heartbeats for realtime channels
+                if channelAttachment.resource.isRealtime() {
                     let now = Date().timeIntervalSince1970
-                    // Send heartbeat if enough time has passed
-                    if now - presenceAttachment.lastHeartbeatTime >= self.presenceHeartbeatInterval {
-                        try? await self.refreshPresence(presenceAttachment.resource)
+                    if now - channelAttachment.lastHeartbeatTime >= self.channelHeartbeatInterval {
+                        do {
+                            try await self.refreshChannel(channelAttachment.resource)
+                        } catch {
+                            Logger.error("Failed heartbeat for channel(\(channelAttachment.resource.getKey())).", error: error)
+                        }
                     }
                 }
             }
@@ -703,21 +703,21 @@ public class Client {
     }
 
     /**
-     * `syncPresence` manually refreshes the presence count for manual mode presences.
+     * `syncChannel` manually refreshes the channel count for manual mode channels.
      * Returns the updated count.
      */
     @discardableResult
-    public func syncPresence(_ presence: Presence) async throws -> Int {
+    public func syncChannel(_ channel: Channel) async throws -> Int {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
-        guard self.has(presence.getKey()) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(presence.getKey()) is not attached")
+        guard let attachment = getChannelAttachment(channel.getKey()) else {
+            throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached")
         }
 
-        try await self.refreshPresence(presence)
-        return presence.getCount()
+        try await self.refreshChannel(attachment.resource)
+        return attachment.resource.getSessionCount()
     }
 
     /**
@@ -735,15 +735,16 @@ public class Client {
     }
 
     /**
-     * `broadcast` broadcasts the given payload to the given topic.
+     * `broadcast` broadcasts the given payload to the given topic over the channel
+     * identified by the given key.
      */
-    public func broadcast(_ docKey: DocKey, topic: String, payload: Payload, options: BroadcastOptions?) async throws {
+    public func broadcast(_ channelKey: String, topic: String, payload: Payload, options: BroadcastOptions?) async throws {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
-        guard let attachment = getDocumentAttachment(docKey) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(docKey) is not attached when \(#function).")
+        guard self.getChannelAttachment(channelKey) != nil else {
+            throw YorkieError(code: .errNotAttached, message: "\(channelKey) is not attached when \(#function).")
         }
 
         guard let clientID = self.id else {
@@ -758,11 +759,11 @@ public class Client {
 
         var request = BroadcastRequest()
         request.clientID = clientID
-        request.documentID = attachment.resourceID
+        request.channelKey = channelKey
         request.topic = topic
         request.payload = payloadData
 
-        try await self.broadcast(docKey: docKey, request: request, maxRetries: maxRetries)
+        try await self.broadcast(channelKey: channelKey, request: request, maxRetries: maxRetries)
     }
 
     /**
@@ -777,7 +778,7 @@ public class Client {
         }
 
         guard let docAttachment = getDocumentAttachment(docKey) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "Can't find attachment by docKey! [\(docKey)]")
+            throw YorkieError(code: .errNotAttached, message: "Can't find attachment by docKey! [\(docKey)]")
         }
 
         let prevSyncMode = docAttachment.syncMode
@@ -825,7 +826,7 @@ public class Client {
         if let doc {
             attachment = self.getDocumentAttachment(doc.getKey())
             guard attachment != nil else {
-                throw YorkieError(code: .errDocumentNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+                throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
             }
         }
 
@@ -951,7 +952,7 @@ public class Client {
         if !self.attachmentMap.keys.contains(key) {
             self.conditions[ClientCondition.watchLoop] = false
             throw YorkieError(
-                code: .errDocumentNotAttached,
+                code: .errNotAttached,
                 message: "\(key) is not attached"
             )
         }
@@ -1004,10 +1005,92 @@ public class Client {
 
             stream.send(request)
 
-            docAttachment.connectStream(stream)
+            docAttachment.connectStream(YorkieServerStream(stream))
 
             docAttachment.resource.publishConnectionEvent(.connected)
         }
+
+        // Handle Channel watch streams. Consumes WatchChannelResponse and
+        // dispatches presence-count updates + remote broadcast events to the
+        // Channel's event system.
+        if let channelAttachment = attachment as? Attachment<Channel> {
+            let stream = self.yorkieService.watchChannel(headers: self.authHeader.makeHeader(key), onResult: { result in
+                Task {
+                    switch result {
+                    case .headers:
+                        break
+                    case .message(let message):
+                        await self.handleWatchChannelResponse(channelKey: key, response: message)
+                    case .complete(_, let error, _):
+                        Logger.debug("[WC] c:\"\(self.key)\" unwatches")
+                        if await self.handleConnectError(error) {
+                            Logger.warning("[WL] c:\"\(self.key)\" channel has Error \(String(describing: error))")
+                            await self.publishChannelAuthErrorIfNeeded(error: error as? ConnectError, channel: channelAttachment.resource, method: "WatchChannel")
+                            try await self.onStreamDisconnect(key, with: channelAttachment)
+                        } else {
+                            if let error = error as? ConnectError {
+                                await channelAttachment.resource.publish(
+                                    ChannelSyncErrorEvent(error: error, method: "WatchChannel")
+                                )
+                            }
+                            await self.setCondition(.watchLoop, value: false)
+                            try await self.onStreamDisconnect(key, with: channelAttachment)
+                        }
+                    }
+                }
+            })
+
+            let request = WatchChannelRequest.with {
+                $0.clientID = id
+                $0.channelKey = channelAttachment.resource.getKey()
+            }
+
+            stream.send(request)
+            channelAttachment.connectStream(YorkieServerStream(stream))
+        }
+    }
+
+    @MainActor
+    private func handleWatchChannelResponse(channelKey: String, response: WatchChannelResponse) {
+        guard let channel = getChannelAttachment(channelKey)?.resource else { return }
+
+        switch response.body {
+        case .initialized(let initialized):
+            if channel.updateSessionCount(Int(initialized.count), initialized.seq) {
+                channel.publish(ChannelPresenceEvent(type: .initialized, count: Int(initialized.count)))
+            }
+        case .event(let event):
+            switch event.type {
+            case .presence:
+                if channel.updateSessionCount(Int(event.count), event.seq) {
+                    channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: Int(event.count)))
+                }
+            case .broadcast:
+                let payload = Payload(jsonData: event.payload)
+                channel.publish(
+                    ChannelBroadcastEvent(
+                        clientID: event.publisher,
+                        topic: event.topic,
+                        payload: payload,
+                        options: nil
+                    )
+                )
+            case .unspecified, .UNRECOGNIZED:
+                break
+            }
+        case .none:
+            break
+        }
+    }
+
+    private func publishChannelAuthErrorIfNeeded(error: ConnectError?, channel: Channel, method: String) {
+        guard let connectError = error else { return }
+        let rawValue = errorCodeOf(error: connectError)
+        guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
+            return
+        }
+        let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
+        channel.publish(ChannelAuthErrorEvent(reason: reason, method: method))
     }
 
     /**
@@ -1017,7 +1100,7 @@ public class Client {
     private func runWatchLoop(_ key: String) throws {
         Logger.debug("[WL] c:\"\(self.key)\" run watch loop")
         guard let anyAttachment = self.attachmentMap[key] else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "\(key) is not attached")
+            throw YorkieError(code: .errNotAttached, message: "\(key) is not attached")
         }
 
         self.setCondition(.watchLoop, value: true)
@@ -1026,10 +1109,10 @@ public class Client {
             // Reset cancelled flag when starting a new watch loop
             docAttachment.cancelled = false
             try self.doWatchLoop(key, with: docAttachment)
-        } else if let presenceAttachment = anyAttachment as? Attachment<Presence> {
+        } else if let channelAttachment = anyAttachment as? Attachment<Channel> {
             // Reset cancelled flag when starting a new watch loop
-            presenceAttachment.cancelled = false
-            try self.doWatchLoop(key, with: presenceAttachment)
+            channelAttachment.cancelled = false
+            try self.doWatchLoop(key, with: channelAttachment)
         }
     }
 
@@ -1105,11 +1188,6 @@ public class Client {
                 if let presence {
                     docAttachment.resource.publishPresenceEvent(.unwatched, publisher, presence)
                 }
-            case .documentBroadcast:
-                let topic = pbWatchEvent.body.topic
-                let payloadData = pbWatchEvent.body.payload
-                let payload = Payload(jsonData: payloadData)
-                docAttachment.resource.publishBroadcastEvent(clientID: publisher, topic: topic, payload: payload)
             default:
                 break
             }
@@ -1153,8 +1231,8 @@ public class Client {
         self.status = .deactivated
 
         // Stop heartbeat timer
-        self.presenceHeartbeatTimer?.invalidate()
-        self.presenceHeartbeatTimer = nil
+        self.channelHeartbeatTimer?.invalidate()
+        self.channelHeartbeatTimer = nil
 
         for (key, _) in self.attachmentMap {
             // Update status based on resource type, but preserve removed status
@@ -1163,9 +1241,9 @@ public class Client {
                 if docAttachment.resource.getStatus() != .removed {
                     docAttachment.resource.applyStatus(.detached)
                 }
-            } else if let presenceAttachment = getPresenceAttachment(key) {
-                if presenceAttachment.resource.getStatus() != .removed {
-                    presenceAttachment.resource.setStatus(.detached)
+            } else if let channelAttachment = getChannelAttachment(key) {
+                if channelAttachment.resource.getStatus() != .removed {
+                    channelAttachment.resource.setStatus(.detached)
                 }
             }
             try self.detachInternal(key)
@@ -1174,10 +1252,9 @@ public class Client {
 
     private func detachInternal(_ key: String) throws {
         if let attachment = getDocumentAttachment(key) {
-            attachment.unsubscribeBroadcastEvent()
             attachment.resource.resetOnlineClients()
             try self.stopWatchLoop(key, with: attachment)
-        } else if let attachment = getPresenceAttachment(key) {
+        } else if let attachment = getChannelAttachment(key) {
             try self.stopWatchLoop(key, with: attachment)
         }
 
@@ -1325,30 +1402,36 @@ public extension Client {
         return min(DefaultBroadcastOptions.initialRetryInterval * pow(2, Double(retryCount)), DefaultBroadcastOptions.maxBackoff)
     }
 
-    private func broadcast(docKey: DocKey, request: BroadcastRequest, maxRetries: Int) async throws {
+    private func broadcast(channelKey: String, request: BroadcastRequest, maxRetries: Int) async throws {
         var retryCount = 0
-        guard let docAttachment = getDocumentAttachment(docKey) else {
-            throw YorkieError(code: .errDocumentNotAttached, message: "document \(docKey) is not attached")
-        }
+        let channelAttachment = self.getChannelAttachment(channelKey)
 
         while retryCount <= maxRetries {
-            let message = await self.yorkieService.broadcast(request: request)
+            let message = await self.yorkieService.broadcast(
+                request: request,
+                headers: self.authHeader.makeHeader(channelKey)
+            )
 
             switch message.result {
             case .success:
-                Logger.info("[BC] c:\(self.key) broadcasted to d: \(request.documentID) t: \(request.topic)")
+                Logger.info("[BC] c:\(self.key) broadcasted to p: \(request.channelKey) t: \(request.topic)")
                 return
             case .failure(let error):
                 Logger.error("[BC] c:\(self.key)", error: error)
 
-                if await !self.handleConnectError(error) {
-                    if YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errUnauthenticated {
-                        docAttachment.resource
-                            .publishAuthErrorEvent(
-                                reason: errorMetadataOf(error: error)["reason"] ?? "AuthError",
-                                method: .broadcast
-                            )
-                    }
+                let recovered = await self.handleConnectError(error)
+                if YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errUnauthenticated,
+                   let channel = channelAttachment?.resource
+                {
+                    channel.publish(
+                        ChannelAuthErrorEvent(
+                            reason: errorMetadataOf(error: error)["reason"] ?? "AuthError",
+                            method: "Broadcast"
+                        )
+                    )
+                }
+                if !recovered {
+                    throw error
                 }
 
                 retryCount += 1

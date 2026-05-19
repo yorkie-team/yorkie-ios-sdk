@@ -72,16 +72,6 @@ public enum DocEventType: String {
     case presenceChanged = "presence-changed"
 
     /**
-     * `broadcast` means that the broadcast event is received from the remote client.
-     */
-    case broadcast
-
-    /**
-     * `localBroadcast` means that the broadcast event is sent from the local client.
-     */
-    case localBroadcast = "local-broadcast"
-
-    /**
      * `authError` indicates an authorization failure in syncLoop or watchLoop.
      */
     case authError = "auth-error"
@@ -291,47 +281,11 @@ public struct PresenceChangedEvent: DocEvent {
 
 public typealias ErrorFn = (Error) -> Void
 
-public struct LocalBroadcastValue {
-    let topic: String
-    let payload: Payload
-}
-
-public struct BroadcastValue {
-    let clientID: ActorID
-    let topic: String
-    let payload: Payload
-}
-
-public struct BroadcastEvent: DocEvent {
-    /**
-     * ``DocEventType/broadcast``
-     */
-    public let type: DocEventType = .broadcast
-    /**
-     * BroadcastEvent type
-     */
-    public let value: BroadcastValue
-    public let options: BroadcastOptions?
-}
-
-public struct LocalBroadcastEvent: DocEvent {
-    /**
-     * ``DocEventType/localBroadcast``
-     */
-    public let type: DocEventType = .localBroadcast
-    /**
-     * LocalBroadcastEvent type
-     */
-    public let value: LocalBroadcastValue
-    public let options: BroadcastOptions?
-}
-
 public struct AuthErrorValue: Equatable {
     public enum Method: CustomStringConvertible {
         case pushPull
         case watchDocuments
         case other(String)
-        case broadcast
 
         public var description: String {
             switch self {
@@ -341,8 +295,6 @@ public struct AuthErrorValue: Equatable {
                 return "WatchDocument"
             case .other(let name):
                 return name
-            case .broadcast:
-                return "Broadcast"
             }
         }
     }

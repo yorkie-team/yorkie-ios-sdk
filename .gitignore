@@ -123,3 +123,6 @@ lcov.info
 */BuildInfo.plist
 
 # End of https://www.toptal.com/developers/gitignore/api/vim
+
+# Local documentation snapshots
+.document/

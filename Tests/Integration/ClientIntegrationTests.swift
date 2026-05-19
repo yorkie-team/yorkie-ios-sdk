@@ -77,7 +77,7 @@ final class ClientIntegrationTests: XCTestCase {
                 XCTFail("error should be ConnectError, but \(type(of: error))")
                 return
             }
-            XCTAssert(code == YorkieError.Code.errDocumentNotDetached)
+            XCTAssert(code == YorkieError.Code.errNotDetached)
         }
 
         try await client.detach(doc)
@@ -88,7 +88,7 @@ final class ClientIntegrationTests: XCTestCase {
                 XCTFail("error should be ConnectError, but \(type(of: error))")
                 return
             }
-            XCTAssert(code == YorkieError.Code.errDocumentNotAttached)
+            XCTAssert(code == YorkieError.Code.errNotAttached)
         }
 
         try await client.deactivate()
@@ -1018,6 +1018,11 @@ final class ClientIntegrationTests: XCTestCase {
         XCTAssertFalse(c1.getCondition(.syncLoop))
     }
 
+    // NOTE(yorkie-ios-sdk v0.6.36 sync): broadcast moved from Document to Channel
+    // upstream. The Channel-based port lives in `ChannelIntegrationTests.swift`.
+    // The block below references the removed `Document.broadcast` / `Document.subscribeBroadcast`
+    // API and is kept disabled for historical reference only.
+    #if false
     @MainActor
     func test_should_successfully_broadcast_serializeable_payload() async throws {
         let c1 = Client(rpcAddress)
@@ -1331,4 +1336,5 @@ final class ClientIntegrationTests: XCTestCase {
             await d2.unsubscribeBroadcast()
         }
     }
+    #endif
 }
