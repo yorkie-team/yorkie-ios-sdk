@@ -15,7 +15,7 @@
  */
 
 import XCTest
-@testable import Yorkie
+@testable @preconcurrency import Yorkie
 
 func parseSimpleXML(_ string: String) -> [String] {
     var res: [String] = []

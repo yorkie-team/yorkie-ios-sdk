@@ -57,6 +57,7 @@ let package = Package(
             name: "YorkieBenchmarkTests",
             dependencies: ["Yorkie", "YorkieTestHelper"],
             path: "Tests/Benchmark",
+            resources: [.process("editing-trace.json")],
             swiftSettings: [.define("SWIFT_TEST")]
         )
     ]

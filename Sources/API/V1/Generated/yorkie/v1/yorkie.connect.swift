@@ -54,33 +54,33 @@ public protocol Yorkie_V1_YorkieServiceClientInterface: Sendable {
     func `watchDocument`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
 
     @discardableResult
+    func `attachChannel`(request: Yorkie_V1_AttachChannelRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_AttachChannelResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `attachChannel`(request: Yorkie_V1_AttachChannelRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_AttachChannelResponse>
+
+    @discardableResult
+    func `detachChannel`(request: Yorkie_V1_DetachChannelRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_DetachChannelResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `detachChannel`(request: Yorkie_V1_DetachChannelRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_DetachChannelResponse>
+
+    @discardableResult
+    func `refreshChannel`(request: Yorkie_V1_RefreshChannelRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_RefreshChannelResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `refreshChannel`(request: Yorkie_V1_RefreshChannelRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_RefreshChannelResponse>
+
+    func `watchChannel`(headers: Connect.Headers, onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchChannelResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchChannelRequest>
+
+    @available(iOS 13, *)
+    func `watchChannel`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchChannelRequest, Yorkie_V1_WatchChannelResponse>
+
+    @discardableResult
     func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_BroadcastResponse>) -> Void) -> Connect.Cancelable
 
     @available(iOS 13, *)
     func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_BroadcastResponse>
-
-    @discardableResult
-    func `attachPresence`(request: Yorkie_V1_AttachPresenceRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_AttachPresenceResponse>) -> Void) -> Connect.Cancelable
-
-    @available(iOS 13, *)
-    func `attachPresence`(request: Yorkie_V1_AttachPresenceRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_AttachPresenceResponse>
-
-    @discardableResult
-    func `detachPresence`(request: Yorkie_V1_DetachPresenceRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_DetachPresenceResponse>) -> Void) -> Connect.Cancelable
-
-    @available(iOS 13, *)
-    func `detachPresence`(request: Yorkie_V1_DetachPresenceRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_DetachPresenceResponse>
-
-    @discardableResult
-    func `refreshPresence`(request: Yorkie_V1_RefreshPresenceRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_RefreshPresenceResponse>) -> Void) -> Connect.Cancelable
-
-    @available(iOS 13, *)
-    func `refreshPresence`(request: Yorkie_V1_RefreshPresenceRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_RefreshPresenceResponse>
-
-    func `watchPresence`(headers: Connect.Headers, onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchPresenceResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchPresenceRequest>
-
-    @available(iOS 13, *)
-    func `watchPresence`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchPresenceRequest, Yorkie_V1_WatchPresenceResponse>
 }
 
 /// Concrete implementation of `Yorkie_V1_YorkieServiceClientInterface`.
@@ -161,6 +161,45 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
     }
 
     @discardableResult
+    public func `attachChannel`(request: Yorkie_V1_AttachChannelRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_AttachChannelResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/AttachChannel", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `attachChannel`(request: Yorkie_V1_AttachChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_AttachChannelResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/AttachChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @discardableResult
+    public func `detachChannel`(request: Yorkie_V1_DetachChannelRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_DetachChannelResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/DetachChannel", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `detachChannel`(request: Yorkie_V1_DetachChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_DetachChannelResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/DetachChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @discardableResult
+    public func `refreshChannel`(request: Yorkie_V1_RefreshChannelRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_RefreshChannelResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/RefreshChannel", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `refreshChannel`(request: Yorkie_V1_RefreshChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_RefreshChannelResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/RefreshChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    public func `watchChannel`(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchChannelResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchChannelRequest> {
+        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchChannel", headers: headers, onResult: onResult)
+    }
+
+    @available(iOS 13, *)
+    public func `watchChannel`(headers: Connect.Headers = [:]) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchChannelRequest, Yorkie_V1_WatchChannelResponse> {
+        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchChannel", headers: headers)
+    }
+
+    @discardableResult
     public func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_BroadcastResponse>) -> Void) -> Connect.Cancelable {
         return self.client.unary(path: "/yorkie.v1.YorkieService/Broadcast", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
     }
@@ -168,45 +207,6 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
     @available(iOS 13, *)
     public func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_BroadcastResponse> {
         return await self.client.unary(path: "/yorkie.v1.YorkieService/Broadcast", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
-    @discardableResult
-    public func `attachPresence`(request: Yorkie_V1_AttachPresenceRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_AttachPresenceResponse>) -> Void) -> Connect.Cancelable {
-        return self.client.unary(path: "/yorkie.v1.YorkieService/AttachPresence", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
-    }
-
-    @available(iOS 13, *)
-    public func `attachPresence`(request: Yorkie_V1_AttachPresenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_AttachPresenceResponse> {
-        return await self.client.unary(path: "/yorkie.v1.YorkieService/AttachPresence", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
-    @discardableResult
-    public func `detachPresence`(request: Yorkie_V1_DetachPresenceRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_DetachPresenceResponse>) -> Void) -> Connect.Cancelable {
-        return self.client.unary(path: "/yorkie.v1.YorkieService/DetachPresence", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
-    }
-
-    @available(iOS 13, *)
-    public func `detachPresence`(request: Yorkie_V1_DetachPresenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_DetachPresenceResponse> {
-        return await self.client.unary(path: "/yorkie.v1.YorkieService/DetachPresence", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
-    @discardableResult
-    public func `refreshPresence`(request: Yorkie_V1_RefreshPresenceRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_RefreshPresenceResponse>) -> Void) -> Connect.Cancelable {
-        return self.client.unary(path: "/yorkie.v1.YorkieService/RefreshPresence", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
-    }
-
-    @available(iOS 13, *)
-    public func `refreshPresence`(request: Yorkie_V1_RefreshPresenceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_RefreshPresenceResponse> {
-        return await self.client.unary(path: "/yorkie.v1.YorkieService/RefreshPresence", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
-    public func `watchPresence`(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchPresenceResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchPresenceRequest> {
-        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchPresence", headers: headers, onResult: onResult)
-    }
-
-    @available(iOS 13, *)
-    public func `watchPresence`(headers: Connect.Headers = [:]) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchPresenceRequest, Yorkie_V1_WatchPresenceResponse> {
-        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchPresence", headers: headers)
     }
 
     public enum Metadata {
@@ -218,11 +218,11 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
             public static let removeDocument = Connect.MethodSpec(name: "RemoveDocument", service: "yorkie.v1.YorkieService", type: .unary)
             public static let pushPullChanges = Connect.MethodSpec(name: "PushPullChanges", service: "yorkie.v1.YorkieService", type: .unary)
             public static let watchDocument = Connect.MethodSpec(name: "WatchDocument", service: "yorkie.v1.YorkieService", type: .serverStream)
+            public static let attachChannel = Connect.MethodSpec(name: "AttachChannel", service: "yorkie.v1.YorkieService", type: .unary)
+            public static let detachChannel = Connect.MethodSpec(name: "DetachChannel", service: "yorkie.v1.YorkieService", type: .unary)
+            public static let refreshChannel = Connect.MethodSpec(name: "RefreshChannel", service: "yorkie.v1.YorkieService", type: .unary)
+            public static let watchChannel = Connect.MethodSpec(name: "WatchChannel", service: "yorkie.v1.YorkieService", type: .serverStream)
             public static let broadcast = Connect.MethodSpec(name: "Broadcast", service: "yorkie.v1.YorkieService", type: .unary)
-            public static let attachPresence = Connect.MethodSpec(name: "AttachPresence", service: "yorkie.v1.YorkieService", type: .unary)
-            public static let detachPresence = Connect.MethodSpec(name: "DetachPresence", service: "yorkie.v1.YorkieService", type: .unary)
-            public static let refreshPresence = Connect.MethodSpec(name: "RefreshPresence", service: "yorkie.v1.YorkieService", type: .unary)
-            public static let watchPresence = Connect.MethodSpec(name: "WatchPresence", service: "yorkie.v1.YorkieService", type: .serverStream)
         }
     }
 }

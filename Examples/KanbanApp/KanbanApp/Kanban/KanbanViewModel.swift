@@ -18,6 +18,7 @@ import Combine
 import Foundation
 import Yorkie
 
+@MainActor
 class KanbanViewModel: ObservableObject {
     private(set) var defaultColumns: [KanbanColumn] = [
         KanbanColumn(title: "todo", cards: [
@@ -45,7 +46,7 @@ class KanbanViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
 
-            await self.document.subscribe { _, document in
+            self.document.subscribe { _, document in
                 Task { @MainActor [weak self] in
                     guard let self, let lists = document.getRoot().lists as? JSONArray else { return }
 
@@ -74,7 +75,7 @@ class KanbanViewModel: ObservableObject {
 
     func addColumn(title: String) {
         Task {
-            try? await self.document.update { root, _ in
+            try? self.document.update { root, _ in
                 var lists = root.lists as? JSONArray
                 if lists == nil {
                     root.lists = JSONArray()
@@ -89,7 +90,7 @@ class KanbanViewModel: ObservableObject {
 
     func deleteColumn(_ column: KanbanColumn) {
         Task {
-            try? await self.document.update { root, _ in
+            try? self.document.update { root, _ in
                 guard let lists = root.lists as? JSONArray else { return }
                 lists.remove(byID: column.id)
             }
@@ -98,7 +99,7 @@ class KanbanViewModel: ObservableObject {
 
     func addCard(title: String, columnId: TimeTicket) {
         Task {
-            try? await self.document.update { root, _ in
+            try? self.document.update { root, _ in
                 guard let lists = root.lists as? JSONArray,
                       let column = lists.getElement(byID: columnId) as? JSONObject,
                       let cards = column.cards as? JSONArray
@@ -114,7 +115,7 @@ class KanbanViewModel: ObservableObject {
 
     func deleteCard(_ card: KanbanCard) {
         Task {
-            try? await self.document.update { root, _ in
+            try? self.document.update { root, _ in
                 guard let lists = root.lists as? JSONArray,
                       let column = lists.getElement(byID: card.columnId) as? JSONObject,
                       let cards = column.cards as? JSONArray

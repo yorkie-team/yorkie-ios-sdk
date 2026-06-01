@@ -41,6 +41,7 @@ class ContentViewModel {
     private(set) var state = ContentState.loading
 
     init() {
+        print(Constant.serverAddress)
         self.client = Client(Constant.serverAddress)
         self.document = Document(key: Constant.documentKey)
     }

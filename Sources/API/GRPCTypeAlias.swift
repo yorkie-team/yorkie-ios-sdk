@@ -20,7 +20,18 @@ import Foundation
 import Connect
 
 typealias YorkieServiceClient = Yorkie_V1_YorkieServiceClient
-typealias YorkieServerStream = Connect.ServerOnlyStreamInterface<WatchDocumentRequest>
+
+/// Abstraction over the generic `Connect.ServerOnlyStreamInterface<Input>` so
+/// `Attachment` can hold either a Document watch stream or a Channel watch
+/// stream without leaking the specific request type. Only `cancel()` is needed
+/// by callers; everything else is type-specific and handled at the call site.
+struct YorkieServerStream: @unchecked Sendable {
+    private let _cancel: () -> Void
+    init<Input: Sendable>(_ stream: any Connect.ServerOnlyStreamInterface<Input>) {
+        self._cancel = { stream.cancel() }
+    }
+    func cancel() { self._cancel() }
+}
 
 typealias ActivateClientRequest = Yorkie_V1_ActivateClientRequest
 typealias ActivateClientResponse = Yorkie_V1_ActivateClientResponse
@@ -38,16 +49,16 @@ typealias RemoveDocumentRequest = Yorkie_V1_RemoveDocumentRequest
 typealias RemoveDocumentResponse = Yorkie_V1_RemoveDocumentResponse
 typealias BroadcastRequest = Yorkie_V1_BroadcastRequest
 typealias BroadcastResponse = Yorkie_V1_BroadcastResponse
-typealias AttachPresenceRequest = Yorkie_V1_AttachPresenceRequest
-typealias AttachPresenceResponse = Yorkie_V1_AttachPresenceResponse
-typealias DetachPresenceRequest = Yorkie_V1_DetachPresenceRequest
-typealias DetachPresenceResponse = Yorkie_V1_DetachPresenceResponse
-typealias RefreshPresenceRequest = Yorkie_V1_RefreshPresenceRequest
-typealias RefreshPresenceResponse = Yorkie_V1_RefreshPresenceResponse
-typealias WatchPresenceRequest = Yorkie_V1_WatchPresenceRequest
-typealias WatchPresenceResponse = Yorkie_V1_WatchPresenceResponse
-typealias PresenceEvent = Yorkie_V1_PresenceEvent
-typealias PresenceEventType = Yorkie_V1_PresenceEventType
+typealias AttachChannelRequest = Yorkie_V1_AttachChannelRequest
+typealias AttachChannelResponse = Yorkie_V1_AttachChannelResponse
+typealias DetachChannelRequest = Yorkie_V1_DetachChannelRequest
+typealias DetachChannelResponse = Yorkie_V1_DetachChannelResponse
+typealias RefreshChannelRequest = Yorkie_V1_RefreshChannelRequest
+typealias RefreshChannelResponse = Yorkie_V1_RefreshChannelResponse
+typealias WatchChannelRequest = Yorkie_V1_WatchChannelRequest
+typealias WatchChannelResponse = Yorkie_V1_WatchChannelResponse
+typealias PbChannelEvent = Yorkie_V1_ChannelEvent
+typealias PbChannelEventType = Yorkie_V1_ChannelEvent.TypeEnum
 
 
 typealias PbChange = Yorkie_V1_Change

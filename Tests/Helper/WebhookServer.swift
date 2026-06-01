@@ -41,8 +41,10 @@ final class WebhookServer {
             .childChannelOption(ChannelOptions.maxMessagesPerRead, value: 16)
             .childChannelOption(ChannelOptions.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
 
-        self.channel = try bootstrap.bind(host: "127.0.0.1", port: self.port).wait()
-        print("✅ Webhook server started on port \(self.port)")
+        // Bind on 0.0.0.0 so the server is reachable both from the host (CI runs
+        // yorkie natively) and from a Docker-hosted yorkie via host.docker.internal.
+        self.channel = try bootstrap.bind(host: "0.0.0.0", port: self.port).wait()
+        print("✅ Webhook server started on port \(self.port) (advertising host: \(Self.advertisedHost))")
     }
 
     func stop() {
@@ -52,8 +54,17 @@ final class WebhookServer {
     }
 
     var authWebhookUrl: String {
-        return "http://127.0.0.1:\(self.port)/auth-webhook"
+        return "http://\(Self.advertisedHost):\(self.port)/auth-webhook"
     }
+
+    /// Host that the *yorkie server* will use to reach this webhook.
+    /// Defaults to `127.0.0.1` (works for the native server on the same host,
+    /// matching CI). When yorkie is running inside Docker, export
+    /// `WEBHOOK_HOST=host.docker.internal` before `swift test`.
+    private static let advertisedHost: String = {
+        let override = ProcessInfo.processInfo.environment["WEBHOOK_HOST"] ?? ""
+        return override.isEmpty ? "127.0.0.1" : override
+    }()
 }
 
 final class WebhookRequestHandler: ChannelInboundHandler {

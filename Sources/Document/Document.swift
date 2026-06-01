@@ -18,22 +18,6 @@ import Combine
 import Foundation
 
 /**
- * `BroadcastOptions` are the options for configuring broadcast behavior.
- *
- * @public
- */
-public struct BroadcastOptions {
-    /**
-     * `error` is called when an error occurs.
-     */
-    let error: ErrorFn?
-    /**
-     * `maxRetries` is the maximum number of retries.
-     */
-    let maxRetries: Int?
-}
-
-/**
  * `DocumentOptions` are the options to create a new document.
  *
  * @public
@@ -109,8 +93,6 @@ public class Document: Attachable {
     private var connectionSubscribeCallback: SubscribeCallback?
     private var statusSubscribeCallback: SubscribeCallback?
     private var syncSubscribeCallback: SubscribeCallback?
-    private var broadcastSubscribeCallback: SubscribeCallback?
-    private var localBroadcastSubscribeCallback: SubscribeCallback?
     private var authErrorSubscribeCallback: SubscribeCallback?
 
     /**
@@ -137,7 +119,7 @@ public class Document: Attachable {
      * `update` executes the given updater to update this document.
      */
     public func update(
-        _ updater: (_ root: JSONObject, _ presence: inout DocPresence) throws -> Void,
+        _ updater: (_ root: JSONObject, _ presence: inout Presence) throws -> Void,
         _ message: String? = nil
     ) throws {
         guard self.status != .removed else {
@@ -162,7 +144,7 @@ public class Document: Attachable {
             self.clone?.presences[actorID] = [:]
         }
 
-        var presence = DocPresence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
+        var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
 
         try updater(proxy, &presence)
 
@@ -263,22 +245,6 @@ public class Document: Attachable {
     }
 
     /**
-     * `subscribeBroadcast` registers a callback to subscribe to events on the document.
-     * The callback will be called when the broadcast event is received from the remote client.
-     */
-    public func subscribeBroadcast(_ callback: @escaping SubscribeCallback) {
-        self.broadcastSubscribeCallback = callback
-    }
-
-    /**
-     * `subscribeLocalBroadcast` registers a callback to subscribe to events on the document.
-     * The callback will be called when the local client sends a broadcast event.
-     */
-    public func subscribeLocalBroadcast(_ callback: @escaping SubscribeCallback) {
-        self.localBroadcastSubscribeCallback = callback
-    }
-
-    /**
      * `subscribeAuthError` registers a callback to subscribe to events on the document.
      * The callback will be called when the authentification error occurs.
      */
@@ -316,20 +282,6 @@ public class Document: Attachable {
      */
     public func unsubscribeSync() {
         self.syncSubscribeCallback = nil
-    }
-
-    /**
-     * `unsubscribeBroadcast` unregisters a callback to subscribe to events on the document.
-     */
-    public func unsubscribeBroadcast() {
-        self.broadcastSubscribeCallback = nil
-    }
-
-    /**
-     * `unsubscribeLocalBroadcast` unregisters a callback to subscribe to events on the document.
-     */
-    public func unsubscribeLocalBroadcast() {
-        self.localBroadcastSubscribeCallback = nil
     }
 
     /**
@@ -775,12 +727,6 @@ public class Document: Attachable {
         self.publish(InitializedEvent(value: self.getPresences()))
     }
 
-    func publishBroadcastEvent(clientID: ActorID, topic: String, payload: Payload) {
-        let value = BroadcastValue(clientID: clientID, topic: topic, payload: payload)
-        let broadcastEvent = BroadcastEvent(value: value, options: nil)
-        self.publish(broadcastEvent)
-    }
-
     func publishAuthErrorEvent(reason: String, method: AuthErrorValue.Method) {
         let authErrorEvent = AuthErrorEvent(value: AuthErrorValue(reason: reason, method: method))
         self.publish(authErrorEvent)
@@ -836,10 +782,6 @@ public class Document: Attachable {
             self.syncSubscribeCallback?(event, self)
         } else if event.type == .snapshot {
             self.subscribeCallbacks["$"]?(event, self)
-        } else if let localBroadcastEvent = event as? LocalBroadcastEvent {
-            self.localBroadcastSubscribeCallback?(localBroadcastEvent, self)
-        } else if let broadcastEvent = event as? BroadcastEvent {
-            self.broadcastSubscribeCallback?(broadcastEvent, self)
         } else if let authErrorEvent = event as? AuthErrorEvent {
             self.authErrorSubscribeCallback?(authErrorEvent, self)
         } else if let event = event as? ChangeEvent {
@@ -1010,15 +952,6 @@ public class Document: Attachable {
         }
 
         return presences
-    }
-
-    /**
-     * `broadcast` the payload to the given topic.
-     */
-    public func broadcast(topic: String, payload: Payload, options: BroadcastOptions? = nil) {
-        let value = LocalBroadcastValue(topic: topic, payload: payload)
-        let localBroadcastEvent = LocalBroadcastEvent(value: value, options: options)
-        self.publish(localBroadcastEvent)
     }
 
     /**

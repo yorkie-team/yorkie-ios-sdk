@@ -23,7 +23,11 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -160,36 +164,6 @@ public enum Yorkie_V1_DocEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum Yorkie_V1_PresenceEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case countChanged // = 0
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .countChanged
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .countChanged
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .countChanged: return 0
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [Yorkie_V1_PresenceEventType] = [
-    .countChanged,
-  ]
-
-}
-
 //////////////////////////////////////////
 /// Messages for Snapshot               //
 //////////////////////////////////////////
@@ -199,11 +173,11 @@ public struct Yorkie_V1_Snapshot: Sendable {
   // methods supported on all messages.
 
   public var root: Yorkie_V1_JSONElement {
-    get {return _root ?? Yorkie_V1_JSONElement()}
+    get {_root ?? Yorkie_V1_JSONElement()}
     set {_root = newValue}
   }
   /// Returns true if `root` has been explicitly set.
-  public var hasRoot: Bool {return self._root != nil}
+  public var hasRoot: Bool {self._root != nil}
   /// Clears the value of `root`. Subsequent reads from it will return its default value.
   public mutating func clearRoot() {self._root = nil}
 
@@ -226,11 +200,11 @@ public struct Yorkie_V1_ChangePack: Sendable {
   public var documentKey: String = String()
 
   public var checkpoint: Yorkie_V1_Checkpoint {
-    get {return _checkpoint ?? Yorkie_V1_Checkpoint()}
+    get {_checkpoint ?? Yorkie_V1_Checkpoint()}
     set {_checkpoint = newValue}
   }
   /// Returns true if `checkpoint` has been explicitly set.
-  public var hasCheckpoint: Bool {return self._checkpoint != nil}
+  public var hasCheckpoint: Bool {self._checkpoint != nil}
   /// Clears the value of `checkpoint`. Subsequent reads from it will return its default value.
   public mutating func clearCheckpoint() {self._checkpoint = nil}
 
@@ -240,22 +214,22 @@ public struct Yorkie_V1_ChangePack: Sendable {
 
   /// deprecated
   public var minSyncedTicket: Yorkie_V1_TimeTicket {
-    get {return _minSyncedTicket ?? Yorkie_V1_TimeTicket()}
+    get {_minSyncedTicket ?? Yorkie_V1_TimeTicket()}
     set {_minSyncedTicket = newValue}
   }
   /// Returns true if `minSyncedTicket` has been explicitly set.
-  public var hasMinSyncedTicket: Bool {return self._minSyncedTicket != nil}
+  public var hasMinSyncedTicket: Bool {self._minSyncedTicket != nil}
   /// Clears the value of `minSyncedTicket`. Subsequent reads from it will return its default value.
   public mutating func clearMinSyncedTicket() {self._minSyncedTicket = nil}
 
   public var isRemoved: Bool = false
 
   public var versionVector: Yorkie_V1_VersionVector {
-    get {return _versionVector ?? Yorkie_V1_VersionVector()}
+    get {_versionVector ?? Yorkie_V1_VersionVector()}
     set {_versionVector = newValue}
   }
   /// Returns true if `versionVector` has been explicitly set.
-  public var hasVersionVector: Bool {return self._versionVector != nil}
+  public var hasVersionVector: Bool {self._versionVector != nil}
   /// Clears the value of `versionVector`. Subsequent reads from it will return its default value.
   public mutating func clearVersionVector() {self._versionVector = nil}
 
@@ -274,11 +248,11 @@ public struct Yorkie_V1_Change: Sendable {
   // methods supported on all messages.
 
   public var id: Yorkie_V1_ChangeID {
-    get {return _id ?? Yorkie_V1_ChangeID()}
+    get {_id ?? Yorkie_V1_ChangeID()}
     set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  public var hasID: Bool {return self._id != nil}
+  public var hasID: Bool {self._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   public mutating func clearID() {self._id = nil}
 
@@ -287,11 +261,11 @@ public struct Yorkie_V1_Change: Sendable {
   public var operations: [Yorkie_V1_Operation] = []
 
   public var presenceChange: Yorkie_V1_PresenceChange {
-    get {return _presenceChange ?? Yorkie_V1_PresenceChange()}
+    get {_presenceChange ?? Yorkie_V1_PresenceChange()}
     set {_presenceChange = newValue}
   }
   /// Returns true if `presenceChange` has been explicitly set.
-  public var hasPresenceChange: Bool {return self._presenceChange != nil}
+  public var hasPresenceChange: Bool {self._presenceChange != nil}
   /// Clears the value of `presenceChange`. Subsequent reads from it will return its default value.
   public mutating func clearPresenceChange() {self._presenceChange = nil}
 
@@ -317,11 +291,11 @@ public struct Yorkie_V1_ChangeID: Sendable {
   public var actorID: Data = Data()
 
   public var versionVector: Yorkie_V1_VersionVector {
-    get {return _versionVector ?? Yorkie_V1_VersionVector()}
+    get {_versionVector ?? Yorkie_V1_VersionVector()}
     set {_versionVector = newValue}
   }
   /// Returns true if `versionVector` has been explicitly set.
-  public var hasVersionVector: Bool {return self._versionVector != nil}
+  public var hasVersionVector: Bool {self._versionVector != nil}
   /// Clears the value of `versionVector`. Subsequent reads from it will return its default value.
   public mutating func clearVersionVector() {self._versionVector = nil}
 
@@ -453,34 +427,34 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var key: String {
-      get {return _storage._key}
+      get {_storage._key}
       set {_uniqueStorage()._key = newValue}
     }
 
     public var value: Yorkie_V1_JSONElementSimple {
-      get {return _storage._value ?? Yorkie_V1_JSONElementSimple()}
+      get {_storage._value ?? Yorkie_V1_JSONElementSimple()}
       set {_uniqueStorage()._value = newValue}
     }
     /// Returns true if `value` has been explicitly set.
-    public var hasValue: Bool {return _storage._value != nil}
+    public var hasValue: Bool {_storage._value != nil}
     /// Clears the value of `value`. Subsequent reads from it will return its default value.
     public mutating func clearValue() {_uniqueStorage()._value = nil}
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
@@ -497,38 +471,38 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var prevCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._prevCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._prevCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._prevCreatedAt = newValue}
     }
     /// Returns true if `prevCreatedAt` has been explicitly set.
-    public var hasPrevCreatedAt: Bool {return _storage._prevCreatedAt != nil}
+    public var hasPrevCreatedAt: Bool {_storage._prevCreatedAt != nil}
     /// Clears the value of `prevCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearPrevCreatedAt() {_uniqueStorage()._prevCreatedAt = nil}
 
     public var value: Yorkie_V1_JSONElementSimple {
-      get {return _storage._value ?? Yorkie_V1_JSONElementSimple()}
+      get {_storage._value ?? Yorkie_V1_JSONElementSimple()}
       set {_uniqueStorage()._value = newValue}
     }
     /// Returns true if `value` has been explicitly set.
-    public var hasValue: Bool {return _storage._value != nil}
+    public var hasValue: Bool {_storage._value != nil}
     /// Clears the value of `value`. Subsequent reads from it will return its default value.
     public mutating func clearValue() {_uniqueStorage()._value = nil}
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
@@ -545,38 +519,38 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return self._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {self._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {self._parentCreatedAt = nil}
 
     public var prevCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _prevCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_prevCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_prevCreatedAt = newValue}
     }
     /// Returns true if `prevCreatedAt` has been explicitly set.
-    public var hasPrevCreatedAt: Bool {return self._prevCreatedAt != nil}
+    public var hasPrevCreatedAt: Bool {self._prevCreatedAt != nil}
     /// Clears the value of `prevCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearPrevCreatedAt() {self._prevCreatedAt = nil}
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_executedAt ?? Yorkie_V1_TimeTicket()}
       set {_executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return self._executedAt != nil}
+    public var hasExecutedAt: Bool {self._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {self._executedAt = nil}
 
@@ -596,29 +570,29 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return self._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {self._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {self._parentCreatedAt = nil}
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_executedAt ?? Yorkie_V1_TimeTicket()}
       set {_executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return self._executedAt != nil}
+    public var hasExecutedAt: Bool {self._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {self._executedAt = nil}
 
@@ -637,54 +611,54 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var from: Yorkie_V1_TextNodePos {
-      get {return _storage._from ?? Yorkie_V1_TextNodePos()}
+      get {_storage._from ?? Yorkie_V1_TextNodePos()}
       set {_uniqueStorage()._from = newValue}
     }
     /// Returns true if `from` has been explicitly set.
-    public var hasFrom: Bool {return _storage._from != nil}
+    public var hasFrom: Bool {_storage._from != nil}
     /// Clears the value of `from`. Subsequent reads from it will return its default value.
     public mutating func clearFrom() {_uniqueStorage()._from = nil}
 
     public var to: Yorkie_V1_TextNodePos {
-      get {return _storage._to ?? Yorkie_V1_TextNodePos()}
+      get {_storage._to ?? Yorkie_V1_TextNodePos()}
       set {_uniqueStorage()._to = newValue}
     }
     /// Returns true if `to` has been explicitly set.
-    public var hasTo: Bool {return _storage._to != nil}
+    public var hasTo: Bool {_storage._to != nil}
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     public mutating func clearTo() {_uniqueStorage()._to = nil}
 
     /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
-      get {return _storage._createdAtMapByActor}
+      get {_storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
     }
 
     public var content: String {
-      get {return _storage._content}
+      get {_storage._content}
       set {_uniqueStorage()._content = newValue}
     }
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
     public var attributes: Dictionary<String,String> {
-      get {return _storage._attributes}
+      get {_storage._attributes}
       set {_uniqueStorage()._attributes = newValue}
     }
 
@@ -701,49 +675,49 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var from: Yorkie_V1_TextNodePos {
-      get {return _storage._from ?? Yorkie_V1_TextNodePos()}
+      get {_storage._from ?? Yorkie_V1_TextNodePos()}
       set {_uniqueStorage()._from = newValue}
     }
     /// Returns true if `from` has been explicitly set.
-    public var hasFrom: Bool {return _storage._from != nil}
+    public var hasFrom: Bool {_storage._from != nil}
     /// Clears the value of `from`. Subsequent reads from it will return its default value.
     public mutating func clearFrom() {_uniqueStorage()._from = nil}
 
     public var to: Yorkie_V1_TextNodePos {
-      get {return _storage._to ?? Yorkie_V1_TextNodePos()}
+      get {_storage._to ?? Yorkie_V1_TextNodePos()}
       set {_uniqueStorage()._to = newValue}
     }
     /// Returns true if `to` has been explicitly set.
-    public var hasTo: Bool {return _storage._to != nil}
+    public var hasTo: Bool {_storage._to != nil}
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     public mutating func clearTo() {_uniqueStorage()._to = nil}
 
     public var attributes: Dictionary<String,String> {
-      get {return _storage._attributes}
+      get {_storage._attributes}
       set {_uniqueStorage()._attributes = newValue}
     }
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
     /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
-      get {return _storage._createdAtMapByActor}
+      get {_storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
     }
 
@@ -760,29 +734,29 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var value: Yorkie_V1_JSONElementSimple {
-      get {return _storage._value ?? Yorkie_V1_JSONElementSimple()}
+      get {_storage._value ?? Yorkie_V1_JSONElementSimple()}
       set {_uniqueStorage()._value = newValue}
     }
     /// Returns true if `value` has been explicitly set.
-    public var hasValue: Bool {return _storage._value != nil}
+    public var hasValue: Bool {_storage._value != nil}
     /// Clears the value of `value`. Subsequent reads from it will return its default value.
     public mutating func clearValue() {_uniqueStorage()._value = nil}
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
@@ -799,54 +773,54 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var from: Yorkie_V1_TreePos {
-      get {return _storage._from ?? Yorkie_V1_TreePos()}
+      get {_storage._from ?? Yorkie_V1_TreePos()}
       set {_uniqueStorage()._from = newValue}
     }
     /// Returns true if `from` has been explicitly set.
-    public var hasFrom: Bool {return _storage._from != nil}
+    public var hasFrom: Bool {_storage._from != nil}
     /// Clears the value of `from`. Subsequent reads from it will return its default value.
     public mutating func clearFrom() {_uniqueStorage()._from = nil}
 
     public var to: Yorkie_V1_TreePos {
-      get {return _storage._to ?? Yorkie_V1_TreePos()}
+      get {_storage._to ?? Yorkie_V1_TreePos()}
       set {_uniqueStorage()._to = newValue}
     }
     /// Returns true if `to` has been explicitly set.
-    public var hasTo: Bool {return _storage._to != nil}
+    public var hasTo: Bool {_storage._to != nil}
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     public mutating func clearTo() {_uniqueStorage()._to = nil}
 
     /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
-      get {return _storage._createdAtMapByActor}
+      get {_storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
     }
 
     public var contents: [Yorkie_V1_TreeNodes] {
-      get {return _storage._contents}
+      get {_storage._contents}
       set {_uniqueStorage()._contents = newValue}
     }
 
     public var splitLevel: Int32 {
-      get {return _storage._splitLevel}
+      get {_storage._splitLevel}
       set {_uniqueStorage()._splitLevel = newValue}
     }
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
@@ -863,54 +837,54 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var from: Yorkie_V1_TreePos {
-      get {return _storage._from ?? Yorkie_V1_TreePos()}
+      get {_storage._from ?? Yorkie_V1_TreePos()}
       set {_uniqueStorage()._from = newValue}
     }
     /// Returns true if `from` has been explicitly set.
-    public var hasFrom: Bool {return _storage._from != nil}
+    public var hasFrom: Bool {_storage._from != nil}
     /// Clears the value of `from`. Subsequent reads from it will return its default value.
     public mutating func clearFrom() {_uniqueStorage()._from = nil}
 
     public var to: Yorkie_V1_TreePos {
-      get {return _storage._to ?? Yorkie_V1_TreePos()}
+      get {_storage._to ?? Yorkie_V1_TreePos()}
       set {_uniqueStorage()._to = newValue}
     }
     /// Returns true if `to` has been explicitly set.
-    public var hasTo: Bool {return _storage._to != nil}
+    public var hasTo: Bool {_storage._to != nil}
     /// Clears the value of `to`. Subsequent reads from it will return its default value.
     public mutating func clearTo() {_uniqueStorage()._to = nil}
 
     public var attributes: Dictionary<String,String> {
-      get {return _storage._attributes}
+      get {_storage._attributes}
       set {_uniqueStorage()._attributes = newValue}
     }
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
     public var attributesToRemove: [String] {
-      get {return _storage._attributesToRemove}
+      get {_storage._attributesToRemove}
       set {_uniqueStorage()._attributesToRemove = newValue}
     }
 
     /// deprecated
     public var createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> {
-      get {return _storage._createdAtMapByActor}
+      get {_storage._createdAtMapByActor}
       set {_uniqueStorage()._createdAtMapByActor = newValue}
     }
 
@@ -927,38 +901,38 @@ public struct Yorkie_V1_Operation: Sendable {
     // methods supported on all messages.
 
     public var parentCreatedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._parentCreatedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._parentCreatedAt = newValue}
     }
     /// Returns true if `parentCreatedAt` has been explicitly set.
-    public var hasParentCreatedAt: Bool {return _storage._parentCreatedAt != nil}
+    public var hasParentCreatedAt: Bool {_storage._parentCreatedAt != nil}
     /// Clears the value of `parentCreatedAt`. Subsequent reads from it will return its default value.
     public mutating func clearParentCreatedAt() {_uniqueStorage()._parentCreatedAt = nil}
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _storage._createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._createdAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return _storage._createdAt != nil}
+    public var hasCreatedAt: Bool {_storage._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {_uniqueStorage()._createdAt = nil}
 
     public var value: Yorkie_V1_JSONElementSimple {
-      get {return _storage._value ?? Yorkie_V1_JSONElementSimple()}
+      get {_storage._value ?? Yorkie_V1_JSONElementSimple()}
       set {_uniqueStorage()._value = newValue}
     }
     /// Returns true if `value` has been explicitly set.
-    public var hasValue: Bool {return _storage._value != nil}
+    public var hasValue: Bool {_storage._value != nil}
     /// Clears the value of `value`. Subsequent reads from it will return its default value.
     public mutating func clearValue() {_uniqueStorage()._value = nil}
 
     public var executedAt: Yorkie_V1_TimeTicket {
-      get {return _storage._executedAt ?? Yorkie_V1_TimeTicket()}
+      get {_storage._executedAt ?? Yorkie_V1_TimeTicket()}
       set {_uniqueStorage()._executedAt = newValue}
     }
     /// Returns true if `executedAt` has been explicitly set.
-    public var hasExecutedAt: Bool {return _storage._executedAt != nil}
+    public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
@@ -978,29 +952,29 @@ public struct Yorkie_V1_JSONElementSimple: Sendable {
   // methods supported on all messages.
 
   public var createdAt: Yorkie_V1_TimeTicket {
-    get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+    get {_createdAt ?? Yorkie_V1_TimeTicket()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
   public var movedAt: Yorkie_V1_TimeTicket {
-    get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+    get {_movedAt ?? Yorkie_V1_TimeTicket()}
     set {_movedAt = newValue}
   }
   /// Returns true if `movedAt` has been explicitly set.
-  public var hasMovedAt: Bool {return self._movedAt != nil}
+  public var hasMovedAt: Bool {self._movedAt != nil}
   /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
   public mutating func clearMovedAt() {self._movedAt = nil}
 
   public var removedAt: Yorkie_V1_TimeTicket {
-    get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+    get {_removedAt ?? Yorkie_V1_TimeTicket()}
     set {_removedAt = newValue}
   }
   /// Returns true if `removedAt` has been explicitly set.
-  public var hasRemovedAt: Bool {return self._removedAt != nil}
+  public var hasRemovedAt: Bool {self._removedAt != nil}
   /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
   public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1092,29 +1066,29 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var nodes: [Yorkie_V1_RHTNode] = []
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+      get {_movedAt ?? Yorkie_V1_TimeTicket()}
       set {_movedAt = newValue}
     }
     /// Returns true if `movedAt` has been explicitly set.
-    public var hasMovedAt: Bool {return self._movedAt != nil}
+    public var hasMovedAt: Bool {self._movedAt != nil}
     /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
     public mutating func clearMovedAt() {self._movedAt = nil}
 
     public var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+      get {_removedAt ?? Yorkie_V1_TimeTicket()}
       set {_removedAt = newValue}
     }
     /// Returns true if `removedAt` has been explicitly set.
-    public var hasRemovedAt: Bool {return self._removedAt != nil}
+    public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1135,29 +1109,29 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var nodes: [Yorkie_V1_RGANode] = []
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+      get {_movedAt ?? Yorkie_V1_TimeTicket()}
       set {_movedAt = newValue}
     }
     /// Returns true if `movedAt` has been explicitly set.
-    public var hasMovedAt: Bool {return self._movedAt != nil}
+    public var hasMovedAt: Bool {self._movedAt != nil}
     /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
     public mutating func clearMovedAt() {self._movedAt = nil}
 
     public var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+      get {_removedAt ?? Yorkie_V1_TimeTicket()}
       set {_removedAt = newValue}
     }
     /// Returns true if `removedAt` has been explicitly set.
-    public var hasRemovedAt: Bool {return self._removedAt != nil}
+    public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1180,29 +1154,29 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var value: Data = Data()
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+      get {_movedAt ?? Yorkie_V1_TimeTicket()}
       set {_movedAt = newValue}
     }
     /// Returns true if `movedAt` has been explicitly set.
-    public var hasMovedAt: Bool {return self._movedAt != nil}
+    public var hasMovedAt: Bool {self._movedAt != nil}
     /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
     public mutating func clearMovedAt() {self._movedAt = nil}
 
     public var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+      get {_removedAt ?? Yorkie_V1_TimeTicket()}
       set {_removedAt = newValue}
     }
     /// Returns true if `removedAt` has been explicitly set.
-    public var hasRemovedAt: Bool {return self._removedAt != nil}
+    public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1223,29 +1197,29 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var nodes: [Yorkie_V1_TextNode] = []
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+      get {_movedAt ?? Yorkie_V1_TimeTicket()}
       set {_movedAt = newValue}
     }
     /// Returns true if `movedAt` has been explicitly set.
-    public var hasMovedAt: Bool {return self._movedAt != nil}
+    public var hasMovedAt: Bool {self._movedAt != nil}
     /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
     public mutating func clearMovedAt() {self._movedAt = nil}
 
     public var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+      get {_removedAt ?? Yorkie_V1_TimeTicket()}
       set {_removedAt = newValue}
     }
     /// Returns true if `removedAt` has been explicitly set.
-    public var hasRemovedAt: Bool {return self._removedAt != nil}
+    public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1268,29 +1242,29 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var value: Data = Data()
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+      get {_movedAt ?? Yorkie_V1_TimeTicket()}
       set {_movedAt = newValue}
     }
     /// Returns true if `movedAt` has been explicitly set.
-    public var hasMovedAt: Bool {return self._movedAt != nil}
+    public var hasMovedAt: Bool {self._movedAt != nil}
     /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
     public mutating func clearMovedAt() {self._movedAt = nil}
 
     public var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+      get {_removedAt ?? Yorkie_V1_TimeTicket()}
       set {_removedAt = newValue}
     }
     /// Returns true if `removedAt` has been explicitly set.
-    public var hasRemovedAt: Bool {return self._removedAt != nil}
+    public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1311,29 +1285,29 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var nodes: [Yorkie_V1_TreeNode] = []
 
     public var createdAt: Yorkie_V1_TimeTicket {
-      get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+      get {_createdAt ?? Yorkie_V1_TimeTicket()}
       set {_createdAt = newValue}
     }
     /// Returns true if `createdAt` has been explicitly set.
-    public var hasCreatedAt: Bool {return self._createdAt != nil}
+    public var hasCreatedAt: Bool {self._createdAt != nil}
     /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
     public mutating func clearCreatedAt() {self._createdAt = nil}
 
     public var movedAt: Yorkie_V1_TimeTicket {
-      get {return _movedAt ?? Yorkie_V1_TimeTicket()}
+      get {_movedAt ?? Yorkie_V1_TimeTicket()}
       set {_movedAt = newValue}
     }
     /// Returns true if `movedAt` has been explicitly set.
-    public var hasMovedAt: Bool {return self._movedAt != nil}
+    public var hasMovedAt: Bool {self._movedAt != nil}
     /// Clears the value of `movedAt`. Subsequent reads from it will return its default value.
     public mutating func clearMovedAt() {self._movedAt = nil}
 
     public var removedAt: Yorkie_V1_TimeTicket {
-      get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+      get {_removedAt ?? Yorkie_V1_TimeTicket()}
       set {_removedAt = newValue}
     }
     /// Returns true if `removedAt` has been explicitly set.
-    public var hasRemovedAt: Bool {return self._removedAt != nil}
+    public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
@@ -1357,11 +1331,11 @@ public struct Yorkie_V1_RHTNode: Sendable {
   public var key: String = String()
 
   public var element: Yorkie_V1_JSONElement {
-    get {return _element ?? Yorkie_V1_JSONElement()}
+    get {_element ?? Yorkie_V1_JSONElement()}
     set {_element = newValue}
   }
   /// Returns true if `element` has been explicitly set.
-  public var hasElement: Bool {return self._element != nil}
+  public var hasElement: Bool {self._element != nil}
   /// Clears the value of `element`. Subsequent reads from it will return its default value.
   public mutating func clearElement() {self._element = nil}
 
@@ -1378,20 +1352,20 @@ public struct Yorkie_V1_RGANode: @unchecked Sendable {
   // methods supported on all messages.
 
   public var next: Yorkie_V1_RGANode {
-    get {return _storage._next ?? Yorkie_V1_RGANode()}
+    get {_storage._next ?? Yorkie_V1_RGANode()}
     set {_uniqueStorage()._next = newValue}
   }
   /// Returns true if `next` has been explicitly set.
-  public var hasNext: Bool {return _storage._next != nil}
+  public var hasNext: Bool {_storage._next != nil}
   /// Clears the value of `next`. Subsequent reads from it will return its default value.
   public mutating func clearNext() {_uniqueStorage()._next = nil}
 
   public var element: Yorkie_V1_JSONElement {
-    get {return _storage._element ?? Yorkie_V1_JSONElement()}
+    get {_storage._element ?? Yorkie_V1_JSONElement()}
     set {_uniqueStorage()._element = newValue}
   }
   /// Returns true if `element` has been explicitly set.
-  public var hasElement: Bool {return _storage._element != nil}
+  public var hasElement: Bool {_storage._element != nil}
   /// Clears the value of `element`. Subsequent reads from it will return its default value.
   public mutating func clearElement() {_uniqueStorage()._element = nil}
 
@@ -1410,11 +1384,11 @@ public struct Yorkie_V1_NodeAttr: Sendable {
   public var value: String = String()
 
   public var updatedAt: Yorkie_V1_TimeTicket {
-    get {return _updatedAt ?? Yorkie_V1_TimeTicket()}
+    get {_updatedAt ?? Yorkie_V1_TimeTicket()}
     set {_updatedAt = newValue}
   }
   /// Returns true if `updatedAt` has been explicitly set.
-  public var hasUpdatedAt: Bool {return self._updatedAt != nil}
+  public var hasUpdatedAt: Bool {self._updatedAt != nil}
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearUpdatedAt() {self._updatedAt = nil}
 
@@ -1433,31 +1407,31 @@ public struct Yorkie_V1_TextNode: Sendable {
   // methods supported on all messages.
 
   public var id: Yorkie_V1_TextNodeID {
-    get {return _id ?? Yorkie_V1_TextNodeID()}
+    get {_id ?? Yorkie_V1_TextNodeID()}
     set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  public var hasID: Bool {return self._id != nil}
+  public var hasID: Bool {self._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   public mutating func clearID() {self._id = nil}
 
   public var value: String = String()
 
   public var removedAt: Yorkie_V1_TimeTicket {
-    get {return _removedAt ?? Yorkie_V1_TimeTicket()}
+    get {_removedAt ?? Yorkie_V1_TimeTicket()}
     set {_removedAt = newValue}
   }
   /// Returns true if `removedAt` has been explicitly set.
-  public var hasRemovedAt: Bool {return self._removedAt != nil}
+  public var hasRemovedAt: Bool {self._removedAt != nil}
   /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
   public mutating func clearRemovedAt() {self._removedAt = nil}
 
   public var insPrevID: Yorkie_V1_TextNodeID {
-    get {return _insPrevID ?? Yorkie_V1_TextNodeID()}
+    get {_insPrevID ?? Yorkie_V1_TextNodeID()}
     set {_insPrevID = newValue}
   }
   /// Returns true if `insPrevID` has been explicitly set.
-  public var hasInsPrevID: Bool {return self._insPrevID != nil}
+  public var hasInsPrevID: Bool {self._insPrevID != nil}
   /// Clears the value of `insPrevID`. Subsequent reads from it will return its default value.
   public mutating func clearInsPrevID() {self._insPrevID = nil}
 
@@ -1478,11 +1452,11 @@ public struct Yorkie_V1_TextNodeID: Sendable {
   // methods supported on all messages.
 
   public var createdAt: Yorkie_V1_TimeTicket {
-    get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+    get {_createdAt ?? Yorkie_V1_TimeTicket()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
@@ -1501,58 +1475,58 @@ public struct Yorkie_V1_TreeNode: @unchecked Sendable {
   // methods supported on all messages.
 
   public var id: Yorkie_V1_TreeNodeID {
-    get {return _storage._id ?? Yorkie_V1_TreeNodeID()}
+    get {_storage._id ?? Yorkie_V1_TreeNodeID()}
     set {_uniqueStorage()._id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  public var hasID: Bool {return _storage._id != nil}
+  public var hasID: Bool {_storage._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   public mutating func clearID() {_uniqueStorage()._id = nil}
 
   public var type: String {
-    get {return _storage._type}
+    get {_storage._type}
     set {_uniqueStorage()._type = newValue}
   }
 
   public var value: String {
-    get {return _storage._value}
+    get {_storage._value}
     set {_uniqueStorage()._value = newValue}
   }
 
   public var removedAt: Yorkie_V1_TimeTicket {
-    get {return _storage._removedAt ?? Yorkie_V1_TimeTicket()}
+    get {_storage._removedAt ?? Yorkie_V1_TimeTicket()}
     set {_uniqueStorage()._removedAt = newValue}
   }
   /// Returns true if `removedAt` has been explicitly set.
-  public var hasRemovedAt: Bool {return _storage._removedAt != nil}
+  public var hasRemovedAt: Bool {_storage._removedAt != nil}
   /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
   public mutating func clearRemovedAt() {_uniqueStorage()._removedAt = nil}
 
   public var insPrevID: Yorkie_V1_TreeNodeID {
-    get {return _storage._insPrevID ?? Yorkie_V1_TreeNodeID()}
+    get {_storage._insPrevID ?? Yorkie_V1_TreeNodeID()}
     set {_uniqueStorage()._insPrevID = newValue}
   }
   /// Returns true if `insPrevID` has been explicitly set.
-  public var hasInsPrevID: Bool {return _storage._insPrevID != nil}
+  public var hasInsPrevID: Bool {_storage._insPrevID != nil}
   /// Clears the value of `insPrevID`. Subsequent reads from it will return its default value.
   public mutating func clearInsPrevID() {_uniqueStorage()._insPrevID = nil}
 
   public var insNextID: Yorkie_V1_TreeNodeID {
-    get {return _storage._insNextID ?? Yorkie_V1_TreeNodeID()}
+    get {_storage._insNextID ?? Yorkie_V1_TreeNodeID()}
     set {_uniqueStorage()._insNextID = newValue}
   }
   /// Returns true if `insNextID` has been explicitly set.
-  public var hasInsNextID: Bool {return _storage._insNextID != nil}
+  public var hasInsNextID: Bool {_storage._insNextID != nil}
   /// Clears the value of `insNextID`. Subsequent reads from it will return its default value.
   public mutating func clearInsNextID() {_uniqueStorage()._insNextID = nil}
 
   public var depth: Int32 {
-    get {return _storage._depth}
+    get {_storage._depth}
     set {_uniqueStorage()._depth = newValue}
   }
 
   public var attributes: Dictionary<String,Yorkie_V1_NodeAttr> {
-    get {return _storage._attributes}
+    get {_storage._attributes}
     set {_uniqueStorage()._attributes = newValue}
   }
 
@@ -1581,11 +1555,11 @@ public struct Yorkie_V1_TreeNodeID: Sendable {
   // methods supported on all messages.
 
   public var createdAt: Yorkie_V1_TimeTicket {
-    get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+    get {_createdAt ?? Yorkie_V1_TimeTicket()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
@@ -1604,20 +1578,20 @@ public struct Yorkie_V1_TreePos: Sendable {
   // methods supported on all messages.
 
   public var parentID: Yorkie_V1_TreeNodeID {
-    get {return _parentID ?? Yorkie_V1_TreeNodeID()}
+    get {_parentID ?? Yorkie_V1_TreeNodeID()}
     set {_parentID = newValue}
   }
   /// Returns true if `parentID` has been explicitly set.
-  public var hasParentID: Bool {return self._parentID != nil}
+  public var hasParentID: Bool {self._parentID != nil}
   /// Clears the value of `parentID`. Subsequent reads from it will return its default value.
   public mutating func clearParentID() {self._parentID = nil}
 
   public var leftSiblingID: Yorkie_V1_TreeNodeID {
-    get {return _leftSiblingID ?? Yorkie_V1_TreeNodeID()}
+    get {_leftSiblingID ?? Yorkie_V1_TreeNodeID()}
     set {_leftSiblingID = newValue}
   }
   /// Returns true if `leftSiblingID` has been explicitly set.
-  public var hasLeftSiblingID: Bool {return self._leftSiblingID != nil}
+  public var hasLeftSiblingID: Bool {self._leftSiblingID != nil}
   /// Clears the value of `leftSiblingID`. Subsequent reads from it will return its default value.
   public mutating func clearLeftSiblingID() {self._leftSiblingID = nil}
 
@@ -1641,11 +1615,11 @@ public struct Yorkie_V1_User: Sendable {
   public var username: String = String()
 
   public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
@@ -1662,85 +1636,140 @@ public struct Yorkie_V1_Project: @unchecked Sendable {
   // methods supported on all messages.
 
   public var id: String {
-    get {return _storage._id}
+    get {_storage._id}
     set {_uniqueStorage()._id = newValue}
   }
 
   public var name: String {
-    get {return _storage._name}
+    get {_storage._name}
     set {_uniqueStorage()._name = newValue}
   }
 
   public var publicKey: String {
-    get {return _storage._publicKey}
+    get {_storage._publicKey}
     set {_uniqueStorage()._publicKey = newValue}
   }
 
   public var secretKey: String {
-    get {return _storage._secretKey}
+    get {_storage._secretKey}
     set {_uniqueStorage()._secretKey = newValue}
   }
 
   public var authWebhookURL: String {
-    get {return _storage._authWebhookURL}
+    get {_storage._authWebhookURL}
     set {_uniqueStorage()._authWebhookURL = newValue}
   }
 
   public var authWebhookMethods: [String] {
-    get {return _storage._authWebhookMethods}
+    get {_storage._authWebhookMethods}
     set {_uniqueStorage()._authWebhookMethods = newValue}
   }
 
+  public var authWebhookMaxRetries: UInt64 {
+    get {_storage._authWebhookMaxRetries}
+    set {_uniqueStorage()._authWebhookMaxRetries = newValue}
+  }
+
+  public var authWebhookMinWaitInterval: String {
+    get {_storage._authWebhookMinWaitInterval}
+    set {_uniqueStorage()._authWebhookMinWaitInterval = newValue}
+  }
+
+  public var authWebhookMaxWaitInterval: String {
+    get {_storage._authWebhookMaxWaitInterval}
+    set {_uniqueStorage()._authWebhookMaxWaitInterval = newValue}
+  }
+
+  public var authWebhookRequestTimeout: String {
+    get {_storage._authWebhookRequestTimeout}
+    set {_uniqueStorage()._authWebhookRequestTimeout = newValue}
+  }
+
   public var eventWebhookURL: String {
-    get {return _storage._eventWebhookURL}
+    get {_storage._eventWebhookURL}
     set {_uniqueStorage()._eventWebhookURL = newValue}
   }
 
   public var eventWebhookEvents: [String] {
-    get {return _storage._eventWebhookEvents}
+    get {_storage._eventWebhookEvents}
     set {_uniqueStorage()._eventWebhookEvents = newValue}
   }
 
+  public var eventWebhookMaxRetries: UInt64 {
+    get {_storage._eventWebhookMaxRetries}
+    set {_uniqueStorage()._eventWebhookMaxRetries = newValue}
+  }
+
+  public var eventWebhookMinWaitInterval: String {
+    get {_storage._eventWebhookMinWaitInterval}
+    set {_uniqueStorage()._eventWebhookMinWaitInterval = newValue}
+  }
+
+  public var eventWebhookMaxWaitInterval: String {
+    get {_storage._eventWebhookMaxWaitInterval}
+    set {_uniqueStorage()._eventWebhookMaxWaitInterval = newValue}
+  }
+
+  public var eventWebhookRequestTimeout: String {
+    get {_storage._eventWebhookRequestTimeout}
+    set {_uniqueStorage()._eventWebhookRequestTimeout = newValue}
+  }
+
   public var clientDeactivateThreshold: String {
-    get {return _storage._clientDeactivateThreshold}
+    get {_storage._clientDeactivateThreshold}
     set {_uniqueStorage()._clientDeactivateThreshold = newValue}
   }
 
+  public var snapshotThreshold: Int64 {
+    get {_storage._snapshotThreshold}
+    set {_uniqueStorage()._snapshotThreshold = newValue}
+  }
+
+  public var snapshotInterval: Int64 {
+    get {_storage._snapshotInterval}
+    set {_uniqueStorage()._snapshotInterval = newValue}
+  }
+
   public var maxSubscribersPerDocument: Int32 {
-    get {return _storage._maxSubscribersPerDocument}
+    get {_storage._maxSubscribersPerDocument}
     set {_uniqueStorage()._maxSubscribersPerDocument = newValue}
   }
 
   public var maxAttachmentsPerDocument: Int32 {
-    get {return _storage._maxAttachmentsPerDocument}
+    get {_storage._maxAttachmentsPerDocument}
     set {_uniqueStorage()._maxAttachmentsPerDocument = newValue}
   }
 
   public var maxSizePerDocument: Int32 {
-    get {return _storage._maxSizePerDocument}
+    get {_storage._maxSizePerDocument}
     set {_uniqueStorage()._maxSizePerDocument = newValue}
   }
 
+  public var removeOnDetach: Bool {
+    get {_storage._removeOnDetach}
+    set {_uniqueStorage()._removeOnDetach = newValue}
+  }
+
   public var allowedOrigins: [String] {
-    get {return _storage._allowedOrigins}
+    get {_storage._allowedOrigins}
     set {_uniqueStorage()._allowedOrigins = newValue}
   }
 
   public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _storage._createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_storage._createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_uniqueStorage()._createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return _storage._createdAt != nil}
+  public var hasCreatedAt: Bool {_storage._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {_uniqueStorage()._createdAt = nil}
 
   public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _storage._updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_storage._updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_uniqueStorage()._updatedAt = newValue}
   }
   /// Returns true if `updatedAt` has been explicitly set.
-  public var hasUpdatedAt: Bool {return _storage._updatedAt != nil}
+  public var hasUpdatedAt: Bool {_storage._updatedAt != nil}
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearUpdatedAt() {_uniqueStorage()._updatedAt = nil}
 
@@ -1765,100 +1794,199 @@ public struct Yorkie_V1_MetricPoint: Sendable {
   public init() {}
 }
 
-public struct Yorkie_V1_UpdatableProjectFields: Sendable {
+public struct Yorkie_V1_UpdatableProjectFields: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var name: SwiftProtobuf.Google_Protobuf_StringValue {
-    get {return _name ?? SwiftProtobuf.Google_Protobuf_StringValue()}
-    set {_name = newValue}
+    get {_storage._name ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._name = newValue}
   }
   /// Returns true if `name` has been explicitly set.
-  public var hasName: Bool {return self._name != nil}
+  public var hasName: Bool {_storage._name != nil}
   /// Clears the value of `name`. Subsequent reads from it will return its default value.
-  public mutating func clearName() {self._name = nil}
+  public mutating func clearName() {_uniqueStorage()._name = nil}
 
   public var authWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue {
-    get {return _authWebhookURL ?? SwiftProtobuf.Google_Protobuf_StringValue()}
-    set {_authWebhookURL = newValue}
+    get {_storage._authWebhookURL ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._authWebhookURL = newValue}
   }
   /// Returns true if `authWebhookURL` has been explicitly set.
-  public var hasAuthWebhookURL: Bool {return self._authWebhookURL != nil}
+  public var hasAuthWebhookURL: Bool {_storage._authWebhookURL != nil}
   /// Clears the value of `authWebhookURL`. Subsequent reads from it will return its default value.
-  public mutating func clearAuthWebhookURL() {self._authWebhookURL = nil}
+  public mutating func clearAuthWebhookURL() {_uniqueStorage()._authWebhookURL = nil}
 
   public var authWebhookMethods: Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods {
-    get {return _authWebhookMethods ?? Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods()}
-    set {_authWebhookMethods = newValue}
+    get {_storage._authWebhookMethods ?? Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods()}
+    set {_uniqueStorage()._authWebhookMethods = newValue}
   }
   /// Returns true if `authWebhookMethods` has been explicitly set.
-  public var hasAuthWebhookMethods: Bool {return self._authWebhookMethods != nil}
+  public var hasAuthWebhookMethods: Bool {_storage._authWebhookMethods != nil}
   /// Clears the value of `authWebhookMethods`. Subsequent reads from it will return its default value.
-  public mutating func clearAuthWebhookMethods() {self._authWebhookMethods = nil}
+  public mutating func clearAuthWebhookMethods() {_uniqueStorage()._authWebhookMethods = nil}
+
+  public var authWebhookMaxRetries: SwiftProtobuf.Google_Protobuf_UInt64Value {
+    get {_storage._authWebhookMaxRetries ?? SwiftProtobuf.Google_Protobuf_UInt64Value()}
+    set {_uniqueStorage()._authWebhookMaxRetries = newValue}
+  }
+  /// Returns true if `authWebhookMaxRetries` has been explicitly set.
+  public var hasAuthWebhookMaxRetries: Bool {_storage._authWebhookMaxRetries != nil}
+  /// Clears the value of `authWebhookMaxRetries`. Subsequent reads from it will return its default value.
+  public mutating func clearAuthWebhookMaxRetries() {_uniqueStorage()._authWebhookMaxRetries = nil}
+
+  public var authWebhookMinWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._authWebhookMinWaitInterval ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._authWebhookMinWaitInterval = newValue}
+  }
+  /// Returns true if `authWebhookMinWaitInterval` has been explicitly set.
+  public var hasAuthWebhookMinWaitInterval: Bool {_storage._authWebhookMinWaitInterval != nil}
+  /// Clears the value of `authWebhookMinWaitInterval`. Subsequent reads from it will return its default value.
+  public mutating func clearAuthWebhookMinWaitInterval() {_uniqueStorage()._authWebhookMinWaitInterval = nil}
+
+  public var authWebhookMaxWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._authWebhookMaxWaitInterval ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._authWebhookMaxWaitInterval = newValue}
+  }
+  /// Returns true if `authWebhookMaxWaitInterval` has been explicitly set.
+  public var hasAuthWebhookMaxWaitInterval: Bool {_storage._authWebhookMaxWaitInterval != nil}
+  /// Clears the value of `authWebhookMaxWaitInterval`. Subsequent reads from it will return its default value.
+  public mutating func clearAuthWebhookMaxWaitInterval() {_uniqueStorage()._authWebhookMaxWaitInterval = nil}
+
+  public var authWebhookRequestTimeout: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._authWebhookRequestTimeout ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._authWebhookRequestTimeout = newValue}
+  }
+  /// Returns true if `authWebhookRequestTimeout` has been explicitly set.
+  public var hasAuthWebhookRequestTimeout: Bool {_storage._authWebhookRequestTimeout != nil}
+  /// Clears the value of `authWebhookRequestTimeout`. Subsequent reads from it will return its default value.
+  public mutating func clearAuthWebhookRequestTimeout() {_uniqueStorage()._authWebhookRequestTimeout = nil}
 
   public var eventWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue {
-    get {return _eventWebhookURL ?? SwiftProtobuf.Google_Protobuf_StringValue()}
-    set {_eventWebhookURL = newValue}
+    get {_storage._eventWebhookURL ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._eventWebhookURL = newValue}
   }
   /// Returns true if `eventWebhookURL` has been explicitly set.
-  public var hasEventWebhookURL: Bool {return self._eventWebhookURL != nil}
+  public var hasEventWebhookURL: Bool {_storage._eventWebhookURL != nil}
   /// Clears the value of `eventWebhookURL`. Subsequent reads from it will return its default value.
-  public mutating func clearEventWebhookURL() {self._eventWebhookURL = nil}
+  public mutating func clearEventWebhookURL() {_uniqueStorage()._eventWebhookURL = nil}
 
   public var eventWebhookEvents: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents {
-    get {return _eventWebhookEvents ?? Yorkie_V1_UpdatableProjectFields.EventWebhookEvents()}
-    set {_eventWebhookEvents = newValue}
+    get {_storage._eventWebhookEvents ?? Yorkie_V1_UpdatableProjectFields.EventWebhookEvents()}
+    set {_uniqueStorage()._eventWebhookEvents = newValue}
   }
   /// Returns true if `eventWebhookEvents` has been explicitly set.
-  public var hasEventWebhookEvents: Bool {return self._eventWebhookEvents != nil}
+  public var hasEventWebhookEvents: Bool {_storage._eventWebhookEvents != nil}
   /// Clears the value of `eventWebhookEvents`. Subsequent reads from it will return its default value.
-  public mutating func clearEventWebhookEvents() {self._eventWebhookEvents = nil}
+  public mutating func clearEventWebhookEvents() {_uniqueStorage()._eventWebhookEvents = nil}
+
+  public var eventWebhookMaxRetries: SwiftProtobuf.Google_Protobuf_UInt64Value {
+    get {_storage._eventWebhookMaxRetries ?? SwiftProtobuf.Google_Protobuf_UInt64Value()}
+    set {_uniqueStorage()._eventWebhookMaxRetries = newValue}
+  }
+  /// Returns true if `eventWebhookMaxRetries` has been explicitly set.
+  public var hasEventWebhookMaxRetries: Bool {_storage._eventWebhookMaxRetries != nil}
+  /// Clears the value of `eventWebhookMaxRetries`. Subsequent reads from it will return its default value.
+  public mutating func clearEventWebhookMaxRetries() {_uniqueStorage()._eventWebhookMaxRetries = nil}
+
+  public var eventWebhookMinWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._eventWebhookMinWaitInterval ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._eventWebhookMinWaitInterval = newValue}
+  }
+  /// Returns true if `eventWebhookMinWaitInterval` has been explicitly set.
+  public var hasEventWebhookMinWaitInterval: Bool {_storage._eventWebhookMinWaitInterval != nil}
+  /// Clears the value of `eventWebhookMinWaitInterval`. Subsequent reads from it will return its default value.
+  public mutating func clearEventWebhookMinWaitInterval() {_uniqueStorage()._eventWebhookMinWaitInterval = nil}
+
+  public var eventWebhookMaxWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._eventWebhookMaxWaitInterval ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._eventWebhookMaxWaitInterval = newValue}
+  }
+  /// Returns true if `eventWebhookMaxWaitInterval` has been explicitly set.
+  public var hasEventWebhookMaxWaitInterval: Bool {_storage._eventWebhookMaxWaitInterval != nil}
+  /// Clears the value of `eventWebhookMaxWaitInterval`. Subsequent reads from it will return its default value.
+  public mutating func clearEventWebhookMaxWaitInterval() {_uniqueStorage()._eventWebhookMaxWaitInterval = nil}
+
+  public var eventWebhookRequestTimeout: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._eventWebhookRequestTimeout ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._eventWebhookRequestTimeout = newValue}
+  }
+  /// Returns true if `eventWebhookRequestTimeout` has been explicitly set.
+  public var hasEventWebhookRequestTimeout: Bool {_storage._eventWebhookRequestTimeout != nil}
+  /// Clears the value of `eventWebhookRequestTimeout`. Subsequent reads from it will return its default value.
+  public mutating func clearEventWebhookRequestTimeout() {_uniqueStorage()._eventWebhookRequestTimeout = nil}
+
+  public var snapshotThreshold: SwiftProtobuf.Google_Protobuf_Int64Value {
+    get {_storage._snapshotThreshold ?? SwiftProtobuf.Google_Protobuf_Int64Value()}
+    set {_uniqueStorage()._snapshotThreshold = newValue}
+  }
+  /// Returns true if `snapshotThreshold` has been explicitly set.
+  public var hasSnapshotThreshold: Bool {_storage._snapshotThreshold != nil}
+  /// Clears the value of `snapshotThreshold`. Subsequent reads from it will return its default value.
+  public mutating func clearSnapshotThreshold() {_uniqueStorage()._snapshotThreshold = nil}
+
+  public var snapshotInterval: SwiftProtobuf.Google_Protobuf_Int64Value {
+    get {_storage._snapshotInterval ?? SwiftProtobuf.Google_Protobuf_Int64Value()}
+    set {_uniqueStorage()._snapshotInterval = newValue}
+  }
+  /// Returns true if `snapshotInterval` has been explicitly set.
+  public var hasSnapshotInterval: Bool {_storage._snapshotInterval != nil}
+  /// Clears the value of `snapshotInterval`. Subsequent reads from it will return its default value.
+  public mutating func clearSnapshotInterval() {_uniqueStorage()._snapshotInterval = nil}
 
   public var clientDeactivateThreshold: SwiftProtobuf.Google_Protobuf_StringValue {
-    get {return _clientDeactivateThreshold ?? SwiftProtobuf.Google_Protobuf_StringValue()}
-    set {_clientDeactivateThreshold = newValue}
+    get {_storage._clientDeactivateThreshold ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._clientDeactivateThreshold = newValue}
   }
   /// Returns true if `clientDeactivateThreshold` has been explicitly set.
-  public var hasClientDeactivateThreshold: Bool {return self._clientDeactivateThreshold != nil}
+  public var hasClientDeactivateThreshold: Bool {_storage._clientDeactivateThreshold != nil}
   /// Clears the value of `clientDeactivateThreshold`. Subsequent reads from it will return its default value.
-  public mutating func clearClientDeactivateThreshold() {self._clientDeactivateThreshold = nil}
+  public mutating func clearClientDeactivateThreshold() {_uniqueStorage()._clientDeactivateThreshold = nil}
 
   public var maxSubscribersPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value {
-    get {return _maxSubscribersPerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
-    set {_maxSubscribersPerDocument = newValue}
+    get {_storage._maxSubscribersPerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
+    set {_uniqueStorage()._maxSubscribersPerDocument = newValue}
   }
   /// Returns true if `maxSubscribersPerDocument` has been explicitly set.
-  public var hasMaxSubscribersPerDocument: Bool {return self._maxSubscribersPerDocument != nil}
+  public var hasMaxSubscribersPerDocument: Bool {_storage._maxSubscribersPerDocument != nil}
   /// Clears the value of `maxSubscribersPerDocument`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxSubscribersPerDocument() {self._maxSubscribersPerDocument = nil}
+  public mutating func clearMaxSubscribersPerDocument() {_uniqueStorage()._maxSubscribersPerDocument = nil}
 
   public var maxAttachmentsPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value {
-    get {return _maxAttachmentsPerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
-    set {_maxAttachmentsPerDocument = newValue}
+    get {_storage._maxAttachmentsPerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
+    set {_uniqueStorage()._maxAttachmentsPerDocument = newValue}
   }
   /// Returns true if `maxAttachmentsPerDocument` has been explicitly set.
-  public var hasMaxAttachmentsPerDocument: Bool {return self._maxAttachmentsPerDocument != nil}
+  public var hasMaxAttachmentsPerDocument: Bool {_storage._maxAttachmentsPerDocument != nil}
   /// Clears the value of `maxAttachmentsPerDocument`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxAttachmentsPerDocument() {self._maxAttachmentsPerDocument = nil}
+  public mutating func clearMaxAttachmentsPerDocument() {_uniqueStorage()._maxAttachmentsPerDocument = nil}
 
   public var maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value {
-    get {return _maxSizePerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
-    set {_maxSizePerDocument = newValue}
+    get {_storage._maxSizePerDocument ?? SwiftProtobuf.Google_Protobuf_Int32Value()}
+    set {_uniqueStorage()._maxSizePerDocument = newValue}
   }
   /// Returns true if `maxSizePerDocument` has been explicitly set.
-  public var hasMaxSizePerDocument: Bool {return self._maxSizePerDocument != nil}
+  public var hasMaxSizePerDocument: Bool {_storage._maxSizePerDocument != nil}
   /// Clears the value of `maxSizePerDocument`. Subsequent reads from it will return its default value.
-  public mutating func clearMaxSizePerDocument() {self._maxSizePerDocument = nil}
+  public mutating func clearMaxSizePerDocument() {_uniqueStorage()._maxSizePerDocument = nil}
+
+  public var removeOnDetach: SwiftProtobuf.Google_Protobuf_BoolValue {
+    get {_storage._removeOnDetach ?? SwiftProtobuf.Google_Protobuf_BoolValue()}
+    set {_uniqueStorage()._removeOnDetach = newValue}
+  }
+  /// Returns true if `removeOnDetach` has been explicitly set.
+  public var hasRemoveOnDetach: Bool {_storage._removeOnDetach != nil}
+  /// Clears the value of `removeOnDetach`. Subsequent reads from it will return its default value.
+  public mutating func clearRemoveOnDetach() {_uniqueStorage()._removeOnDetach = nil}
 
   public var allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins {
-    get {return _allowedOrigins ?? Yorkie_V1_UpdatableProjectFields.AllowedOrigins()}
-    set {_allowedOrigins = newValue}
+    get {_storage._allowedOrigins ?? Yorkie_V1_UpdatableProjectFields.AllowedOrigins()}
+    set {_uniqueStorage()._allowedOrigins = newValue}
   }
   /// Returns true if `allowedOrigins` has been explicitly set.
-  public var hasAllowedOrigins: Bool {return self._allowedOrigins != nil}
+  public var hasAllowedOrigins: Bool {_storage._allowedOrigins != nil}
   /// Clears the value of `allowedOrigins`. Subsequent reads from it will return its default value.
-  public mutating func clearAllowedOrigins() {self._allowedOrigins = nil}
+  public mutating func clearAllowedOrigins() {_uniqueStorage()._allowedOrigins = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1900,16 +2028,7 @@ public struct Yorkie_V1_UpdatableProjectFields: Sendable {
 
   public init() {}
 
-  fileprivate var _name: SwiftProtobuf.Google_Protobuf_StringValue? = nil
-  fileprivate var _authWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue? = nil
-  fileprivate var _authWebhookMethods: Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods? = nil
-  fileprivate var _eventWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue? = nil
-  fileprivate var _eventWebhookEvents: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents? = nil
-  fileprivate var _clientDeactivateThreshold: SwiftProtobuf.Google_Protobuf_StringValue? = nil
-  fileprivate var _maxSubscribersPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
-  fileprivate var _maxAttachmentsPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
-  fileprivate var _maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
-  fileprivate var _allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public struct Yorkie_V1_DocumentSummary: Sendable {
@@ -1926,11 +2045,11 @@ public struct Yorkie_V1_DocumentSummary: Sendable {
   public var attachedClients: Int32 = 0
 
   public var documentSize: Yorkie_V1_DocSize {
-    get {return _documentSize ?? Yorkie_V1_DocSize()}
+    get {_documentSize ?? Yorkie_V1_DocSize()}
     set {_documentSize = newValue}
   }
   /// Returns true if `documentSize` has been explicitly set.
-  public var hasDocumentSize: Bool {return self._documentSize != nil}
+  public var hasDocumentSize: Bool {self._documentSize != nil}
   /// Clears the value of `documentSize`. Subsequent reads from it will return its default value.
   public mutating func clearDocumentSize() {self._documentSize = nil}
 
@@ -1939,29 +2058,29 @@ public struct Yorkie_V1_DocumentSummary: Sendable {
   public var presences: Dictionary<String,Yorkie_V1_Presence> = [:]
 
   public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
   public var accessedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _accessedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_accessedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_accessedAt = newValue}
   }
   /// Returns true if `accessedAt` has been explicitly set.
-  public var hasAccessedAt: Bool {return self._accessedAt != nil}
+  public var hasAccessedAt: Bool {self._accessedAt != nil}
   /// Clears the value of `accessedAt`. Subsequent reads from it will return its default value.
   public mutating func clearAccessedAt() {self._accessedAt = nil}
 
   public var updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_updatedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_updatedAt = newValue}
   }
   /// Returns true if `updatedAt` has been explicitly set.
-  public var hasUpdatedAt: Bool {return self._updatedAt != nil}
+  public var hasUpdatedAt: Bool {self._updatedAt != nil}
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearUpdatedAt() {self._updatedAt = nil}
 
@@ -1983,11 +2102,11 @@ public struct Yorkie_V1_PresenceChange: Sendable {
   public var type: Yorkie_V1_PresenceChange.ChangeType = .unspecified
 
   public var presence: Yorkie_V1_Presence {
-    get {return _presence ?? Yorkie_V1_Presence()}
+    get {_presence ?? Yorkie_V1_Presence()}
     set {_presence = newValue}
   }
   /// Returns true if `presence` has been explicitly set.
-  public var hasPresence: Bool {return self._presence != nil}
+  public var hasPresence: Bool {self._presence != nil}
   /// Clears the value of `presence`. Subsequent reads from it will return its default value.
   public mutating func clearPresence() {self._presence = nil}
 
@@ -2072,11 +2191,11 @@ public struct Yorkie_V1_TextNodePos: Sendable {
   // methods supported on all messages.
 
   public var createdAt: Yorkie_V1_TimeTicket {
-    get {return _createdAt ?? Yorkie_V1_TimeTicket()}
+    get {_createdAt ?? Yorkie_V1_TimeTicket()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
@@ -2131,11 +2250,11 @@ public struct Yorkie_V1_DocEvent: Sendable {
   public var publisher: String = String()
 
   public var body: Yorkie_V1_DocEventBody {
-    get {return _body ?? Yorkie_V1_DocEventBody()}
+    get {_body ?? Yorkie_V1_DocEventBody()}
     set {_body = newValue}
   }
   /// Returns true if `body` has been explicitly set.
-  public var hasBody: Bool {return self._body != nil}
+  public var hasBody: Bool {self._body != nil}
   /// Clears the value of `body`. Subsequent reads from it will return its default value.
   public mutating func clearBody() {self._body = nil}
 
@@ -2146,18 +2265,62 @@ public struct Yorkie_V1_DocEvent: Sendable {
   fileprivate var _body: Yorkie_V1_DocEventBody? = nil
 }
 
-public struct Yorkie_V1_PresenceEvent: Sendable {
+public struct Yorkie_V1_ChannelEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var type: Yorkie_V1_PresenceEventType = .countChanged
+  public var type: Yorkie_V1_ChannelEvent.TypeEnum = .unspecified
 
-  public var count: Int32 = 0
+  public var publisher: String = String()
+
+  public var count: Int64 = 0
 
   public var seq: Int64 = 0
 
+  public var topic: String = String()
+
+  public var payload: Data = Data()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum TypeEnum: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case presence // = 1
+    case broadcast // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .presence
+      case 2: self = .broadcast
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .presence: return 1
+      case .broadcast: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Yorkie_V1_ChannelEvent.TypeEnum] = [
+      .unspecified,
+      .presence,
+      .broadcast,
+    ]
+
+  }
 
   public init() {}
 }
@@ -2182,20 +2345,20 @@ public struct Yorkie_V1_DocSize: Sendable {
   // methods supported on all messages.
 
   public var live: Yorkie_V1_DataSize {
-    get {return _live ?? Yorkie_V1_DataSize()}
+    get {_live ?? Yorkie_V1_DataSize()}
     set {_live = newValue}
   }
   /// Returns true if `live` has been explicitly set.
-  public var hasLive: Bool {return self._live != nil}
+  public var hasLive: Bool {self._live != nil}
   /// Clears the value of `live`. Subsequent reads from it will return its default value.
   public mutating func clearLive() {self._live = nil}
 
   public var gc: Yorkie_V1_DataSize {
-    get {return _gc ?? Yorkie_V1_DataSize()}
+    get {_gc ?? Yorkie_V1_DataSize()}
     set {_gc = newValue}
   }
   /// Returns true if `gc` has been explicitly set.
-  public var hasGc: Bool {return self._gc != nil}
+  public var hasGc: Bool {self._gc != nil}
   /// Clears the value of `gc`. Subsequent reads from it will return its default value.
   public mutating func clearGc() {self._gc = nil}
 
@@ -2223,11 +2386,11 @@ public struct Yorkie_V1_Schema: Sendable {
   public var rules: [Yorkie_V1_Rule] = []
 
   public var createdAt: SwiftProtobuf.Google_Protobuf_Timestamp {
-    get {return _createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    get {_createdAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
     set {_createdAt = newValue}
   }
   /// Returns true if `createdAt` has been explicitly set.
-  public var hasCreatedAt: Bool {return self._createdAt != nil}
+  public var hasCreatedAt: Bool {self._createdAt != nil}
   /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
   public mutating func clearCreatedAt() {self._createdAt = nil}
 
@@ -2262,10 +2425,6 @@ extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
 
 extension Yorkie_V1_DocEventType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DOC_EVENT_TYPE_DOCUMENT_CHANGED\0\u{1}DOC_EVENT_TYPE_DOCUMENT_WATCHED\0\u{1}DOC_EVENT_TYPE_DOCUMENT_UNWATCHED\0\u{1}DOC_EVENT_TYPE_DOCUMENT_BROADCAST\0")
-}
-
-extension Yorkie_V1_PresenceEventType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0PRESENCE_EVENT_TYPE_COUNT_CHANGED\0")
 }
 
 extension Yorkie_V1_Snapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -4622,7 +4781,7 @@ extension Yorkie_V1_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
 extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Project"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}public_key\0\u{3}secret_key\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}created_at\0\u{3}updated_at\0\u{3}allowed_origins\0\u{3}max_size_per_document\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}public_key\0\u{3}secret_key\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}created_at\0\u{3}updated_at\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -4631,12 +4790,23 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _secretKey: String = String()
     var _authWebhookURL: String = String()
     var _authWebhookMethods: [String] = []
+    var _authWebhookMaxRetries: UInt64 = 0
+    var _authWebhookMinWaitInterval: String = String()
+    var _authWebhookMaxWaitInterval: String = String()
+    var _authWebhookRequestTimeout: String = String()
     var _eventWebhookURL: String = String()
     var _eventWebhookEvents: [String] = []
+    var _eventWebhookMaxRetries: UInt64 = 0
+    var _eventWebhookMinWaitInterval: String = String()
+    var _eventWebhookMaxWaitInterval: String = String()
+    var _eventWebhookRequestTimeout: String = String()
     var _clientDeactivateThreshold: String = String()
+    var _snapshotThreshold: Int64 = 0
+    var _snapshotInterval: Int64 = 0
     var _maxSubscribersPerDocument: Int32 = 0
     var _maxAttachmentsPerDocument: Int32 = 0
     var _maxSizePerDocument: Int32 = 0
+    var _removeOnDetach: Bool = false
     var _allowedOrigins: [String] = []
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
@@ -4656,12 +4826,23 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       _secretKey = source._secretKey
       _authWebhookURL = source._authWebhookURL
       _authWebhookMethods = source._authWebhookMethods
+      _authWebhookMaxRetries = source._authWebhookMaxRetries
+      _authWebhookMinWaitInterval = source._authWebhookMinWaitInterval
+      _authWebhookMaxWaitInterval = source._authWebhookMaxWaitInterval
+      _authWebhookRequestTimeout = source._authWebhookRequestTimeout
       _eventWebhookURL = source._eventWebhookURL
       _eventWebhookEvents = source._eventWebhookEvents
+      _eventWebhookMaxRetries = source._eventWebhookMaxRetries
+      _eventWebhookMinWaitInterval = source._eventWebhookMinWaitInterval
+      _eventWebhookMaxWaitInterval = source._eventWebhookMaxWaitInterval
+      _eventWebhookRequestTimeout = source._eventWebhookRequestTimeout
       _clientDeactivateThreshold = source._clientDeactivateThreshold
+      _snapshotThreshold = source._snapshotThreshold
+      _snapshotInterval = source._snapshotInterval
       _maxSubscribersPerDocument = source._maxSubscribersPerDocument
       _maxAttachmentsPerDocument = source._maxAttachmentsPerDocument
       _maxSizePerDocument = source._maxSizePerDocument
+      _removeOnDetach = source._removeOnDetach
       _allowedOrigins = source._allowedOrigins
       _createdAt = source._createdAt
       _updatedAt = source._updatedAt
@@ -4698,6 +4879,17 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._updatedAt) }()
         case 14: try { try decoder.decodeRepeatedStringField(value: &_storage._allowedOrigins) }()
         case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._maxSizePerDocument) }()
+        case 16: try { try decoder.decodeSingularBoolField(value: &_storage._removeOnDetach) }()
+        case 17: try { try decoder.decodeSingularUInt64Field(value: &_storage._authWebhookMaxRetries) }()
+        case 18: try { try decoder.decodeSingularStringField(value: &_storage._authWebhookMinWaitInterval) }()
+        case 19: try { try decoder.decodeSingularStringField(value: &_storage._authWebhookMaxWaitInterval) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._authWebhookRequestTimeout) }()
+        case 21: try { try decoder.decodeSingularUInt64Field(value: &_storage._eventWebhookMaxRetries) }()
+        case 22: try { try decoder.decodeSingularStringField(value: &_storage._eventWebhookMinWaitInterval) }()
+        case 23: try { try decoder.decodeSingularStringField(value: &_storage._eventWebhookMaxWaitInterval) }()
+        case 24: try { try decoder.decodeSingularStringField(value: &_storage._eventWebhookRequestTimeout) }()
+        case 25: try { try decoder.decodeSingularInt64Field(value: &_storage._snapshotThreshold) }()
+        case 26: try { try decoder.decodeSingularInt64Field(value: &_storage._snapshotInterval) }()
         default: break
         }
       }
@@ -4755,6 +4947,39 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       if _storage._maxSizePerDocument != 0 {
         try visitor.visitSingularInt32Field(value: _storage._maxSizePerDocument, fieldNumber: 15)
       }
+      if _storage._removeOnDetach != false {
+        try visitor.visitSingularBoolField(value: _storage._removeOnDetach, fieldNumber: 16)
+      }
+      if _storage._authWebhookMaxRetries != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._authWebhookMaxRetries, fieldNumber: 17)
+      }
+      if !_storage._authWebhookMinWaitInterval.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._authWebhookMinWaitInterval, fieldNumber: 18)
+      }
+      if !_storage._authWebhookMaxWaitInterval.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._authWebhookMaxWaitInterval, fieldNumber: 19)
+      }
+      if !_storage._authWebhookRequestTimeout.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._authWebhookRequestTimeout, fieldNumber: 20)
+      }
+      if _storage._eventWebhookMaxRetries != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._eventWebhookMaxRetries, fieldNumber: 21)
+      }
+      if !_storage._eventWebhookMinWaitInterval.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._eventWebhookMinWaitInterval, fieldNumber: 22)
+      }
+      if !_storage._eventWebhookMaxWaitInterval.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._eventWebhookMaxWaitInterval, fieldNumber: 23)
+      }
+      if !_storage._eventWebhookRequestTimeout.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._eventWebhookRequestTimeout, fieldNumber: 24)
+      }
+      if _storage._snapshotThreshold != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._snapshotThreshold, fieldNumber: 25)
+      }
+      if _storage._snapshotInterval != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._snapshotInterval, fieldNumber: 26)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4770,12 +4995,23 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         if _storage._secretKey != rhs_storage._secretKey {return false}
         if _storage._authWebhookURL != rhs_storage._authWebhookURL {return false}
         if _storage._authWebhookMethods != rhs_storage._authWebhookMethods {return false}
+        if _storage._authWebhookMaxRetries != rhs_storage._authWebhookMaxRetries {return false}
+        if _storage._authWebhookMinWaitInterval != rhs_storage._authWebhookMinWaitInterval {return false}
+        if _storage._authWebhookMaxWaitInterval != rhs_storage._authWebhookMaxWaitInterval {return false}
+        if _storage._authWebhookRequestTimeout != rhs_storage._authWebhookRequestTimeout {return false}
         if _storage._eventWebhookURL != rhs_storage._eventWebhookURL {return false}
         if _storage._eventWebhookEvents != rhs_storage._eventWebhookEvents {return false}
+        if _storage._eventWebhookMaxRetries != rhs_storage._eventWebhookMaxRetries {return false}
+        if _storage._eventWebhookMinWaitInterval != rhs_storage._eventWebhookMinWaitInterval {return false}
+        if _storage._eventWebhookMaxWaitInterval != rhs_storage._eventWebhookMaxWaitInterval {return false}
+        if _storage._eventWebhookRequestTimeout != rhs_storage._eventWebhookRequestTimeout {return false}
         if _storage._clientDeactivateThreshold != rhs_storage._clientDeactivateThreshold {return false}
+        if _storage._snapshotThreshold != rhs_storage._snapshotThreshold {return false}
+        if _storage._snapshotInterval != rhs_storage._snapshotInterval {return false}
         if _storage._maxSubscribersPerDocument != rhs_storage._maxSubscribersPerDocument {return false}
         if _storage._maxAttachmentsPerDocument != rhs_storage._maxAttachmentsPerDocument {return false}
         if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
+        if _storage._removeOnDetach != rhs_storage._removeOnDetach {return false}
         if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._updatedAt != rhs_storage._updatedAt {return false}
@@ -4825,78 +5061,209 @@ extension Yorkie_V1_MetricPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
 
 extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdatableProjectFields"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}allowed_origins\0\u{3}max_size_per_document\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0")
+
+  fileprivate class _StorageClass {
+    var _name: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _authWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _authWebhookMethods: Yorkie_V1_UpdatableProjectFields.AuthWebhookMethods? = nil
+    var _authWebhookMaxRetries: SwiftProtobuf.Google_Protobuf_UInt64Value? = nil
+    var _authWebhookMinWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _authWebhookMaxWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _authWebhookRequestTimeout: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _eventWebhookURL: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _eventWebhookEvents: Yorkie_V1_UpdatableProjectFields.EventWebhookEvents? = nil
+    var _eventWebhookMaxRetries: SwiftProtobuf.Google_Protobuf_UInt64Value? = nil
+    var _eventWebhookMinWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _eventWebhookMaxWaitInterval: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _eventWebhookRequestTimeout: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _snapshotThreshold: SwiftProtobuf.Google_Protobuf_Int64Value? = nil
+    var _snapshotInterval: SwiftProtobuf.Google_Protobuf_Int64Value? = nil
+    var _clientDeactivateThreshold: SwiftProtobuf.Google_Protobuf_StringValue? = nil
+    var _maxSubscribersPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
+    var _maxAttachmentsPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
+    var _maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
+    var _removeOnDetach: SwiftProtobuf.Google_Protobuf_BoolValue? = nil
+    var _allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _name = source._name
+      _authWebhookURL = source._authWebhookURL
+      _authWebhookMethods = source._authWebhookMethods
+      _authWebhookMaxRetries = source._authWebhookMaxRetries
+      _authWebhookMinWaitInterval = source._authWebhookMinWaitInterval
+      _authWebhookMaxWaitInterval = source._authWebhookMaxWaitInterval
+      _authWebhookRequestTimeout = source._authWebhookRequestTimeout
+      _eventWebhookURL = source._eventWebhookURL
+      _eventWebhookEvents = source._eventWebhookEvents
+      _eventWebhookMaxRetries = source._eventWebhookMaxRetries
+      _eventWebhookMinWaitInterval = source._eventWebhookMinWaitInterval
+      _eventWebhookMaxWaitInterval = source._eventWebhookMaxWaitInterval
+      _eventWebhookRequestTimeout = source._eventWebhookRequestTimeout
+      _snapshotThreshold = source._snapshotThreshold
+      _snapshotInterval = source._snapshotInterval
+      _clientDeactivateThreshold = source._clientDeactivateThreshold
+      _maxSubscribersPerDocument = source._maxSubscribersPerDocument
+      _maxAttachmentsPerDocument = source._maxAttachmentsPerDocument
+      _maxSizePerDocument = source._maxSizePerDocument
+      _removeOnDetach = source._removeOnDetach
+      _allowedOrigins = source._allowedOrigins
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._name) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._authWebhookURL) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._authWebhookMethods) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._eventWebhookURL) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._eventWebhookEvents) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._clientDeactivateThreshold) }()
-      case 7: try { try decoder.decodeSingularMessageField(value: &self._maxSubscribersPerDocument) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._maxAttachmentsPerDocument) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._allowedOrigins) }()
-      case 10: try { try decoder.decodeSingularMessageField(value: &self._maxSizePerDocument) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._name) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._authWebhookURL) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._authWebhookMethods) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookURL) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookEvents) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._clientDeactivateThreshold) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._maxSubscribersPerDocument) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._maxAttachmentsPerDocument) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._allowedOrigins) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._maxSizePerDocument) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._removeOnDetach) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._authWebhookMaxRetries) }()
+        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._authWebhookMinWaitInterval) }()
+        case 14: try { try decoder.decodeSingularMessageField(value: &_storage._authWebhookMaxWaitInterval) }()
+        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._authWebhookRequestTimeout) }()
+        case 16: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookMaxRetries) }()
+        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookMinWaitInterval) }()
+        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookMaxWaitInterval) }()
+        case 19: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookRequestTimeout) }()
+        case 20: try { try decoder.decodeSingularMessageField(value: &_storage._snapshotThreshold) }()
+        case 21: try { try decoder.decodeSingularMessageField(value: &_storage._snapshotInterval) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._name {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._authWebhookURL {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._authWebhookMethods {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._eventWebhookURL {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._eventWebhookEvents {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._clientDeactivateThreshold {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._maxSubscribersPerDocument {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-    } }()
-    try { if let v = self._maxAttachmentsPerDocument {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
-    try { if let v = self._allowedOrigins {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._maxSizePerDocument {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
-    } }()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._name {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._authWebhookURL {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._authWebhookMethods {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._eventWebhookURL {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._eventWebhookEvents {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._clientDeactivateThreshold {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._maxSubscribersPerDocument {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._maxAttachmentsPerDocument {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._allowedOrigins {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._maxSizePerDocument {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._removeOnDetach {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
+      try { if let v = _storage._authWebhookMaxRetries {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
+      try { if let v = _storage._authWebhookMinWaitInterval {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._authWebhookMaxWaitInterval {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._authWebhookRequestTimeout {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._eventWebhookMaxRetries {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._eventWebhookMinWaitInterval {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._eventWebhookMaxWaitInterval {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
+      } }()
+      try { if let v = _storage._eventWebhookRequestTimeout {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
+      } }()
+      try { if let v = _storage._snapshotThreshold {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+      } }()
+      try { if let v = _storage._snapshotInterval {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
+      } }()
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_UpdatableProjectFields, rhs: Yorkie_V1_UpdatableProjectFields) -> Bool {
-    if lhs._name != rhs._name {return false}
-    if lhs._authWebhookURL != rhs._authWebhookURL {return false}
-    if lhs._authWebhookMethods != rhs._authWebhookMethods {return false}
-    if lhs._eventWebhookURL != rhs._eventWebhookURL {return false}
-    if lhs._eventWebhookEvents != rhs._eventWebhookEvents {return false}
-    if lhs._clientDeactivateThreshold != rhs._clientDeactivateThreshold {return false}
-    if lhs._maxSubscribersPerDocument != rhs._maxSubscribersPerDocument {return false}
-    if lhs._maxAttachmentsPerDocument != rhs._maxAttachmentsPerDocument {return false}
-    if lhs._maxSizePerDocument != rhs._maxSizePerDocument {return false}
-    if lhs._allowedOrigins != rhs._allowedOrigins {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._authWebhookURL != rhs_storage._authWebhookURL {return false}
+        if _storage._authWebhookMethods != rhs_storage._authWebhookMethods {return false}
+        if _storage._authWebhookMaxRetries != rhs_storage._authWebhookMaxRetries {return false}
+        if _storage._authWebhookMinWaitInterval != rhs_storage._authWebhookMinWaitInterval {return false}
+        if _storage._authWebhookMaxWaitInterval != rhs_storage._authWebhookMaxWaitInterval {return false}
+        if _storage._authWebhookRequestTimeout != rhs_storage._authWebhookRequestTimeout {return false}
+        if _storage._eventWebhookURL != rhs_storage._eventWebhookURL {return false}
+        if _storage._eventWebhookEvents != rhs_storage._eventWebhookEvents {return false}
+        if _storage._eventWebhookMaxRetries != rhs_storage._eventWebhookMaxRetries {return false}
+        if _storage._eventWebhookMinWaitInterval != rhs_storage._eventWebhookMinWaitInterval {return false}
+        if _storage._eventWebhookMaxWaitInterval != rhs_storage._eventWebhookMaxWaitInterval {return false}
+        if _storage._eventWebhookRequestTimeout != rhs_storage._eventWebhookRequestTimeout {return false}
+        if _storage._snapshotThreshold != rhs_storage._snapshotThreshold {return false}
+        if _storage._snapshotInterval != rhs_storage._snapshotInterval {return false}
+        if _storage._clientDeactivateThreshold != rhs_storage._clientDeactivateThreshold {return false}
+        if _storage._maxSubscribersPerDocument != rhs_storage._maxSubscribersPerDocument {return false}
+        if _storage._maxAttachmentsPerDocument != rhs_storage._maxAttachmentsPerDocument {return false}
+        if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
+        if _storage._removeOnDetach != rhs_storage._removeOnDetach {return false}
+        if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5342,9 +5709,9 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension Yorkie_V1_PresenceEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".PresenceEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}count\0\u{1}seq\0")
+extension Yorkie_V1_ChannelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}publisher\0\u{1}count\0\u{1}seq\0\u{1}topic\0\u{1}payload\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5353,33 +5720,52 @@ extension Yorkie_V1_PresenceEvent: SwiftProtobuf.Message, SwiftProtobuf._Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.count) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.publisher) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.count) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.topic) }()
+      case 6: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.type != .countChanged {
+    if self.type != .unspecified {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
+    if !self.publisher.isEmpty {
+      try visitor.visitSingularStringField(value: self.publisher, fieldNumber: 2)
+    }
     if self.count != 0 {
-      try visitor.visitSingularInt32Field(value: self.count, fieldNumber: 2)
+      try visitor.visitSingularInt64Field(value: self.count, fieldNumber: 3)
     }
     if self.seq != 0 {
-      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 3)
+      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 4)
+    }
+    if !self.topic.isEmpty {
+      try visitor.visitSingularStringField(value: self.topic, fieldNumber: 5)
+    }
+    if !self.payload.isEmpty {
+      try visitor.visitSingularBytesField(value: self.payload, fieldNumber: 6)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_PresenceEvent, rhs: Yorkie_V1_PresenceEvent) -> Bool {
+  public static func ==(lhs: Yorkie_V1_ChannelEvent, rhs: Yorkie_V1_ChannelEvent) -> Bool {
     if lhs.type != rhs.type {return false}
+    if lhs.publisher != rhs.publisher {return false}
     if lhs.count != rhs.count {return false}
     if lhs.seq != rhs.seq {return false}
+    if lhs.topic != rhs.topic {return false}
+    if lhs.payload != rhs.payload {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
+}
+
+extension Yorkie_V1_ChannelEvent.TypeEnum: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TYPE_UNSPECIFIED\0\u{1}TYPE_PRESENCE\0\u{1}TYPE_BROADCAST\0")
 }
 
 extension Yorkie_V1_DataSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

@@ -2,10 +2,19 @@ version: '3.3'
 
 services:
   yorkie:
-    image: 'yorkieteam/yorkie:latest'
+    image: 'yorkieteam/yorkie:0.6.36'
     container_name: 'yorkie'
-    command: ['server', '--enable-pprof']
+#    command: ['server', '--enable-pprof']
     restart: always
     ports:
       - '8080:8080'
       - '8081:8081'
+    # Inject `host.docker.internal` into the container's /etc/hosts so Go's
+    # pure resolver (used by the yorkie binary) can dial back to the host
+    # for the auth-webhook integration tests. Docker Desktop's dynamic DNS
+    # only services glibc's resolver, not Go's, so the /etc/hosts entry is
+    # what actually makes `WEBHOOK_HOST=host.docker.internal` work.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    command: >
+        server --pprof-enabled --rpc-addr 0.0.0.0:8080

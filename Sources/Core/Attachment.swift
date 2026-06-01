@@ -18,7 +18,7 @@ import Connect
 import Foundation
 
 /**
- * `Attachment` is a class that manages the state of an attachable resource (Document or Presence).
+ * `Attachment` is a class that manages the state of an attachable resource (Document or Channel).
  */
 @MainActor
 final class Attachment<R: Attachable>: @unchecked Sendable {
@@ -27,7 +27,7 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     var syncMode: SyncMode?
     var changeEventReceived: Bool?
     var lastHeartbeatTime: TimeInterval
-    var remoteWatchStream: (any YorkieServerStream)?
+    var remoteWatchStream: YorkieServerStream?
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
     private var isDisconnected: Bool
@@ -55,7 +55,7 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
      * Only applicable to Document resources with syncMode defined.
      */
     func needRealtimeSync() async -> Bool {
-        // If syncMode is not defined (e.g., for Presence), no sync is needed
+        // If syncMode is not defined (e.g., for Channel), no sync is needed
         guard let syncMode = self.syncMode else {
             return false
         }
@@ -73,7 +73,7 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         return syncMode != .manual && (hasLocalChanges || (self.changeEventReceived ?? false))
     }
 
-    func connectStream(_ stream: (any YorkieServerStream)?) {
+    func connectStream(_ stream: YorkieServerStream?) {
         // Cancel the old stream if it exists to prevent it from interfering
         if let oldStream = self.remoteWatchStream {
             oldStream.cancel()
@@ -111,16 +111,6 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
             return self.remoteWatchStream == nil
         } else {
             return self.isDisconnected
-        }
-    }
-
-    /**
-     * `unsubscribeBroadcastEvent` unsubscribes from broadcast events.
-     * Only applicable to Document resources.
-     */
-    func unsubscribeBroadcastEvent() {
-        if let doc = self.resource as? Document {
-            doc.unsubscribeLocalBroadcast()
         }
     }
 }
