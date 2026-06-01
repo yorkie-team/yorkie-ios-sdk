@@ -85,6 +85,38 @@ class LLRBTreeTests: XCTestCase {
         }
     }
 
+    private func checkFloor(_ tree: LLRBTree<Int, Int>, _ arr: [Int], _ loop: Int) {
+        for floorKey in 0 ..< loop {
+            var expectedKey: Int?
+            for value in arr where value <= floorKey {
+                if expectedKey == nil || expectedKey! <= value {
+                    expectedKey = value
+                }
+            }
+
+            let resultEntry = tree.floorEntry(floorKey)
+
+            if let expectedKey {
+                XCTAssertEqual(expectedKey, resultEntry?.key)
+            } else {
+                XCTAssertNil(resultEntry)
+            }
+        }
+    }
+
+    func test_can_floor_entry_at_each_insertion_step() {
+        for array in self.sources {
+            var testArr = [Int]()
+            let target = LLRBTree<Int, Int>()
+            for value in array {
+                self.checkFloor(target, testArr, 10)
+                target.put(value, value)
+                testArr.append(value)
+                self.checkFloor(target, testArr, 10)
+            }
+        }
+    }
+
     func test_insert() {
         for array in self.sources {
             let target = LLRBTree<Int, Int>()

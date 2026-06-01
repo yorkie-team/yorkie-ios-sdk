@@ -35,7 +35,6 @@ class LLRBTree<K: Comparable, V> {
     class Node: CustomDebugStringConvertible {
         var key: K
         var value: V
-        weak var parent: Node?
         var left: Node?
         var right: Node?
         var isRed: Bool
@@ -121,34 +120,20 @@ class LLRBTree<K: Comparable, V> {
      */
     func floorEntry(_ key: K) -> Entry? {
         var node = self.root
+        var result: Node?
 
-        while node != nil {
-            if key > node!.key {
-                if node!.right != nil {
-                    node?.right?.parent = node
-                    node = node?.right
-                } else {
-                    return node?.entry
-                }
-            } else if key < node!.key {
-                if node!.left != nil {
-                    node?.left?.parent = node
-                    node = node?.left
-                } else {
-                    var parent = node?.parent
-                    var childNode = node
-                    while parent != nil, childNode === parent?.left {
-                        childNode = parent
-                        parent = parent!.parent
-                    }
-
-                    return parent?.entry
-                }
+        while let current = node {
+            if key == current.key {
+                return current.entry
+            } else if key < current.key {
+                node = current.left
             } else {
-                return node?.entry
+                result = current
+                node = current.right
             }
         }
-        return nil
+
+        return result?.entry
     }
 
     /**
