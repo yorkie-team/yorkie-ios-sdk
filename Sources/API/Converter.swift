@@ -1350,3 +1350,20 @@ func bytesToHex(_ bytes: Data?) -> String {
     guard let bytes = bytes else { return "" }
     return bytes.map { String(format: "%02x", $0) }.joined()
 }
+
+extension Converter {
+    /**
+     * `fromRevisionSummary` converts a Protobuf `RevisionSummary` to a `RevisionSummary`.
+     */
+    static func fromRevisionSummary(_ pbRevision: PbRevisionSummary) -> RevisionSummary {
+        let createdAt = pbRevision.hasCreatedAt
+            ? Date(timeIntervalSince1970: TimeInterval(pbRevision.createdAt.seconds) + TimeInterval(pbRevision.createdAt.nanos) / 1_000_000_000)
+            : Date()
+
+        return RevisionSummary(id: pbRevision.id,
+                               label: pbRevision.label,
+                               description: pbRevision.description_p,
+                               snapshot: pbRevision.snapshot,
+                               createdAt: createdAt)
+    }
+}
