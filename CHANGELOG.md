@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.6.40] - 2026-06-02
+
+- Implement revision management in https://github.com/yorkie-team/yorkie-ios-sdk/pull/243
+
 ## [v0.6.39] - 2026-06-02
 
 - Apply updates from yorkie-js-sdk 0.6.39 in https://github.com/yorkie-team/yorkie-ios-sdk/pull/242

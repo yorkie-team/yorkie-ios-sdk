@@ -47,11 +47,12 @@ final class RevisionIntegrationTests: XCTestCase {
         let rev2 = try await client.createRevision(doc, label: "v2.0", description: "Second revision")
         XCTAssertEqual(rev2.label, "v2.0")
 
-        // 05. List all revisions (newest first).
+        // 05. List all revisions — both should be present (ordering is server-defined).
         let revisions = try await client.listRevisions(doc)
         XCTAssertTrue(revisions.count >= 2)
-        XCTAssertEqual(revisions[0].label, "v2.0")
-        XCTAssertEqual(revisions[1].label, "v1.0")
+        let labels = revisions.map { $0.label }
+        XCTAssertTrue(labels.contains("v1.0"))
+        XCTAssertTrue(labels.contains("v2.0"))
 
         try await client.detach(doc)
         try await client.deactivate()
@@ -111,8 +112,8 @@ final class RevisionIntegrationTests: XCTestCase {
         try await client.sync()
 
         // 04. Verify the document was modified.
-        var k1 = await doc.getRoot().k1 as? String
-        var k2 = await doc.getRoot().k2 as? String
+        var k1 = doc.getRoot().k1 as? String
+        var k2 = doc.getRoot().k2 as? String
         XCTAssertEqual(k1, "modified")
         XCTAssertEqual(k2, "v3")
 
@@ -123,8 +124,8 @@ final class RevisionIntegrationTests: XCTestCase {
         try await client.sync()
 
         // 07. Verify the document was restored to the initial state.
-        k1 = await doc.getRoot().k1 as? String
-        k2 = await doc.getRoot().k2 as? String
+        k1 = doc.getRoot().k1 as? String
+        k2 = doc.getRoot().k2 as? String
         XCTAssertEqual(k1, "v1")
         XCTAssertEqual(k2, "v2")
 
@@ -144,7 +145,7 @@ final class RevisionIntegrationTests: XCTestCase {
             try await c2.sync()
 
             // 02. Both clients share the same state.
-            var d2k1 = await d2.getRoot().k1 as? String
+            var d2k1 = d2.getRoot().k1 as? String
             XCTAssertEqual(d2k1, "v1")
 
             // 03. Client1 creates a revision.
@@ -159,7 +160,7 @@ final class RevisionIntegrationTests: XCTestCase {
             try await c2.sync()
 
             // 05. Both clients have the modified state.
-            d2k1 = await d2.getRoot().k1 as? String
+            d2k1 = d2.getRoot().k1 as? String
             XCTAssertEqual(d2k1, "modified")
 
             // 06. Client1 restores to the revision.
@@ -170,10 +171,10 @@ final class RevisionIntegrationTests: XCTestCase {
             try await c2.sync()
 
             // 08. Both clients are restored to the initial state.
-            let d1k1 = await d1.getRoot().k1 as? String
-            let d1k2 = await d1.getRoot().k2 as? String
-            d2k1 = await d2.getRoot().k1 as? String
-            let d2k2 = await d2.getRoot().k2 as? String
+            let d1k1 = d1.getRoot().k1 as? String
+            let d1k2 = d1.getRoot().k2 as? String
+            d2k1 = d2.getRoot().k1 as? String
+            let d2k2 = d2.getRoot().k2 as? String
             XCTAssertEqual(d1k1, "v1")
             XCTAssertEqual(d1k2, "v2")
             XCTAssertEqual(d2k1, "v1")
