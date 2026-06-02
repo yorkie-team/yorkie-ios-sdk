@@ -128,8 +128,8 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d3 = Document(key: docKey)
         try await self.c1.attach(self.d3)
 
-        let doc2Content = d2.toSortedJSON()
-        let doc3Content = d3.toSortedJSON()
+        let doc2Content = self.d2.toSortedJSON()
+        let doc3Content = self.d3.toSortedJSON()
 
         XCTAssertEqual(doc2Content, doc3Content)
 
@@ -166,8 +166,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        let doc1Content = d1.toSortedJSON()
-        let doc2Content = d2.toSortedJSON()
+        let doc1Content = self.d1.toSortedJSON()
+        let doc2Content = self.d2.toSortedJSON()
 
         XCTAssertEqual(doc1Content, doc2Content)
 
@@ -181,8 +181,8 @@ final class DocumentIntegrationTests: XCTestCase {
         // 03. c2 syncs and checks that d2 is removed.
         try await self.c2.sync()
 
-        let doc1Status = d1.status
-        let doc2Status = d2.status
+        let doc1Status = self.d1.status
+        let doc2Status = self.d2.status
 
         XCTAssertEqual(doc1Status, doc2Status)
 
@@ -216,8 +216,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        let doc1Content = d1.toSortedJSON()
-        let doc2Content = d2.toSortedJSON()
+        let doc1Content = self.d1.toSortedJSON()
+        let doc2Content = self.d2.toSortedJSON()
 
         XCTAssertEqual(doc1Content, doc2Content)
 
@@ -225,8 +225,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.remove(self.d1)
         try await self.c2.detach(self.d2)
 
-        let doc1Status = d1.status
-        let doc2Status = d2.status
+        let doc1Status = self.d1.status
+        let doc2Status = self.d2.status
 
         XCTAssertEqual(doc1Status, .removed)
         XCTAssertEqual(doc2Status, .removed)
@@ -261,8 +261,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        let doc1Content = d1.toSortedJSON()
-        let doc2Content = d2.toSortedJSON()
+        let doc1Content = self.d1.toSortedJSON()
+        let doc2Content = self.d2.toSortedJSON()
 
         XCTAssertEqual(doc1Content, doc2Content)
 
@@ -270,8 +270,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.remove(self.d1)
         try await self.c2.remove(self.d2)
 
-        let doc1Status = d1.status
-        let doc2Status = d2.status
+        let doc1Status = self.d1.status
+        let doc2Status = self.d2.status
 
         XCTAssertEqual(doc1Status, .removed)
         XCTAssertEqual(doc2Status, .removed)
