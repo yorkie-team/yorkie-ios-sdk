@@ -41,7 +41,7 @@ class GCIntegrationTests: XCTestCase {
         // 1. initial state
         try await client1.attach(doc1, [:], .manual)
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
         }
 
@@ -49,19 +49,19 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
 
         // 2. client1 updates doc
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.remove(key: "point")
         }
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         // 3. client2 updates doc
-        try await doc2.update { root, _ in
+        try doc2.update { root, _ in
             (root.point as? JSONObject)?.remove(key: "x")
         }
 
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 1) // x
 
         try await client1.sync()
@@ -69,14 +69,14 @@ class GCIntegrationTests: XCTestCase {
         try await client1.sync()
 
         let gcNodeLen = 3 // point x, y
-        var doc1Len = await doc1.getGarbageLength()
-        var doc2Len = await doc2.getGarbageLength()
+        var doc1Len = doc1.getGarbageLength()
+        var doc2Len = doc2.getGarbageLength()
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)
 
         // Actual garbage-collected nodes
-        doc1Len = await doc1.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.id, client2.id]))
-        doc2Len = await doc2.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.id, client2.id]))
+        doc1Len = doc1.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.id, client2.id]))
+        doc2Len = doc2.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.id, client2.id]))
 
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)
@@ -107,7 +107,7 @@ class GCIntegrationTests: XCTestCase {
         await assertTrue(versionVector: d2.getVersionVector(),
                          actorDatas: [])
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc",
                                     children: [
@@ -131,9 +131,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c1.id!, lamport: 1)
         ])
 
-        var len = await d1.getGarbageLength()
+        var len = d1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await c1.sync()
@@ -147,7 +147,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 2)
         ])
 
-        try await d2.update({ root, _ in
+        try d2.update({ root, _ in
             do {
                 try (root.t as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 2], JSONTreeTextNode(value: "gh"))
             } catch {
@@ -160,9 +160,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 3)
         ])
 
-        len = await d1.getGarbageLength()
+        len = d1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await c2.sync()
@@ -171,9 +171,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 3)
         ])
 
-        len = await d1.getGarbageLength()
+        len = d1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await c1.sync()
@@ -182,9 +182,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 3)
         ])
 
-        len = await d1.getGarbageLength()
+        len = d1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await c2.sync()
@@ -193,9 +193,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 3)
         ])
 
-        len = await d1.getGarbageLength()
+        len = d1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await c1.sync()
@@ -204,9 +204,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 3)
         ])
 
-        len = await d1.getGarbageLength()
+        len = d1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await c2.sync()
@@ -215,9 +215,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: c2.id!, lamport: 3)
         ])
 
-        len = await d1.getGarbageLength()
+        len = d1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await d2.getGarbageLength()
+        len = d2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await c1.detach(d1)
@@ -246,7 +246,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root["1"] = Int64(1)
             root["2"] = [Int64(1), Int64(2), Int64(3)]
             root["3"] = Int64(3)
@@ -255,9 +255,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 1)
         ])
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -271,7 +271,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             root.remove(key: "2")
         }, "removes 2")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -279,9 +279,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client2.sync()
@@ -290,9 +290,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client1.sync()
@@ -301,9 +301,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client2.sync()
@@ -312,9 +312,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client1.sync()
@@ -324,9 +324,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client2.sync()
@@ -335,9 +335,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.detach(doc1)
@@ -366,7 +366,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.text = JSONText()
             (root.text as? JSONText)?.edit(0, 0, "Hello World")
             root.textWithAttr = JSONText()
@@ -376,9 +376,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 1)
         ])
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -392,7 +392,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.text as? JSONText)?.edit(0, 1, "a")
             (root.text as? JSONText)?.edit(1, 2, "b")
             (root.textWithAttr as? JSONText)?.edit(0, 1, "a", ["b": "1"])
@@ -403,9 +403,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client2.sync()
@@ -414,9 +414,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client1.sync()
@@ -425,9 +425,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client2.sync()
@@ -436,9 +436,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client1.sync()
@@ -447,9 +447,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client2.sync()
@@ -458,9 +458,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.detach(doc1)
@@ -490,7 +490,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root["1"] = Int64(1)
             root["2"] = [Int64(1), Int64(2), Int64(3)]
             root["3"] = Int64(3)
@@ -504,9 +504,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 1)
         ])
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -520,7 +520,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.remove(key: "2")
             (root["4"] as? JSONText)?.edit(0, 1, "h")
             (root["5"] as? JSONText)?.edit(0, 1, "h", ["b": "1"])
@@ -529,9 +529,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 6)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -539,17 +539,17 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 6)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client2.detach(doc2)
 
         try await client2.sync()
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 6)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 6)
 
         try await client1.sync()
@@ -557,9 +557,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 6)
 
         try await client1.detach(doc1)
@@ -582,30 +582,30 @@ class GCIntegrationTests: XCTestCase {
         try await client.attach(doc, [:], .manual)
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [])
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
         }
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
             ActorData(actor: client.id!, lamport: 1)
         ])
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             root.point = ["x": Int64(1), "y": Int64(1)]
         }
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
             ActorData(actor: client.id!, lamport: 2)
         ])
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             root.point = ["x": Int64(2), "y": Int64(2)]
         }
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
             ActorData(actor: client.id!, lamport: 3)
         ])
 
-        var len = await doc.getGarbageLength()
+        var len = doc.getGarbageLength()
         XCTAssertEqual(len, 6)
-        len = await doc.getGarbageLengthFromClone()
+        len = doc.getGarbageLengthFromClone()
         XCTAssertEqual(len, 6)
     }
 
@@ -622,7 +622,7 @@ class GCIntegrationTests: XCTestCase {
         try await client.attach(doc, [:], .manual)
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [])
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             root.list = [Int(0), Int(1), Int(2)]
             (root.list as? JSONArray)?.push([Int(3), Int(4), Int(5)])
         }
@@ -630,33 +630,33 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client.id!, lamport: 1)
         ])
 
-        var expectedJson = await doc.toJSON()
+        var expectedJson = doc.toJSON()
         XCTAssertEqual("{\"list\":[0,1,2,[3,4,5]]}", expectedJson)
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             (root.list as? JSONArray)?.remove(index: 1)
         }
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
             ActorData(actor: client.id!, lamport: 2)
         ])
 
-        expectedJson = await doc.toJSON()
+        expectedJson = doc.toJSON()
         XCTAssertEqual("{\"list\":[0,2,[3,4,5]]}", expectedJson)
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             ((root.list as? JSONArray)?[2] as? JSONArray)?.remove(index: 1)
         }
         await assertTrue(versionVector: doc.getVersionVector(), actorDatas: [
             ActorData(actor: client.id!, lamport: 3)
         ])
 
-        expectedJson = await doc.toJSON()
+        expectedJson = doc.toJSON()
         XCTAssertEqual("{\"list\":[0,2,[3,5]]}", expectedJson)
 
-        var len = await doc.getGarbageLength()
+        var len = doc.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        len = await doc.getGarbageLengthFromClone()
+        len = doc.getGarbageLengthFromClone()
         XCTAssertEqual(len, 2)
 
         try await client.deactivate()
@@ -679,26 +679,26 @@ class GCIntegrationTests: XCTestCase {
         try await client1.attach(doc1, [:], .manual)
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.point = ["x": Int64(0), "y": Int64(0)]
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 1)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.point as? JSONObject)?.x = Int64(1)
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 1)
 
         try await client1.sync()
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -711,10 +711,10 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 1)
 
-        try await doc2.update { root, _ in
+        try doc2.update { root, _ in
             (root.point as? JSONObject)?.x = Int64(2)
         }
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -722,33 +722,33 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.point = ["x": Int64(3), "y": Int64(3)]
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client1.sync()
-        await assertTrue(versionVector: await doc1.getVersionVector(), actorDatas: [
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client1.sync()
-        await assertTrue(versionVector: await doc1.getVersionVector(), actorDatas: [
+        await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 3)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client2.sync()
@@ -757,7 +757,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 3)
 
         try await client1.sync()
@@ -766,19 +766,19 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client2.sync()
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 4)
 
         try await client1.sync()
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client2.sync()
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.deactivate()
@@ -796,7 +796,7 @@ class GCIntegrationTests: XCTestCase {
 
         try await client.activate()
 
-        try await doc.update { root, _ in
+        try doc.update { root, _ in
             root.shape = JSONObject()
             (root.shape as? JSONObject)?.point = JSONObject()
             ((root.shape as? JSONObject)?.point as? JSONObject)?.set(key: "x", value: Int32(0))
@@ -804,11 +804,11 @@ class GCIntegrationTests: XCTestCase {
             root.remove(key: "shape")
         }
 
-        var len = await doc.getGarbageLength()
+        var len = doc.getGarbageLength()
         XCTAssertEqual(len, 4)
 
-        let actorID = await doc.changeID.getActorID() ?? ""
-        len = await doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [actorID]))
+        let actorID = doc.changeID.getActorID() ?? ""
+        len = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [actorID]))
         XCTAssertEqual(len, 4) // The number of GC nodes must also be 4.
     }
 
@@ -832,7 +832,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "z")
         }
@@ -840,21 +840,21 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 1)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 1, "a")
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(1, 1, "b")
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 3)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "d")
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -872,14 +872,14 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        var strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
-        var strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
+        var strDoc1 = (doc1.getRoot().t as? JSONText)?.toString
+        var strDoc2 = (doc2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc1, "abd")
         XCTAssertEqual(strDoc2, "abd")
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 1)
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -897,12 +897,12 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
-        strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
+        strDoc1 = (doc1.getRoot().t as? JSONText)?.toString
+        strDoc2 = (doc2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc1, "abcd")
         XCTAssertEqual(strDoc2, "abcd")
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -914,9 +914,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 6)
         ])
 
-        strDoc1 = await(doc1.getRoot().t as? JSONText)?.toString
+        strDoc1 = (doc1.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc1, "ad")
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2) // b,c
 
         try await client2.sync()
@@ -931,11 +931,11 @@ class GCIntegrationTests: XCTestCase {
         ])
 
         try await client2.sync()
-        strDoc2 = await(doc2.getRoot().t as? JSONText)?.toString
+        strDoc2 = (doc2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(strDoc2, "ad")
 
         try await client1.sync()
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.deactivate()
@@ -962,7 +962,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "r",
                                     children: [
@@ -974,21 +974,21 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 1)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([0], [1], JSONTreeTextNode(value: "a"))
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([1], [1], JSONTreeTextNode(value: "b"))
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 3)
         ])
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([2], [2], JSONTreeTextNode(value: "d"))
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1006,14 +1006,14 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        var strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
-        var strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        var strDoc1 = (doc1.getRoot().t as? JSONTree)?.toXML()
+        var strDoc2 = (doc2.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>abd</r>")
         XCTAssertEqual(strDoc2, "<r>abd</r>")
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 1)
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([2], [2], JSONTreeTextNode(value: "c"))
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1031,12 +1031,12 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
-        strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        strDoc1 = (doc1.getRoot().t as? JSONTree)?.toXML()
+        strDoc2 = (doc2.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>abcd</r>")
         XCTAssertEqual(strDoc2, "<r>abcd</r>")
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             try (root.t as? JSONTree)?.editByPath([1], [3])
         }
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1048,9 +1048,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 6)
         ])
 
-        strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
+        strDoc1 = (doc1.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>ad</r>")
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2) // b, c
 
         try await client2.sync()
@@ -1064,9 +1064,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 6)
         ])
 
-        strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        strDoc2 = (doc2.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc2, "<r>ad</r>")
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await client2.sync()
@@ -1075,9 +1075,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 7)
         ])
 
-        strDoc2 = await(doc2.getRoot().t as? JSONTree)?.toXML()
+        strDoc2 = (doc2.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc2, "<r>ad</r>")
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -1085,9 +1085,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client1.id!, lamport: 6)
         ])
 
-        strDoc1 = await(doc1.getRoot().t as? JSONTree)?.toXML()
+        strDoc1 = (doc1.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(strDoc1, "<r>ad</r>")
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.deactivate()
@@ -1114,7 +1114,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
@@ -1135,7 +1135,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }, "insert c")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1143,16 +1143,16 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }, "delete bd")
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -1166,12 +1166,12 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "1")
         }, "insert 1")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1185,9 +1185,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -1196,9 +1196,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.deactivate()
@@ -1225,7 +1225,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
@@ -1245,7 +1245,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "d")
         }, "insert d")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1265,7 +1265,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }, "insert c")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1273,7 +1273,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }, "remove ac")
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1282,7 +1282,7 @@ class GCIntegrationTests: XCTestCase {
         ])
 
         // Sync with PushOnly
-        try await client2.changeSyncMode(doc2, .realtimePushOnly)
+        try client2.changeSyncMode(doc2, .realtimePushOnly)
         try await client2.sync()
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 1),
@@ -1295,7 +1295,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "1")
         }, "insert 1 (pushonly)")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1315,12 +1315,12 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        var len = await doc1.getGarbageLength()
+        var len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "2")
         }, "insert 2 (pushonly)")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1328,7 +1328,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        try await client2.changeSyncMode(doc2, .manual)
+        try client2.changeSyncMode(doc2, .manual)
         try await client2.sync()
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 5),
@@ -1341,9 +1341,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 2)
 
         try await client2.sync()
@@ -1352,9 +1352,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 7)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.sync()
@@ -1363,9 +1363,9 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        len = await doc1.getGarbageLength()
+        len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
-        len = await doc2.getGarbageLength()
+        len = doc2.getGarbageLength()
         XCTAssertEqual(len, 0)
 
         try await client1.deactivate()
@@ -1392,7 +1392,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
@@ -1413,7 +1413,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }, "insert c")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1421,7 +1421,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }, "delete bd")
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1433,15 +1433,15 @@ class GCIntegrationTests: XCTestCase {
 
         try await client1.deactivate()
 
-        let garbageLength1 = await doc2.getGarbageLength()
-        let getVersionVector1 = await doc2.getVersionVector().size()
+        let garbageLength1 = doc2.getGarbageLength()
+        let getVersionVector1 = doc2.getVersionVector().size()
 
         XCTAssertEqual(garbageLength1, 2)
         XCTAssertEqual(getVersionVector1, 2)
 
         try await client2.sync()
-        let garbageLength2 = await doc2.getGarbageLength()
-        let getVersionVector2 = await doc2.getVersionVector().size()
+        let garbageLength2 = doc2.getGarbageLength()
+        let getVersionVector2 = doc2.getVersionVector().size()
 
         XCTAssertEqual(garbageLength2, 0)
         XCTAssertEqual(getVersionVector2, 2)
@@ -1467,7 +1467,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
@@ -1488,7 +1488,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }, "insert c")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1496,15 +1496,15 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }, "delete bd")
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        let doc1Garbage1 = await doc1.getGarbageLength()
-        let doc2Garbage1 = await doc2.getGarbageLength()
+        let doc1Garbage1 = doc1.getGarbageLength()
+        let doc2Garbage1 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage1, 2)
         XCTAssertEqual(doc2Garbage1, 0)
@@ -1520,13 +1520,13 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        let doc1Garbage2 = await doc1.getGarbageLength()
-        let doc2Garbage2 = await doc2.getGarbageLength()
+        let doc1Garbage2 = doc1.getGarbageLength()
+        let doc2Garbage2 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage2, 2)
         XCTAssertEqual(doc2Garbage2, 2)
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "1")
         }, "insert 1")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1540,8 +1540,8 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        let doc1Garbage3 = await doc1.getGarbageLength()
-        let doc2Garbage3 = await doc2.getGarbageLength()
+        let doc1Garbage3 = doc1.getGarbageLength()
+        let doc2Garbage3 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage3, 2)
         XCTAssertEqual(doc2Garbage3, 0)
@@ -1560,7 +1560,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(0, 3, "")
         }, "delete all")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1568,7 +1568,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        let doc2Garbage4 = await doc2.getGarbageLength()
+        let doc2Garbage4 = doc2.getGarbageLength()
         XCTAssertEqual(doc2Garbage4, 3)
 
         try await client2.sync()
@@ -1577,7 +1577,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        let doc2Garbage5 = await doc2.getGarbageLength()
+        let doc2Garbage5 = doc2.getGarbageLength()
         XCTAssertEqual(doc2Garbage5, 0)
 
         try await client2.detach(doc2)
@@ -1606,7 +1606,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
@@ -1627,7 +1627,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 2)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }, "insert c")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1635,15 +1635,15 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 3)
         ])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }, "delete bd")
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
             ActorData(actor: client1.id!, lamport: 2)
         ])
 
-        let doc1Garbage1 = await doc1.getGarbageLength()
-        let doc2Garbage1 = await doc2.getGarbageLength()
+        let doc1Garbage1 = doc1.getGarbageLength()
+        let doc2Garbage1 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage1, 2)
         XCTAssertEqual(doc2Garbage1, 0)
@@ -1659,13 +1659,13 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 4)
         ])
 
-        let doc1Garbage2 = await doc1.getGarbageLength()
-        let doc2Garbage2 = await doc2.getGarbageLength()
+        let doc1Garbage2 = doc1.getGarbageLength()
+        let doc2Garbage2 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage2, 2)
         XCTAssertEqual(doc2Garbage2, 2)
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(2, 2, "1")
         }, "insert 1")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1679,8 +1679,8 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        let doc1Garbage3 = await doc1.getGarbageLength()
-        let doc2Garbage3 = await doc2.getGarbageLength()
+        let doc1Garbage3 = doc1.getGarbageLength()
+        let doc2Garbage3 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage3, 2)
         XCTAssertEqual(doc2Garbage3, 0)
@@ -1699,7 +1699,7 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 5)
         ])
 
-        try await doc2.update({ root, _ in
+        try doc2.update({ root, _ in
             (root.t as? JSONText)?.edit(0, 3, "")
         }, "delete all")
         await assertTrue(versionVector: doc2.getVersionVector(), actorDatas: [
@@ -1707,12 +1707,12 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.id!, lamport: 6)
         ])
 
-        let doc2Garbage4 = await doc2.getGarbageLength()
+        let doc2Garbage4 = doc2.getGarbageLength()
         XCTAssertEqual(doc2Garbage4, 3)
 
         try await client2.detach(doc2)
 
-        let doc2Garbage5 = await doc2.getGarbageLength()
+        let doc2Garbage5 = doc2.getGarbageLength()
         XCTAssertEqual(doc2Garbage5, 0)
 
         try await client1.deactivate()
@@ -1750,7 +1750,7 @@ class GCIntegrationTests: XCTestCase {
 
         await assertTrue(versionVector: doc3.getVersionVector(), actorDatas: [])
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
             (root.t as? JSONText)?.edit(1, 1, "b")
@@ -1776,29 +1776,29 @@ class GCIntegrationTests: XCTestCase {
         ])
 
         // doc3 update
-        try await doc3.update { root, _ in
+        try doc3.update { root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }
 
         // doc1 update
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "1")
         }
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "2")
         }
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "3")
         }
 
         // doc2 update
-        try await doc2.update { root, _ in
+        try doc2.update { root, _ in
             (root.t as? JSONText)?.edit(3, 3, "x")
         }
 
-        try await doc2.update { root, _ in
+        try doc2.update { root, _ in
             (root.t as? JSONText)?.edit(4, 4, "y")
         }
 
@@ -1807,8 +1807,8 @@ class GCIntegrationTests: XCTestCase {
         try await client2.sync()
         try await client1.sync()
 
-        let doc1Expected = await doc1.toJSON()
-        let doc2Expected = await doc1.toJSON()
+        let doc1Expected = doc1.toJSON()
+        let doc2Expected = doc1.toJSON()
 
         let doc1JSON = """
         {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"b"},{"val":"c"},{"val":"x"},{"val":"y"}]}
@@ -1837,18 +1837,18 @@ class GCIntegrationTests: XCTestCase {
 
         try await client3.detach(doc3)
 
-        try await doc2.update { root, _ in
+        try doc2.update { root, _ in
             (root.t as? JSONText)?.edit(5, 5, "z")
         }
 
         try await client1.sync()
 
-        let len1 = await doc1.getGarbageLength()
+        let len1 = doc1.getGarbageLength()
         XCTAssertEqual(len1, 2)
 
         try await client1.sync()
 
-        let len2 = await doc1.getGarbageLength()
+        let len2 = doc1.getGarbageLength()
         XCTAssertEqual(len2, 2)
 
         // client 2 sync
@@ -1867,8 +1867,8 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client3.id!, lamport: 3)
         ])
 
-        let doc3Expected = await doc1.toJSON()
-        let doc4Expected = await doc1.toJSON()
+        let doc3Expected = doc1.toJSON()
+        let doc4Expected = doc1.toJSON()
         let doc3JSON = """
         {"t":[{"val":"3"},{"val":"2"},{"val":"1"},{"val":"a"},{"val":"z"},{"val":"x"},{"val":"y"}]}
         """
@@ -1878,20 +1878,20 @@ class GCIntegrationTests: XCTestCase {
         XCTAssertEqual(doc3JSON, doc3Expected)
         XCTAssertEqual(doc4JSON, doc4Expected)
 
-        let len3 = await doc1.getGarbageLength()
+        let len3 = doc1.getGarbageLength()
         XCTAssertEqual(len3, 2)
 
-        let len4 = await doc2.getGarbageLength()
+        let len4 = doc2.getGarbageLength()
         XCTAssertEqual(len4, 2)
 
         // client 2 sync
         try await client2.sync()
         try await client1.sync()
 
-        let len5 = await doc1.getGarbageLength()
+        let len5 = doc1.getGarbageLength()
         XCTAssertEqual(len5, 0)
 
-        let len6 = await doc2.getGarbageLength()
+        let len6 = doc2.getGarbageLength()
         XCTAssertEqual(len6, 0)
 
         try await client1.deactivate()
@@ -1919,7 +1919,7 @@ class GCIntegrationTests: XCTestCase {
         try await client2.attach(doc2, [:], .manual)
         try await client3.attach(doc3, [:], .manual)
 
-        try await doc1.update({ root, _ in
+        try doc1.update({ root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
         }, "sets text")
@@ -1944,14 +1944,14 @@ class GCIntegrationTests: XCTestCase {
 
         // 01. Updates changes over snapshot threshold.
         for idx in 0 ..< (defaultSnapshotThreshold / 2) {
-            try await doc1.update { root, _ in
+            try doc1.update { root, _ in
                 (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
             }
 
             try await client1.sync()
             try await client2.sync()
 
-            try await doc2.update { root, _ in
+            try doc2.update { root, _ in
                 (root.t as? JSONText)?.edit(0, 0, "\(idx % 10)")
             }
 
@@ -1975,13 +1975,13 @@ class GCIntegrationTests: XCTestCase {
         ])
 
         // 02. Makes local changes then pull a snapshot from the server.
-        try await doc3.update { root, _ in
+        try doc3.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "c")
         }
 
         try await client3.sync()
 
-        let vectors = await doc3.getVersionVector()
+        let vectors = doc3.getVersionVector()
         await assertTrue(versionVector: vectors, actorDatas: [
             ActorData(actor: client1.id!, lamport: 998),
             ActorData(actor: client2.id!, lamport: 1000),
@@ -1991,16 +1991,16 @@ class GCIntegrationTests: XCTestCase {
 
         try await client3.sync()
 
-        var json3Count = (await doc3.getRoot().t as? JSONText)?.length ?? 0
+        var json3Count = (doc3.getRoot().t as? JSONText)?.length ?? 0
         XCTAssertEqual(defaultSnapshotThreshold + 2, json3Count)
 
         // PASSED
         // 03. Delete text after receiving the snapshot.
-        try await doc3.update { root, _ in
+        try doc3.update { root, _ in
             (root.t as? JSONText)?.edit(1, 3, "")
         }
 
-        json3Count = (await doc3.getRoot().t as? JSONText)?.length ?? 0
+        json3Count = (doc3.getRoot().t as? JSONText)?.length ?? 0
 
         XCTAssertEqual(defaultSnapshotThreshold, json3Count)
 
@@ -2008,10 +2008,10 @@ class GCIntegrationTests: XCTestCase {
         try await client2.sync()
         try await client1.sync()
 
-        let json2Count = (await doc2.getRoot().t as? JSONText)?.length ?? 0
+        let json2Count = (doc2.getRoot().t as? JSONText)?.length ?? 0
         XCTAssertEqual(defaultSnapshotThreshold, json2Count)
 
-        let json1Count = (await doc1.getRoot().t as? JSONText)?.length ?? 0
+        let json1Count = (doc1.getRoot().t as? JSONText)?.length ?? 0
         XCTAssertEqual(defaultSnapshotThreshold, json1Count)
 
         try await client3.deactivate()

@@ -54,6 +54,24 @@ public protocol Yorkie_V1_YorkieServiceClientInterface: Sendable {
     func `watchDocument`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
 
     @discardableResult
+    func `createRevision`(request: Yorkie_V1_CreateRevisionRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_CreateRevisionResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `createRevision`(request: Yorkie_V1_CreateRevisionRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_CreateRevisionResponse>
+
+    @discardableResult
+    func `listRevisions`(request: Yorkie_V1_ListRevisionsRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_ListRevisionsResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `listRevisions`(request: Yorkie_V1_ListRevisionsRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_ListRevisionsResponse>
+
+    @discardableResult
+    func `restoreRevision`(request: Yorkie_V1_RestoreRevisionRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_RestoreRevisionResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `restoreRevision`(request: Yorkie_V1_RestoreRevisionRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_RestoreRevisionResponse>
+
+    @discardableResult
     func `attachChannel`(request: Yorkie_V1_AttachChannelRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_AttachChannelResponse>) -> Void) -> Connect.Cancelable
 
     @available(iOS 13, *)
@@ -161,6 +179,36 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
     }
 
     @discardableResult
+    public func `createRevision`(request: Yorkie_V1_CreateRevisionRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_CreateRevisionResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/CreateRevision", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `createRevision`(request: Yorkie_V1_CreateRevisionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_CreateRevisionResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/CreateRevision", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @discardableResult
+    public func `listRevisions`(request: Yorkie_V1_ListRevisionsRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_ListRevisionsResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/ListRevisions", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `listRevisions`(request: Yorkie_V1_ListRevisionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_ListRevisionsResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/ListRevisions", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @discardableResult
+    public func `restoreRevision`(request: Yorkie_V1_RestoreRevisionRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_RestoreRevisionResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/RestoreRevision", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `restoreRevision`(request: Yorkie_V1_RestoreRevisionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_RestoreRevisionResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/RestoreRevision", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @discardableResult
     public func `attachChannel`(request: Yorkie_V1_AttachChannelRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_AttachChannelResponse>) -> Void) -> Connect.Cancelable {
         return self.client.unary(path: "/yorkie.v1.YorkieService/AttachChannel", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
     }
@@ -218,6 +266,9 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
             public static let removeDocument = Connect.MethodSpec(name: "RemoveDocument", service: "yorkie.v1.YorkieService", type: .unary)
             public static let pushPullChanges = Connect.MethodSpec(name: "PushPullChanges", service: "yorkie.v1.YorkieService", type: .unary)
             public static let watchDocument = Connect.MethodSpec(name: "WatchDocument", service: "yorkie.v1.YorkieService", type: .serverStream)
+            public static let createRevision = Connect.MethodSpec(name: "CreateRevision", service: "yorkie.v1.YorkieService", type: .unary)
+            public static let listRevisions = Connect.MethodSpec(name: "ListRevisions", service: "yorkie.v1.YorkieService", type: .unary)
+            public static let restoreRevision = Connect.MethodSpec(name: "RestoreRevision", service: "yorkie.v1.YorkieService", type: .unary)
             public static let attachChannel = Connect.MethodSpec(name: "AttachChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let detachChannel = Connect.MethodSpec(name: "DetachChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let refreshChannel = Connect.MethodSpec(name: "RefreshChannel", service: "yorkie.v1.YorkieService", type: .unary)

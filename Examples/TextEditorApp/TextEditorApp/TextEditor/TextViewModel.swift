@@ -30,7 +30,7 @@ class TextViewModel {
 
     private weak var operationSubject: PassthroughSubject<[TextOperation], Never>?
 
-    init(_ operationSubject: PassthroughSubject<[TextOperation], Never>) {
+    @MainActor init(_ operationSubject: PassthroughSubject<[TextOperation], Never>) {
         self.operationSubject = operationSubject
 
         // create client with RPCAddress.
@@ -46,7 +46,7 @@ class TextViewModel {
             // attach the document into the client.
             try! await self.client.attach(self.document)
 
-            try await self.document.update { root, _ in
+            try self.document.update { root, _ in
                 var text = root.content as? JSONText
                 if text == nil {
                     root.content = JSONText()
@@ -55,7 +55,7 @@ class TextViewModel {
             }
 
             // subscribe document event.
-            await self.document.subscribe { [weak self] event, _ in
+            self.document.subscribe { [weak self] event, _ in
                 switch event.type {
                 case .snapshot, .remoteChange:
                     Task { [weak self] in
@@ -66,7 +66,7 @@ class TextViewModel {
                 }
             }
 
-            await self.document.subscribePresence(.others) { [weak self] event, document in
+            self.document.subscribePresence(.others) { [weak self] event, document in
                 if let event = event as? PresenceChangedEvent {
                     if let fromPos: TextPosStruct = self?.decodePresence(event.value.presence["from"]),
                        let toPos: TextPosStruct = self?.decodePresence(event.value.presence["to"])
