@@ -545,7 +545,7 @@ public class Client {
         attachRequest.channelKey = channel.getKey()
 
         do {
-            let attachResponse = await self.yorkieService.attachChannel(request: attachRequest, headers: self.authHeader.makeHeader(channel.getKey()))
+            let attachResponse = await self.yorkieService.attachChannel(request: attachRequest, headers: self.authHeader.makeHeader(channel.getFirstKeyPath()))
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach channel error")
@@ -619,7 +619,7 @@ public class Client {
         detachRequest.sessionID = attachment.resourceID
 
         do {
-            let detachResponse = await self.yorkieService.detachChannel(request: detachRequest, headers: self.authHeader.makeHeader(channel.getKey()))
+            let detachResponse = await self.yorkieService.detachChannel(request: detachRequest, headers: self.authHeader.makeHeader(channel.getFirstKeyPath()))
 
             guard detachResponse.error == nil else {
                 throw self.handleErrorResponse(detachResponse.error, defaultMessage: "Unknown detach channel error")
@@ -655,7 +655,7 @@ public class Client {
         refreshRequest.channelKey = channel.getKey()
         refreshRequest.sessionID = attachment.resourceID
 
-        let refreshResponse = await self.yorkieService.refreshChannel(request: refreshRequest, headers: self.authHeader.makeHeader(channel.getKey()))
+        let refreshResponse = await self.yorkieService.refreshChannel(request: refreshRequest, headers: self.authHeader.makeHeader(channel.getFirstKeyPath()))
 
         guard refreshResponse.error == nil, let message = refreshResponse.message else {
             throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh channel error")
@@ -1014,7 +1014,7 @@ public class Client {
         // dispatches presence-count updates + remote broadcast events to the
         // Channel's event system.
         if let channelAttachment = attachment as? Attachment<Channel> {
-            let stream = self.yorkieService.watchChannel(headers: self.authHeader.makeHeader(key), onResult: { result in
+            let stream = self.yorkieService.watchChannel(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { result in
                 Task {
                     switch result {
                     case .headers:
@@ -1409,7 +1409,7 @@ public extension Client {
         while retryCount <= maxRetries {
             let message = await self.yorkieService.broadcast(
                 request: request,
-                headers: self.authHeader.makeHeader(channelKey)
+                headers: self.authHeader.makeHeader(channelAttachment?.resource.getFirstKeyPath() ?? channelKey)
             )
 
             switch message.result {
