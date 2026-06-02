@@ -37,28 +37,28 @@ final class ClientIntegrationTests: XCTestCase {
 
         let clientWithKey = Client(self.rpcAddress, options)
 
-        var boolResult = await clientWithKey.isActive
+        var boolResult = clientWithKey.isActive
         XCTAssertFalse(boolResult)
         try await clientWithKey.activate()
-        boolResult = await clientWithKey.isActive
+        boolResult = clientWithKey.isActive
         XCTAssertTrue(boolResult)
         var key = clientWithKey.key
         XCTAssertEqual(key, clientKey)
         try await clientWithKey.deactivate()
-        boolResult = await clientWithKey.isActive
+        boolResult = clientWithKey.isActive
         XCTAssertFalse(boolResult)
 
         let clientWithoutKey = Client(self.rpcAddress)
 
-        boolResult = await clientWithoutKey.isActive
+        boolResult = clientWithoutKey.isActive
         XCTAssertFalse(boolResult)
         try await clientWithoutKey.activate()
-        boolResult = await clientWithoutKey.isActive
+        boolResult = clientWithoutKey.isActive
         XCTAssertTrue(boolResult)
         key = clientWithoutKey.key
         XCTAssertEqual(key.count, 36)
         try await clientWithoutKey.deactivate()
-        boolResult = await clientWithoutKey.isActive
+        boolResult = clientWithoutKey.isActive
         XCTAssertFalse(boolResult)
     }
 
@@ -98,39 +98,39 @@ final class ClientIntegrationTests: XCTestCase {
     @MainActor
     func test_can_handle_sync() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
-            try await d1.update { root, _ in
+            try d1.update { root, _ in
                 root.k1 = "v1"
             }
 
             try await c1.sync()
             try await c2.sync()
 
-            var d1JSON = await d1.toSortedJSON()
-            var d2JSON = await d2.toSortedJSON()
+            var d1JSON = d1.toSortedJSON()
+            var d2JSON = d2.toSortedJSON()
 
             XCTAssertEqual(d1JSON, d2JSON)
 
-            try await d1.update { root, _ in
+            try d1.update { root, _ in
                 root.k2 = "v2"
             }
 
             try await c1.sync()
             try await c2.sync()
 
-            d1JSON = await d1.toSortedJSON()
-            d2JSON = await d2.toSortedJSON()
+            d1JSON = d1.toSortedJSON()
+            d2JSON = d2.toSortedJSON()
 
             XCTAssertEqual(d1JSON, d2JSON)
 
-            try await d1.update { root, _ in
+            try d1.update { root, _ in
                 root.k3 = "v3"
             }
 
             try await c1.sync()
             try await c2.sync()
 
-            d1JSON = await d1.toSortedJSON()
-            d2JSON = await d2.toSortedJSON()
+            d1JSON = d1.toSortedJSON()
+            d2JSON = d2.toSortedJSON()
 
             XCTAssertEqual(d1JSON, d2JSON)
         }
@@ -203,44 +203,44 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.attach(d1, [:], .manual)
         try await c2.attach(d2, [:], .manual)
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.version = "v1"
         }
 
-        var d1JSON = await d1.toSortedJSON()
-        var d2JSON = await d2.toSortedJSON()
+        var d1JSON = d1.toSortedJSON()
+        var d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"version\":\"v1\"}")
         XCTAssertEqual(d2JSON, "{}")
 
         try await c1.sync()
         try await c2.sync()
 
-        d2JSON = await d2.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d2JSON, "{\"version\":\"v1\"}")
 
         // 02. c2 changes the sync mode to realtime sync mode.
         let c2Exp1 = expectation(description: "C2 Exp")
 
-        await d2.subscribeSync { event, _ in
+        d2.subscribeSync { event, _ in
             if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 c2Exp1.fulfill()
             }
         }
 
-        try await c2.changeSyncMode(d2, .realtime)
+        try c2.changeSyncMode(d2, .realtime)
         await fulfillment(of: [c2Exp1], timeout: 5) // sync occurs when resuming
 
-        await d2.unsubscribeSync()
+        d2.unsubscribeSync()
 
         let c2Exp2 = expectation(description: "C2 Exp 2")
 
-        await d2.subscribeSync { event, _ in
+        d2.subscribeSync { event, _ in
             if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 c2Exp2.fulfill()
             }
         }
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.version = "v2"
         }
 
@@ -248,26 +248,26 @@ final class ClientIntegrationTests: XCTestCase {
 
         await fulfillment(of: [c2Exp2], timeout: 5)
 
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"version\":\"v2\"}")
         XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
 
-        await d2.unsubscribeSync()
+        d2.unsubscribeSync()
 
         // 03. c2 changes the sync mode to manual sync mode again.
-        try await c2.changeSyncMode(d2, .manual)
-        try await d1.update { root, _ in
+        try c2.changeSyncMode(d2, .manual)
+        try d1.update { root, _ in
             root.version = "v3"
         }
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"version\":\"v3\"}")
         XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
 
         try await c1.sync()
         try await c2.sync()
-        d2JSON = await d2.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d2JSON, "{\"version\":\"v3\"}")
 
         try await c1.deactivate()
@@ -319,7 +319,7 @@ final class ClientIntegrationTests: XCTestCase {
         var d2EventCount = 0
         var d3EventCount = 0
 
-        await d1.subscribe { event, _ in
+        d1.subscribe { event, _ in
             guard event is ChangeEvent else {
                 return
             }
@@ -340,7 +340,7 @@ final class ClientIntegrationTests: XCTestCase {
             }
         }
 
-        await d2.subscribe { event, _ in
+        d2.subscribe { event, _ in
             guard event is ChangeEvent else {
                 return
             }
@@ -362,7 +362,7 @@ final class ClientIntegrationTests: XCTestCase {
             }
         }
 
-        await d3.subscribe { event, _ in
+        d3.subscribe { event, _ in
             guard event is ChangeEvent else {
                 return
             }
@@ -385,79 +385,79 @@ final class ClientIntegrationTests: XCTestCase {
         }
 
         // 02. [Step1] c1, c2, c3 sync in realtime.
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.c1 = Int64(0)
         }
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             root.c2 = Int64(0)
         }
-        try await d3.update { root, _ in
+        try d3.update { root, _ in
             root.c3 = Int64(0)
         }
 
         await fulfillment(of: [d1Exp1, d2Exp1, d3Exp1], timeout: 5)
 
-        var d1JSON = await d1.toSortedJSON()
-        var d2JSON = await d2.toSortedJSON()
-        var d3JSON = await d3.toSortedJSON()
+        var d1JSON = d1.toSortedJSON()
+        var d2JSON = d2.toSortedJSON()
+        var d3JSON = d3.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"c1\":0,\"c2\":0,\"c3\":0}")
         XCTAssertEqual(d2JSON, "{\"c1\":0,\"c2\":0,\"c3\":0}")
         XCTAssertEqual(d3JSON, "{\"c1\":0,\"c2\":0,\"c3\":0}")
 
         // 03. [Step2] c1 sync with push-only mode, c2 sync with sync-off mode.
         // c3 can get the changes of c1 and c2, because c3 sync with push-pull mode.
-        try await c1.changeSyncMode(d1, .realtimePushOnly)
-        try await c2.changeSyncMode(d2, .realtimeSyncOff)
-        try await d1.update { root, _ in
+        try c1.changeSyncMode(d1, .realtimePushOnly)
+        try c2.changeSyncMode(d2, .realtimeSyncOff)
+        try d1.update { root, _ in
             root.c1 = Int64(1)
         }
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             root.c2 = Int64(1)
         }
-        try await d3.update { root, _ in
+        try d3.update { root, _ in
             root.c3 = Int64(1)
         }
 
         await fulfillment(of: [d1Exp2, d2Exp2, d3Exp2], timeout: 5)
 
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
-        d3JSON = await d3.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
+        d3JSON = d3.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"c1\":1,\"c2\":0,\"c3\":0}")
         XCTAssertEqual(d2JSON, "{\"c1\":0,\"c2\":1,\"c3\":0}")
         XCTAssertEqual(d3JSON, "{\"c1\":1,\"c2\":0,\"c3\":1}")
 
         // 04. [Step3] c1 sync with sync-off mode, c2 sync with push-only mode.
-        try await c1.changeSyncMode(d1, .realtimeSyncOff)
-        try await c2.changeSyncMode(d2, .realtimePushOnly)
-        try await d1.update { root, _ in
+        try c1.changeSyncMode(d1, .realtimeSyncOff)
+        try c2.changeSyncMode(d2, .realtimePushOnly)
+        try d1.update { root, _ in
             root.c1 = Int64(2)
         }
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             root.c2 = Int64(2)
         }
-        try await d3.update { root, _ in
+        try d3.update { root, _ in
             root.c3 = Int64(2)
         }
 
         await fulfillment(of: [d1Exp3, d2Exp3, d3Exp3], timeout: 5)
 
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
-        d3JSON = await d3.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
+        d3JSON = d3.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"c1\":2,\"c2\":0,\"c3\":0}")
         XCTAssertEqual(d2JSON, "{\"c1\":0,\"c2\":2,\"c3\":0}")
         XCTAssertEqual(d3JSON, "{\"c1\":1,\"c2\":2,\"c3\":2}")
 
         // 05. [Step4] c1 and c2 sync with push-pull mode.
-        try await c1.changeSyncMode(d1, .realtime)
-        try await c2.changeSyncMode(d2, .realtime)
+        try c1.changeSyncMode(d1, .realtime)
+        try c2.changeSyncMode(d2, .realtime)
 
         await fulfillment(of: [d1Exp4, d2Exp4, d3Exp4], timeout: 5)
 
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
-        d3JSON = await d3.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
+        d3JSON = d3.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"c1\":2,\"c2\":2,\"c3\":2}")
         XCTAssertEqual(d2JSON, "{\"c1\":2,\"c2\":2,\"c3\":2}")
         XCTAssertEqual(d3JSON, "{\"c1\":2,\"c2\":2,\"c3\":2}")
@@ -481,7 +481,7 @@ final class ClientIntegrationTests: XCTestCase {
         let d2 = Document(key: docKey)
 
         let exp1 = expectation(description: "exp 1")
-        await d2.subscribeSync { event, _ in
+        d2.subscribeSync { event, _ in
             if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp1.fulfill()
             }
@@ -491,74 +491,74 @@ final class ClientIntegrationTests: XCTestCase {
         try await c1.attach(d1, [:], .manual)
         try await c2.attach(d2)
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.version = "v1"
         }
 
         try await c1.sync()
 
-        var d1JSON = await d1.toSortedJSON()
+        var d1JSON = d1.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"version\":\"v1\"}")
 
         await fulfillment(of: [exp1], timeout: 5)
 
-        var d2JSON = await d2.toSortedJSON()
+        var d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d2JSON, "{\"version\":\"v1\"}")
 
         // 02. c2 is changed to manual sync. So, c2 doesn't get the changes of c1.
-        try await c2.changeSyncMode(d2, .manual)
-        try await d1.update { root, _ in
+        try c2.changeSyncMode(d2, .manual)
+        try d1.update { root, _ in
             root.version = "v2"
         }
         try await c1.sync()
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"version\":\"v2\"}")
         XCTAssertEqual(d2JSON, "{\"version\":\"v1\"}")
 
         // 03. c2 is changed to realtime sync.
         // c2 should be able to apply changes made to the document while c2 is not in realtime sync.
-        await d2.unsubscribeSync()
+        d2.unsubscribeSync()
 
         let exp2 = expectation(description: "exp 2")
 
-        await d2.subscribeSync { event, _ in
+        d2.subscribeSync { event, _ in
             if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp2.fulfill()
             }
         }
 
-        try await c2.changeSyncMode(d2, .realtime)
+        try c2.changeSyncMode(d2, .realtime)
 
         await fulfillment(of: [exp2], timeout: 5)
 
-        d2JSON = await d2.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d2JSON, "{\"version\":\"v2\"}")
 
         // 04. c2 should automatically synchronize changes.
-        await d2.unsubscribeSync()
+        d2.unsubscribeSync()
 
         let exp3 = expectation(description: "exp 3")
 
-        await d2.subscribeSync { event, _ in
+        d2.subscribeSync { event, _ in
             if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp3.fulfill()
             }
         }
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.version = "v3"
         }
         try await c1.sync()
 
         await fulfillment(of: [exp3], timeout: 5)
 
-        d1JSON = await d1.toSortedJSON()
-        d2JSON = await d2.toSortedJSON()
+        d1JSON = d1.toSortedJSON()
+        d2JSON = d2.toSortedJSON()
         XCTAssertEqual(d1JSON, "{\"version\":\"v3\"}")
         XCTAssertEqual(d2JSON, "{\"version\":\"v3\"}")
 
-        await d2.unsubscribeSync()
+        d2.unsubscribeSync()
 
         try await c1.deactivate()
         try await c2.deactivate()
@@ -576,63 +576,63 @@ final class ClientIntegrationTests: XCTestCase {
 
         // 02. cli update the document with creating a counter
         //     and sync with push-pull mode: CP(1, 1) -> CP(2, 2)
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.counter = JSONCounter(value: Int64(0))
         }
 
-        var checkpoint = await d1.checkpoint
+        var checkpoint = d1.checkpoint
         XCTAssertEqual(checkpoint.getClientSeq(), 1)
         XCTAssertEqual(checkpoint.getServerSeq(), 1)
 
         try await c1.sync()
-        checkpoint = await d1.checkpoint
+        checkpoint = d1.checkpoint
         XCTAssertEqual(checkpoint.getClientSeq(), 2)
         XCTAssertEqual(checkpoint.getServerSeq(), 2)
 
         // 03. cli update the document with increasing the counter(0 -> 1)
         //     and sync with push-only mode: CP(2, 2) -> CP(3, 2)
         let exp1 = expectation(description: "exp 1")
-        await d1.subscribeSync { event, _ in
+        d1.subscribeSync { event, _ in
             if let event = event as? SyncStatusChangedEvent, event.value == .synced {
                 exp1.fulfill()
             }
         }
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
         }
 
-        var changePack = await d1.createChangePack()
+        var changePack = d1.createChangePack()
         XCTAssertEqual(changePack.getChangeSize(), 1)
 
-        try await c1.changeSyncMode(d1, .realtimePushOnly)
+        try c1.changeSyncMode(d1, .realtimePushOnly)
         await fulfillment(of: [exp1], timeout: 5)
 
-        await d1.unsubscribeSync()
+        d1.unsubscribeSync()
 
-        checkpoint = await d1.checkpoint
+        checkpoint = d1.checkpoint
         XCTAssertEqual(checkpoint.getClientSeq(), 3)
         XCTAssertEqual(checkpoint.getServerSeq(), 2)
 
-        try await c1.changeSyncMode(d1, .manual)
+        try c1.changeSyncMode(d1, .manual)
 
         // 04. cli update the document with increasing the counter(1 -> 2)
         //     and sync with push-pull mode. CP(3, 2) -> CP(4, 4)
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
         }
 
         // The previous increase(0 -> 1) is already pushed to the server,
         // so the ChangePack of the request only has the increase(1 -> 2).
-        changePack = await d1.createChangePack()
+        changePack = d1.createChangePack()
         XCTAssertEqual(changePack.getChangeSize(), 1)
 
         try await c1.sync()
-        checkpoint = await d1.checkpoint
+        checkpoint = d1.checkpoint
         XCTAssertEqual(checkpoint.getClientSeq(), 4)
         XCTAssertEqual(checkpoint.getServerSeq(), 4)
 
-        let value = await(d1.getRoot().counter as? JSONCounter<Int64>)?.value
+        let value = (d1.getRoot().counter as? JSONCounter<Int64>)?.value
         XCTAssertEqual(value, 2)
 
         try await c1.deactivate()
@@ -656,15 +656,15 @@ final class ClientIntegrationTests: XCTestCase {
         let eventCollectorD2 = EventCollector<DocEventType>(doc: d2)
 
         // subscribe document change event
-        await d1.subscribe("$") { event, _ in
+        d1.subscribe("$") { event, _ in
             eventCollectorD1.add(event: event.type)
         }
 
-        await d2.subscribe("$") { event, _ in
+        d2.subscribe("$") { event, _ in
             eventCollectorD2.add(event: event.type)
         }
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [
                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
@@ -675,12 +675,12 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .remoteChange)
         }
 
-        var d1JSON = await(d1.getRoot().tree as? JSONTree)?.toXML()
-        var d2JSON = await(d2.getRoot().tree as? JSONTree)?.toXML()
+        var d1JSON = (d1.getRoot().tree as? JSONTree)?.toXML()
+        var d2JSON = (d2.getRoot().tree as? JSONTree)?.toXML()
         XCTAssertEqual(d1JSON, "<doc><p>12</p><p>34</p></doc>")
         XCTAssertEqual(d2JSON, "<doc><p>12</p><p>34</p></doc>")
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "a"))
         }
         try await c1.sync()
@@ -690,11 +690,11 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.sync()
 
         // In push-only mode, remote-change events should not occur.
-        try await c2.changeSyncMode(d2, .realtimePushOnly)
+        try c2.changeSyncMode(d2, .realtimePushOnly)
         var remoteChangeOccured = false
 
-        await d2.unsubscribe()
-        await d2.subscribe { event, _ in
+        d2.unsubscribe()
+        d2.subscribe { event, _ in
             if event.type == .remoteChange {
                 remoteChangeOccured = true
             }
@@ -703,9 +703,9 @@ final class ClientIntegrationTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertFalse(remoteChangeOccured)
 
-        try await c2.changeSyncMode(d2, .realtime)
+        try c2.changeSyncMode(d2, .realtime)
 
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
         }
 
@@ -713,13 +713,13 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD1.verifyNthValue(at: 3, isEqualTo: .remoteChange)
         }
 
-        d1JSON = await(d1.getRoot().tree as? JSONTree)?.toXML()
-        d2JSON = await(d2.getRoot().tree as? JSONTree)?.toXML()
+        d1JSON = (d1.getRoot().tree as? JSONTree)?.toXML()
+        d2JSON = (d2.getRoot().tree as? JSONTree)?.toXML()
         XCTAssertEqual(d1JSON, "<doc><p>1ba2</p><p>34</p></doc>")
         XCTAssertEqual(d2JSON, "<doc><p>1ba2</p><p>34</p></doc>")
 
-        await d1.unsubscribe()
-        await d2.unsubscribe()
+        d1.unsubscribe()
+        d2.unsubscribe()
 
         try await c1.deactivate()
         try await c2.deactivate()
@@ -743,14 +743,14 @@ final class ClientIntegrationTests: XCTestCase {
         let eventCollectorD2 = EventCollector<DocEventType>(doc: d2)
 
         // subscribe document change events
-        await d1.subscribe("$") { event, _ in
+        d1.subscribe("$") { event, _ in
             eventCollectorD1.add(event: event.type)
         }
-        await d2.subscribe("$") { event, _ in
+        d2.subscribe("$") { event, _ in
             eventCollectorD2.add(event: event.type)
         }
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [
                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "12")]),
                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "34")])
@@ -761,12 +761,12 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .remoteChange)
         }
 
-        var d1XML = await(d1.getRoot().tree as? JSONTree)?.toXML()
-        var d2XML = await(d2.getRoot().tree as? JSONTree)?.toXML()
+        var d1XML = (d1.getRoot().tree as? JSONTree)?.toXML()
+        var d2XML = (d2.getRoot().tree as? JSONTree)?.toXML()
         XCTAssertEqual(d1XML, "<doc><p>12</p><p>34</p></doc>")
         XCTAssertEqual(d2XML, "<doc><p>12</p><p>34</p></doc>")
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "a"))
         }
         try await c1.sync()
@@ -776,11 +776,11 @@ final class ClientIntegrationTests: XCTestCase {
         try await c2.sync()
 
         // In sync-off mode, remote-change events should not occur.
-        try await c2.changeSyncMode(d2, .realtimeSyncOff)
+        try c2.changeSyncMode(d2, .realtimeSyncOff)
 
         var remoteChangeOccurred = false
-        await d2.unsubscribe()
-        await d2.subscribe("$") { event, _ in
+        d2.unsubscribe()
+        d2.subscribe("$") { event, _ in
             if event.type == .remoteChange {
                 remoteChangeOccurred = true
             }
@@ -789,9 +789,9 @@ final class ClientIntegrationTests: XCTestCase {
         try await Task.sleep(nanoseconds: 100_000_000)
         XCTAssertFalse(remoteChangeOccurred)
 
-        try await c2.changeSyncMode(d2, .realtime)
+        try c2.changeSyncMode(d2, .realtime)
 
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             try (root.tree as? JSONTree)?.edit(2, 2, JSONTreeTextNode(value: "b"))
         }
 
@@ -799,13 +799,13 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD1.verifyNthValue(at: 3, isEqualTo: .remoteChange)
         }
 
-        d1XML = await(d1.getRoot().tree as? JSONTree)?.toXML()
-        d2XML = await(d2.getRoot().tree as? JSONTree)?.toXML()
+        d1XML = (d1.getRoot().tree as? JSONTree)?.toXML()
+        d2XML = (d2.getRoot().tree as? JSONTree)?.toXML()
         XCTAssertEqual(d1XML, "<doc><p>1ba2</p><p>34</p></doc>")
         XCTAssertEqual(d2XML, "<doc><p>1ba2</p><p>34</p></doc>")
 
-        await d1.unsubscribe()
-        await d2.unsubscribe()
+        d1.unsubscribe()
+        d2.unsubscribe()
         try await c1.deactivate()
         try await c2.deactivate()
     }
@@ -824,13 +824,13 @@ final class ClientIntegrationTests: XCTestCase {
         let eventCollectorD1 = EventCollector<DocSyncStatus>(doc: d1)
         let eventCollectorD2 = EventCollector<DocSyncStatus>(doc: d2)
 
-        await d1.subscribeSync { event, _ in
+        d1.subscribeSync { event, _ in
             if let syncStatusEvent = event as? SyncStatusChangedEvent {
                 eventCollectorD1.add(event: syncStatusEvent.value)
             }
         }
 
-        await d2.subscribeSync { event, _ in
+        d2.subscribeSync { event, _ in
             if let syncStatusEvent = event as? SyncStatusChangedEvent {
                 eventCollectorD2.add(event: syncStatusEvent.value)
             }
@@ -843,7 +843,7 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: .synced)
         }
 
-        try await d1.update { root, _ in
+        try d1.update { root, _ in
             root.t = JSONText()
             (root.t as? JSONText)?.edit(0, 0, "a")
         }
@@ -852,15 +852,15 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD2.verifyNthValue(at: 1, isEqualTo: .synced)
         }
 
-        var d1JSON = await(d1.getRoot().t as? JSONText)?.toString
-        var d2JSON = await(d2.getRoot().t as? JSONText)?.toString
+        var d1JSON = (d1.getRoot().t as? JSONText)?.toString
+        var d2JSON = (d2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(d1JSON, "a")
         XCTAssertEqual(d2JSON, "a")
 
         eventCollectorD1.reset()
-        try await c1.changeSyncMode(d1, .realtimePushOnly)
+        try c1.changeSyncMode(d1, .realtimePushOnly)
 
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             (root.t as? JSONText)?.edit(1, 1, "b")
         }
 
@@ -868,7 +868,7 @@ final class ClientIntegrationTests: XCTestCase {
             await eventCollectorD2.verifyNthValue(at: 2, isEqualTo: .synced)
         }
 
-        try await d2.update { root, _ in
+        try d2.update { root, _ in
             (root.t as? JSONText)?.edit(2, 2, "c")
         }
 
@@ -877,19 +877,19 @@ final class ClientIntegrationTests: XCTestCase {
         }
 
         XCTAssertEqual(eventCollectorD1.count, 0)
-        try await c1.changeSyncMode(d1, .realtime)
+        try c1.changeSyncMode(d1, .realtime)
 
         for await _ in eventCollectorD1.waitStream(until: .synced) {
             await eventCollectorD1.verifyNthValue(at: 1, isEqualTo: .synced)
         }
 
-        d1JSON = await(d1.getRoot().t as? JSONText)?.toString
-        d2JSON = await(d2.getRoot().t as? JSONText)?.toString
+        d1JSON = (d1.getRoot().t as? JSONText)?.toString
+        d2JSON = (d2.getRoot().t as? JSONText)?.toString
         XCTAssertEqual(d1JSON, "abc")
         XCTAssertEqual(d2JSON, "abc")
 
-        await d1.unsubscribeSync()
-        await d2.unsubscribeSync()
+        d1.unsubscribeSync()
+        d2.unsubscribeSync()
 
         try await c1.deactivate()
         try await c2.deactivate()
@@ -917,7 +917,7 @@ final class ClientIntegrationTests: XCTestCase {
     @MainActor
     func test_duplicated_local_changes_not_sent_to_server() async throws {
         try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
-            try await d1.update { root, _ in
+            try d1.update { root, _ in
                 root.t = JSONTree(initialRoot:
                     JSONTreeElementNode(type: "doc",
                                         children: [
@@ -936,8 +936,8 @@ final class ClientIntegrationTests: XCTestCase {
 
             try await c2.sync()
 
-            let d1XML = await(d1.getRoot().t as? JSONTree)?.toXML()
-            let d2XML = await(d2.getRoot().t as? JSONTree)?.toXML()
+            let d1XML = (d1.getRoot().t as? JSONTree)?.toXML()
+            let d2XML = (d2.getRoot().t as? JSONTree)?.toXML()
             XCTAssertEqual(d1XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
             XCTAssertEqual(d2XML, /* html */ "<doc><p>12</p><p>34</p></doc>")
 
@@ -951,7 +951,7 @@ final class ClientIntegrationTests: XCTestCase {
     @MainActor
     func test_should_handle_local_changes_correctly_when_receiving_snapshot() async throws {
         try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
-            try await d1.update { root, _ in
+            try d1.update { root, _ in
                 root.counter = JSONCounter(value: Int64(0))
             }
 
@@ -960,7 +960,7 @@ final class ClientIntegrationTests: XCTestCase {
 
             // 01. c1 increases the counter for creating snapshot.
             for _ in 0 ..< defaultSnapshotThreshold {
-                try await d1.update { root, _ in
+                try d1.update { root, _ in
                     (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
                 }
             }
@@ -971,15 +971,15 @@ final class ClientIntegrationTests: XCTestCase {
             Task {
                 try await c2.sync()
             }
-            try await d2.update { root, _ in
+            try d2.update { root, _ in
                 (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
             }
 
             try await c2.sync()
             try await c1.sync()
 
-            let d1JSON = await d1.toSortedJSON()
-            let d2JSON = await d2.toSortedJSON()
+            let d1JSON = d1.toSortedJSON()
+            let d2JSON = d2.toSortedJSON()
             XCTAssertEqual(d1JSON, d2JSON)
         }
     }

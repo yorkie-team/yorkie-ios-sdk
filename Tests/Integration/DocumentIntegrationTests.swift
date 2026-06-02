@@ -70,13 +70,13 @@ final class DocumentIntegrationTests: XCTestCase {
             XCTAssert(false)
         }
 
-        let docStatus = await self.d1.status
+        let docStatus = self.d1.status
 
         XCTAssertEqual(docStatus, .removed)
 
         // 04. try to update a removed document.
         do {
-            try await self.d1.update { root, _ in
+            try self.d1.update { root, _ in
                 root.k1 = String("v1")
             }
         } catch let error as YorkieError {
@@ -112,7 +112,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 create d1 and remove it.
-        try await self.d1.update { root, _ in
+        try self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -128,8 +128,8 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d3 = Document(key: docKey)
         try await self.c1.attach(self.d3)
 
-        let doc2Content = await d2.toSortedJSON()
-        let doc3Content = await d3.toSortedJSON()
+        let doc2Content = d2.toSortedJSON()
+        let doc3Content = d3.toSortedJSON()
 
         XCTAssertEqual(doc2Content, doc3Content)
 
@@ -153,7 +153,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 creates d1 and c2 syncs.
-        try await self.d1.update { root, _ in
+        try self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -166,13 +166,13 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        let doc1Content = await d1.toSortedJSON()
-        let doc2Content = await d2.toSortedJSON()
+        let doc1Content = d1.toSortedJSON()
+        let doc2Content = d2.toSortedJSON()
 
         XCTAssertEqual(doc1Content, doc2Content)
 
         // 02. c1 updates d1 and removes it.
-        try await self.d1.update { root, _ in
+        try self.d1.update { root, _ in
             root.k1 = "v2"
         }
 
@@ -181,8 +181,8 @@ final class DocumentIntegrationTests: XCTestCase {
         // 03. c2 syncs and checks that d2 is removed.
         try await self.c2.sync()
 
-        let doc1Status = await d1.status
-        let doc2Status = await d2.status
+        let doc1Status = d1.status
+        let doc2Status = d2.status
 
         XCTAssertEqual(doc1Status, doc2Status)
 
@@ -203,7 +203,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 creates d1 and c2 syncs.
-        try await self.d1.update { root, _ in
+        try self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -216,8 +216,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        let doc1Content = await d1.toSortedJSON()
-        let doc2Content = await d2.toSortedJSON()
+        let doc1Content = d1.toSortedJSON()
+        let doc2Content = d2.toSortedJSON()
 
         XCTAssertEqual(doc1Content, doc2Content)
 
@@ -225,8 +225,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.remove(self.d1)
         try await self.c2.detach(self.d2)
 
-        let doc1Status = await d1.status
-        let doc2Status = await d2.status
+        let doc1Status = d1.status
+        let doc2Status = d2.status
 
         XCTAssertEqual(doc1Status, .removed)
         XCTAssertEqual(doc2Status, .removed)
@@ -248,7 +248,7 @@ final class DocumentIntegrationTests: XCTestCase {
         self.d1 = Document(key: docKey)
 
         // 01. c1 creates d1 and c2 syncs.
-        try await self.d1.update { root, _ in
+        try self.d1.update { root, _ in
             root.k1 = "v1"
         }
 
@@ -261,8 +261,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.sync()
         try await self.c2.sync()
 
-        let doc1Content = await d1.toSortedJSON()
-        let doc2Content = await d2.toSortedJSON()
+        let doc1Content = d1.toSortedJSON()
+        let doc2Content = d2.toSortedJSON()
 
         XCTAssertEqual(doc1Content, doc2Content)
 
@@ -270,8 +270,8 @@ final class DocumentIntegrationTests: XCTestCase {
         try await self.c1.remove(self.d1)
         try await self.c2.remove(self.d2)
 
-        let doc1Status = await d1.status
-        let doc2Status = await d2.status
+        let doc1Status = d1.status
+        let doc2Status = d2.status
 
         XCTAssertEqual(doc1Status, .removed)
         XCTAssertEqual(doc2Status, .removed)
@@ -390,19 +390,19 @@ final class DocumentIntegrationTests: XCTestCase {
         var d2Events = [any OperationInfo]()
         var d3Events = [any OperationInfo]()
 
-        await self.d1.subscribe { event, _ in
+        self.d1.subscribe { event, _ in
             d1Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        await self.d1.subscribe("$.todos") { event, _ in
+        self.d1.subscribe("$.todos") { event, _ in
             d2Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        await self.d1.subscribe("$.counter") { event, _ in
+        self.d1.subscribe("$.counter") { event, _ in
             d3Events.append(contentsOf: (event as? ChangeEvent)?.value.operations ?? [])
         }
 
-        try await self.d2.update { root, _ in
+        try self.d2.update { root, _ in
             root.counter = JSONCounter(value: Int32(0))
             root.todos = ["todo1", "todo2"]
         }
@@ -420,7 +420,7 @@ final class DocumentIntegrationTests: XCTestCase {
         d1Events = []
         d2Events = []
 
-        try await self.d2.update { root, _ in
+        try self.d2.update { root, _ in
             (root.counter as? JSONCounter<Int32>)?.increase(value: 10)
         }
 
@@ -433,7 +433,7 @@ final class DocumentIntegrationTests: XCTestCase {
         d1Events = []
         d3Events = []
 
-        try await self.d2.update { root, _ in
+        try self.d2.update { root, _ in
             (root.todos as? JSONArray)?.append("todo3")
         }
 
@@ -446,9 +446,9 @@ final class DocumentIntegrationTests: XCTestCase {
         d1Events = []
         d2Events = []
 
-        await self.d1.unsubscribe("$.todos")
+        self.d1.unsubscribe("$.todos")
 
-        try await self.d2.update { root, _ in
+        try self.d2.update { root, _ in
             (root.todos as? JSONArray)?.append("todo4")
         }
 
@@ -460,9 +460,9 @@ final class DocumentIntegrationTests: XCTestCase {
 
         d1Events = []
 
-        await self.d1.unsubscribe("$.counter")
+        self.d1.unsubscribe("$.counter")
 
-        try await self.d2.update { root, _ in
+        try self.d2.update { root, _ in
             (root.counter as? JSONCounter<Int32>)?.increase(value: 10)
         }
 
@@ -472,7 +472,7 @@ final class DocumentIntegrationTests: XCTestCase {
         XCTAssertEqual(d1Events[0] as? IncreaseOpInfo, IncreaseOpInfo(path: "$.counter", value: 10))
         XCTAssertTrue(d3Events.isEmpty)
 
-        await self.d1.unsubscribe()
+        self.d1.unsubscribe()
 
         try await self.c1.detach(self.d1)
         try await self.c2.detach(self.d2)
@@ -605,7 +605,7 @@ final class DocumentIntegrationTests: XCTestCase {
             ]
         ])
 
-        let doc1JSON = await doc1.toSortedJSON()
+        let doc1JSON = doc1.toSortedJSON()
         XCTAssertEqual(doc1JSON, "{\"content\":{\"x\":1,\"y\":1},\"counter\":0}")
 
         try await c1.sync()
@@ -621,7 +621,7 @@ final class DocumentIntegrationTests: XCTestCase {
             "new": ["k": "v"]
         ])
 
-        let doc2JSON = await doc2.toSortedJSON()
+        let doc2JSON = doc2.toSortedJSON()
         XCTAssertEqual(doc2JSON, "{\"content\":{\"x\":1,\"y\":1},\"counter\":0,\"new\":{\"k\":\"v\"}}")
 
         try await c1.deactivate()
@@ -641,7 +641,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await c1.attach(doc1, initialRoot: [
             "writer": "user1"
         ])
-        var doc1JSON = await doc1.toSortedJSON()
+        var doc1JSON = doc1.toSortedJSON()
         XCTAssertEqual(doc1JSON, "{\"writer\":\"user1\"}")
 
         // 02. user2 attach with initialRoot and client doesn't sync
@@ -649,7 +649,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await c2.attach(doc2, initialRoot: [
             "writer": "user2"
         ])
-        var doc2JSON = await doc2.toSortedJSON()
+        var doc2JSON = doc2.toSortedJSON()
         XCTAssertEqual(doc2JSON, "{\"writer\":\"user2\"}")
 
         // 03. user1 sync first and user2 seconds
@@ -657,14 +657,14 @@ final class DocumentIntegrationTests: XCTestCase {
         try await c2.sync()
 
         // 04. user1's local document's writer was user1
-        doc1JSON = await doc1.toSortedJSON()
+        doc1JSON = doc1.toSortedJSON()
         XCTAssertEqual(doc1JSON, "{\"writer\":\"user1\"}")
-        doc2JSON = await doc2.toSortedJSON()
+        doc2JSON = doc2.toSortedJSON()
         XCTAssertEqual(doc2JSON, "{\"writer\":\"user2\"}")
 
         // 05. user1's local document's writer is overwritten by user2
         try await c1.sync()
-        doc1JSON = await doc2.toSortedJSON()
+        doc1JSON = doc2.toSortedJSON()
         XCTAssertEqual(doc1JSON, "{\"writer\":\"user2\"}")
 
         try await c1.deactivate()
@@ -732,7 +732,7 @@ final class DocumentIntegrationTests: XCTestCase {
                 testCase.name: testCase.input
             ])
 
-            let docJSON = await doc.toSortedJSON()
+            let docJSON = doc.toSortedJSON()
             XCTAssertEqual(docJSON, testCase.expectedJSON)
 
             try await c1.deactivate()
@@ -745,7 +745,7 @@ final class DocumentIntegrationTests: XCTestCase {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
             let eventCollector = EventCollector<Int32>(doc: d2)
 
-            await d2.subscribe("$") { event, doc in
+            d2.subscribe("$") { event, doc in
                 if event.type == .snapshot {
                     if let value = (doc.getRoot().counter as? JSONCounter<Int32>)?.value as? Int32 {
                         eventCollector.add(event: value)
@@ -753,7 +753,7 @@ final class DocumentIntegrationTests: XCTestCase {
                 }
             }
 
-            try await d1.update { root, _ in
+            try d1.update { root, _ in
                 root.counter = JSONCounter(value: Int32(0))
             }
             try await c1.sync()
@@ -761,14 +761,14 @@ final class DocumentIntegrationTests: XCTestCase {
 
             // 01. c1 increases the counter for creating snapshot.
             for _ in 1 ... defaultSnapshotThreshold {
-                try await d1.update { root, _ in
+                try d1.update { root, _ in
                     (root.counter as? JSONCounter<Int32>)?.increase(value: 1)
                 }
             }
             try await c1.sync()
 
             // 02. c2 receives the snapshot and increases the counter simultaneously.
-            try await d2.update { root, _ in
+            try d2.update { root, _ in
                 (root.counter as? JSONCounter<Int32>)?.increase(value: 1)
             }
             // should have a local change after receiving a snapshot event

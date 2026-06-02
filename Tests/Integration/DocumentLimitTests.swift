@@ -158,7 +158,7 @@ extension DocumentSizeLimitTest {
     func test_should_successfully_assign_size_limit_to_document() async throws {
         // update the max size of document
         let (_, document) = try await activateClientAndDocument()
-        let docMaxSize = await document.getMaxSizePerDocument()
+        let docMaxSize = document.getMaxSizePerDocument()
 
         XCTAssertEqual(docMaxSize, self.sizeLimit)
     }
@@ -168,25 +168,25 @@ extension DocumentSizeLimitTest {
     func test_should_reject_local_update_that_exceeds_document_size_limit() async throws {
         let expectation = XCTestExpectation(description: "Must throws when update due to size limitation risk!")
         let (client, document) = try await activateClientAndDocument(size: 100)
-        try await document.update { root, _ in
+        try document.update { root, _ in
             root.t = JSONText()
         }
 
-        let size = await document.getDocSize()
+        let size = document.getDocSize()
         XCTAssertEqual(size.live, .init(data: 0, meta: 72))
-        let rootSize = await document.getClone()?.root.getDocSize()
+        let rootSize = document.getClone()?.root.getDocSize()
         XCTAssertEqual(size, rootSize)
 
         // document size exceeded
         do {
-            try await document.update { root, _ in
+            try document.update { root, _ in
                 (root.t as? JSONText)?.edit(0, 0, "helloworld")
             }
         } catch {
             expectation.fulfill()
         }
 
-        let totalSize = await document.getDocSize().totalDocSize
+        let totalSize = document.getDocSize().totalDocSize
         XCTAssertEqual(totalSize, 72)
 
         try await client.detach(document)
@@ -200,53 +200,53 @@ extension DocumentSizeLimitTest {
     func test_should_allow_remote_updates_even_if_they_exceed_document_size_limit() async throws {
         let (client1, doc1) = try await activateClientAndDocument(size: 100)
 
-        let client2 = await Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
+        let client2 = Client(rpcAddress, ClientOptions(apiKey: apiKey, authTokenInjector: TestAuthTokenInjector()))
 
         try await client2.activate()
         let doc2 = Document(key: docKey)
 
         try await client2.attach(doc2)
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             root.t = JSONText()
         }
 
-        var size = await doc1.getDocSize()
+        var size = doc1.getDocSize()
         XCTAssertEqual(size.live, .init(data: 0, meta: 72))
 
         try await client1.sync()
         try await client2.sync()
 
-        size = await doc1.getDocSize()
+        size = doc1.getDocSize()
         XCTAssertEqual(size.live, .init(data: 0, meta: 72))
 
-        try await doc1.update { root, _ in
+        try doc1.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "aa")
         }
-        var live = await doc1.getDocSize().live
+        var live = doc1.getDocSize().live
         XCTAssertEqual(live, .init(data: 4, meta: 96))
 
-        try await doc2.update { root, _ in
+        try doc2.update { root, _ in
             (root.t as? JSONText)?.edit(0, 0, "a")
         }
 
-        live = await doc2.getDocSize().live
+        live = doc2.getDocSize().live
         XCTAssertEqual(live, .init(data: 2, meta: 96))
 
         try await client2.sync()
         // Pulls changes - should succeed despite exceeding limit
 
-        live = await doc2.getDocSize().live
+        live = doc2.getDocSize().live
         XCTAssertEqual(live, .init(data: 2, meta: 96))
 
         try await client1.sync()
 
-        live = await doc1.getDocSize().live
+        live = doc1.getDocSize().live
         XCTAssertEqual(live, .init(data: 6, meta: 120))
 
         let expectation = XCTestExpectation(description: "Must return error!")
         do {
-            try await doc1.update { root, _ in
+            try doc1.update { root, _ in
                 (root.t as? JSONText)?.edit(0, 0, "a")
             }
         } catch {

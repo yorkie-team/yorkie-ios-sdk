@@ -163,7 +163,7 @@ extension CRDTArray {
     func deepcopy() -> CRDTElement {
         let result = CRDTArray(createdAt: self.createdAt)
         for node in self.elements {
-            try? result.elements.insert(
+            _ = try? result.elements.insert(
                 node.value.deepcopy(),
                 prevCreatedAt: result.getLastCreatedAt()
             )

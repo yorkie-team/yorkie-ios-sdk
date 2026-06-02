@@ -108,9 +108,6 @@ struct ChangeID {
     func setClocks(with otherLamport: Int64, vector: VersionVector) -> ChangeID {
         let lamport = otherLamport > self.lamport ? otherLamport + 1 : self.lamport + 1
 
-        // clone another vector before mutating
-        var vector = vector
-
         var maxVersionVector = self.versionVector.max(other: vector)
         maxVersionVector.set(actorID: self.actor, lamport: lamport)
 
