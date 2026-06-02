@@ -1,12 +1,12 @@
 version: v1
 plugins:
-  - plugin: buf.build/connectrpc/swift
+  - plugin: buf.build/connectrpc/swift:v1.0.3
     opt:
       - GenerateAsyncMethods=true
       - GenerateCallbackMethods=true
       - Visibility=Public
     out: Generated
-  - plugin: buf.build/apple/swift
+  - plugin: buf.build/apple/swift:v1.37.0
     opt:
       - Visibility=Public
     out: Generated
