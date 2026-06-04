@@ -79,6 +79,49 @@ final class DocumentUndoRedoTests: XCTestCase {
         }
     }
 
+    func test_undo_and_redo_text_edit() async throws {
+        let doc = Document(key: "undo-text")
+        try await doc.update { root, _ in
+            root.text = JSONText()
+            (root.text as? JSONText)?.edit(0, 0, "Hello")
+        }
+        try await doc.update { root, _ in
+            (root.text as? JSONText)?.edit(5, 5, " World")
+        }
+
+        var content = await (doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "Hello World")
+
+        // Undo the " World" insertion.
+        try await doc.undo()
+        content = await (doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "Hello")
+
+        // Redo restores " World".
+        try await doc.redo()
+        content = await (doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "Hello World")
+    }
+
+    func test_undo_text_deletion_restores_content() async throws {
+        let doc = Document(key: "undo-text-delete")
+        try await doc.update { root, _ in
+            root.text = JSONText()
+            (root.text as? JSONText)?.edit(0, 0, "Hello World")
+        }
+        try await doc.update { root, _ in
+            // delete " World"
+            (root.text as? JSONText)?.edit(5, 11, "")
+        }
+
+        var content = await (doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "Hello")
+
+        try await doc.undo()
+        content = await (doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "Hello World")
+    }
+
     func test_new_local_change_clears_redo() async throws {
         let doc = Document(key: "undo-clear-redo")
         try await doc.update { root, _ in root.a = Int64(1) }

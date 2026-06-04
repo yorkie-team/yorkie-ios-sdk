@@ -777,7 +777,23 @@ public class Document: Attachable {
                 }
             }
 
-            let opInfos = try change.execute(root: self.root, presences: &self.presences, source: source).opInfos
+            let executionResult = try change.execute(root: self.root, presences: &self.presences, source: source)
+            let opInfos = executionResult.opInfos
+
+            // NOTE: when a text edit is applied, reconcile the ranges of any edit operations
+            // sitting on the undo/redo stacks so later undo/redo lands at the correct position.
+            for op in executionResult.operations {
+                if let edit = op as? EditOperation {
+                    let (from, to) = try edit.normalizePos(self.root)
+                    self.internalHistory.reconcileTextEdit(
+                        parentCreatedAt: edit.parentCreatedAt,
+                        rangeFrom: from,
+                        rangeTo: to,
+                        contentLength: (edit.content as NSString).length
+                    )
+                }
+            }
+
             self.changeID = self.changeID.syncClocks(with: change.id)
 
             if change.hasOperations {

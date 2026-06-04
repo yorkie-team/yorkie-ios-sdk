@@ -125,6 +125,22 @@ final class History {
         self.replaceCreatedAt(in: &self.redoStack, prevCreatedAt: prevCreatedAt, currCreatedAt: currCreatedAt)
     }
 
+    /**
+     * `reconcileTextEdit` reconciles the range of edit operations on both stacks when a text
+     * edit occurs, so a later undo/redo lands at the correct position.
+     */
+    func reconcileTextEdit(parentCreatedAt: TimeTicket, rangeFrom: Int, rangeTo: Int, contentLength: Int) {
+        for stack in [self.undoStack, self.redoStack] {
+            for ops in stack {
+                for case .operation(let op) in ops {
+                    if let edit = op as? EditOperation, edit.parentCreatedAt == parentCreatedAt {
+                        edit.reconcileOperation(rangeFrom, rangeTo, contentLength)
+                    }
+                }
+            }
+        }
+    }
+
     private func replaceCreatedAt(in stack: inout [[HistoryOperation]], prevCreatedAt: TimeTicket, currCreatedAt: TimeTicket) {
         for i in stack.indices {
             for j in stack[i].indices {

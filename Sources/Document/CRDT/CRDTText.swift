@@ -227,7 +227,7 @@ final class CRDTText: CRDTElement {
         _ editedAt: TimeTicket,
         _ attributes: [String: String]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TextChange], [GCPair], DataSize, RGATreeSplitPosRange) {
+    ) throws -> ([TextChange], [GCPair], DataSize, RGATreeSplitPosRange, [CRDTTextValue]) {
         let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
             for (key, jsonValue) in attributes {
@@ -235,7 +235,7 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        let (caretPos, pairs, diff, contentChanges) = try self.rgaTreeSplit.edit(
+        let (caretPos, pairs, diff, contentChanges, removedValues) = try self.rgaTreeSplit.edit(
             range,
             editedAt,
             value,
@@ -250,7 +250,28 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        return (changes, pairs, diff, (caretPos, caretPos))
+        return (changes, pairs, diff, (caretPos, caretPos), removedValues)
+    }
+
+    /**
+     * `refinePos` remaps the given position to the current split chain.
+     */
+    func refinePos(_ pos: RGATreeSplitPos) throws -> RGATreeSplitPos {
+        try self.rgaTreeSplit.refinePos(pos)
+    }
+
+    /**
+     * `normalizePos` converts the given position into a single absolute offset from the head.
+     */
+    func normalizePos(_ pos: RGATreeSplitPos) throws -> RGATreeSplitPos {
+        try self.rgaTreeSplit.normalizePos(pos)
+    }
+
+    /**
+     * `posToIndex` converts the given position to an index.
+     */
+    func posToIndex(_ pos: RGATreeSplitPos, _ preferToLeft: Bool = false) throws -> Int {
+        try self.rgaTreeSplit.posToIndex(pos, preferToLeft)
     }
 
     /**
