@@ -276,9 +276,12 @@ public class Document: Attachable {
     }
 
     /**
-     * `clearHistory` flushes the undo and redo stacks. Used when a snapshot replaces local state.
+     * `clearHistory` flushes the undo and redo stacks.
+     *
+     * Used internally when a snapshot replaces local state, and exposed so callers can drop
+     * one-time setup changes (e.g. initial document scaffolding) from the undo history.
      */
-    private func clearHistory() {
+    public func clearHistory() {
         self.internalHistory.clearRedo()
         self.internalHistory.clearUndo()
     }
