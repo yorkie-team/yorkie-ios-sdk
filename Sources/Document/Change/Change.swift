@@ -59,14 +59,16 @@ public struct Change {
     @discardableResult
     func execute(
         root: CRDTRoot,
-        presences: inout [ActorID: StringValueTypeDictionary]
+        presences: inout [ActorID: StringValueTypeDictionary],
+        source: OpSource = .local
     ) throws -> [any OperationInfo] {
         let versionVector = self.id.getVersionVector()
         let opInfos = try self.operations.flatMap {
             try $0.execute(
                 root: root,
-                versionVector: versionVector
-            )
+                versionVector: versionVector,
+                source: source
+            ).opInfos
         }
 
         if let presenceChange = self.presenceChange, let actorID = self.id.getActorID() {

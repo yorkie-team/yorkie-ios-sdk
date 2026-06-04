@@ -576,7 +576,7 @@ public class Document: Attachable {
         let clone = self.cloned
 
         for change in changes {
-            try change.execute(root: clone.root, presences: &self.clone!.presences)
+            try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
 
             var changeInfo: ChangeInfo?
             var presenceEvent: DocEvent?
@@ -616,7 +616,7 @@ public class Document: Attachable {
                 }
             }
 
-            let opInfos = try change.execute(root: self.root, presences: &self.presences)
+            let opInfos = try change.execute(root: self.root, presences: &self.presences, source: source)
             self.changeID = self.changeID.syncClocks(with: change.id)
 
             if change.hasOperations {

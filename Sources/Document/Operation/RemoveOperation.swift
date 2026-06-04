@@ -37,6 +37,14 @@ struct RemoveOperation: Operation {
     @discardableResult
     func execute(
         root: CRDTRoot,
+        versionVector: VersionVector? = nil,
+        source: OpSource = .local
+    ) throws -> ExecutionResult {
+        try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
+    }
+
+    private func executeOpInfos(
+        root: CRDTRoot,
         versionVector: VersionVector? = nil
     ) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
