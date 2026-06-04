@@ -98,6 +98,15 @@ class CRDTRoot {
         return self.elementPairMapByCreatedAt[createdAt.toIDString]?.element
     }
 
+    /**
+     * `findElementPairByCreatedAt` returns the element and its parent of the given creation time.
+     *
+     * Used by undo/redo to walk up the ancestor chain and detect whether any ancestor was removed.
+     */
+    func findElementPairByCreatedAt(_ createdAt: TimeTicket) -> CRDTElementPair? {
+        return self.elementPairMapByCreatedAt[createdAt.toIDString]
+    }
+
     private let subPathPrefix = "$"
     private let subPathSeparator = "."
 
