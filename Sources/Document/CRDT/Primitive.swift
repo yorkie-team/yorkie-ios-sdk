@@ -32,7 +32,7 @@ enum PrimitiveValue: Equatable {
  * It has a type and a value.
  */
 class Primitive: CRDTElement {
-    let createdAt: TimeTicket
+    var createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 

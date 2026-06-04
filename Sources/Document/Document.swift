@@ -151,7 +151,15 @@ public class Document: Attachable {
 
         var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
 
-        try updater(proxy, &presence)
+        // NOTE: the updater must not call undo/redo; isUpdating guards against that.
+        self.isUpdating = true
+        do {
+            try updater(proxy, &presence)
+        } catch {
+            self.isUpdating = false
+            throw error
+        }
+        self.isUpdating = false
 
         self.clone?.presences[actorID] = presence.presence
 
@@ -222,6 +230,133 @@ public class Document: Attachable {
             }
 
             Logger.trace("after update a local change: \(self.toJSON())")
+        }
+    }
+
+    /**
+     * `canUndo` returns whether there are any operations to undo.
+     */
+    public var canUndo: Bool {
+        self.internalHistory.hasUndo && !self.isUpdating
+    }
+
+    /**
+     * `canRedo` returns whether there are any operations to redo.
+     */
+    public var canRedo: Bool {
+        self.internalHistory.hasRedo && !self.isUpdating
+    }
+
+    /**
+     * `undo` undoes the last change made to the document by the local client.
+     */
+    public func undo() throws {
+        try self.executeUndoRedo(isUndo: true)
+    }
+
+    /**
+     * `redo` redoes the last undone change made to the document by the local client.
+     */
+    public func redo() throws {
+        try self.executeUndoRedo(isUndo: false)
+    }
+
+    /**
+     * `getUndoStackForTest` returns the undo stack for testing.
+     */
+    func getUndoStackForTest() -> [[HistoryOperation]] {
+        self.internalHistory.getUndoStackForTest()
+    }
+
+    /**
+     * `getRedoStackForTest` returns the redo stack for testing.
+     */
+    func getRedoStackForTest() -> [[HistoryOperation]] {
+        self.internalHistory.getRedoStackForTest()
+    }
+
+    /**
+     * `clearHistory` flushes the undo and redo stacks. Used when a snapshot replaces local state.
+     */
+    private func clearHistory() {
+        self.internalHistory.clearRedo()
+        self.internalHistory.clearUndo()
+    }
+
+    /**
+     * `executeUndoRedo` executes an undo or redo with the shared logic.
+     */
+    private func executeUndoRedo(isUndo: Bool) throws {
+        if self.isUpdating {
+            throw YorkieError(code: .errRefused, message: "\(isUndo ? "Undo" : "Redo") is not allowed during an update")
+        }
+
+        guard let ops = isUndo ? self.internalHistory.popUndo() : self.internalHistory.popRedo() else {
+            throw YorkieError(code: .errRefused, message: "There is no operation to be \(isUndo ? "undone" : "redone")")
+        }
+
+        guard let actorID = self.actorID else {
+            throw YorkieError(code: .errUnexpected, message: "actor ID is null.")
+        }
+
+        let clone = self.cloned
+        let context = ChangeContext(prevID: self.changeID, root: clone.root)
+
+        // Apply the reverse operations into the context to generate a change.
+        for historyOp in ops {
+            // NOTE: presence reverse ops are not yet supported (deferred).
+            guard case .operation(var op) = historyOp else {
+                continue
+            }
+
+            let ticket = context.issueTimeTicket
+            op.executedAt = ticket
+
+            // NOTE: in undo/redo, both ArraySet and Add may act as updates that restore an
+            // element, which receives a new createdAt. Reconcile the history accordingly.
+            if let arraySet = op as? ArraySetOperation {
+                let prev = arraySet.getCreatedAt()
+                arraySet.getValue().setCreatedAt(ticket)
+                self.internalHistory.reconcileCreatedAt(prevCreatedAt: prev, currCreatedAt: ticket)
+            } else if let add = op as? AddOperation {
+                let prev = add.value.createdAt
+                add.value.setCreatedAt(ticket)
+                self.internalHistory.reconcileCreatedAt(prevCreatedAt: prev, currCreatedAt: ticket)
+            }
+
+            context.push(operation: op)
+        }
+
+        let change = context.toChange()
+        // Execute on the clone first, then on the real root.
+        try change.execute(root: clone.root, presences: &self.clone!.presences, source: .undoRedo)
+        let executionResult = try change.execute(root: self.root, presences: &self.presences, source: .undoRedo)
+        let opInfos = executionResult.opInfos
+        let reverseOps = executionResult.reverseOps
+
+        if !reverseOps.isEmpty {
+            if isUndo {
+                self.internalHistory.pushRedo(reverseOps)
+            } else {
+                self.internalHistory.pushUndo(reverseOps)
+            }
+        }
+
+        // NOTE: skip propagating the change when nothing was applied.
+        if change.presenceChange == nil, opInfos.isEmpty {
+            return
+        }
+
+        self.localChanges.append(change)
+        self.changeID = context.getNextID()
+
+        if !opInfos.isEmpty {
+            let changeInfo = ChangeInfo(message: change.message ?? "",
+                                        operations: opInfos,
+                                        actorID: actorID,
+                                        clientSeq: change.id.getClientSeq(),
+                                        serverSeq: change.id.getServerSeq())
+            self.publish(LocalChangeEvent(value: changeInfo))
         }
     }
 
@@ -576,6 +711,7 @@ public class Document: Attachable {
         // Afterward, we should publish a snapshot event with the latest
         // version of the document to ensure the user receives the most up-to-date snapshot.
         try self.applyChanges(self.localChanges, source: .local)
+        self.clearHistory()
 
         let hexSnapshotVector = try Converter.versionVectorToHex(vector: snapshotVector)
         let snapshotInfo = SnapshotInfo(serverSeq: serverSeq,

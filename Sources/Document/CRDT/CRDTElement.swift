@@ -27,7 +27,7 @@ public let timeTicketSize = 8 + 4 + 12
  */
 protocol CRDTElement: AnyObject {
     /// `createdAt` returns the creation time of this element.
-    var createdAt: TimeTicket { get }
+    var createdAt: TimeTicket { get set }
     /// `movedAt` returns the move time of this element.
     var movedAt: TimeTicket? { get set }
     /// `removedAt` returns the removal time of this element.
@@ -55,6 +55,16 @@ extension CRDTElement {
      */
     var id: TimeTicket {
         return self.createdAt
+    }
+
+    /**
+     * `setCreatedAt` sets the creation time of this element.
+     *
+     * Used by undo/redo to reassign a new creation time when an element is
+     * re-added (e.g. UndoRemove restoring a deleted element).
+     */
+    func setCreatedAt(_ createdAt: TimeTicket) {
+        self.createdAt = createdAt
     }
 
     /**

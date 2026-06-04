@@ -31,7 +31,7 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
         )
     }
 
-    let createdAt: TimeTicket
+    var createdAt: TimeTicket
     var movedAt: TimeTicket?
     var removedAt: TimeTicket?
 
