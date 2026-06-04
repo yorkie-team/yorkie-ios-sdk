@@ -89,17 +89,17 @@ final class DocumentUndoRedoTests: XCTestCase {
             (root.text as? JSONText)?.edit(5, 5, " World")
         }
 
-        var content = await (doc.getRoot().text as? JSONText)?.toString
+        var content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "Hello World")
 
         // Undo the " World" insertion.
         try await doc.undo()
-        content = await (doc.getRoot().text as? JSONText)?.toString
+        content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "Hello")
 
         // Redo restores " World".
         try await doc.redo()
-        content = await (doc.getRoot().text as? JSONText)?.toString
+        content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "Hello World")
     }
 
@@ -114,12 +114,103 @@ final class DocumentUndoRedoTests: XCTestCase {
             (root.text as? JSONText)?.edit(5, 11, "")
         }
 
-        var content = await (doc.getRoot().text as? JSONText)?.toString
+        var content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "Hello")
 
         try await doc.undo()
-        content = await (doc.getRoot().text as? JSONText)?.toString
+        content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "Hello World")
+    }
+
+    func test_undo_multi_node_text_deletion_restores_exact_content() async throws {
+        let doc = Document(key: "undo-text-multinode-delete")
+        // Insert each character as a SEPARATE edit so the text spans multiple RGATreeSplit nodes;
+        // a single combined insert would collapse into one node and not exercise the multi-node path.
+        try await doc.update { root, _ in root.text = JSONText() }
+        for (index, character) in "abcdefghij".enumerated() {
+            try await doc.update { root, _ in
+                (root.text as? JSONText)?.edit(index, index, String(character))
+            }
+        }
+        var content = await(doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "abcdefghij")
+
+        // Delete a range spanning multiple nodes: [2, 8) removes "cdefgh".
+        try await doc.update { root, _ in
+            (root.text as? JSONText)?.edit(2, 8, "")
+        }
+        content = await(doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "abij")
+
+        // Undo must restore the EXACT original character order (regression guard: the removed
+        // nodes must be collected in document order, not Dictionary hash order).
+        try await doc.undo()
+        content = await(doc.getRoot().text as? JSONText)?.toString
+        XCTAssertEqual(content, "abcdefghij")
+    }
+
+    // MARK: - EditOperation.reconcileOperation (range shifting against remote edits)
+
+    func test_reconcileOperation_shifts_undo_range_for_each_case() {
+        // Builds an undo (isUndoOp) edit whose range is [from, to) on a single node.
+        func makeUndoEdit(_ from: Int32, _ to: Int32) -> EditOperation {
+            let id = RGATreeSplitNodeID(TimeTicket.initial, 0)
+            return EditOperation(parentCreatedAt: TimeTicket.initial,
+                                 fromPos: RGATreeSplitPos(id, from),
+                                 toPos: RGATreeSplitPos(id, to),
+                                 content: "",
+                                 attributes: nil,
+                                 executedAt: TimeTicket.initial,
+                                 isUndoOp: true)
+        }
+        func assertRange(_ op: EditOperation, _ from: Int32, _ to: Int32, _ message: String) {
+            XCTAssertEqual(op.fromPos.relativeOffset, from, "\(message) (from)")
+            XCTAssertEqual(op.toPos.relativeOffset, to, "\(message) (to)")
+        }
+
+        // Case 1: remote edit entirely left of the undo range → shift left by the deleted length.
+        let case1 = makeUndoEdit(4, 6)
+        case1.reconcileOperation(0, 2, 0) // delete [0,2)
+        assertRange(case1, 2, 4, "case 1 (remote left)")
+
+        // Case 2: remote edit entirely right of the undo range → unchanged.
+        let case2 = makeUndoEdit(2, 4)
+        case2.reconcileOperation(6, 8, 0)
+        assertRange(case2, 2, 4, "case 2 (remote right)")
+
+        // Case 3: undo range contained within the remote range → collapse to the remote start.
+        let case3 = makeUndoEdit(3, 5)
+        case3.reconcileOperation(2, 8, 0)
+        assertRange(case3, 2, 2, "case 3 (undo inside remote)")
+
+        // Case 4: remote range contained within the undo range → shrink the end by the net change.
+        let case4 = makeUndoEdit(2, 10)
+        case4.reconcileOperation(4, 6, 0) // delete [4,6)
+        assertRange(case4, 2, 8, "case 4 (remote inside undo)")
+
+        // Case 5: remote overlaps the start of the undo range.
+        let case5 = makeUndoEdit(4, 10)
+        case5.reconcileOperation(2, 6, 0)
+        assertRange(case5, 2, 6, "case 5 (overlap start)")
+
+        // Case 6: remote overlaps the end of the undo range.
+        let case6 = makeUndoEdit(2, 6)
+        case6.reconcileOperation(4, 10, 0)
+        assertRange(case6, 2, 4, "case 6 (overlap end)")
+    }
+
+    func test_reconcileOperation_is_a_noop_for_non_undo_operations() {
+        let id = RGATreeSplitNodeID(TimeTicket.initial, 0)
+        // isUndoOp defaults to false → reconcile must not touch the range.
+        let op = EditOperation(parentCreatedAt: TimeTicket.initial,
+                               fromPos: RGATreeSplitPos(id, 4),
+                               toPos: RGATreeSplitPos(id, 6),
+                               content: "",
+                               attributes: nil,
+                               executedAt: TimeTicket.initial)
+        op.reconcileOperation(0, 2, 0)
+        XCTAssertEqual(op.fromPos.relativeOffset, 4)
+        XCTAssertEqual(op.toPos.relativeOffset, 6)
     }
 
     func test_new_local_change_clears_redo() async throws {
@@ -264,22 +355,22 @@ final class DocumentUndoRedoTests: XCTestCase {
             (root.text as? JSONText)?.edit(5, 5, "AB")
         }
 
-        var content = await (doc.getRoot().text as? JSONText)?.toString
+        var content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "01234AB56789")
 
         // when — undo removes "AB"; undo stack now has the reverse-insert sitting at [5,7)
         try await doc.undo()
-        content = await (doc.getRoot().text as? JSONText)?.toString
+        content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "0123456789")
 
         // Redo the insert so the reverse-edit (delete "AB") is back on the undo stack.
         try await doc.redo()
-        content = await (doc.getRoot().text as? JSONText)?.toString
+        content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "01234AB56789")
 
         // Undo again — the undo op (delete "AB") is now on the undo stack.
         try await doc.undo()
-        content = await (doc.getRoot().text as? JSONText)?.toString
+        content = await(doc.getRoot().text as? JSONText)?.toString
 
         // then — the undo succeeded without crashing and content is correct.
         // The reconcileOperation path is exercised any time applyChanges delivers a
@@ -312,7 +403,7 @@ final class DocumentUndoRedoTests: XCTestCase {
         // Undo again: now undo stack has reverse(insert "AB") = delete at [5,7).
         try await doc.undo()
 
-        let content = await (doc.getRoot().text as? JSONText)?.toString
+        let content = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertEqual(content, "0123456789")
 
         // when — build a "remote" change using a second document with the same initial text,
@@ -341,7 +432,7 @@ final class DocumentUndoRedoTests: XCTestCase {
         }
 
         // then — doc is still stable; the reconcile path ran without crashing.
-        let finalContent = await (doc.getRoot().text as? JSONText)?.toString
+        let finalContent = await(doc.getRoot().text as? JSONText)?.toString
         XCTAssertNotNil(finalContent)
     }
 

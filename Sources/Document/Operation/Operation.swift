@@ -273,8 +273,8 @@ public struct TreeStyleOpInfo: OperationInfo {
 struct ExecutionResult {
     /// The operation infos describing what was executed.
     let opInfos: [any OperationInfo]
-    /// The reverse operation used for undo/redo.
     // TODO(undo/redo): becomes non-optional once every operation implements its reverse.
+    /// The reverse operation used for undo/redo.
     let reverseOp: Operation?
 
     init(opInfos: [any OperationInfo], reverseOp: Operation? = nil) {

@@ -30,7 +30,7 @@ public enum YSON {
     /// - Returns: The parsed ``YSONValue``.
     /// - Throws: ``YorkieError`` with ``YorkieError/code`` `errInvalidArgument` when parsing fails.
     public static func parse(_ yson: String) throws -> YSONValue {
-        let processed = preprocessYSON(yson)
+        let processed = self.preprocessYSON(yson)
 
         guard let data = processed.data(using: .utf8) else {
             throw YorkieError(code: .errInvalidArgument, message: "Failed to parse YSON: invalid encoding")
@@ -38,7 +38,7 @@ public enum YSON {
 
         do {
             let parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
-            return try postprocessValue(parsed)
+            return try self.postprocessValue(parsed)
         } catch let error as YorkieError {
             throw error
         } catch {
@@ -53,7 +53,7 @@ public enum YSON {
 
     /// Converts a ``YSONTree`` to its XML string representation.
     public static func treeToXML(_ tree: YSONTree) -> String {
-        treeNodeToXML(tree.root)
+        self.treeNodeToXML(tree.root)
     }
 
     // MARK: - Type guards
@@ -157,17 +157,17 @@ public enum YSON {
         }
 
         if let array = value as? [Any] {
-            return .array(try array.map { try postprocessValue($0) })
+            return try .array(array.map { try self.postprocessValue($0) })
         }
 
         if let dict = value as? [String: Any] {
             if let marker = dict[typeKey] as? String {
-                return try postprocessMarked(marker, data: dict[dataKey] as Any)
+                return try self.postprocessMarked(marker, data: dict[self.dataKey] as Any)
             }
 
             var object = [String: YSONValue]()
             for (key, val) in dict {
-                object[key] = try postprocessValue(val)
+                object[key] = try self.postprocessValue(val)
             }
             return .object(object)
         }
@@ -198,9 +198,9 @@ public enum YSON {
             return .counter(counterValue)
         case "Text":
             guard let nodes = data as? [Any] else { break }
-            return .text(YSONText(nodes: try nodes.map { try postprocessTextNode($0) }))
+            return try .text(YSONText(nodes: nodes.map { try self.postprocessTextNode($0) }))
         case "Tree":
-            return .tree(YSONTree(root: try postprocessTreeNode(data)))
+            return try .tree(YSONTree(root: self.postprocessTreeNode(data)))
         default:
             break
         }
@@ -217,7 +217,7 @@ public enum YSON {
         if let rawAttrs = dict["attrs"] as? [String: Any] {
             var mapped = [String: YSONValue]()
             for (key, value) in rawAttrs {
-                mapped[key] = try postprocessValue(value)
+                mapped[key] = try self.postprocessValue(value)
             }
             attrs = mapped
         }
@@ -240,7 +240,7 @@ public enum YSON {
 
         var children: [YSONTreeNode]?
         if let rawChildren = dict["children"] as? [Any] {
-            children = try rawChildren.map { try postprocessTreeNode($0) }
+            children = try rawChildren.map { try self.postprocessTreeNode($0) }
         }
 
         return YSONTreeNode(type: type, attrs: attrs, children: children)
@@ -249,11 +249,11 @@ public enum YSON {
     // MARK: - XML
 
     private static func treeNodeToXML(_ node: YSONTreeNode) -> String {
-        let attrs = node.attrs?.map { " \($0.key)=\"\(escapeXML($0.value))\"" }.joined() ?? ""
+        let attrs = node.attrs?.map { " \($0.key)=\"\(self.escapeXML($0.value))\"" }.joined() ?? ""
 
         // Text node with value.
         if node.type == "text", let value = node.value {
-            return "<\(node.type)\(attrs)>\(escapeXML(value))</\(node.type)>"
+            return "<\(node.type)\(attrs)>\(self.escapeXML(value))</\(node.type)>"
         }
 
         // Empty element node.
@@ -262,7 +262,7 @@ public enum YSON {
         }
 
         // Element node with children.
-        let inner = children.map { treeNodeToXML($0) }.joined()
+        let inner = children.map { self.treeNodeToXML($0) }.joined()
         return "<\(node.type)\(attrs)>\(inner)</\(node.type)>"
     }
 

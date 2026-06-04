@@ -535,7 +535,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // 04. add removed node
         var pairs = [GCPair]()
         var removedValues = [T]()
-        for (_, removedNode) in removedNodes {
+        for removedNode in removedNodes {
             pairs.append(GCPair(parent: self, child: removedNode))
             removedValues.append(removedNode.value)
         }
@@ -824,10 +824,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ vector: VersionVector? = nil
     ) throws -> ([ContentChange<T>],
-                 [String: RGATreeSplitNode<T>])
+                 [RGATreeSplitNode<T>])
     {
         guard !candidates.isEmpty else {
-            return ([], [:])
+            return ([], [])
         }
         let isLocal = vector == nil
         // 01. Collect nodes to remove and keep.
@@ -851,11 +851,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // 02. Create value changes with previous indexes before deletion.
         let changes = try makeChanges(nodesToKeep, editedAt)
 
-        // 03. Mark tombstones for removal.
-        var removedNodes: [String: RGATreeSplitNode<T>] = [:]
+        // 03. Mark tombstones for removal. Keep `nodesToRemove` (document) order so callers can
+        // reconstruct the removed content left-to-right (Swift Dictionary is unordered).
+        var removedNodes: [RGATreeSplitNode<T>] = []
         for node in nodesToRemove {
-            removedNodes[node.id.toIDString] = node
             node.remove(editedAt)
+            removedNodes.append(node)
         }
 
         // 04. Clear the index tree of the given deletion boundaries.

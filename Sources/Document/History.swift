@@ -144,11 +144,11 @@ final class History {
     }
 
     private func replaceCreatedAt(in stack: inout [[HistoryOperation]], prevCreatedAt: TimeTicket, currCreatedAt: TimeTicket) {
-        for i in stack.indices {
-            for j in stack[i].indices {
-                guard case .operation(let op) = stack[i][j] else { continue }
+        for stackIndex in stack.indices {
+            for opIndex in stack[stackIndex].indices {
+                guard case .operation(let op) = stack[stackIndex][opIndex] else { continue }
                 if let reconciled = Self.reconcile(op, prevCreatedAt: prevCreatedAt, currCreatedAt: currCreatedAt) {
-                    stack[i][j] = .operation(reconciled)
+                    stack[stackIndex][opIndex] = .operation(reconciled)
                 }
             }
         }
