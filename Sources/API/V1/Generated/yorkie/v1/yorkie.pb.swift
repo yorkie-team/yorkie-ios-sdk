@@ -383,12 +383,49 @@ public struct Yorkie_V1_CreateRevisionResponse: Sendable {
   fileprivate var _revision: Yorkie_V1_RevisionSummary? = nil
 }
 
+public struct Yorkie_V1_GetRevisionRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var clientID: String = String()
+
+  public var documentID: String = String()
+
+  public var revisionID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_GetRevisionResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var revision: Yorkie_V1_RevisionSummary {
+    get {_revision ?? Yorkie_V1_RevisionSummary()}
+    set {_revision = newValue}
+  }
+  /// Returns true if `revision` has been explicitly set.
+  public var hasRevision: Bool {self._revision != nil}
+  /// Clears the value of `revision`. Subsequent reads from it will return its default value.
+  public mutating func clearRevision() {self._revision = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _revision: Yorkie_V1_RevisionSummary? = nil
+}
+
 public struct Yorkie_V1_ListRevisionsRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var projectID: String = String()
+  public var clientID: String = String()
 
   public var documentID: String = String()
 
@@ -421,6 +458,8 @@ public struct Yorkie_V1_RestoreRevisionRequest: Sendable {
   // methods supported on all messages.
 
   public var clientID: String = String()
+
+  public var documentID: String = String()
 
   public var revisionID: String = String()
 
@@ -1284,9 +1323,9 @@ extension Yorkie_V1_CreateRevisionResponse: SwiftProtobuf.Message, SwiftProtobuf
   }
 }
 
-extension Yorkie_V1_ListRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListRevisionsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}document_id\0\u{3}page_size\0\u{1}offset\0\u{3}is_forward\0")
+extension Yorkie_V1_GetRevisionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetRevisionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}revision_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1294,7 +1333,81 @@ extension Yorkie_V1_ListRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.revisionID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.clientID.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
+    }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    }
+    if !self.revisionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.revisionID, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_GetRevisionRequest, rhs: Yorkie_V1_GetRevisionRequest) -> Bool {
+    if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentID != rhs.documentID {return false}
+    if lhs.revisionID != rhs.revisionID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_GetRevisionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetRevisionResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}revision\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._revision) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._revision {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_GetRevisionResponse, rhs: Yorkie_V1_GetRevisionResponse) -> Bool {
+    if lhs._revision != rhs._revision {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_ListRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListRevisionsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}page_size\0\u{1}offset\0\u{3}is_forward\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.pageSize) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.offset) }()
@@ -1305,8 +1418,8 @@ extension Yorkie_V1_ListRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.projectID.isEmpty {
-      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 1)
+    if !self.clientID.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
     if !self.documentID.isEmpty {
       try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
@@ -1324,7 +1437,7 @@ extension Yorkie_V1_ListRevisionsRequest: SwiftProtobuf.Message, SwiftProtobuf._
   }
 
   public static func ==(lhs: Yorkie_V1_ListRevisionsRequest, rhs: Yorkie_V1_ListRevisionsRequest) -> Bool {
-    if lhs.projectID != rhs.projectID {return false}
+    if lhs.clientID != rhs.clientID {return false}
     if lhs.documentID != rhs.documentID {return false}
     if lhs.pageSize != rhs.pageSize {return false}
     if lhs.offset != rhs.offset {return false}
@@ -1366,7 +1479,7 @@ extension Yorkie_V1_ListRevisionsResponse: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_RestoreRevisionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RestoreRevisionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}revision_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{4}\u{2}revision_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1375,7 +1488,8 @@ extension Yorkie_V1_RestoreRevisionRequest: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.revisionID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.revisionID) }()
       default: break
       }
     }
@@ -1385,14 +1499,18 @@ extension Yorkie_V1_RestoreRevisionRequest: SwiftProtobuf.Message, SwiftProtobuf
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    }
     if !self.revisionID.isEmpty {
-      try visitor.visitSingularStringField(value: self.revisionID, fieldNumber: 2)
+      try visitor.visitSingularStringField(value: self.revisionID, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_RestoreRevisionRequest, rhs: Yorkie_V1_RestoreRevisionRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.documentID != rhs.documentID {return false}
     if lhs.revisionID != rhs.revisionID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

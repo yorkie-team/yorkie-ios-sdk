@@ -28,7 +28,9 @@ public struct RevisionSummary: Sendable {
     public let label: String
     /// A detailed explanation of this revision.
     public let description: String
-    /// The serialized document content (JSON) at this revision point, containing only the pure data without CRDT metadata.
+    /// The serialized document content in YSON format at this revision point.
+    ///
+    /// Use ``YSON/parse(_:)`` to convert this string into a typed Swift value.
     public let snapshot: String
     /// The time when this revision was created.
     public let createdAt: Date
