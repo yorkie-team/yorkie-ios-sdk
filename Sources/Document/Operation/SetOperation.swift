@@ -43,13 +43,45 @@ struct SetOperation: Operation {
         root: CRDTRoot,
         versionVector: VersionVector? = nil,
         source: OpSource = .local
-    ) throws -> ExecutionResult {
-        try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
+    ) throws -> ExecutionResult? {
+        // NOTE: handle cases where the operation cannot be executed during undo/redo
+        // (e.g. the parent object or one of its ancestors was already removed).
+        if source == .undoRedo, self.isAncestorRemoved(root) {
+            return nil
+        }
+        let previousValue = (root.find(createdAt: self.parentCreatedAt) as? CRDTObject)?.get(key: self.key)
+        let reverseOp = self.toReverseOperation(previousValue)
+        let opInfos = try self.executeOpInfos(root: root, versionVector: versionVector, source: source)
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
+    /// Returns whether the parent object or any of its ancestors was already removed.
+    private func isAncestorRemoved(_ root: CRDTRoot) -> Bool {
+        var currentCreatedAt: TimeTicket? = self.parentCreatedAt
+        while let createdAt = currentCreatedAt, let pair = root.findElementPairByCreatedAt(createdAt) {
+            if pair.element.isRemoved {
+                return true
+            }
+            currentCreatedAt = pair.parent?.createdAt
+        }
+        return false
+    }
+
+    /// Returns the reverse operation (restoring the previous value, or removing it) for undo/redo.
+    private func toReverseOperation(_ previousValue: CRDTElement?) -> Operation {
+        if let previousValue, !previousValue.isRemoved {
+            return SetOperation(key: self.key, value: previousValue.deepcopy(),
+                                parentCreatedAt: self.parentCreatedAt, executedAt: TimeTicket.initial)
+        }
+        // executedAt is reassigned just before execution when Document.undo() is called.
+        return RemoveOperation(parentCreatedAt: self.parentCreatedAt,
+                               createdAt: self.value.createdAt, executedAt: TimeTicket.initial)
     }
 
     private func executeOpInfos(
         root: CRDTRoot,
-        versionVector: VersionVector? = nil
+        versionVector: VersionVector? = nil,
+        source: OpSource = .local
     ) throws -> [any OperationInfo] {
         let parent = root.find(createdAt: self.parentCreatedAt)
         guard let parent = parent as? CRDTObject else {
@@ -64,6 +96,11 @@ struct SetOperation: Operation {
 
         let value = self.value.deepcopy()
         let removed = parent.set(key: self.key, value: value)
+        // NOTE: when resetting an element with a pre-existing createdAt during undo/redo,
+        // deregister the previously tombstoned element before re-registering.
+        if source == .undoRedo, root.find(createdAt: value.createdAt) != nil {
+            root.deregisterElement(value)
+        }
         root.registerElement(value, parent: parent)
         if let removed {
             root.registerRemovedElement(removed)

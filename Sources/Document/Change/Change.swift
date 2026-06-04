@@ -64,11 +64,13 @@ public struct Change {
     ) throws -> [any OperationInfo] {
         let versionVector = self.id.getVersionVector()
         let opInfos = try self.operations.flatMap {
+            // NOTE: a nil result means the operation was skipped during undo/redo
+            // (e.g. the target element was already removed).
             try $0.execute(
                 root: root,
                 versionVector: versionVector,
                 source: source
-            ).opInfos
+            )?.opInfos ?? []
         }
 
         if let presenceChange = self.presenceChange, let actorID = self.id.getActorID() {

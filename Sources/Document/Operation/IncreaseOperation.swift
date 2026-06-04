@@ -48,7 +48,7 @@ struct IncreaseOperation: Operation {
         root: CRDTRoot,
         versionVector: VersionVector? = nil,
         source: OpSource = .local
-    ) throws -> ExecutionResult {
+    ) throws -> ExecutionResult? {
         try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
     }
 

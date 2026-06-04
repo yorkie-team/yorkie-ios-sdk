@@ -305,12 +305,15 @@ protocol Operation {
 
     /**
      * `execute` executes this operation on the given document(`root`).
+     *
+     * Returns `nil` when the operation cannot be executed during undo/redo
+     * (e.g. the target element was already removed).
      */
     func execute(
         root: CRDTRoot,
         versionVector: VersionVector?,
         source: OpSource
-    ) throws -> ExecutionResult
+    ) throws -> ExecutionResult?
 }
 
 extension Operation {

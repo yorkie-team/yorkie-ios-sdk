@@ -27,8 +27,15 @@ class ArraySetOperation: Operation {
     var parentCreatedAt: TimeTicket
 
     var executedAt: TimeTicket
-    let createdAt: TimeTicket
+    private(set) var createdAt: TimeTicket
     private let value: CRDTElement
+
+    /**
+     * `setCreatedAt` sets the creation time of the target element.
+     */
+    func setCreatedAt(_ createdAt: TimeTicket) {
+        self.createdAt = createdAt
+    }
 
     init(
         parentCreatedAt: TimeTicket,
@@ -67,8 +74,25 @@ class ArraySetOperation: Operation {
         root: CRDTRoot,
         versionVector: VersionVector? = nil,
         source: OpSource = .local
-    ) throws -> ExecutionResult {
-        try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
+    ) throws -> ExecutionResult? {
+        // Compute the reverse before mutating, capturing the current element value.
+        let reverseOp = self.toReverseOperation(root)
+        let opInfos = try self.executeOpInfos(root: root, versionVector: versionVector)
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
+    /// Returns the reverse operation (restoring the previous element value) for undo/redo.
+    private func toReverseOperation(_ root: CRDTRoot) -> Operation? {
+        guard let array = root.find(createdAt: self.parentCreatedAt) as? CRDTArray,
+              let previousValue = try? array.get(createdAt: self.createdAt)
+        else {
+            return nil
+        }
+        // executedAt is reassigned just before execution when Document.undo() is called.
+        return ArraySetOperation(parentCreatedAt: self.parentCreatedAt,
+                                 createdAt: self.value.createdAt,
+                                 value: previousValue.deepcopy(),
+                                 executedAt: TimeTicket.initial)
     }
 
     private func executeOpInfos(
