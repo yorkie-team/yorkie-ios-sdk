@@ -1750,6 +1750,11 @@ public struct Yorkie_V1_Project: @unchecked Sendable {
     set {_uniqueStorage()._removeOnDetach = newValue}
   }
 
+  public var autoRevisionEnabled: Bool {
+    get {_storage._autoRevisionEnabled}
+    set {_uniqueStorage()._autoRevisionEnabled = newValue}
+  }
+
   public var allowedOrigins: [String] {
     get {_storage._allowedOrigins}
     set {_uniqueStorage()._allowedOrigins = newValue}
@@ -1978,6 +1983,15 @@ public struct Yorkie_V1_UpdatableProjectFields: @unchecked Sendable {
   public var hasRemoveOnDetach: Bool {_storage._removeOnDetach != nil}
   /// Clears the value of `removeOnDetach`. Subsequent reads from it will return its default value.
   public mutating func clearRemoveOnDetach() {_uniqueStorage()._removeOnDetach = nil}
+
+  public var autoRevisionEnabled: SwiftProtobuf.Google_Protobuf_BoolValue {
+    get {_storage._autoRevisionEnabled ?? SwiftProtobuf.Google_Protobuf_BoolValue()}
+    set {_uniqueStorage()._autoRevisionEnabled = newValue}
+  }
+  /// Returns true if `autoRevisionEnabled` has been explicitly set.
+  public var hasAutoRevisionEnabled: Bool {_storage._autoRevisionEnabled != nil}
+  /// Clears the value of `autoRevisionEnabled`. Subsequent reads from it will return its default value.
+  public mutating func clearAutoRevisionEnabled() {_uniqueStorage()._autoRevisionEnabled = nil}
 
   public var allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins {
     get {_storage._allowedOrigins ?? Yorkie_V1_UpdatableProjectFields.AllowedOrigins()}
@@ -2435,8 +2449,6 @@ public struct Yorkie_V1_RevisionSummary: Sendable {
   // methods supported on all messages.
 
   public var id: String = String()
-
-  public var seq: Int64 = 0
 
   public var label: String = String()
 
@@ -4826,7 +4838,7 @@ extension Yorkie_V1_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
 extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Project"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}public_key\0\u{3}secret_key\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}created_at\0\u{3}updated_at\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}public_key\0\u{3}secret_key\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}created_at\0\u{3}updated_at\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0\u{3}auto_revision_enabled\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -4852,6 +4864,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _maxAttachmentsPerDocument: Int32 = 0
     var _maxSizePerDocument: Int32 = 0
     var _removeOnDetach: Bool = false
+    var _autoRevisionEnabled: Bool = false
     var _allowedOrigins: [String] = []
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
@@ -4888,6 +4901,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       _maxAttachmentsPerDocument = source._maxAttachmentsPerDocument
       _maxSizePerDocument = source._maxSizePerDocument
       _removeOnDetach = source._removeOnDetach
+      _autoRevisionEnabled = source._autoRevisionEnabled
       _allowedOrigins = source._allowedOrigins
       _createdAt = source._createdAt
       _updatedAt = source._updatedAt
@@ -4935,6 +4949,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         case 24: try { try decoder.decodeSingularStringField(value: &_storage._eventWebhookRequestTimeout) }()
         case 25: try { try decoder.decodeSingularInt64Field(value: &_storage._snapshotThreshold) }()
         case 26: try { try decoder.decodeSingularInt64Field(value: &_storage._snapshotInterval) }()
+        case 27: try { try decoder.decodeSingularBoolField(value: &_storage._autoRevisionEnabled) }()
         default: break
         }
       }
@@ -5025,6 +5040,9 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       if _storage._snapshotInterval != 0 {
         try visitor.visitSingularInt64Field(value: _storage._snapshotInterval, fieldNumber: 26)
       }
+      if _storage._autoRevisionEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._autoRevisionEnabled, fieldNumber: 27)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5057,6 +5075,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         if _storage._maxAttachmentsPerDocument != rhs_storage._maxAttachmentsPerDocument {return false}
         if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
         if _storage._removeOnDetach != rhs_storage._removeOnDetach {return false}
+        if _storage._autoRevisionEnabled != rhs_storage._autoRevisionEnabled {return false}
         if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._updatedAt != rhs_storage._updatedAt {return false}
@@ -5106,7 +5125,7 @@ extension Yorkie_V1_MetricPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
 
 extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdatableProjectFields"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0\u{3}auto_revision_enabled\0")
 
   fileprivate class _StorageClass {
     var _name: SwiftProtobuf.Google_Protobuf_StringValue? = nil
@@ -5129,6 +5148,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
     var _maxAttachmentsPerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
     var _maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
     var _removeOnDetach: SwiftProtobuf.Google_Protobuf_BoolValue? = nil
+    var _autoRevisionEnabled: SwiftProtobuf.Google_Protobuf_BoolValue? = nil
     var _allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -5160,6 +5180,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
       _maxAttachmentsPerDocument = source._maxAttachmentsPerDocument
       _maxSizePerDocument = source._maxSizePerDocument
       _removeOnDetach = source._removeOnDetach
+      _autoRevisionEnabled = source._autoRevisionEnabled
       _allowedOrigins = source._allowedOrigins
     }
   }
@@ -5200,6 +5221,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
         case 19: try { try decoder.decodeSingularMessageField(value: &_storage._eventWebhookRequestTimeout) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._snapshotThreshold) }()
         case 21: try { try decoder.decodeSingularMessageField(value: &_storage._snapshotInterval) }()
+        case 22: try { try decoder.decodeSingularMessageField(value: &_storage._autoRevisionEnabled) }()
         default: break
         }
       }
@@ -5275,6 +5297,9 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
       try { if let v = _storage._snapshotInterval {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
       } }()
+      try { if let v = _storage._autoRevisionEnabled {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5304,6 +5329,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._maxAttachmentsPerDocument != rhs_storage._maxAttachmentsPerDocument {return false}
         if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
         if _storage._removeOnDetach != rhs_storage._removeOnDetach {return false}
+        if _storage._autoRevisionEnabled != rhs_storage._autoRevisionEnabled {return false}
         if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
         return true
       }
@@ -6018,7 +6044,7 @@ extension Yorkie_V1_Rule: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
 extension Yorkie_V1_RevisionSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RevisionSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}seq\0\u{1}label\0\u{1}description\0\u{1}snapshot\0\u{3}created_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}label\0\u{1}description\0\u{1}snapshot\0\u{3}created_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6027,11 +6053,10 @@ extension Yorkie_V1_RevisionSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.label) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.snapshot) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.label) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.description_p) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.snapshot) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       default: break
       }
     }
@@ -6045,27 +6070,23 @@ extension Yorkie_V1_RevisionSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if !self.id.isEmpty {
       try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
-    if self.seq != 0 {
-      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 2)
-    }
     if !self.label.isEmpty {
-      try visitor.visitSingularStringField(value: self.label, fieldNumber: 3)
+      try visitor.visitSingularStringField(value: self.label, fieldNumber: 2)
     }
     if !self.description_p.isEmpty {
-      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 4)
+      try visitor.visitSingularStringField(value: self.description_p, fieldNumber: 3)
     }
     if !self.snapshot.isEmpty {
-      try visitor.visitSingularStringField(value: self.snapshot, fieldNumber: 5)
+      try visitor.visitSingularStringField(value: self.snapshot, fieldNumber: 4)
     }
     try { if let v = self._createdAt {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_RevisionSummary, rhs: Yorkie_V1_RevisionSummary) -> Bool {
     if lhs.id != rhs.id {return false}
-    if lhs.seq != rhs.seq {return false}
     if lhs.label != rhs.label {return false}
     if lhs.description_p != rhs.description_p {return false}
     if lhs.snapshot != rhs.snapshot {return false}

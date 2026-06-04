@@ -75,6 +75,30 @@ public final class YorkieService {
     }
 
     @available(iOS 15, *)
+    public func createRevision(request: Yorkie_V1_CreateRevisionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_CreateRevisionResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.createRevision) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.createRevision(request: request, headers: headers)
+    }
+
+    @available(iOS 15, *)
+    public func listRevisions(request: Yorkie_V1_ListRevisionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_ListRevisionsResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.listRevisions) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.listRevisions(request: request, headers: headers)
+    }
+
+    @available(iOS 15, *)
+    public func restoreRevision(request: Yorkie_V1_RestoreRevisionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_RestoreRevisionResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.restoreRevision) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.restoreRevision(request: request, headers: headers)
+    }
+
+    @available(iOS 15, *)
     public func pushPullChanges(request: Yorkie_V1_PushPullChangesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_PushPullChangesResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges) {
             return .init(result: .failure(error))

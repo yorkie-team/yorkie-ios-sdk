@@ -57,6 +57,13 @@ typealias RefreshChannelRequest = Yorkie_V1_RefreshChannelRequest
 typealias RefreshChannelResponse = Yorkie_V1_RefreshChannelResponse
 typealias WatchChannelRequest = Yorkie_V1_WatchChannelRequest
 typealias WatchChannelResponse = Yorkie_V1_WatchChannelResponse
+typealias CreateRevisionRequest = Yorkie_V1_CreateRevisionRequest
+typealias CreateRevisionResponse = Yorkie_V1_CreateRevisionResponse
+typealias ListRevisionsRequest = Yorkie_V1_ListRevisionsRequest
+typealias ListRevisionsResponse = Yorkie_V1_ListRevisionsResponse
+typealias RestoreRevisionRequest = Yorkie_V1_RestoreRevisionRequest
+typealias RestoreRevisionResponse = Yorkie_V1_RestoreRevisionResponse
+typealias PbRevisionSummary = Yorkie_V1_RevisionSummary
 typealias PbChannelEvent = Yorkie_V1_ChannelEvent
 typealias PbChannelEventType = Yorkie_V1_ChannelEvent.TypeEnum
 

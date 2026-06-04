@@ -518,6 +518,127 @@ public class Client {
         }
     }
 
+    // MARK: - Revision Methods
+
+    /**
+     * `createRevision` creates a new revision for the given document.
+     */
+    @discardableResult
+    public func createRevision(_ doc: Document, label: String, description: String = "") async throws -> RevisionSummary {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard let attachment = getDocumentAttachment(doc.getKey()) else {
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+        }
+
+        var request = CreateRevisionRequest()
+        request.clientID = clientID
+        request.documentID = attachment.resourceID
+        request.label = label
+        request.description_p = description
+
+        do {
+            let response = await self.yorkieService.createRevision(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
+
+            guard response.error == nil, let message = response.message else {
+                throw self.handleErrorResponse(response.error, defaultMessage: "Unknown create revision error")
+            }
+
+            guard message.hasRevision else {
+                throw YorkieError(code: .errInvalidArgument, message: "revision is not returned")
+            }
+
+            Logger.info("[CR] c:\"\(self.key)\" creates revision d:\"\(doc.getKey())\" l:\"\(label)\"")
+
+            return Converter.fromRevisionSummary(message.revision)
+        } catch {
+            Logger.error("Failed to request create revision(\(self.key)).", error: error)
+            await self.handleConnectError(error)
+            throw error
+        }
+    }
+
+    /**
+     * `listRevisions` lists all revisions for the given document.
+     */
+    public func listRevisions(_ doc: Document, pageSize: Int32 = 10, offset: Int32 = 0, isForward: Bool = false) async throws -> [RevisionSummary] {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard self.id != nil else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard let attachment = getDocumentAttachment(doc.getKey()) else {
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+        }
+
+        var request = ListRevisionsRequest()
+        request.projectID = "" // Filled by the server from the auth context.
+        request.documentID = attachment.resourceID
+        request.pageSize = pageSize
+        request.offset = offset
+        request.isForward = isForward
+
+        do {
+            let response = await self.yorkieService.listRevisions(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
+
+            guard response.error == nil, let message = response.message else {
+                throw self.handleErrorResponse(response.error, defaultMessage: "Unknown list revisions error")
+            }
+
+            Logger.info("[LR] c:\"\(self.key)\" lists revisions d:\"\(doc.getKey())\" count:\(message.revisions.count)")
+
+            return message.revisions.map(Converter.fromRevisionSummary)
+        } catch {
+            Logger.error("Failed to request list revisions(\(self.key)).", error: error)
+            await self.handleConnectError(error)
+            throw error
+        }
+    }
+
+    /**
+     * `restoreRevision` restores the document to the given revision.
+     */
+    public func restoreRevision(_ doc: Document, revisionID: String) async throws {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard self.getDocumentAttachment(doc.getKey()) != nil else {
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+        }
+
+        var request = RestoreRevisionRequest()
+        request.clientID = clientID
+        request.revisionID = revisionID
+
+        do {
+            let response = await self.yorkieService.restoreRevision(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
+
+            guard response.error == nil, response.message != nil else {
+                throw self.handleErrorResponse(response.error, defaultMessage: "Unknown restore revision error")
+            }
+
+            Logger.info("[RR] c:\"\(self.key)\" restores revision d:\"\(doc.getKey())\" r:\"\(revisionID)\"")
+        } catch {
+            Logger.error("Failed to request restore revision(\(self.key)).", error: error)
+            await self.handleConnectError(error)
+            throw error
+        }
+    }
+
     // MARK: - Channel Methods
 
     /**
