@@ -84,6 +84,11 @@ public class Document: Attachable {
     private var maxSizeLimit: Int
     private var schemaRules: [Rule] = []
 
+    /// Stores the undo/redo history of this document.
+    private let internalHistory = History()
+    /// Whether an `update` is in progress. Undo/redo is not allowed during an update.
+    private var isUpdating = false
+
     private var root = CRDTRoot()
     private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
 
@@ -176,8 +181,28 @@ public class Document: Attachable {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
             let change = context.toChange()
-            let opInfos = (try? change.execute(root: self.root, presences: &self.presences)) ?? []
+            let executionResult = try? change.execute(root: self.root, presences: &self.presences)
+            let opInfos = executionResult?.opInfos ?? []
+
+            // NOTE: in update(Set on array), the element is replaced with a new value.
+            // The history stack may still reference the old element's createdAt, so reconcile.
+            for op in change.operations {
+                if let arraySet = op as? ArraySetOperation {
+                    self.internalHistory.reconcileCreatedAt(
+                        prevCreatedAt: arraySet.getCreatedAt(),
+                        currCreatedAt: arraySet.getValue().createdAt
+                    )
+                }
+            }
+
             self.localChanges.append(change)
+            if let reverseOps = executionResult?.reverseOps, !reverseOps.isEmpty {
+                self.internalHistory.pushUndo(reverseOps)
+            }
+            // NOTE: clear redo when a new local operation is applied.
+            if !opInfos.isEmpty {
+                self.internalHistory.clearRedo()
+            }
             self.changeID = context.getNextID()
 
             // 03. Publish the document change event.
@@ -616,7 +641,7 @@ public class Document: Attachable {
                 }
             }
 
-            let opInfos = try change.execute(root: self.root, presences: &self.presences, source: source)
+            let opInfos = try change.execute(root: self.root, presences: &self.presences, source: source).opInfos
             self.changeID = self.changeID.syncClocks(with: change.id)
 
             if change.hasOperations {

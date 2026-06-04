@@ -17,6 +17,18 @@
 import Foundation
 
 /**
+ * `ChangeExecutionResult` is the result of executing a ``Change``.
+ */
+struct ChangeExecutionResult {
+    /// The operations that were actually executed (skipped operations are excluded).
+    let operations: [Operation]
+    /// The operation infos describing what was executed.
+    let opInfos: [any OperationInfo]
+    /// The reverse operations to push onto the undo/redo stack.
+    let reverseOps: [HistoryOperation]
+}
+
+/**
  * `Change` represents a unit of modification in the document.
  */
 public struct Change {
@@ -61,16 +73,23 @@ public struct Change {
         root: CRDTRoot,
         presences: inout [ActorID: StringValueTypeDictionary],
         source: OpSource = .local
-    ) throws -> [any OperationInfo] {
+    ) throws -> ChangeExecutionResult {
         let versionVector = self.id.getVersionVector()
-        let opInfos = try self.operations.flatMap {
+        var changeOpInfos: [any OperationInfo] = []
+        var executedOperations: [Operation] = []
+        var reverseOps: [HistoryOperation] = []
+
+        for operation in self.operations {
             // NOTE: a nil result means the operation was skipped during undo/redo
             // (e.g. the target element was already removed).
-            try $0.execute(
-                root: root,
-                versionVector: versionVector,
-                source: source
-            )?.opInfos ?? []
+            guard let result = try operation.execute(root: root, versionVector: versionVector, source: source) else {
+                continue
+            }
+            changeOpInfos.append(contentsOf: result.opInfos)
+            executedOperations.append(operation)
+            if let reverseOp = result.reverseOp {
+                reverseOps.insert(.operation(reverseOp), at: 0)
+            }
         }
 
         if let presenceChange = self.presenceChange, let actorID = self.id.getActorID() {
@@ -82,7 +101,7 @@ public struct Change {
             }
         }
 
-        return opInfos
+        return ChangeExecutionResult(operations: executedOperations, opInfos: changeOpInfos, reverseOps: reverseOps)
     }
 
     /**
