@@ -91,12 +91,12 @@ class ContentViewModel: ObservableObject {
 
     var didFinishSync = false
     init() {
-        self.client = Client(
-            "https://yorkie-api-qa.navercorp.com",
-            .init(apiKey: self.apiKey)
-        )
+//        self.client = Client(
+//            "https://yorkie-api-qa.navercorp.com",
+//            .init(apiKey: self.apiKey)
+//        )
         // use for local server
-        // self.client = Client(Constant.serverAddress)
+        self.client = Client(Constant.serverAddress)
 
         self.document = Document(key: self.documentKey)
         Log.log("Document key: \(self.documentKey)", level: .info)
@@ -273,9 +273,15 @@ extension ContentViewModel {
     }
 
     /// Syncs the undo/redo button state from the document's history.
+    ///
+    /// Invoked from the document subscription, which can fire while SwiftUI is updating a view
+    /// (e.g. during a text-view change). Publish on the next main-actor turn to avoid the
+    /// "Publishing changes from within view updates is not allowed" runtime warning.
     func refreshUndoRedoState() {
-        self.canUndo = self.document.canUndo
-        self.canRedo = self.document.canRedo
+        Task { @MainActor in
+            self.canUndo = self.document.canUndo
+            self.canRedo = self.document.canRedo
+        }
     }
 
     func watch() async {
