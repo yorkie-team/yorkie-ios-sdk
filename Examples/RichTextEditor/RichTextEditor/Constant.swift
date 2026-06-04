@@ -35,8 +35,7 @@ enum Constant {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd"
         let dateString = dateFormatter.string(from: Date())
-        let documentKey = "vanilla-quill-\(dateString)"
-        return documentKey
+        return "vanilla-quill-\(dateString)"
     }()
 
     enum Format {

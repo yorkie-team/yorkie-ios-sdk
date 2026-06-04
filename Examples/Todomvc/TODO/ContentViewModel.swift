@@ -63,12 +63,12 @@ extension ContentView {
         @Published var networkConnected = false
 
         init() {
-            self.client = Client(
-                "https://yorkie-api-qa.navercorp.com",
-                .init(apiKey: Constant.apiKey)
-            )
+//            self.client = Client(
+//                "https://yorkie-api-qa.navercorp.com",
+//                .init(apiKey: Constant.apiKey)
+//            )
             // use Local server
-            // self.client = .init(Constant.serverAddress)
+            self.client = .init(Constant.serverAddress)
             self.document = Document(key: Constant.documentKey)
 
             Log.log("Document key: \(Constant.documentKey)", level: .info)
