@@ -130,6 +130,8 @@ final class History {
      * edit occurs, so a later undo/redo lands at the correct position.
      */
     func reconcileTextEdit(parentCreatedAt: TimeTicket, rangeFrom: Int, rangeTo: Int, contentLength: Int) {
+        // NOTE: iterating copies of the stacks is intentional and harmless — `EditOperation` is a
+        // class, so `reconcileOperation` mutates the stored instance through its reference.
         for stack in [self.undoStack, self.redoStack] {
             for ops in stack {
                 for case .operation(let op) in ops {

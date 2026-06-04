@@ -82,6 +82,9 @@ class ArraySetOperation: Operation {
     }
 
     /// Returns the reverse operation (restoring the previous element value) for undo/redo.
+    ///
+    /// NOTE: deliberate divergence from yorkie-js-sdk, which force-unwraps `getByID`. Here a missing
+    /// element yields `nil` (no reverse) rather than a crash. Do not "correct" this to a force-unwrap.
     private func toReverseOperation(_ root: CRDTRoot) -> Operation? {
         guard let array = root.find(createdAt: self.parentCreatedAt) as? CRDTArray,
               let previousValue = try? array.get(createdAt: self.createdAt)
