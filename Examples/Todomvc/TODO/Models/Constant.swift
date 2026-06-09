@@ -36,7 +36,6 @@ enum Constant {
         dateFormatter.dateFormat = "yyyyMMdd"
         dateFormatter.locale = Locale.current
         let dateString = dateFormatter.string(from: Date())
-        var key = "react-todomvc-\(dateString)"
-        return key
+        return "react-todomvc-\(dateString)"
     }()
 }

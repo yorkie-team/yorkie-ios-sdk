@@ -17,7 +17,10 @@
 import Foundation
 
 struct Peer: Identifiable {
-    var id: String { self.name + self.color }
+    var id: String {
+        self.name + self.color
+    }
+
     let clientID: String
     let name: String
     var position: NSRange

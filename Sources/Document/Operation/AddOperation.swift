@@ -22,8 +22,15 @@ import Foundation
 struct AddOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
-    let previousCreatedAt: TimeTicket
+    private(set) var previousCreatedAt: TimeTicket
     let value: CRDTElement
+
+    /**
+     * `setPrevCreatedAt` sets the creation time of the previous element.
+     */
+    mutating func setPrevCreatedAt(_ createdAt: TimeTicket) {
+        self.previousCreatedAt = createdAt
+    }
 
     init(parentCreatedAt: TimeTicket, previousCreatedAt: TimeTicket, value: CRDTElement, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -37,6 +44,21 @@ struct AddOperation: Operation {
      */
     @discardableResult
     func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector? = nil,
+        source: OpSource = .local
+    ) throws -> ExecutionResult? {
+        let opInfos = try self.executeOpInfos(root: root, versionVector: versionVector)
+        return ExecutionResult(opInfos: opInfos, reverseOp: self.toReverseOperation())
+    }
+
+    /// Returns the reverse operation (removing the added element) for undo/redo.
+    private func toReverseOperation() -> Operation {
+        // executedAt is reassigned just before execution when Document.undo() is called.
+        RemoveOperation(parentCreatedAt: self.parentCreatedAt, createdAt: self.value.createdAt, executedAt: TimeTicket.initial)
+    }
+
+    private func executeOpInfos(
         root: CRDTRoot,
         versionVector: VersionVector? = nil
     ) throws -> [any OperationInfo] {

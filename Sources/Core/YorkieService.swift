@@ -83,6 +83,14 @@ public final class YorkieService {
     }
 
     @available(iOS 15, *)
+    public func getRevision(request: Yorkie_V1_GetRevisionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_GetRevisionResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.getRevision) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.getRevision(request: request, headers: headers)
+    }
+
+    @available(iOS 15, *)
     public func listRevisions(request: Yorkie_V1_ListRevisionsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_ListRevisionsResponse> {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.listRevisions) {
             return .init(result: .failure(error))

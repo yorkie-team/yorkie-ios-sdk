@@ -23,8 +23,22 @@ struct MoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
     /// The creation time of previous element.
-    let previousCreatedAt: TimeTicket
-    let createdAt: TimeTicket
+    private(set) var previousCreatedAt: TimeTicket
+    private(set) var createdAt: TimeTicket
+
+    /**
+     * `setCreatedAt` sets the creation time of the target element.
+     */
+    mutating func setCreatedAt(_ createdAt: TimeTicket) {
+        self.createdAt = createdAt
+    }
+
+    /**
+     * `setPrevCreatedAt` sets the creation time of the previous element.
+     */
+    mutating func setPrevCreatedAt(_ createdAt: TimeTicket) {
+        self.previousCreatedAt = createdAt
+    }
 
     init(parentCreatedAt: TimeTicket, previousCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -38,6 +52,31 @@ struct MoveOperation: Operation {
      */
     @discardableResult
     func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector? = nil,
+        source: OpSource = .local
+    ) throws -> ExecutionResult? {
+        // Compute the reverse before mutating, capturing the current previous element.
+        let reverseOp = self.toReverseOperation(root)
+        let opInfos = try self.executeOpInfos(root: root, versionVector: versionVector)
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
+    /// Returns the reverse operation (moving the element back to its previous position) for undo/redo.
+    private func toReverseOperation(_ root: CRDTRoot) -> Operation? {
+        guard let array = root.find(createdAt: self.parentCreatedAt) as? CRDTArray,
+              let prevCreatedAt = try? array.getPreviousCreatedAt(createdAt: self.createdAt)
+        else {
+            return nil
+        }
+        // executedAt is reassigned just before execution when Document.undo() is called.
+        return MoveOperation(parentCreatedAt: self.parentCreatedAt,
+                             previousCreatedAt: prevCreatedAt,
+                             createdAt: self.createdAt,
+                             executedAt: TimeTicket.initial)
+    }
+
+    private func executeOpInfos(
         root: CRDTRoot,
         versionVector: VersionVector? = nil
     ) throws -> [any OperationInfo] {

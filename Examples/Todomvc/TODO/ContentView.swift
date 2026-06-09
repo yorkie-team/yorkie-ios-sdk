@@ -18,7 +18,9 @@ import SwiftUI
 
 struct ContentView: View {
     enum Status: String, Identifiable {
-        var id: String { rawValue }
+        var id: String {
+            rawValue
+        }
 
         case all = "All"
         case active = "Active"

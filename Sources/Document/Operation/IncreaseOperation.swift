@@ -46,7 +46,15 @@ struct IncreaseOperation: Operation {
     @discardableResult
     func execute(
         root: CRDTRoot,
-        versionVector: VersionVector?
+        versionVector: VersionVector? = nil,
+        source: OpSource = .local
+    ) throws -> ExecutionResult? {
+        try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
+    }
+
+    private func executeOpInfos(
+        root: CRDTRoot,
+        versionVector: VersionVector? = nil
     ) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"

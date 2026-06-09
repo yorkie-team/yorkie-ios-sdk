@@ -493,7 +493,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ value: T?,
         _ versionVector: VersionVector? = nil
-    ) throws -> (RGATreeSplitPos, [GCPair], DataSize, [ContentChange<T>]) {
+    ) throws -> (RGATreeSplitPos, [GCPair], DataSize, [ContentChange<T>], [T]) {
         var diff = DataSize(data: 0, meta: 0)
 
         // 01. split nodes with from and to
@@ -534,11 +534,60 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         // 04. add removed node
         var pairs = [GCPair]()
-        for (_, removedNode) in removedNodes {
+        var removedValues = [T]()
+        for removedNode in removedNodes {
             pairs.append(GCPair(parent: self, child: removedNode))
+            removedValues.append(removedNode.value)
         }
 
-        return (caretPos, pairs, diff, changes)
+        return (caretPos, pairs, diff, changes, removedValues)
+    }
+
+    /**
+     * `normalizePos` converts a local position `(id, rel)` into a single absolute offset
+     * measured from the head `(0:0)` of the physical chain.
+     */
+    func normalizePos(_ pos: RGATreeSplitPos) throws -> RGATreeSplitPos {
+        guard let node = self.findFloorNode(pos.id) else {
+            throw YorkieError(code: .errInvalidArgument, message: "the node of the given id should be found: \(pos.id.toTestString)")
+        }
+
+        var total = Int(pos.relativeOffset)
+        var curr = node
+        var prev = node.prev
+        while let prevNode = prev {
+            total += prevNode.length
+            curr = prevNode
+            prev = prevNode.prev
+        }
+
+        return RGATreeSplitPos(curr.id, Int32(total))
+    }
+
+    /**
+     * `refinePos` remaps the given pos to the current split chain.
+     *
+     * It traverses the physical `next` chain counting only live characters (removed nodes are
+     * treated as length 0). When the offset exceeds the current node, it advances, subtracting
+     * lengths, until the offset fits; if it runs out of nodes it snaps to the end of the last node.
+     */
+    func refinePos(_ pos: RGATreeSplitPos) throws -> RGATreeSplitPos {
+        guard var node = self.findFloorNode(pos.id) else {
+            throw YorkieError(code: .errInvalidArgument, message: "the node of the given id should be found: \(pos.id.toTestString)")
+        }
+
+        var offsetInPart = Int(pos.relativeOffset)
+        var partLen = node.contentLength
+        while offsetInPart > partLen {
+            offsetInPart -= partLen
+            guard let next = node.next else {
+                return RGATreeSplitPos(node.id, Int32(partLen))
+            }
+            node = next
+            partLen = node.length
+        }
+
+        return RGATreeSplitPos(node.id, Int32(offsetInPart))
     }
 
     /**
@@ -775,10 +824,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ vector: VersionVector? = nil
     ) throws -> ([ContentChange<T>],
-                 [String: RGATreeSplitNode<T>])
+                 [RGATreeSplitNode<T>])
     {
         guard !candidates.isEmpty else {
-            return ([], [:])
+            return ([], [])
         }
         let isLocal = vector == nil
         // 01. Collect nodes to remove and keep.
@@ -802,11 +851,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // 02. Create value changes with previous indexes before deletion.
         let changes = try makeChanges(nodesToKeep, editedAt)
 
-        // 03. Mark tombstones for removal.
-        var removedNodes: [String: RGATreeSplitNode<T>] = [:]
+        // 03. Mark tombstones for removal. Keep `nodesToRemove` (document) order so callers can
+        // reconstruct the removed content left-to-right (Swift Dictionary is unordered).
+        var removedNodes: [RGATreeSplitNode<T>] = []
         for node in nodesToRemove {
-            removedNodes[node.id.toIDString] = node
             node.remove(editedAt)
+            removedNodes.append(node)
         }
 
         // 04. Clear the index tree of the given deletion boundaries.

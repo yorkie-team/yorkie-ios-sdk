@@ -268,6 +268,22 @@ public struct TreeStyleOpInfo: OperationInfo {
 }
 
 /**
+ * `ExecutionResult` represents the result of operation execution.
+ */
+struct ExecutionResult {
+    /// The operation infos describing what was executed.
+    let opInfos: [any OperationInfo]
+    // TODO(undo/redo): becomes non-optional once every operation implements its reverse.
+    /// The reverse operation used for undo/redo.
+    let reverseOp: Operation?
+
+    init(opInfos: [any OperationInfo], reverseOp: Operation? = nil) {
+        self.opInfos = opInfos
+        self.reverseOp = reverseOp
+    }
+}
+
+/**
  * `Operation` represents an operation to be executed on a document.
  *  Types confiming ``Operation`` must be struct to avoid data racing.
  */
@@ -289,11 +305,15 @@ protocol Operation {
 
     /**
      * `execute` executes this operation on the given document(`root`).
+     *
+     * Returns `nil` when the operation cannot be executed during undo/redo
+     * (e.g. the target element was already removed).
      */
     func execute(
         root: CRDTRoot,
-        versionVector: VersionVector?
-    ) throws -> [any OperationInfo]
+        versionVector: VersionVector?,
+        source: OpSource
+    ) throws -> ExecutionResult?
 }
 
 extension Operation {

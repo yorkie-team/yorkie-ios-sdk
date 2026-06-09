@@ -26,8 +26,7 @@ extension UIFont {
         guard let boldItalicDescriptor = fontDescriptor.withSymbolicTraits(combinedTraits) else {
             fatalError()
         }
-        let boldItalicFont = UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
-        return boldItalicFont
+        return UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
     }
 
     func removeBold() -> UIFont {
@@ -39,8 +38,7 @@ extension UIFont {
         guard let boldItalicDescriptor = fontDescriptor.withSymbolicTraits(combinedTraits) else {
             fatalError()
         }
-        let boldItalicFont = UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
-        return boldItalicFont
+        return UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
     }
 
     func addItalic() -> UIFont {
@@ -52,8 +50,7 @@ extension UIFont {
         guard let boldItalicDescriptor = fontDescriptor.withSymbolicTraits(combinedTraits) else {
             fatalError()
         }
-        let boldItalicFont = UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
-        return boldItalicFont
+        return UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
     }
 
     func removeItalic() -> UIFont {
@@ -65,8 +62,7 @@ extension UIFont {
         guard let boldItalicDescriptor = fontDescriptor.withSymbolicTraits(combinedTraits) else {
             fatalError()
         }
-        let boldItalicFont = UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
-        return boldItalicFont
+        return UIFont(descriptor: boldItalicDescriptor, size: font.pointSize)
     }
 }
 

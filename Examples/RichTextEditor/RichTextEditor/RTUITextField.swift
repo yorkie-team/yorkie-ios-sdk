@@ -218,7 +218,7 @@ struct RTUITextField: UIViewRepresentable {
             // This method is kept for future enhancements if needed
         }
 
-        // iOS 18 and earlier
+        /// iOS 18 and earlier
         func textView(
             _ textView: UITextView,
             shouldChangeTextIn range: NSRange,
@@ -234,7 +234,7 @@ struct RTUITextField: UIViewRepresentable {
             return false
         }
 
-        // iOS 26.0+ and later
+        /// iOS 26.0+ and later
         func textView(
             _ textView: UITextView,
             shouldChangeTextInRanges ranges: [NSValue],

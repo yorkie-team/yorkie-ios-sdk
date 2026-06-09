@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.6.41] - 2026-06-04
+
+- Implement YSON module with parser and types in https://github.com/yorkie-team/yorkie-ios-sdk/pull/244
+- Add GetRevision for retrieving specific revisions in https://github.com/yorkie-team/yorkie-ios-sdk/pull/244
+- Implement reverse EditOperation for Text (undo/redo) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/244
+
 ## [v0.6.40] - 2026-06-02
 
 - Implement revision management in https://github.com/yorkie-team/yorkie-ios-sdk/pull/243

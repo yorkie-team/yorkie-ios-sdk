@@ -161,6 +161,17 @@ struct ContentView: View {
                     self.dismiss.callAsFunction()
                 }
             }
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button(action: { self.viewModel.undo() }) {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .disabled(!self.viewModel.canUndo)
+
+                Button(action: { self.viewModel.redo() }) {
+                    Image(systemName: "arrow.uturn.forward")
+                }
+                .disabled(!self.viewModel.canRedo)
+            }
         })
         .navigationTitle("Rich Text Editor")
         .navigationBarTitleDisplayMode(.inline)
@@ -202,7 +213,7 @@ struct ContentView: View {
     }
 }
 
-// Wrapper for UITextView to use in SwiftUI
+/// Wrapper for UITextView to use in SwiftUI
 struct RichTextEditorView: UIViewRepresentable {
     func makeUIView(context: Context) -> UITextView {
         let textView = UITextView()

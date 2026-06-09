@@ -23,7 +23,14 @@ struct RemoveOperation: Operation {
     let parentCreatedAt: TimeTicket
     var executedAt: TimeTicket
     /// The creation time of the target element.
-    let createdAt: TimeTicket
+    private(set) var createdAt: TimeTicket
+
+    /**
+     * `setCreatedAt` sets the creation time of the target element.
+     */
+    mutating func setCreatedAt(_ createdAt: TimeTicket) {
+        self.createdAt = createdAt
+    }
 
     init(parentCreatedAt: TimeTicket, createdAt: TimeTicket, executedAt: TimeTicket) {
         self.parentCreatedAt = parentCreatedAt
@@ -36,6 +43,62 @@ struct RemoveOperation: Operation {
      */
     @discardableResult
     func execute(
+        root: CRDTRoot,
+        versionVector: VersionVector? = nil,
+        source: OpSource = .local
+    ) throws -> ExecutionResult? {
+        // NOTE: handle cases where the operation cannot be executed during undo/redo
+        // (e.g. the target element or one of its ancestors was already removed).
+        if source == .undoRedo, self.isAncestorRemoved(root) {
+            return nil
+        }
+        // Compute the reverse before deleting, capturing the current element/value.
+        let reverseOp = self.toReverseOperation(root)
+        let opInfos = try self.executeOpInfos(root: root, versionVector: versionVector)
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
+    /// Returns whether the target element or any of its ancestors was already removed.
+    private func isAncestorRemoved(_ root: CRDTRoot) -> Bool {
+        var currentCreatedAt: TimeTicket? = self.createdAt
+        while let createdAt = currentCreatedAt, let pair = root.findElementPairByCreatedAt(createdAt) {
+            if pair.element.isRemoved {
+                return true
+            }
+            currentCreatedAt = pair.parent?.createdAt
+        }
+        return false
+    }
+
+    /// Returns the reverse operation (restoring the removed element) for undo/redo.
+    private func toReverseOperation(_ root: CRDTRoot) -> Operation? {
+        let parent = root.find(createdAt: self.parentCreatedAt)
+        if let array = parent as? CRDTArray {
+            guard let value = try? array.get(createdAt: self.createdAt),
+                  let prevCreatedAt = try? array.getPreviousCreatedAt(createdAt: self.createdAt)
+            else {
+                return nil
+            }
+            // executedAt is reassigned just before execution when Document.undo() is called.
+            return AddOperation(parentCreatedAt: self.parentCreatedAt,
+                                previousCreatedAt: prevCreatedAt,
+                                value: value.deepcopy(),
+                                executedAt: TimeTicket.initial)
+        }
+        if let object = parent as? CRDTObject {
+            guard let key = try? object.subPath(createdAt: self.createdAt),
+                  let value = object.get(key: key)
+            else {
+                return nil
+            }
+            return SetOperation(key: key, value: value.deepcopy(),
+                                parentCreatedAt: self.parentCreatedAt,
+                                executedAt: TimeTicket.initial)
+        }
+        return nil
+    }
+
+    private func executeOpInfos(
         root: CRDTRoot,
         versionVector: VersionVector? = nil
     ) throws -> [any OperationInfo] {

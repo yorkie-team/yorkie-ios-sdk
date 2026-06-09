@@ -55,6 +55,10 @@ class ContentViewModel: ObservableObject {
     @Published var isUnderline: Bool = false
     @Published var isStrikethrough: Bool = false
 
+    /// Whether there is a local change that can be undone / redone.
+    @Published var canUndo: Bool = false
+    @Published var canRedo: Bool = false
+
     var mutableAttributeString: NSMutableAttributedString {
         self.attributeString.mutableCopy() as! NSMutableAttributedString
     }
@@ -69,14 +73,14 @@ class ContentViewModel: ObservableObject {
     private let apiKey = Constant.apiKey
     @Published var peers = [Peer]()
 
-    // Generate unique username for this device
+    /// Generate unique username for this device
     lazy var localUsername: String = {
         let deviceName = UIDevice.current.name
         let identifier = UUID().uuidString.prefix(8)
         return "\(deviceName)-\(identifier)"
     }()
 
-    // Generate a random color for this device
+    /// Generate a random color for this device
     private lazy var localUserColor: String = {
         let colors: [String] = [
             "#a83267", "#2196F3", "#4CAF50", "#FF9800",
@@ -87,12 +91,12 @@ class ContentViewModel: ObservableObject {
 
     var didFinishSync = false
     init() {
-        self.client = Client(
-            "https://yorkie-api-qa.navercorp.com",
-            .init(apiKey: self.apiKey)
-        )
+//        self.client = Client(
+//            "https://yorkie-api-qa.navercorp.com",
+//            .init(apiKey: self.apiKey)
+//        )
         // use for local server
-        // self.client = Client(Constant.serverAddress)
+        self.client = Client(Constant.serverAddress)
 
         self.document = Document(key: self.documentKey)
         Log.log("Document key: \(self.documentKey)", level: .info)
@@ -166,7 +170,11 @@ extension ContentViewModel {
                     text = root.content as? JSONText
                 }
             }
+            // The initial `content` scaffolding is a one-time setup change; drop it from the
+            // undo history so the user can never undo the editor into an invalid (no-content) state.
+            self.document.clearHistory()
             self.syncTextSnapShot()
+            self.refreshUndoRedoState()
 
             await self.watch()
         } catch {
@@ -240,9 +248,47 @@ extension ContentViewModel {
         }
     }
 
+    /// Undoes the last local change and re-renders the editor from the document.
+    func undo() {
+        guard self.document.canUndo else { return }
+        do {
+            try self.document.undo()
+            self.syncTextSnapShot()
+        } catch {
+            Log.log("undo failed: \(error.localizedDescription)", level: .warning)
+        }
+        self.refreshUndoRedoState()
+    }
+
+    /// Redoes the last undone local change and re-renders the editor from the document.
+    func redo() {
+        guard self.document.canRedo else { return }
+        do {
+            try self.document.redo()
+            self.syncTextSnapShot()
+        } catch {
+            Log.log("redo failed: \(error.localizedDescription)", level: .warning)
+        }
+        self.refreshUndoRedoState()
+    }
+
+    /// Syncs the undo/redo button state from the document's history.
+    ///
+    /// Invoked from the document subscription, which can fire while SwiftUI is updating a view
+    /// (e.g. during a text-view change). Publish on the next main-actor turn to avoid the
+    /// "Publishing changes from within view updates is not allowed" runtime warning.
+    func refreshUndoRedoState() {
+        Task { @MainActor in
+            self.canUndo = self.document.canUndo
+            self.canRedo = self.document.canRedo
+        }
+    }
+
     func watch() async {
         self.document.subscribe { [weak self] event, _ in
             Log.log("did receive event \(event.type)", level: .debug)
+            // Keep the undo/redo buttons in sync after any local or remote change.
+            self?.refreshUndoRedoState()
             if let event = event as? RemoteChangeEvent {
                 // adding text from FE and sync to iOS
                 // receive when peer changes text
@@ -279,8 +325,8 @@ extension ContentViewModel {
 }
 
 extension ContentViewModel {
-    // decode event local change with styles only
-    // adding or remove will be handled in local
+    /// decode event local change with styles only
+    /// adding or remove will be handled in local
     func decodeEvent(_ event: LocalChangeEvent) -> [EditStyle] {
         // this is local change and will apply to local only
         // use this function to add attribute to local attribute after publishing to other peers
