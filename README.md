@@ -13,7 +13,7 @@ See [Getting Started with iOS SDK](https://yorkie.dev/docs/getting-started/with-
 
 Example projects can be found in the [examples](https://github.com/yorkie-team/yorkie-ios-sdk/tree/main/Examples) folder.
 
-Read the [full documentation](https://yorkie.dev/docs) for all details.
+Read the [full documentation](https://yorkie.dev/docs/sdks/ios-sdk) for all details.
 
 ## Testing yorkie-ios-sdk with Envoy, Yorkie and MongoDB.
 
