@@ -1630,6 +1630,37 @@ public struct Yorkie_V1_User: Sendable {
   fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
+public struct Yorkie_V1_Member: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var projectID: String = String()
+
+  public var userID: String = String()
+
+  public var username: String = String()
+
+  public var role: String = String()
+
+  public var invitedAt: SwiftProtobuf.Google_Protobuf_Timestamp {
+    get {_invitedAt ?? SwiftProtobuf.Google_Protobuf_Timestamp()}
+    set {_invitedAt = newValue}
+  }
+  /// Returns true if `invitedAt` has been explicitly set.
+  public var hasInvitedAt: Bool {self._invitedAt != nil}
+  /// Clears the value of `invitedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearInvitedAt() {self._invitedAt = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _invitedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+}
+
 public struct Yorkie_V1_Project: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -4831,6 +4862,65 @@ extension Yorkie_V1_User: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if lhs.authProvider != rhs.authProvider {return false}
     if lhs.username != rhs.username {return false}
     if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".Member"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}project_id\0\u{3}user_id\0\u{1}username\0\u{1}role\0\u{3}invited_at\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.projectID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.userID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.username) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.role) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._invitedAt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.projectID.isEmpty {
+      try visitor.visitSingularStringField(value: self.projectID, fieldNumber: 2)
+    }
+    if !self.userID.isEmpty {
+      try visitor.visitSingularStringField(value: self.userID, fieldNumber: 3)
+    }
+    if !self.username.isEmpty {
+      try visitor.visitSingularStringField(value: self.username, fieldNumber: 4)
+    }
+    if !self.role.isEmpty {
+      try visitor.visitSingularStringField(value: self.role, fieldNumber: 5)
+    }
+    try { if let v = self._invitedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_Member, rhs: Yorkie_V1_Member) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.projectID != rhs.projectID {return false}
+    if lhs.userID != rhs.userID {return false}
+    if lhs.username != rhs.username {return false}
+    if lhs.role != rhs.role {return false}
+    if lhs._invitedAt != rhs._invitedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

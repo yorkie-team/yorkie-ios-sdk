@@ -33,9 +33,9 @@ struct RoomsView: View {
             .padding()
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    ForEach(self.viewModel.channels, id: \.id) { channel in
-                        RoomView(channel: channel)
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    ForEach(self.viewModel.categories) { category in
+                        CategorySection(category: category, channels: self.viewModel.channels(in: category))
                     }
                 }
                 .padding()
@@ -51,6 +51,29 @@ struct RoomsView: View {
     }
 }
 
+struct CategorySection: View {
+    let category: ChannelCategory
+    let channels: [ChannelModel]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(self.category.emoji) \(self.category.name)")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+
+                Text(self.category.categoryDescription)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.white.opacity(0.8))
+            }
+
+            ForEach(self.channels) { channel in
+                RoomView(channel: channel)
+            }
+        }
+    }
+}
+
 struct RoomView: View {
     let channel: ChannelModel
 
@@ -58,6 +81,7 @@ struct RoomView: View {
         VStack(alignment: .leading) {
             Text(self.channel.name)
                 .font(.title)
+                .foregroundStyle(.black)
 
             HStack {
                 Text(self.channel.roomDescription)

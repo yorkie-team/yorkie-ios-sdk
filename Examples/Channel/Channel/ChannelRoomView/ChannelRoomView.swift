@@ -115,5 +115,5 @@ struct RoomErrorView: View {
 }
 
 #Preview {
-    ChannelRoomView(channel: ChannelModel(id: "dev", name: "💻 Development", roomDescription: "Tech talk and coding"))
+    ChannelRoomView(channel: ChannelModel(id: "development.1", name: "💻 Development #1", roomDescription: "Tech talk and coding", categoryId: "development"))
 }
