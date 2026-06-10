@@ -2192,7 +2192,7 @@ public struct Yorkie_V1_ChannelSummary: Sendable {
 
   public var key: String = String()
 
-  public var presenceCount: Int32 = 0
+  public var sessionCount: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -5584,7 +5584,7 @@ extension Yorkie_V1_Presence: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension Yorkie_V1_ChannelSummary: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelSummary"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{3}presence_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{3}session_count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5593,7 +5593,7 @@ extension Yorkie_V1_ChannelSummary: SwiftProtobuf.Message, SwiftProtobuf._Messag
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.key) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.presenceCount) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.sessionCount) }()
       default: break
       }
     }
@@ -5603,15 +5603,15 @@ extension Yorkie_V1_ChannelSummary: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if !self.key.isEmpty {
       try visitor.visitSingularStringField(value: self.key, fieldNumber: 1)
     }
-    if self.presenceCount != 0 {
-      try visitor.visitSingularInt32Field(value: self.presenceCount, fieldNumber: 2)
+    if self.sessionCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.sessionCount, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_ChannelSummary, rhs: Yorkie_V1_ChannelSummary) -> Bool {
     if lhs.key != rhs.key {return false}
-    if lhs.presenceCount != rhs.presenceCount {return false}
+    if lhs.sessionCount != rhs.sessionCount {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
