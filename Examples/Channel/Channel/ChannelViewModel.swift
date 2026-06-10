@@ -17,17 +17,48 @@
 import Combine
 import Foundation
 
+struct ChannelCategory: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let emoji: String
+    let categoryDescription: String
+}
+
 struct ChannelModel: Identifiable, Hashable {
     let id: String
     let name: String
     let roomDescription: String
+    let categoryId: String
 }
 
 final class ChannelViewModel: ObservableObject {
-    @Published var channels: [ChannelModel] = [
-        ChannelModel(id: "general", name: "💬 General", roomDescription: "General Discussion"),
-        ChannelModel(id: "dev", name: "💻 Development", roomDescription: "Tech talk and coding"),
-        ChannelModel(id: "random", name: "🎲 Random", roomDescription: "Off-topic chat"),
-        ChannelModel(id: "music", name: "🎵 Music", roomDescription: "Share your favorite tunes")
+    @Published var categories: [ChannelCategory] = ChannelViewModel.defaultCategories
+    @Published var channels: [ChannelModel] = ChannelViewModel.generateRooms()
+
+    /// Returns the rooms that belong to the given category.
+    func channels(in category: ChannelCategory) -> [ChannelModel] {
+        self.channels.filter { $0.categoryId == category.id }
+    }
+
+    private static let defaultCategories: [ChannelCategory] = [
+        ChannelCategory(id: "general", name: "General", emoji: "💬", categoryDescription: "General discussion"),
+        ChannelCategory(id: "development", name: "Development", emoji: "💻", categoryDescription: "Tech talk and coding"),
+        ChannelCategory(id: "random", name: "Random", emoji: "🎲", categoryDescription: "Off-topic chat"),
+        ChannelCategory(id: "music", name: "Music", emoji: "🎵", categoryDescription: "Share your favorite tunes")
     ]
+
+    /// Generates rooms with a hierarchical structure: each category yields a fixed number of rooms.
+    private static func generateRooms() -> [ChannelModel] {
+        let roomsPerCategory = 4
+        return self.defaultCategories.flatMap { category in
+            (1 ... roomsPerCategory).map { index in
+                ChannelModel(
+                    id: "\(category.id).\(index)",
+                    name: "\(category.emoji) \(category.name) #\(index)",
+                    roomDescription: category.categoryDescription,
+                    categoryId: category.id
+                )
+            }
+        }
+    }
 }
