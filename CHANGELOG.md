@@ -9,6 +9,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 ## [v0.6.47] - 2026-06-11
 
 - Refactor channel terminology from presence to session in https://github.com/yorkie-team/yorkie-ios-sdk/pull/249
+- Add backend-disable-webhook-validation to CI in https://github.com/yorkie-team/yorkie-ios-sdk/pull/249
 
 ## [v0.6.44] - 2026-06-11
 

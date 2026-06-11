@@ -17,4 +17,4 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     command: >
-        server --pprof-enabled --rpc-addr 0.0.0.0:8080
+        server --pprof-enabled --rpc-addr 0.0.0.0:8080 --backend-disable-webhook-validation

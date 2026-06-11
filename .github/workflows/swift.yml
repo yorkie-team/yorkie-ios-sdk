@@ -50,7 +50,7 @@ jobs:
         curl -fsSL -o "$TAP_DIR/yorkie.rb" "${{ env.YORKIE_RB_URL }}"
         brew install local/pinned/yorkie
     - name: Start Yorkie server
-      run: yorkie server &
+      run: yorkie server --backend-disable-webhook-validation &
     - name: SwiftLint
       run: |
         swiftlint --version
