@@ -35,8 +35,26 @@ private class StringNode: SplayNode<String> {
     }
 }
 
+private class ElementNode: SplayNode<Int> {
+    var removed: Bool = false
+    override init(_ value: Int) {
+        super.init(value)
+    }
+
+    static func create(_ value: Int) -> ElementNode {
+        return ElementNode(value)
+    }
+
+    override var length: Int {
+        if self.removed {
+            return 0
+        }
+        return 1
+    }
+}
+
 class SplayTreeTests: XCTestCase {
-    func test_can_insert_values_and_splay_them() throws {
+    func test_can_insert_text_values_and_splay_them() throws {
         let tree = SplayTree<String>()
 
         let nodeA = tree.insert(StringNode.create("A2"))
@@ -57,37 +75,70 @@ class SplayTreeTests: XCTestCase {
         XCTAssertEqual(tree.indexOf(nodeC), 5)
         XCTAssertEqual(tree.indexOf(nodeD), 9)
 
-        var result = try tree.find(-1)
+        var result = try tree.findForText(-1)
         XCTAssertNil(result.node)
         XCTAssertEqual(result.offset, 0)
 
-        result = try tree.find(0)
+        result = try tree.findForText(0)
         XCTAssertEqual(result.node?.value, "A2")
         XCTAssertEqual(result.offset, 0)
 
-        result = try tree.find(1)
+        result = try tree.findForText(1)
         XCTAssertEqual(result.node?.value, "A2")
         XCTAssertEqual(result.offset, 1)
 
-        result = try tree.find(2)
+        result = try tree.findForText(2)
         XCTAssertEqual(result.node?.value, "A2")
         XCTAssertEqual(result.offset, 2)
 
-        result = try tree.find(3)
+        result = try tree.findForText(3)
         XCTAssertEqual(result.node?.value, "B23")
         XCTAssertEqual(result.offset, 1)
 
-        result = try tree.find(4)
+        result = try tree.findForText(4)
         XCTAssertEqual(result.node?.value, "B23")
         XCTAssertEqual(result.offset, 2)
 
-        result = try tree.find(5)
+        result = try tree.findForText(5)
         XCTAssertEqual(result.node?.value, "B23")
         XCTAssertEqual(result.offset, 3)
 
-        result = try tree.find(6)
+        result = try tree.findForText(6)
         XCTAssertEqual(result.node?.value, "C234")
         XCTAssertEqual(result.offset, 1)
+    }
+
+    func test_can_insert_delete_array_values_and_splay_them() throws {
+        let tree = SplayTree<Int>()
+
+        var node = try tree.findForArray(0)
+        XCTAssertNil(node)
+
+        let nodeA = tree.insert(ElementNode.create(2))
+        XCTAssertEqual(tree.toTestString, "[1,1]2")
+        let nodeB = ElementNode.create(3)
+        tree.insert(nodeB)
+        XCTAssertEqual(tree.toTestString, "[1,1]2[2,1]3")
+        let nodeC = tree.insert(ElementNode.create(4))
+        XCTAssertEqual(tree.toTestString, "[1,1]2[2,1]3[3,1]4")
+        let nodeD = tree.insert(ElementNode.create(5))
+        XCTAssertEqual(tree.toTestString, "[1,1]2[2,1]3[3,1]4[4,1]5")
+
+        nodeB.removed = true
+        tree.splayNode(nodeB)
+        XCTAssertEqual(tree.toTestString, "[1,1]2[3,0]3[2,1]4[1,1]5")
+        XCTAssertEqual(tree.indexOf(nodeA), 0)
+        XCTAssertEqual(tree.indexOf(nodeC), 1)
+        XCTAssertEqual(tree.indexOf(nodeD), 2)
+
+        node = try tree.findForArray(0)
+        XCTAssertTrue(node === nodeA)
+        node = try tree.findForArray(1)
+        XCTAssertTrue(node === nodeC)
+        node = try tree.findForArray(2)
+        XCTAssertTrue(node === nodeD)
+
+        XCTAssertThrowsError(try tree.findForArray(3))
     }
 
     func test_can_delete_the_given_node() {
@@ -195,7 +246,7 @@ class SplayTreeTests: XCTestCase {
         tree.splayNode(nodeB)
         XCTAssertEqual(tree.toTestString, "[2,2]A2[14,3]B23[9,4]C234[5,5]D2345")
 
-        let (node, _) = try tree.find(6)
+        let (node, _) = try tree.findForText(6)
         XCTAssertEqual(node?.value, "C234")
     }
 

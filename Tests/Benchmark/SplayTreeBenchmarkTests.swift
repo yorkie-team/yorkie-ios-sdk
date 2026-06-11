@@ -49,7 +49,7 @@ final class SplayTreeBenchmarkTests: XCTestCase {
             tree.insert(StringNode("A"))
         }
         for index in 0 ..< 1000 {
-            _ = try tree.find(self.randomValue(zeroUpTo: index))
+            _ = try tree.findForText(self.randomValue(zeroUpTo: index))
         }
     }
 
@@ -60,16 +60,16 @@ final class SplayTreeBenchmarkTests: XCTestCase {
         for _ in 0 ..< size {
             let op = Int.random(in: 0 ..< 3)
             if op == 0 {
-                if let node = try tree.find(Int.random(in: 0 ..< treeSize)).node {
+                if let node = try tree.findForText(Int.random(in: 0 ..< treeSize)).node {
                     tree.insert(previousNode: node, newNode: StringNode("A"))
                 } else {
                     tree.insert(StringNode("A"))
                 }
                 treeSize += 1
             } else if op == 1 {
-                _ = try tree.find(Int.random(in: 0 ..< treeSize))
+                _ = try tree.findForText(Int.random(in: 0 ..< treeSize))
             } else {
-                if let node = try tree.find(Int.random(in: 0 ..< treeSize)).node {
+                if let node = try tree.findForText(Int.random(in: 0 ..< treeSize)).node {
                     tree.delete(node)
                     treeSize -= 1
                 }
@@ -131,11 +131,11 @@ final class SplayTreeBenchmarkTests: XCTestCase {
 
                 switch operation {
                 case 0:
-                    if let value = edit[2] as? String, let node = try? tree.find(position).node {
+                    if let value = edit[2] as? String, let node = try? tree.findForText(position).node {
                         tree.insert(previousNode: node, newNode: StringNode(value))
                     }
                 case 1:
-                    if let nodeToDelete = try? tree.find(position).node {
+                    if let nodeToDelete = try? tree.findForText(position).node {
                         tree.delete(nodeToDelete)
                     }
                 default:

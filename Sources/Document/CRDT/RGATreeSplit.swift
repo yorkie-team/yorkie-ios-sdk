@@ -594,7 +594,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * `findNodePos` finds RGATreeSplitNodePos of given offset.
      */
     func indexToPos(_ idx: Int) throws -> RGATreeSplitPos {
-        let (node, offset) = try self.treeByIndex.find(idx)
+        let (node, offset) = try self.treeByIndex.findForText(idx)
         guard let splitNode = node as? RGATreeSplitNode<T> else {
             throw YorkieError(code: .errInvalidArgument, message: "no element for index \(idx)")
         }
