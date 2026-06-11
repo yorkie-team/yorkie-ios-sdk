@@ -318,31 +318,13 @@ class RGATreeList {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        let (node, offset) = try self.nodeMapByIndex.find(index)
+        let node = try self.nodeMapByIndex.findForArray(index)
         guard let rgaNode = node as? RGATreeListNode else {
             let log = "failed to find the given index: \(index)"
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        guard (index == 0 && rgaNode === self.dummyHead) || offset >= 1 else {
-            return rgaNode
-        }
-
-        var nextRgaNode: RGATreeListNode? = rgaNode
-        repeat {
-            if nextRgaNode == nil {
-                break
-            }
-            nextRgaNode = nextRgaNode?.next
-
-        } while nextRgaNode?.isRemoved == true
-
-        guard let nextRgaNode else {
-            let log = "failed to find the given index: \(index)"
-            throw YorkieError(code: .errUnexpected, message: log)
-        }
-
-        return nextRgaNode
+        return rgaNode
     }
 
     /**

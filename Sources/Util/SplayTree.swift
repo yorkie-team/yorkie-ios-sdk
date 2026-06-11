@@ -138,9 +138,10 @@ class SplayTree<V> {
     }
 
     /**
-     * `find` returns the Node and offset of the given index.
+     * `findForText` returns the Node and offset of the given position (cursor).
+     * Used for Text where cursor placed between characters.
      */
-    func find(_ position: Int) throws -> (node: SplayNode<V>?, offset: Int) {
+    func findForText(_ position: Int) throws -> (node: SplayNode<V>?, offset: Int) {
         guard let root = self.root, position >= 0 else {
             return (nil, 0)
         }
@@ -166,6 +167,38 @@ class SplayTree<V> {
         self.splayNode(node)
 
         return (node, offset)
+    }
+
+    /**
+     * `findForArray` returns the Node of the given position (index).
+     * Used for Array where index points to the element.
+     */
+    func findForArray(_ index: Int) throws -> SplayNode<V>? {
+        guard let root = self.root else {
+            return nil
+        }
+
+        if index < 0 || index >= self.length {
+            let message = "out of index range: idx: \(index), length: \(self.length)"
+            throw YorkieError(code: .errInvalidArgument, message: message)
+        }
+
+        var idx = index
+        var node = root
+        while true {
+            if let left = node.left, idx < node.leftWeight {
+                node = left
+            } else if node.hasRight, node.leftWeight + node.length <= idx {
+                idx -= node.leftWeight + node.length
+                node = node.right!
+            } else {
+                break
+            }
+        }
+
+        self.splayNode(node)
+
+        return node
     }
 
     /**
