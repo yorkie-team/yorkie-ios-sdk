@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.6.47] - 2026-06-11
+
+- Refactor channel terminology from presence to session in https://github.com/yorkie-team/yorkie-ios-sdk/pull/249
+
 ## [v0.6.44] - 2026-06-11
 
 - Fix SplayTree Find semantics for CRDT Array in https://github.com/yorkie-team/yorkie-ios-sdk/pull/248

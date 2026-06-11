@@ -719,7 +719,7 @@ public class Client {
             channel.setStatus(.attached)
 
             // Initialize count from server
-            _ = channel.updateSessionCount(Int(message.count), 0)
+            _ = channel.updateSessionCount(Int(message.sessionCount), 0)
 
             self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel,
                                                                        resourceID: message.sessionID)
@@ -825,7 +825,7 @@ public class Client {
             throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh channel error")
         }
 
-        _ = channel.updateSessionCount(Int(message.count), 0)
+        _ = channel.updateSessionCount(Int(message.sessionCount), 0)
         attachment.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
@@ -1220,14 +1220,14 @@ public class Client {
 
         switch response.body {
         case .initialized(let initialized):
-            if channel.updateSessionCount(Int(initialized.count), initialized.seq) {
-                channel.publish(ChannelPresenceEvent(type: .initialized, count: Int(initialized.count)))
+            if channel.updateSessionCount(Int(initialized.sessionCount), initialized.seq) {
+                channel.publish(ChannelPresenceEvent(type: .initialized, count: Int(initialized.sessionCount)))
             }
         case .event(let event):
             switch event.type {
             case .presence:
-                if channel.updateSessionCount(Int(event.count), event.seq) {
-                    channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: Int(event.count)))
+                if channel.updateSessionCount(Int(event.sessionCount), event.seq) {
+                    channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: Int(event.sessionCount)))
                 }
             case .broadcast:
                 let payload = Payload(jsonData: event.payload)
