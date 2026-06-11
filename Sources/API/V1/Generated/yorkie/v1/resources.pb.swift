@@ -2333,7 +2333,7 @@ public struct Yorkie_V1_ChannelEvent: Sendable {
 
   public var publisher: String = String()
 
-  public var count: Int64 = 0
+  public var sessionCount: Int64 = 0
 
   public var seq: Int64 = 0
 
@@ -5907,7 +5907,7 @@ extension Yorkie_V1_DocEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension Yorkie_V1_ChannelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChannelEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}publisher\0\u{1}count\0\u{1}seq\0\u{1}topic\0\u{1}payload\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}publisher\0\u{3}session_count\0\u{1}seq\0\u{1}topic\0\u{1}payload\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5917,7 +5917,7 @@ extension Yorkie_V1_ChannelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.publisher) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.count) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.sessionCount) }()
       case 4: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.topic) }()
       case 6: try { try decoder.decodeSingularBytesField(value: &self.payload) }()
@@ -5933,8 +5933,8 @@ extension Yorkie_V1_ChannelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.publisher.isEmpty {
       try visitor.visitSingularStringField(value: self.publisher, fieldNumber: 2)
     }
-    if self.count != 0 {
-      try visitor.visitSingularInt64Field(value: self.count, fieldNumber: 3)
+    if self.sessionCount != 0 {
+      try visitor.visitSingularInt64Field(value: self.sessionCount, fieldNumber: 3)
     }
     if self.seq != 0 {
       try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 4)
@@ -5951,7 +5951,7 @@ extension Yorkie_V1_ChannelEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   public static func ==(lhs: Yorkie_V1_ChannelEvent, rhs: Yorkie_V1_ChannelEvent) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs.publisher != rhs.publisher {return false}
-    if lhs.count != rhs.count {return false}
+    if lhs.sessionCount != rhs.sessionCount {return false}
     if lhs.seq != rhs.seq {return false}
     if lhs.topic != rhs.topic {return false}
     if lhs.payload != rhs.payload {return false}

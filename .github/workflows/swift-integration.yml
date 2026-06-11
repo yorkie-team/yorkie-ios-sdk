@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      # yorkie server v0.6.44
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/fc1e731facb3a75bba1eb2e067720bc3881ac75a/Formula/y/yorkie.rb"
+      # yorkie server v0.6.47
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/d939ddb8621021b008aff8e7c3ed91308e19a325/Formula/y/yorkie.rb"
         
     steps:
     - uses: maxim-lobanov/setup-xcode@v1
@@ -33,6 +33,6 @@ jobs:
         curl -fsSL -o "$TAP_DIR/yorkie.rb" "${{ env.YORKIE_RB_URL }}"
         brew install local/pinned/yorkie
     - name: Run yorkie server
-      run: yorkie server & 
+      run: yorkie server --backend-disable-webhook-validation &
     - name: Run tests
       run: swift test --enable-code-coverage -v --filter YorkieIntegrationTests
