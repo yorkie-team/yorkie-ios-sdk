@@ -284,15 +284,15 @@ public typealias ErrorFn = (Error) -> Void
 public struct AuthErrorValue: Equatable {
     public enum Method: CustomStringConvertible {
         case pushPull
-        case watchDocuments
+        case watch
         case other(String)
 
         public var description: String {
             switch self {
             case .pushPull:
                 return "PushPull"
-            case .watchDocuments:
-                return "WatchDocument"
+            case .watch:
+                return "Watch"
             case .other(let name):
                 return name
             }

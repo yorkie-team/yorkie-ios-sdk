@@ -40,7 +40,7 @@ final class WebhookIntegrationTests: XCTestCase {
         "DetachDocument",
         "RemoveDocument",
         "PushPull",
-        "WatchDocument",
+        "Watch",
         "Broadcast"
     ]
 
@@ -447,7 +447,7 @@ final class WebhookIntegrationTests: XCTestCase {
     /// JS: `should refresh token and retry watch document`
     @MainActor
     func test_should_refresh_token_and_retry_watch_document() async throws {
-        let localApiKey = try await createIsolatedProject(webhookMethods: ["WatchDocument"])
+        let localApiKey = try await createIsolatedProject(webhookMethods: ["Watch"])
 
         let tokenExpirationMs: Double = 500
         let counter = AuthCallCounter()
@@ -480,7 +480,7 @@ final class WebhookIntegrationTests: XCTestCase {
             authErrorCollector.add(event: authEvent.value)
         }
 
-        // second client with a long-lived token to verify watchDocument really works
+        // second client with a long-lived token to verify watch really works
         let c2 = Client(Self.rpcAddress, ClientOptions(
             apiKey: localApiKey,
             authTokenInjector: InjectorImpl(counter: counter, tokenExpirationMs: 1000 * 60 * 60, isPrimary: false)
@@ -500,7 +500,7 @@ final class WebhookIntegrationTests: XCTestCase {
 
         try await self.collectorWait(
             authErrorCollector,
-            until: AuthErrorValue(reason: Self.expiredTokenErrorMessage, method: .watchDocuments),
+            until: AuthErrorValue(reason: Self.expiredTokenErrorMessage, method: .watch),
             timeoutMs: Self.defaultWaitTimeoutMs
         )
         let callsCount = await counter.calls.count

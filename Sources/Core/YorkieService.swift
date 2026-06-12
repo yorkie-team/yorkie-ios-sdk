@@ -114,8 +114,8 @@ public final class YorkieService {
         return await self.rpcClient.pushPullChanges(request: request, headers: headers)
     }
 
-    public func watchDocument(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchDocumentResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchDocumentRequest> {
-        return self.rpcClient.watchDocument(headers: headers, onResult: onResult)
+    public func watch(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchRequest> {
+        return self.rpcClient.watch(headers: headers, onResult: onResult)
     }
 
     @available(iOS 15, *)
@@ -148,10 +148,6 @@ public final class YorkieService {
             return .init(result: .failure(error))
         }
         return await self.rpcClient.refreshChannel(request: request, headers: headers)
-    }
-
-    public func watchChannel(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchChannelResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchChannelRequest> {
-        return self.rpcClient.watchChannel(headers: headers, onResult: onResult)
     }
 }
 

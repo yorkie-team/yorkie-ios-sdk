@@ -190,12 +190,58 @@ public struct Yorkie_V1_DetachDocumentResponse: Sendable {
   fileprivate var _changePack: Yorkie_V1_ChangePack? = nil
 }
 
-public struct Yorkie_V1_WatchDocumentRequest: Sendable {
+public struct Yorkie_V1_WatchRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var clientID: String = String()
+
+  public var resources: [Yorkie_V1_ResourceDescriptor] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_ResourceDescriptor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var resource: Yorkie_V1_ResourceDescriptor.OneOf_Resource? = nil
+
+  public var document: Yorkie_V1_DocumentDescriptor {
+    get {
+      if case .document(let v)? = resource {return v}
+      return Yorkie_V1_DocumentDescriptor()
+    }
+    set {resource = .document(newValue)}
+  }
+
+  public var channel: Yorkie_V1_ChannelDescriptor {
+    get {
+      if case .channel(let v)? = resource {return v}
+      return Yorkie_V1_ChannelDescriptor()
+    }
+    set {resource = .channel(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Resource: Equatable, Sendable {
+    case document(Yorkie_V1_DocumentDescriptor)
+    case channel(Yorkie_V1_ChannelDescriptor)
+
+  }
+
+  public init() {}
+}
+
+public struct Yorkie_V1_DocumentDescriptor: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
 
   public var documentID: String = String()
 
@@ -204,25 +250,37 @@ public struct Yorkie_V1_WatchDocumentRequest: Sendable {
   public init() {}
 }
 
-public struct Yorkie_V1_WatchDocumentResponse: Sendable {
+public struct Yorkie_V1_ChannelDescriptor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var body: Yorkie_V1_WatchDocumentResponse.OneOf_Body? = nil
+  public var channelKey: String = String()
 
-  public var initialization: Yorkie_V1_WatchDocumentResponse.Initialization {
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_WatchResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var body: Yorkie_V1_WatchResponse.OneOf_Body? = nil
+
+  public var initialization: Yorkie_V1_WatchInitialization {
     get {
       if case .initialization(let v)? = body {return v}
-      return Yorkie_V1_WatchDocumentResponse.Initialization()
+      return Yorkie_V1_WatchInitialization()
     }
     set {body = .initialization(newValue)}
   }
 
-  public var event: Yorkie_V1_DocEvent {
+  public var event: Yorkie_V1_WatchEvent {
     get {
       if case .event(let v)? = body {return v}
-      return Yorkie_V1_DocEvent()
+      return Yorkie_V1_WatchEvent()
     }
     set {body = .event(newValue)}
   }
@@ -230,24 +288,168 @@ public struct Yorkie_V1_WatchDocumentResponse: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum OneOf_Body: Equatable, Sendable {
-    case initialization(Yorkie_V1_WatchDocumentResponse.Initialization)
-    case event(Yorkie_V1_DocEvent)
+    case initialization(Yorkie_V1_WatchInitialization)
+    case event(Yorkie_V1_WatchEvent)
 
-  }
-
-  public struct Initialization: Sendable {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    public var clientIds: [String] = []
-
-    public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    public init() {}
   }
 
   public init() {}
+}
+
+public struct Yorkie_V1_WatchInitialization: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var resourceInits: [Yorkie_V1_ResourceInit] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_ResourceInit: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var init_p: Yorkie_V1_ResourceInit.OneOf_Init? = nil
+
+  public var documentInit: Yorkie_V1_DocumentInit {
+    get {
+      if case .documentInit(let v)? = init_p {return v}
+      return Yorkie_V1_DocumentInit()
+    }
+    set {init_p = .documentInit(newValue)}
+  }
+
+  public var channelInit: Yorkie_V1_ChannelInit {
+    get {
+      if case .channelInit(let v)? = init_p {return v}
+      return Yorkie_V1_ChannelInit()
+    }
+    set {init_p = .channelInit(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Init: Equatable, Sendable {
+    case documentInit(Yorkie_V1_DocumentInit)
+    case channelInit(Yorkie_V1_ChannelInit)
+
+  }
+
+  public init() {}
+}
+
+public struct Yorkie_V1_DocumentInit: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var documentID: String = String()
+
+  public var clientIds: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_ChannelInit: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channelKey: String = String()
+
+  public var sessionCount: Int64 = 0
+
+  public var seq: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_WatchEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var event: Yorkie_V1_WatchEvent.OneOf_Event? = nil
+
+  public var docEvent: Yorkie_V1_DocWatchEvent {
+    get {
+      if case .docEvent(let v)? = event {return v}
+      return Yorkie_V1_DocWatchEvent()
+    }
+    set {event = .docEvent(newValue)}
+  }
+
+  public var channelEvent: Yorkie_V1_ChannelWatchEvent {
+    get {
+      if case .channelEvent(let v)? = event {return v}
+      return Yorkie_V1_ChannelWatchEvent()
+    }
+    set {event = .channelEvent(newValue)}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Event: Equatable, Sendable {
+    case docEvent(Yorkie_V1_DocWatchEvent)
+    case channelEvent(Yorkie_V1_ChannelWatchEvent)
+
+  }
+
+  public init() {}
+}
+
+public struct Yorkie_V1_DocWatchEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var documentID: String = String()
+
+  public var event: Yorkie_V1_DocEvent {
+    get {_event ?? Yorkie_V1_DocEvent()}
+    set {_event = newValue}
+  }
+  /// Returns true if `event` has been explicitly set.
+  public var hasEvent: Bool {self._event != nil}
+  /// Clears the value of `event`. Subsequent reads from it will return its default value.
+  public mutating func clearEvent() {self._event = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _event: Yorkie_V1_DocEvent? = nil
+}
+
+public struct Yorkie_V1_ChannelWatchEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channelKey: String = String()
+
+  public var event: Yorkie_V1_ChannelEvent {
+    get {_event ?? Yorkie_V1_ChannelEvent()}
+    set {_event = newValue}
+  }
+  /// Returns true if `event` has been explicitly set.
+  public var hasEvent: Bool {self._event != nil}
+  /// Clears the value of `event`. Subsequent reads from it will return its default value.
+  public mutating func clearEvent() {self._event = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _event: Yorkie_V1_ChannelEvent? = nil
 }
 
 public struct Yorkie_V1_RemoveDocumentRequest: Sendable {
@@ -556,68 +758,6 @@ public struct Yorkie_V1_RefreshChannelResponse: Sendable {
   // methods supported on all messages.
 
   public var sessionCount: Int64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_WatchChannelRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var clientID: String = String()
-
-  public var channelKey: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public struct Yorkie_V1_WatchChannelResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var body: Yorkie_V1_WatchChannelResponse.OneOf_Body? = nil
-
-  public var initialized: Yorkie_V1_WatchChannelInitialized {
-    get {
-      if case .initialized(let v)? = body {return v}
-      return Yorkie_V1_WatchChannelInitialized()
-    }
-    set {body = .initialized(newValue)}
-  }
-
-  public var event: Yorkie_V1_ChannelEvent {
-    get {
-      if case .event(let v)? = body {return v}
-      return Yorkie_V1_ChannelEvent()
-    }
-    set {body = .event(newValue)}
-  }
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public enum OneOf_Body: Equatable, Sendable {
-    case initialized(Yorkie_V1_WatchChannelInitialized)
-    case event(Yorkie_V1_ChannelEvent)
-
-  }
-
-  public init() {}
-}
-
-public struct Yorkie_V1_WatchChannelInitialized: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var sessionCount: Int64 = 0
-
-  public var seq: Int64 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -951,9 +1091,9 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
   }
 }
 
-extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0")
+extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -962,7 +1102,7 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.resources) }()
       default: break
       }
     }
@@ -972,22 +1112,149 @@ extension Yorkie_V1_WatchDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
-    if !self.documentID.isEmpty {
-      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 2)
+    if !self.resources.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.resources, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_WatchDocumentRequest, rhs: Yorkie_V1_WatchDocumentRequest) -> Bool {
+  public static func ==(lhs: Yorkie_V1_WatchRequest, rhs: Yorkie_V1_WatchRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.resources != rhs.resources {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_ResourceDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ResourceDescriptor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}document\0\u{1}channel\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Yorkie_V1_DocumentDescriptor?
+        var hadOneofValue = false
+        if let current = self.resource {
+          hadOneofValue = true
+          if case .document(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.resource = .document(v)
+        }
+      }()
+      case 2: try {
+        var v: Yorkie_V1_ChannelDescriptor?
+        var hadOneofValue = false
+        if let current = self.resource {
+          hadOneofValue = true
+          if case .channel(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.resource = .channel(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.resource {
+    case .document?: try {
+      guard case .document(let v)? = self.resource else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }()
+    case .channel?: try {
+      guard case .channel(let v)? = self.resource else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_ResourceDescriptor, rhs: Yorkie_V1_ResourceDescriptor) -> Bool {
+    if lhs.resource != rhs.resource {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_DocumentDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DocumentDescriptor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_DocumentDescriptor, rhs: Yorkie_V1_DocumentDescriptor) -> Bool {
     if lhs.documentID != rhs.documentID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchDocumentResponse"
+extension Yorkie_V1_ChannelDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelDescriptor"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}channel_key\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_ChannelDescriptor, rhs: Yorkie_V1_ChannelDescriptor) -> Bool {
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_WatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialization\0\u{1}event\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -997,7 +1264,7 @@ extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf.
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try {
-        var v: Yorkie_V1_WatchDocumentResponse.Initialization?
+        var v: Yorkie_V1_WatchInitialization?
         var hadOneofValue = false
         if let current = self.body {
           hadOneofValue = true
@@ -1010,7 +1277,7 @@ extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf.
         }
       }()
       case 2: try {
-        var v: Yorkie_V1_DocEvent?
+        var v: Yorkie_V1_WatchEvent?
         var hadOneofValue = false
         if let current = self.body {
           hadOneofValue = true
@@ -1046,16 +1313,16 @@ extension Yorkie_V1_WatchDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_WatchDocumentResponse, rhs: Yorkie_V1_WatchDocumentResponse) -> Bool {
+  public static func ==(lhs: Yorkie_V1_WatchResponse, rhs: Yorkie_V1_WatchResponse) -> Bool {
     if lhs.body != rhs.body {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = Yorkie_V1_WatchDocumentResponse.protoMessageName + ".Initialization"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_ids\0")
+extension Yorkie_V1_WatchInitialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchInitialization"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_inits\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1063,21 +1330,308 @@ extension Yorkie_V1_WatchDocumentResponse.Initialization: SwiftProtobuf.Message,
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedStringField(value: &self.clientIds) }()
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.resourceInits) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.clientIds.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.clientIds, fieldNumber: 1)
+    if !self.resourceInits.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.resourceInits, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Yorkie_V1_WatchDocumentResponse.Initialization, rhs: Yorkie_V1_WatchDocumentResponse.Initialization) -> Bool {
+  public static func ==(lhs: Yorkie_V1_WatchInitialization, rhs: Yorkie_V1_WatchInitialization) -> Bool {
+    if lhs.resourceInits != rhs.resourceInits {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_ResourceInit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ResourceInit"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_init\0\u{3}channel_init\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Yorkie_V1_DocumentInit?
+        var hadOneofValue = false
+        if let current = self.init_p {
+          hadOneofValue = true
+          if case .documentInit(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.init_p = .documentInit(v)
+        }
+      }()
+      case 2: try {
+        var v: Yorkie_V1_ChannelInit?
+        var hadOneofValue = false
+        if let current = self.init_p {
+          hadOneofValue = true
+          if case .channelInit(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.init_p = .channelInit(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.init_p {
+    case .documentInit?: try {
+      guard case .documentInit(let v)? = self.init_p else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }()
+    case .channelInit?: try {
+      guard case .channelInit(let v)? = self.init_p else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_ResourceInit, rhs: Yorkie_V1_ResourceInit) -> Bool {
+    if lhs.init_p != rhs.init_p {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_DocumentInit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DocumentInit"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{3}client_ids\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeRepeatedStringField(value: &self.clientIds) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 1)
+    }
+    if !self.clientIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.clientIds, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_DocumentInit, rhs: Yorkie_V1_DocumentInit) -> Bool {
+    if lhs.documentID != rhs.documentID {return false}
     if lhs.clientIds != rhs.clientIds {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_ChannelInit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelInit"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}channel_key\0\u{3}session_count\0\u{1}seq\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.sessionCount) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 1)
+    }
+    if self.sessionCount != 0 {
+      try visitor.visitSingularInt64Field(value: self.sessionCount, fieldNumber: 2)
+    }
+    if self.seq != 0 {
+      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_ChannelInit, rhs: Yorkie_V1_ChannelInit) -> Bool {
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs.sessionCount != rhs.sessionCount {return false}
+    if lhs.seq != rhs.seq {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_WatchEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}doc_event\0\u{3}channel_event\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Yorkie_V1_DocWatchEvent?
+        var hadOneofValue = false
+        if let current = self.event {
+          hadOneofValue = true
+          if case .docEvent(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.event = .docEvent(v)
+        }
+      }()
+      case 2: try {
+        var v: Yorkie_V1_ChannelWatchEvent?
+        var hadOneofValue = false
+        if let current = self.event {
+          hadOneofValue = true
+          if case .channelEvent(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.event = .channelEvent(v)
+        }
+      }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.event {
+    case .docEvent?: try {
+      guard case .docEvent(let v)? = self.event else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    }()
+    case .channelEvent?: try {
+      guard case .channelEvent(let v)? = self.event else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_WatchEvent, rhs: Yorkie_V1_WatchEvent) -> Bool {
+    if lhs.event != rhs.event {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_DocWatchEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DocWatchEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{1}event\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._event) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.documentID.isEmpty {
+      try visitor.visitSingularStringField(value: self.documentID, fieldNumber: 1)
+    }
+    try { if let v = self._event {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_DocWatchEvent, rhs: Yorkie_V1_DocWatchEvent) -> Bool {
+    if lhs.documentID != rhs.documentID {return false}
+    if lhs._event != rhs._event {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_ChannelWatchEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ChannelWatchEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}channel_key\0\u{1}event\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._event) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 1)
+    }
+    try { if let v = self._event {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_ChannelWatchEvent, rhs: Yorkie_V1_ChannelWatchEvent) -> Bool {
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs._event != rhs._event {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1741,143 +2295,6 @@ extension Yorkie_V1_RefreshChannelResponse: SwiftProtobuf.Message, SwiftProtobuf
 
   public static func ==(lhs: Yorkie_V1_RefreshChannelResponse, rhs: Yorkie_V1_RefreshChannelResponse) -> Bool {
     if lhs.sessionCount != rhs.sessionCount {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_WatchChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchChannelRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.clientID.isEmpty {
-      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
-    }
-    if !self.channelKey.isEmpty {
-      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Yorkie_V1_WatchChannelRequest, rhs: Yorkie_V1_WatchChannelRequest) -> Bool {
-    if lhs.clientID != rhs.clientID {return false}
-    if lhs.channelKey != rhs.channelKey {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_WatchChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchChannelResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialized\0\u{1}event\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try {
-        var v: Yorkie_V1_WatchChannelInitialized?
-        var hadOneofValue = false
-        if let current = self.body {
-          hadOneofValue = true
-          if case .initialized(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.body = .initialized(v)
-        }
-      }()
-      case 2: try {
-        var v: Yorkie_V1_ChannelEvent?
-        var hadOneofValue = false
-        if let current = self.body {
-          hadOneofValue = true
-          if case .event(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.body = .event(v)
-        }
-      }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    switch self.body {
-    case .initialized?: try {
-      guard case .initialized(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    }()
-    case .event?: try {
-      guard case .event(let v)? = self.body else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    }()
-    case nil: break
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Yorkie_V1_WatchChannelResponse, rhs: Yorkie_V1_WatchChannelResponse) -> Bool {
-    if lhs.body != rhs.body {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension Yorkie_V1_WatchChannelInitialized: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".WatchChannelInitialized"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_count\0\u{1}seq\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt64Field(value: &self.sessionCount) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.seq) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.sessionCount != 0 {
-      try visitor.visitSingularInt64Field(value: self.sessionCount, fieldNumber: 1)
-    }
-    if self.seq != 0 {
-      try visitor.visitSingularInt64Field(value: self.seq, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Yorkie_V1_WatchChannelInitialized, rhs: Yorkie_V1_WatchChannelInitialized) -> Bool {
-    if lhs.sessionCount != rhs.sessionCount {return false}
-    if lhs.seq != rhs.seq {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
