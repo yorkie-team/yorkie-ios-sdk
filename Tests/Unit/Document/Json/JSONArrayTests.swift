@@ -406,4 +406,42 @@ class JSONArrayTests: XCTestCase {
             XCTAssertEqual(defaultCount, wrappedCount)
         }
     }
+
+    /// Verifies that `elements()` traverses every live element without early termination
+    /// for a heterogeneous (mixed-type) array, matching the default iterator's coverage.
+    func test_elements_iterator_traverses_all_heterogeneous_elements() async throws {
+        // given — a mixed-type array (Int32, String, Bool)
+        let doc = Document(key: "elements-iterator-mixed")
+        try await doc.update { root, _ in
+            root.array = [Int32(7), "hello", true]
+        }
+
+        try await doc.update { root, _ in
+            guard let array = root.array as? JSONArray else {
+                XCTFail("array not found")
+                return
+            }
+
+            // when — default iterator yields unwrapped heterogeneous values
+            var unwrapped = [Any]()
+            for element in array {
+                unwrapped.append(element)
+            }
+
+            // when — elements() yields wrapped Primitive objects
+            var wrapped = [Primitive]()
+            for element in array.elements() {
+                if let primitive = element as? Primitive {
+                    wrapped.append(primitive)
+                }
+            }
+
+            // then — both iterators cover all three live elements (no early termination)
+            XCTAssertEqual(unwrapped.count, 3)
+            XCTAssertEqual(wrapped.count, 3)
+            XCTAssertEqual(unwrapped[0] as? Int32, 7)
+            XCTAssertEqual(unwrapped[1] as? String, "hello")
+            XCTAssertEqual(unwrapped[2] as? Bool, true)
+        }
+    }
 }

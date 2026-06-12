@@ -506,6 +506,42 @@ final class DocumentUndoRedoTests: XCTestCase {
         XCTAssertEqual(json, redJSON)
     }
 
+    /// Verifies the combined reverse-op branch: a single `setStyle` that both *overwrites*
+    /// an existing attribute and *adds* a new one. The reverse op must compose both
+    /// `attributes` (restore the previous value) and `attributesToRemove` (drop the newly
+    /// added key), so undo reconstructs the prior state in one operation.
+    func test_undo_mixed_overwrite_and_add_style_op() async throws {
+        // given — text styled with color:red
+        let doc = Document(key: "undo-style-mixed")
+        try await doc.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "Hello")
+        }
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 5, ["color": "red"])
+        }
+        let redJSON = await doc.toSortedJSON()
+        XCTAssertEqual(redJSON, "{\"t\":[{\"attrs\":{\"color\":\"red\"},\"val\":\"Hello\"}]}")
+
+        // when — one op overwrites color (red -> blue) AND adds a new "weight" attribute
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 5, ["color": "blue", "weight": "bold"])
+        }
+        let mixedJSON = "{\"t\":[{\"attrs\":{\"color\":\"blue\",\"weight\":\"bold\"},\"val\":\"Hello\"}]}"
+        var json = await doc.toSortedJSON()
+        XCTAssertEqual(json, mixedJSON)
+
+        // then — undo restores color:red AND removes the newly added "weight" in one reverse op
+        try await doc.undo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, redJSON)
+
+        // redo re-applies both the overwrite and the addition
+        try await doc.redo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, mixedJSON)
+    }
+
     // MARK: - Ancestor-removed undo-skip
 
     func test_undo_skips_safely_when_ancestor_container_is_removed() async throws {
