@@ -777,3 +777,53 @@ public class JSONArrayIterator: IteratorProtocol {
         return ElementConverter.toJSONElement(from: value, context: self.context)
     }
 }
+
+public extension JSONArray {
+    /**
+     * `elements` returns a sequence of wrapped elements including CRDT metadata.
+     */
+    func elements() -> JSONArrayWrappedSequence {
+        JSONArrayWrappedSequence(self.target, self.context)
+    }
+}
+
+public struct JSONArrayWrappedSequence: Sequence {
+    private let target: CRDTArray
+    private let context: ChangeContext
+
+    init(_ target: CRDTArray, _ context: ChangeContext) {
+        self.target = target
+        self.context = context
+    }
+
+    public func makeIterator() -> JSONArrayWrappedIterator {
+        JSONArrayWrappedIterator(self.target, self.context)
+    }
+}
+
+public class JSONArrayWrappedIterator: IteratorProtocol {
+    private var values: [CRDTElement]
+    private var iteratorNext: Int = 0
+    private let context: ChangeContext
+
+    init(_ crdtArray: CRDTArray, _ context: ChangeContext) {
+        self.context = context
+        self.values = []
+        for element in crdtArray {
+            self.values.append(element)
+        }
+    }
+
+    public func next() -> Any? {
+        defer {
+            self.iteratorNext += 1
+        }
+
+        guard self.iteratorNext < self.values.count else {
+            return nil
+        }
+
+        let value = self.values[self.iteratorNext]
+        return ElementConverter.toWrappedElement(from: value, context: self.context)
+    }
+}
