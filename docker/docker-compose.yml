@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   yorkie:
-    image: 'yorkieteam/yorkie:0.6.48'
+    image: 'yorkieteam/yorkie:0.6.49'
     container_name: 'yorkie'
 #    command: ['server', '--enable-pprof']
     restart: always

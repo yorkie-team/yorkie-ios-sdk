@@ -168,7 +168,7 @@ public class JSONText {
         let ticket = context.issueTimeTicket
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
 
-        let (pairs, diff, _) = try text.setStyle(
+        let (pairs, diff, _, _, _) = try text.setStyle(
             range,
             stringAttrs,
             ticket
@@ -176,7 +176,7 @@ public class JSONText {
         self.context?.acc(diff)
 
         context.push(
-            operation: StyleOperation(
+            operation: StyleOperation.create(
                 parentCreatedAt: text.createdAt,
                 fromPos: range.0,
                 toPos: range.1,

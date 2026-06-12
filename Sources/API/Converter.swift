@@ -461,6 +461,7 @@ extension Converter {
             styleOperation.attributes.forEach {
                 pbStyleOperation.attributes[$0.key] = $0.value
             }
+            pbStyleOperation.attributesToRemove = styleOperation.attributesToRemove
             pbStyleOperation.executedAt = toTimeTicket(styleOperation.executedAt)
             pbOperation.style = pbStyleOperation
         } else if let increaseOperation = operation as? IncreaseOperation {
@@ -547,6 +548,7 @@ extension Converter {
                                       fromPos: fromTextNodePos(pbStyleOperation.from),
                                       toPos: fromTextNodePos(pbStyleOperation.to),
                                       attributes: pbStyleOperation.attributes,
+                                      attributesToRemove: pbStyleOperation.attributesToRemove,
                                       executedAt: fromTimeTicket(pbStyleOperation.executedAt))
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {
                 return IncreaseOperation(parentCreatedAt: fromTimeTicket(pbIncreaseOperation.parentCreatedAt),

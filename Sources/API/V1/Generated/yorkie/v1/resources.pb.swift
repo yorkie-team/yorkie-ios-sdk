@@ -721,6 +721,11 @@ public struct Yorkie_V1_Operation: Sendable {
       set {_uniqueStorage()._createdAtMapByActor = newValue}
     }
 
+    public var attributesToRemove: [String] {
+      get {_storage._attributesToRemove}
+      set {_uniqueStorage()._attributesToRemove = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -3343,7 +3348,7 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
 extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".Style"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{1}attributes\0\u{3}executed_at\0\u{3}created_at_map_by_actor\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{1}attributes\0\u{3}executed_at\0\u{3}created_at_map_by_actor\0\u{3}attributes_to_remove\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
@@ -3352,6 +3357,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
     var _attributes: Dictionary<String,String> = [:]
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _createdAtMapByActor: Dictionary<String,Yorkie_V1_TimeTicket> = [:]
+    var _attributesToRemove: [String] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3368,6 +3374,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
       _attributes = source._attributes
       _executedAt = source._executedAt
       _createdAtMapByActor = source._createdAtMapByActor
+      _attributesToRemove = source._attributesToRemove
     }
   }
 
@@ -3392,6 +3399,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
         case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
         case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: &_storage._createdAtMapByActor) }()
+        case 7: try { try decoder.decodeRepeatedStringField(value: &_storage._attributesToRemove) }()
         default: break
         }
       }
@@ -3422,6 +3430,9 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
       if !_storage._createdAtMapByActor.isEmpty {
         try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_TimeTicket>.self, value: _storage._createdAtMapByActor, fieldNumber: 6)
       }
+      if !_storage._attributesToRemove.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._attributesToRemove, fieldNumber: 7)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3437,6 +3448,7 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
         if _storage._attributes != rhs_storage._attributes {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
         if _storage._createdAtMapByActor != rhs_storage._createdAtMapByActor {return false}
+        if _storage._attributesToRemove != rhs_storage._attributesToRemove {return false}
         return true
       }
       if !storagesAreEqual {return false}
