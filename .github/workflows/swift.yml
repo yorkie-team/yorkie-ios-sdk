@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      # yorkie server v0.6.47
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/d939ddb8621021b008aff8e7c3ed91308e19a325/Formula/y/yorkie.rb"
+      # yorkie server v0.6.48
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/89b3cc187b08bf2812999dbb45292835dd0f7e3c/Formula/y/yorkie.rb"
       # swiftlint v0.58.2
       SWIFTLINT_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/ae3894d1d8d343733160e1c57903187228628d9d/Formula/s/swiftlint.rb"
       # swiftformat v0.55.6
@@ -50,7 +50,7 @@ jobs:
         curl -fsSL -o "$TAP_DIR/yorkie.rb" "${{ env.YORKIE_RB_URL }}"
         brew install local/pinned/yorkie
     - name: Start Yorkie server
-      run: yorkie server --backend-disable-webhook-validation &
+      run: yorkie server &
     - name: SwiftLint
       run: |
         swiftlint --version

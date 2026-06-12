@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   yorkie:
-    image: 'yorkieteam/yorkie:0.6.47'
+    image: 'yorkieteam/yorkie:0.6.48'
     container_name: 'yorkie'
 #    command: ['server', '--enable-pprof']
     restart: always
@@ -17,4 +17,4 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     command: >
-        server --pprof-enabled --rpc-addr 0.0.0.0:8080 --backend-disable-webhook-validation
+        server --pprof-enabled --rpc-addr 0.0.0.0:8080
