@@ -35,7 +35,7 @@ class DocumentSizeLimitTest: XCTestCase {
         "DetachDocument",
         "RemoveDocument",
         "PushPull",
-        "WatchDocument",
+        "Watch",
         "Broadcast"
     ]
 

@@ -46,10 +46,10 @@ public protocol Yorkie_V1_YorkieServiceClientInterface: Sendable {
     @available(iOS 13, *)
     func `pushPullChanges`(request: Yorkie_V1_PushPullChangesRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_PushPullChangesResponse>
 
-    func `watchDocument`(headers: Connect.Headers, onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchDocumentResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchDocumentRequest>
+    func `watch`(headers: Connect.Headers, onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchRequest>
 
     @available(iOS 13, *)
-    func `watchDocument`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse>
+    func `watch`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchRequest, Yorkie_V1_WatchResponse>
 
     @discardableResult
     func `createRevision`(request: Yorkie_V1_CreateRevisionRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_CreateRevisionResponse>) -> Void) -> Connect.Cancelable
@@ -92,11 +92,6 @@ public protocol Yorkie_V1_YorkieServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `refreshChannel`(request: Yorkie_V1_RefreshChannelRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_RefreshChannelResponse>
-
-    func `watchChannel`(headers: Connect.Headers, onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchChannelResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchChannelRequest>
-
-    @available(iOS 13, *)
-    func `watchChannel`(headers: Connect.Headers) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchChannelRequest, Yorkie_V1_WatchChannelResponse>
 
     @discardableResult
     func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_BroadcastResponse>) -> Void) -> Connect.Cancelable
@@ -173,13 +168,13 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
         return await self.client.unary(path: "/yorkie.v1.YorkieService/PushPullChanges", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
-    public func `watchDocument`(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchDocumentResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchDocumentRequest> {
-        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchDocument", headers: headers, onResult: onResult)
+    public func `watch`(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchRequest> {
+        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/Watch", headers: headers, onResult: onResult)
     }
 
     @available(iOS 13, *)
-    public func `watchDocument`(headers: Connect.Headers = [:]) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchDocumentRequest, Yorkie_V1_WatchDocumentResponse> {
-        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchDocument", headers: headers)
+    public func `watch`(headers: Connect.Headers = [:]) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchRequest, Yorkie_V1_WatchResponse> {
+        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/Watch", headers: headers)
     }
 
     @discardableResult
@@ -252,15 +247,6 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
         return await self.client.unary(path: "/yorkie.v1.YorkieService/RefreshChannel", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
-    public func `watchChannel`(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchChannelResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchChannelRequest> {
-        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchChannel", headers: headers, onResult: onResult)
-    }
-
-    @available(iOS 13, *)
-    public func `watchChannel`(headers: Connect.Headers = [:]) -> any Connect.ServerOnlyAsyncStreamInterface<Yorkie_V1_WatchChannelRequest, Yorkie_V1_WatchChannelResponse> {
-        return self.client.serverOnlyStream(path: "/yorkie.v1.YorkieService/WatchChannel", headers: headers)
-    }
-
     @discardableResult
     public func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_BroadcastResponse>) -> Void) -> Connect.Cancelable {
         return self.client.unary(path: "/yorkie.v1.YorkieService/Broadcast", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
@@ -279,7 +265,7 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
             public static let detachDocument = Connect.MethodSpec(name: "DetachDocument", service: "yorkie.v1.YorkieService", type: .unary)
             public static let removeDocument = Connect.MethodSpec(name: "RemoveDocument", service: "yorkie.v1.YorkieService", type: .unary)
             public static let pushPullChanges = Connect.MethodSpec(name: "PushPullChanges", service: "yorkie.v1.YorkieService", type: .unary)
-            public static let watchDocument = Connect.MethodSpec(name: "WatchDocument", service: "yorkie.v1.YorkieService", type: .serverStream)
+            public static let watch = Connect.MethodSpec(name: "Watch", service: "yorkie.v1.YorkieService", type: .serverStream)
             public static let createRevision = Connect.MethodSpec(name: "CreateRevision", service: "yorkie.v1.YorkieService", type: .unary)
             public static let getRevision = Connect.MethodSpec(name: "GetRevision", service: "yorkie.v1.YorkieService", type: .unary)
             public static let listRevisions = Connect.MethodSpec(name: "ListRevisions", service: "yorkie.v1.YorkieService", type: .unary)
@@ -287,7 +273,6 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
             public static let attachChannel = Connect.MethodSpec(name: "AttachChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let detachChannel = Connect.MethodSpec(name: "DetachChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let refreshChannel = Connect.MethodSpec(name: "RefreshChannel", service: "yorkie.v1.YorkieService", type: .unary)
-            public static let watchChannel = Connect.MethodSpec(name: "WatchChannel", service: "yorkie.v1.YorkieService", type: .serverStream)
             public static let broadcast = Connect.MethodSpec(name: "Broadcast", service: "yorkie.v1.YorkieService", type: .unary)
         }
     }

@@ -192,8 +192,8 @@ private final class CancelCounter: @unchecked Sendable {
 /// Minimal `ServerOnlyStreamInterface` conformance just so `YorkieServerStream`
 /// can be constructed in tests; only `cancel()` is observed via `CancelCounter`.
 private struct FakeServerStream: ServerOnlyStreamInterface {
-    typealias Input = WatchDocumentRequest
+    typealias Input = WatchRequest
     let counter: CancelCounter
-    func send(_: WatchDocumentRequest) {}
+    func send(_: WatchRequest) {}
     func cancel() { self.counter.increment() }
 }

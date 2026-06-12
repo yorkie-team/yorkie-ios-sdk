@@ -1056,6 +1056,24 @@ public class Document: Attachable {
     }
 
     /**
+     * `prunePresences` removes stored presences for clients that are no longer
+     * online, keeping only the given online clients and the current client.
+     */
+    func prunePresences(keeping onlineClients: Set<ActorID>) {
+        let myActorID = self.actorID
+        for clientID in self.presences.keys where clientID != myActorID && !onlineClients.contains(clientID) {
+            self.presences[clientID] = nil
+        }
+    }
+
+    /**
+     * `removePresence` removes the stored presence of the given client.
+     */
+    func removePresence(_ clientID: ActorID) {
+        self.presences[clientID] = nil
+    }
+
+    /**
      * `hasPresence` returns whether the given clientID has a presence or not.
      */
     public func hasPresence(_ clientID: ActorID) -> Bool {

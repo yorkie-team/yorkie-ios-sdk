@@ -1132,9 +1132,10 @@ public class Client {
             // Fallback on earlier versions
         }
 
-        // Handle Document watch streams
+        // Handle Document watch streams. Uses the unified Watch RPC, sending a
+        // single document ResourceDescriptor and consuming WatchResponse.
         if let docAttachment = attachment as? Attachment<Document> {
-            let stream = self.yorkieService.watchDocument(headers: self.authHeader.makeHeader(key), onResult: { result in
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { result in
                 Task {
                     switch result {
                     case .headers:
@@ -1152,7 +1153,7 @@ public class Client {
 
                         if await self.handleConnectError(error) {
                             Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
-                            await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: docAttachment, method: .watchDocuments)
+                            await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: docAttachment, method: .watch)
                             try await self.onStreamDisconnect(key, with: docAttachment)
                         } else {
                             await self.setCondition(.watchLoop, value: false)
@@ -1162,9 +1163,15 @@ public class Client {
                 }
             })
 
-            let request = WatchDocumentRequest.with {
+            let request = WatchRequest.with {
                 $0.clientID = id
-                $0.documentID = docAttachment.resourceID
+                $0.resources = [
+                    ResourceDescriptor.with {
+                        $0.document = DocumentDescriptor.with {
+                            $0.documentID = docAttachment.resourceID
+                        }
+                    }
+                ]
             }
 
             stream.send(request)
@@ -1174,11 +1181,11 @@ public class Client {
             docAttachment.resource.publishConnectionEvent(.connected)
         }
 
-        // Handle Channel watch streams. Consumes WatchChannelResponse and
-        // dispatches presence-count updates + remote broadcast events to the
-        // Channel's event system.
+        // Handle Channel watch streams. Uses the unified Watch RPC, sending a
+        // single channel ResourceDescriptor and dispatching presence-count
+        // updates + remote broadcast events to the Channel's event system.
         if let channelAttachment = attachment as? Attachment<Channel> {
-            let stream = self.yorkieService.watchChannel(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { result in
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { result in
                 Task {
                     switch result {
                     case .headers:
@@ -1189,12 +1196,12 @@ public class Client {
                         Logger.debug("[WC] c:\"\(self.key)\" unwatches")
                         if await self.handleConnectError(error) {
                             Logger.warning("[WL] c:\"\(self.key)\" channel has Error \(String(describing: error))")
-                            await self.publishChannelAuthErrorIfNeeded(error: error as? ConnectError, channel: channelAttachment.resource, method: "WatchChannel")
+                            await self.publishChannelAuthErrorIfNeeded(error: error as? ConnectError, channel: channelAttachment.resource, method: "Watch")
                             try await self.onStreamDisconnect(key, with: channelAttachment)
                         } else {
                             if let error = error as? ConnectError {
                                 await channelAttachment.resource.publish(
-                                    ChannelSyncErrorEvent(error: error, method: "WatchChannel")
+                                    ChannelSyncErrorEvent(error: error, method: "Watch")
                                 )
                             }
                             await self.setCondition(.watchLoop, value: false)
@@ -1204,57 +1211,20 @@ public class Client {
                 }
             })
 
-            let request = WatchChannelRequest.with {
+            let request = WatchRequest.with {
                 $0.clientID = id
-                $0.channelKey = channelAttachment.resource.getKey()
+                $0.resources = [
+                    ResourceDescriptor.with {
+                        $0.channel = ChannelDescriptor.with {
+                            $0.channelKey = channelAttachment.resource.getKey()
+                        }
+                    }
+                ]
             }
 
             stream.send(request)
             channelAttachment.connectStream(YorkieServerStream(stream))
         }
-    }
-
-    @MainActor
-    private func handleWatchChannelResponse(channelKey: String, response: WatchChannelResponse) {
-        guard let channel = getChannelAttachment(channelKey)?.resource else { return }
-
-        switch response.body {
-        case .initialized(let initialized):
-            if channel.updateSessionCount(Int(initialized.sessionCount), initialized.seq) {
-                channel.publish(ChannelPresenceEvent(type: .initialized, count: Int(initialized.sessionCount)))
-            }
-        case .event(let event):
-            switch event.type {
-            case .presence:
-                if channel.updateSessionCount(Int(event.sessionCount), event.seq) {
-                    channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: Int(event.sessionCount)))
-                }
-            case .broadcast:
-                let payload = Payload(jsonData: event.payload)
-                channel.publish(
-                    ChannelBroadcastEvent(
-                        clientID: event.publisher,
-                        topic: event.topic,
-                        payload: payload,
-                        options: nil
-                    )
-                )
-            case .unspecified, .UNRECOGNIZED:
-                break
-            }
-        case .none:
-            break
-        }
-    }
-
-    private func publishChannelAuthErrorIfNeeded(error: ConnectError?, channel: Channel, method: String) {
-        guard let connectError = error else { return }
-        let rawValue = errorCodeOf(error: connectError)
-        guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
-            return
-        }
-        let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
-        channel.publish(ChannelAuthErrorEvent(reason: reason, method: method))
     }
 
     /**
@@ -1299,7 +1269,7 @@ public class Client {
         }
     }
 
-    private func handleWatchDocumentsResponse(docKey: DocKey, response: WatchDocumentResponse) async {
+    private func handleWatchDocumentsResponse(docKey: DocKey, response: WatchResponse) async {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
         guard let body = response.body else {
@@ -1312,18 +1282,28 @@ public class Client {
 
         switch body {
         case .initialization(let initialization):
-            var onlineClients = Set<ActorID>()
-            let actorID = docAttachment.resource.actorID
-
-            for pbClientID in initialization.clientIds.filter({ $0 != actorID }) {
-                onlineClients.insert(pbClientID)
-            }
-
+            // Signal initialization once per init frame (mirrors JS `isInit`),
+            // independent of the resource inits contained in it.
             self.semaphoresForInitialzation[docKey]?.signal()
 
-            docAttachment.resource.setOnlineClients(onlineClients)
-            docAttachment.resource.publishPresenceEvent(.initialized)
-        case .event(let pbWatchEvent):
+            for resourceInit in initialization.resourceInits {
+                guard case .documentInit(let documentInit) = resourceInit.init_p else { continue }
+
+                var onlineClients = Set<ActorID>()
+                let actorID = docAttachment.resource.actorID
+
+                for pbClientID in documentInit.clientIds.filter({ $0 != actorID }) {
+                    onlineClients.insert(pbClientID)
+                }
+
+                docAttachment.resource.setOnlineClients(onlineClients)
+                // Prune presences for clients no longer online (except self).
+                docAttachment.resource.prunePresences(keeping: onlineClients)
+                docAttachment.resource.publishPresenceEvent(.initialized)
+            }
+        case .event(let watchEvent):
+            guard case .docEvent(let docWatchEvent) = watchEvent.event, docWatchEvent.hasEvent else { return }
+            let pbWatchEvent = docWatchEvent.event
             let publisher = pbWatchEvent.publisher
 
             switch pbWatchEvent.type {
@@ -1348,6 +1328,7 @@ public class Client {
                 let presence = docAttachment.resource.getPresence(publisher)
 
                 docAttachment.resource.removeOnlineClient(publisher)
+                docAttachment.resource.removePresence(publisher)
 
                 if let presence {
                     docAttachment.resource.publishPresenceEvent(.unwatched, publisher, presence)
@@ -1625,5 +1606,57 @@ public extension Client {
 
         let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
         attachment.resource.publishAuthErrorEvent(reason: reason, method: method)
+    }
+}
+
+// MARK: - Channel watch response handling
+
+private extension Client {
+    @MainActor
+    func handleWatchChannelResponse(channelKey: String, response: WatchResponse) {
+        guard let channel = getChannelAttachment(channelKey)?.resource else { return }
+
+        switch response.body {
+        case .initialization(let initialization):
+            for resourceInit in initialization.resourceInits {
+                guard case .channelInit(let channelInit) = resourceInit.init_p else { continue }
+                if channel.updateSessionCount(Int(channelInit.sessionCount), channelInit.seq) {
+                    channel.publish(ChannelPresenceEvent(type: .initialized, count: Int(channelInit.sessionCount)))
+                }
+            }
+        case .event(let watchEvent):
+            guard case .channelEvent(let channelWatchEvent) = watchEvent.event, channelWatchEvent.hasEvent else { return }
+            let event = channelWatchEvent.event
+            switch event.type {
+            case .presence:
+                if channel.updateSessionCount(Int(event.sessionCount), event.seq) {
+                    channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: Int(event.sessionCount)))
+                }
+            case .broadcast:
+                let payload = Payload(jsonData: event.payload)
+                channel.publish(
+                    ChannelBroadcastEvent(
+                        clientID: event.publisher,
+                        topic: event.topic,
+                        payload: payload,
+                        options: nil
+                    )
+                )
+            case .unspecified, .UNRECOGNIZED:
+                break
+            }
+        case .none:
+            break
+        }
+    }
+
+    func publishChannelAuthErrorIfNeeded(error: ConnectError?, channel: Channel, method: String) {
+        guard let connectError = error else { return }
+        let rawValue = errorCodeOf(error: connectError)
+        guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
+            return
+        }
+        let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
+        channel.publish(ChannelAuthErrorEvent(reason: reason, method: method))
     }
 }
