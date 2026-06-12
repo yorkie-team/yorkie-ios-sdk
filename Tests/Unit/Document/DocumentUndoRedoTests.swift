@@ -436,6 +436,112 @@ final class DocumentUndoRedoTests: XCTestCase {
         XCTAssertNotNil(finalContent)
     }
 
+    // MARK: - Text style undo/redo (#1174)
+
+    /// Ports the upstream JS test `should undo/redo style op` from
+    /// `packages/sdk/test/integration/history_text_test.ts` at tag v0.6.49.
+    ///
+    /// Scenario: text starts unstyled; applying bold is undone (removes the attribute)
+    /// and redone (restores it). This exercises the `StyleOperation.execute` reverse-op
+    /// path where a new attribute is added for the first time — undo must remove it.
+    func test_undo_and_redo_style_op() async throws {
+        // given
+        let doc = Document(key: "undo-style-op")
+        try await doc.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "The fox jumped.")
+        }
+
+        let initialJSON = await doc.toSortedJSON()
+        let styledJSON = "{\"t\":[{\"attrs\":{\"bold\":true},\"val\":\"The fox jumped.\"}]}"
+
+        // when — apply bold style to the entire text
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 15, ["bold": true])
+        }
+
+        var json = await doc.toSortedJSON()
+        XCTAssertEqual(json, styledJSON)
+
+        // then — undo removes the attribute that was newly added
+        try await doc.undo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, initialJSON)
+
+        // redo restores the bold style
+        try await doc.redo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, styledJSON)
+    }
+
+    /// Verifies that undoing a style op that *overwrote* an existing attribute
+    /// restores the previous value rather than deleting the attribute altogether.
+    ///
+    /// Scenario: text is styled red; overwriting with blue is undone, restoring red.
+    func test_undo_style_op_restores_previous_attribute_value() async throws {
+        // given — text with an existing "color" attribute set to "red"
+        let doc = Document(key: "undo-style-overwrite")
+        try await doc.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "Hello")
+        }
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 5, ["color": "red"])
+        }
+
+        let redJSON = await doc.toSortedJSON()
+        XCTAssertEqual(redJSON, "{\"t\":[{\"attrs\":{\"color\":\"red\"},\"val\":\"Hello\"}]}")
+
+        // when — overwrite "red" with "blue"
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 5, ["color": "blue"])
+        }
+
+        var json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{\"t\":[{\"attrs\":{\"color\":\"blue\"},\"val\":\"Hello\"}]}")
+
+        // then — undo restores the previous "red" value
+        try await doc.undo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, redJSON)
+    }
+
+    /// Verifies the combined reverse-op branch: a single `setStyle` that both *overwrites*
+    /// an existing attribute and *adds* a new one. The reverse op must compose both
+    /// `attributes` (restore the previous value) and `attributesToRemove` (drop the newly
+    /// added key), so undo reconstructs the prior state in one operation.
+    func test_undo_mixed_overwrite_and_add_style_op() async throws {
+        // given — text styled with color:red
+        let doc = Document(key: "undo-style-mixed")
+        try await doc.update { root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "Hello")
+        }
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 5, ["color": "red"])
+        }
+        let redJSON = await doc.toSortedJSON()
+        XCTAssertEqual(redJSON, "{\"t\":[{\"attrs\":{\"color\":\"red\"},\"val\":\"Hello\"}]}")
+
+        // when — one op overwrites color (red -> blue) AND adds a new "weight" attribute
+        try await doc.update { root, _ in
+            (root.t as? JSONText)?.setStyle(0, 5, ["color": "blue", "weight": "bold"])
+        }
+        let mixedJSON = "{\"t\":[{\"attrs\":{\"color\":\"blue\",\"weight\":\"bold\"},\"val\":\"Hello\"}]}"
+        var json = await doc.toSortedJSON()
+        XCTAssertEqual(json, mixedJSON)
+
+        // then — undo restores color:red AND removes the newly added "weight" in one reverse op
+        try await doc.undo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, redJSON)
+
+        // redo re-applies both the overwrite and the addition
+        try await doc.redo()
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, mixedJSON)
+    }
+
     // MARK: - Ancestor-removed undo-skip
 
     func test_undo_skips_safely_when_ancestor_container_is_removed() async throws {

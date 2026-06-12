@@ -322,4 +322,126 @@ class JSONArrayTests: XCTestCase {
             XCTAssertEqual(root.debugDescription, "{\"array\":[1]}")
         }
     }
+
+    // MARK: - elements() iterator (#1178)
+
+    /// Verifies that the default `for-in` iterator yields unwrapped Swift values for
+    /// primitive elements, while `elements()` yields wrapped `Primitive` objects that
+    /// carry CRDT metadata such as `createdAt`.
+    func test_default_iterator_yields_unwrapped_values_and_elements_yields_wrapped() async throws {
+        // given — an array of three Int32 primitives
+        let doc = Document(key: "elements-iterator")
+        try await doc.update { root, _ in
+            root.array = [Int32(10), Int32(20), Int32(30)]
+        }
+
+        try await doc.update { root, _ in
+            guard let array = root.array as? JSONArray else {
+                XCTFail("array not found")
+                return
+            }
+
+            // when — collect via the default for-in iterator (unwrapped path)
+            var unwrappedValues = [Int32]()
+            for element in array {
+                if let value = element as? Int32 {
+                    unwrappedValues.append(value)
+                }
+            }
+
+            // then — default iterator returns plain Swift Int32 values
+            XCTAssertEqual(unwrappedValues, [10, 20, 30])
+
+            // when — collect via elements() (wrapped path)
+            var wrappedElements = [Primitive]()
+            for element in array.elements() {
+                if let primitive = element as? Primitive {
+                    wrappedElements.append(primitive)
+                }
+            }
+
+            // then — elements() returns Primitive objects carrying CRDT metadata
+            XCTAssertEqual(wrappedElements.count, 3)
+            XCTAssertNotNil(wrappedElements.first?.createdAt)
+
+            // The wrapped values carry the correct underlying data
+            let values = wrappedElements.compactMap { primitive -> Int32? in
+                if case .integer(let intValue) = primitive.value { return intValue }
+                return nil
+            }
+            XCTAssertEqual(values, [10, 20, 30])
+        }
+    }
+
+    /// Verifies that `elements()` and the default for-in iterator both cover the same
+    /// number of live elements, confirming the two iterators share the same underlying
+    /// `CRDTArray` sequence.
+    func test_elements_iterator_count_matches_default_iterator_count() async throws {
+        // given
+        let doc = Document(key: "elements-iterator-count")
+        try await doc.update { root, _ in
+            root.array = [Int32(1), Int32(2), Int32(3), Int32(4), Int32(5)]
+        }
+
+        try await doc.update { root, _ in
+            guard let array = root.array as? JSONArray else {
+                XCTFail("array not found")
+                return
+            }
+
+            // when
+            var defaultCount = 0
+            for _ in array {
+                defaultCount += 1
+            }
+
+            var wrappedCount = 0
+            for _ in array.elements() {
+                wrappedCount += 1
+            }
+
+            // then
+            XCTAssertEqual(defaultCount, 5)
+            XCTAssertEqual(wrappedCount, 5)
+            XCTAssertEqual(defaultCount, wrappedCount)
+        }
+    }
+
+    /// Verifies that `elements()` traverses every live element without early termination
+    /// for a heterogeneous (mixed-type) array, matching the default iterator's coverage.
+    func test_elements_iterator_traverses_all_heterogeneous_elements() async throws {
+        // given — a mixed-type array (Int32, String, Bool)
+        let doc = Document(key: "elements-iterator-mixed")
+        try await doc.update { root, _ in
+            root.array = [Int32(7), "hello", true]
+        }
+
+        try await doc.update { root, _ in
+            guard let array = root.array as? JSONArray else {
+                XCTFail("array not found")
+                return
+            }
+
+            // when — default iterator yields unwrapped heterogeneous values
+            var unwrapped = [Any]()
+            for element in array {
+                unwrapped.append(element)
+            }
+
+            // when — elements() yields wrapped Primitive objects
+            var wrapped = [Primitive]()
+            for element in array.elements() {
+                if let primitive = element as? Primitive {
+                    wrapped.append(primitive)
+                }
+            }
+
+            // then — both iterators cover all three live elements (no early termination)
+            XCTAssertEqual(unwrapped.count, 3)
+            XCTAssertEqual(wrapped.count, 3)
+            XCTAssertEqual(unwrapped[0] as? Int32, 7)
+            XCTAssertEqual(unwrapped[1] as? String, "hello")
+            XCTAssertEqual(unwrapped[2] as? Bool, true)
+        }
+    }
 }
