@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.6.49] - 2026-06-12
+
+- Add undo/redo support for Text.Style operations in https://github.com/yorkie-team/yorkie-ios-sdk/pull/251
+- Return unwrapped primitive values from Array iterator in https://github.com/yorkie-team/yorkie-ios-sdk/pull/251
+
 ## [v0.6.48] - 2026-06-12
 
 - Replace WatchDocument and WatchChannel with unified Watch RPC in https://github.com/yorkie-team/yorkie-ios-sdk/pull/250
