@@ -64,4 +64,62 @@ final class UndoRedoIntegrationTests: XCTestCase {
             XCTAssertEqual(d1JSON, d2JSON)
         }
     }
+
+    /// Ports "should converge with concurrent style operations" from yorkie-js-sdk v0.6.49
+    /// `packages/sdk/test/integration/history_text_test.ts` (Text History - multi client edge cases).
+    ///
+    /// Two clients concurrently apply `setStyle` on overlapping ranges of the same text node,
+    /// then sync. After convergence, both clients undo their style operations and sync again —
+    /// the documents must still converge. Then both clients redo and sync once more.
+    @MainActor
+    func test_can_converge_with_concurrent_style_operations() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            // given — both clients establish a shared text node with initial content
+            try d1.update { root, _ in
+                root.t = JSONText()
+                (root.t as? JSONText)?.edit(0, 0, "The fox jumped.")
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            // when — c1 applies bold over the full text, c2 applies italic from index 4
+            try d1.update { root, _ in
+                (root.t as? JSONText)?.setStyle(0, 15, ["bold": true])
+            }
+
+            try d2.update { root, _ in
+                (root.t as? JSONText)?.setStyle(4, 15, ["italic": true])
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            // then — documents converge after concurrent style operations
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+
+            // when — both clients undo their style operations
+            try d1.undo()
+            try d2.undo()
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            // then — documents converge after concurrent undo
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+
+            // when — both clients redo their style operations
+            try d1.redo()
+            try d2.redo()
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            // then — documents converge after concurrent redo
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+        }
+    }
 }

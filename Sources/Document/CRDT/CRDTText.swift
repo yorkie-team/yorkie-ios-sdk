@@ -289,7 +289,7 @@ final class CRDTText: CRDTElement {
         _ attributes: [String: String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], DataSize, [TextChange]) {
+    ) throws -> ([GCPair], DataSize, [TextChange], [String: String], [String]) {
         var diff = DataSize(data: 0, meta: 0)
         // 01. split nodes with from and to
         let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
@@ -318,10 +318,29 @@ final class CRDTText: CRDTElement {
             }
         }
 
+        // Capture previous attribute values from the first styled node for reverse op.
+        var prevAttributes = [String: String]()
+        var attributesToRemove = [String]()
+        var capturedPrev = false
+
         var pairs = [GCPair]()
         for node in toBeStyleds {
             if node.isRemoved {
                 continue
+            }
+
+            if !capturedPrev {
+                let attrs = node.value.getAttrs()
+                for key in attributes.keys {
+                    if attrs.has(key: key) {
+                        if let value = try? attrs.get(key: key) {
+                            prevAttributes[key] = value
+                        }
+                    } else {
+                        attributesToRemove.append(key)
+                    }
+                }
+                capturedPrev = true
             }
 
             let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
@@ -344,7 +363,93 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        return (pairs, diff, changes)
+        return (pairs, diff, changes, prevAttributes, attributesToRemove)
+    }
+
+    /**
+     * `removeStyle` removes the style attributes of the given range.
+     *
+     * Returns previous attribute values (from the first styled node) for the reverse operation.
+     */
+    @discardableResult
+    func removeStyle(
+        _ range: RGATreeSplitPosRange,
+        _ attributesToRemove: [String],
+        _ editedAt: TimeTicket,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([GCPair], DataSize, [TextChange], [String: String]) {
+        var diff = DataSize(data: 0, meta: 0)
+        // 01. split nodes with from and to
+        let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
+        let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
+
+        diff.addDataSizes(others: diffTo, diffFrom)
+
+        // 02. find nodes to remove style from
+        var changes = [TextChange]()
+        let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
+        var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
+        for node in nodes {
+            let actorID = node.createdAt.actorID
+
+            var clientLamportAtChange: Int64 = .max
+
+            if let versionVector {
+                clientLamportAtChange = versionVector.get(actorID) ?? 0
+            }
+            let canStyle = node.canStyle(
+                editedAt,
+                clientLamportAtChange: clientLamportAtChange
+            )
+            if canStyle {
+                toBeStyleds.append(node)
+            }
+        }
+
+        // Capture previous attribute values from the first styled node for reverse op.
+        var prevAttributes = [String: String]()
+        var capturedPrev = false
+
+        var pairs = [GCPair]()
+        for node in toBeStyleds {
+            if node.isRemoved {
+                continue
+            }
+
+            if !capturedPrev {
+                let attrs = node.value.getAttrs()
+                for key in attributesToRemove where attrs.has(key: key) {
+                    if let value = try? attrs.get(key: key) {
+                        prevAttributes[key] = value
+                    }
+                }
+                capturedPrev = true
+            }
+
+            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
+
+            // `nil` per key signals attribute removal to editors (e.g. Quill).
+            var removedAttributes = [String: String?]()
+            for key in attributesToRemove {
+                removedAttributes.updateValue(nil, forKey: key)
+            }
+            changes.append(TextChange(type: .style,
+                                      actor: editedAt.actorID,
+                                      from: fromIdx,
+                                      to: toIdx,
+                                      content: nil,
+                                      attributes: removedAttributes))
+
+            for key in attributesToRemove {
+                let gcNodes = node.value.getAttrs().remove(key: key, executedAt: editedAt)
+                for rhtNode in gcNodes {
+                    pairs.append(GCPair(parent: node.value, child: rhtNode))
+                    diff.addDataSizes(others: rhtNode.getDataSize())
+                }
+            }
+        }
+
+        return (pairs, diff, changes, prevAttributes)
     }
 
     /**
