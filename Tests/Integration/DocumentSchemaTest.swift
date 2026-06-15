@@ -687,7 +687,12 @@ extension DocumentSchemaTest {
         schemaReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
         schemaReq.setValue("API-Key \(treeSecretKey)", forHTTPHeaderField: "Authorization")
         schemaReq.httpBody = try JSONSerialization.data(withJSONObject: schemaBody)
-        _ = try await URLSession.shared.data(for: schemaReq)
+        let (schemaRespData, schemaResp) = try await URLSession.shared.data(for: schemaReq)
+        let schemaStatus = (schemaResp as? HTTPURLResponse)?.statusCode ?? -1
+        XCTAssertTrue(
+            (200 ... 299).contains(schemaStatus),
+            "CreateSchema failed with status \(schemaStatus): \(String(data: schemaRespData, encoding: .utf8) ?? "")"
+        )
 
         let client = await Client.makeMock(apiKey: treeApiKey)
         try await client.activate()

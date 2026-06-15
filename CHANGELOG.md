@@ -8,7 +8,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ## [v0.7.1] - 2026-06-15
 
-- Add tree-level schema validation and ProseMirror example in https://github.com/yorkie-team/yorkie-ios-sdk/pull/253
+- Add tree-level schema validation in https://github.com/yorkie-team/yorkie-ios-sdk/pull/253
 - Retain peer presence across watch stream reconnections in https://github.com/yorkie-team/yorkie-ios-sdk/pull/253
 
 ## [v0.7.0] - 2026-06-15
