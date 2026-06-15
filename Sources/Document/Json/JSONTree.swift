@@ -732,7 +732,7 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        let (_, pairs, diff) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
+        let (_, pairs, diff, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
             context.issueTimeTicket
         }, nil)
         self.context?.acc(diff)

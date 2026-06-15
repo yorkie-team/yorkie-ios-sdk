@@ -143,6 +143,24 @@ final class History {
         }
     }
 
+    /**
+     * `reconcileTreeEdit` reconciles the range of tree edit operations on both stacks when a tree
+     * edit occurs, so a later undo/redo lands at the correct position.
+     */
+    func reconcileTreeEdit(parentCreatedAt: TimeTicket, rangeFrom: Int, rangeTo: Int, contentSize: Int) {
+        // NOTE: iterating copies of the stacks is intentional and harmless — `TreeEditOperation` is
+        // a class, so `reconcileOperation` mutates the stored instance through its reference.
+        for stack in [self.undoStack, self.redoStack] {
+            for ops in stack {
+                for case .operation(let op) in ops {
+                    if let edit = op as? TreeEditOperation, edit.parentCreatedAt == parentCreatedAt {
+                        edit.reconcileOperation(rangeFrom, rangeTo, contentSize)
+                    }
+                }
+            }
+        }
+    }
+
     private func replaceCreatedAt(in stack: inout [[HistoryOperation]], prevCreatedAt: TimeTicket, currCreatedAt: TimeTicket) {
         for stackIndex in stack.indices {
             for opIndex in stack[stackIndex].indices {

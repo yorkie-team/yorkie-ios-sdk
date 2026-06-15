@@ -825,7 +825,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -979,7 +979,7 @@ class CRDTTree: CRDTElement {
                 }
             }
         }
-        return (changes, pairs, diff)
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx)
     }
 
     /**
