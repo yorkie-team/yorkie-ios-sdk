@@ -177,6 +177,38 @@ final class CRDTTreeEditTests: XCTestCase {
         XCTAssertEqual(treeNode.children![0].children![0].size, 1)
     }
 
+    // Regression: the undo machinery derives the deleted span from `Σ removedNodes.paddedSize`
+    // (TreeEditOperation.execute). `removedNodes` includes nested descendants, but because
+    // `remove()` decrements an element's own `size` as each child is removed, summing every
+    // removed node's post-edit `paddedSize` equals the true visible span without double-counting.
+    func test_removed_nodes_padded_size_equals_deleted_span() throws {
+        //       0   1 2 3    4   5 6 7    8
+        // <root> <p> a b </p> <p> c d </p> </root>
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0,
+                       timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((5, 5),
+                       [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0,
+                       timeT(), timeT)
+        XCTAssertEqual(tree.toXML(), "<root><p>ab</p><p>cd</p></root>")
+
+        // Delete the whole first paragraph <p>ab</p> (visible span = 2 text + 2 element padding = 4),
+        // which removes BOTH the <p> element and its text child.
+        let sizeBefore = tree.size
+        let fromPos = try tree.findPos(0)
+        let toPos = try tree.findPos(4)
+        let (_, _, _, removedNodes, _) = try tree.edit((fromPos, toPos), nil, 0, timeT(), timeT, nil)
+
+        XCTAssertEqual(removedNodes.count, 2, "both the <p> and its text child are removed")
+        let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
+        let trueSpan = sizeBefore - tree.size
+        XCTAssertEqual(trueSpan, 4)
+        XCTAssertEqual(removedSize, trueSpan, "Σ removedNodes.paddedSize must equal the deleted span (no double-count)")
+    }
+
     func test_can_delete_tree_nodes_with_edit() throws {
         // 01. Create a tree with 2 paragraphs.
         //       0   1 2 3    4   5 6 7    8
