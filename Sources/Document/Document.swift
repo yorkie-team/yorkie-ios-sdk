@@ -1064,16 +1064,12 @@ public class Document: Attachable {
         self.onlineClients.remove(clientID)
     }
 
-    /**
-     * `prunePresences` removes stored presences for clients that are no longer
-     * online, keeping only the given online clients and the current client.
-     */
-    func prunePresences(keeping onlineClients: Set<ActorID>) {
-        let myActorID = self.actorID
-        for clientID in self.presences.keys where clientID != myActorID && !onlineClients.contains(clientID) {
-            self.presences[clientID] = nil
-        }
-    }
+    // NOTE: stale presences for clients no longer in the online set are intentionally NOT pruned.
+    // The presences map retains them, but `getPresence`/`getPresences`/`getOthersPresences` already
+    // filter by `onlineClients`, so stale data is never exposed. Keeping them allows correct
+    // recovery when a client's watch stream reconnects: the server sends a `watched` event and,
+    // because the old presence is still in the map, the peer becomes visible again instead of being
+    // silently dropped.
 
     /**
      * `removePresence` removes the stored presence of the given client.
@@ -1140,6 +1136,13 @@ public class Document: Attachable {
      */
     public func getPresenceForTest(_ clientID: ActorID) -> [String: Any]? {
         self.presences[clientID]?.mapValues { $0.toJSONObject }
+    }
+
+    /**
+     * `setPresenceForTest` injects a stored presence for the given client. Test only.
+     */
+    func setPresenceForTest(_ clientID: ActorID, _ presence: StringValueTypeDictionary) {
+        self.presences[clientID] = presence
     }
 
     /**

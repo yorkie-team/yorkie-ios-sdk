@@ -1297,8 +1297,8 @@ public class Client {
                 }
 
                 docAttachment.resource.setOnlineClients(onlineClients)
-                // Prune presences for clients no longer online (except self).
-                docAttachment.resource.prunePresences(keeping: onlineClients)
+                // NOTE: stale presences are intentionally retained (not pruned) so a peer whose
+                // watch stream reconnects becomes visible again — see `Document` presence handling.
                 docAttachment.resource.publishPresenceEvent(.initialized)
             }
         case .event(let watchEvent):
