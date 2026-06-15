@@ -642,4 +642,108 @@ extension DocumentSchemaTest {
 
         try await client.deactivate()
     }
+
+    // should validate tree structure with tree node rules
+    // Mirrors: document_schema_test.ts "should validate tree structure with tree node rules"
+    @MainActor
+    func test_should_validate_tree_structure_with_tree_node_rules() async throws {
+        // given — create a dedicated project and a tree-schema
+        let adminToken = try await YorkieProjectHelper.logIn(
+            rpcAddress: ServerInfo.rpcAddress,
+            username: ServerInfo.testAPIID,
+            password: ServerInfo.testAPIPW
+        )
+
+        let time = "\(Date().timeIntervalSince1970)"
+        let treeProjectName = "tree-schema-\(time)"
+        let (_, treeApiKey, treeSecretKey) = try await YorkieProjectHelper.createProject(
+            rpcAddress: ServerInfo.rpcAddress,
+            token: adminToken,
+            name: treeProjectName
+        )
+
+        let treeSchemaName = "tree-schema-\(time)"
+        let schemaBody: [String: Any] = [
+            "schemaName": treeSchemaName,
+            "schemaVersion": 1,
+            "schemaBody": "type Document = {content: yorkie.Tree;};",
+            "rules": [
+                [
+                    "path": "$.content",
+                    "type": "yorkie.Tree",
+                    "tree_nodes": [
+                        ["node_type": "doc", "content": "block+", "marks": "", "group": ""],
+                        ["node_type": "paragraph", "content": "text*", "marks": "bold italic", "group": "block"],
+                        ["node_type": "heading", "content": "text*", "marks": "bold", "group": "block"],
+                        ["node_type": "text", "content": "", "marks": "", "group": ""]
+                    ]
+                ]
+            ]
+        ]
+
+        let schemaURL = URL(string: "\(ServerInfo.rpcAddress)/yorkie.v1.AdminService/CreateSchema")!
+        var schemaReq = URLRequest(url: schemaURL)
+        schemaReq.httpMethod = "POST"
+        schemaReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        schemaReq.setValue("API-Key \(treeSecretKey)", forHTTPHeaderField: "Authorization")
+        schemaReq.httpBody = try JSONSerialization.data(withJSONObject: schemaBody)
+        _ = try await URLSession.shared.data(for: schemaReq)
+
+        let client = await Client.makeMock(apiKey: treeApiKey)
+        try await client.activate()
+
+        let docKey = "\(#function)-\(time)".toDocKey
+        let doc = Document(key: docKey)
+
+        try await client.attach(doc, [:], .manual, "\(treeSchemaName)@1")
+
+        // when — valid: initialize tree with doc > paragraph > text
+        try await doc.update { root, _ in
+            root["content"] = JSONTree(initialRoot: JSONTreeElementNode(
+                type: "doc",
+                children: [
+                    JSONTreeElementNode(type: "paragraph", children: [
+                        JSONTreeTextNode(value: "Hello")
+                    ])
+                ]
+            ))
+        }
+
+        let docJSON = await doc.toSortedJSON()
+        XCTAssertTrue(docJSON.contains("content"))
+
+        // when — valid: add a heading (block group) at the start
+        try await doc.update { root, _ in
+            let tree = root["content"] as? JSONTree
+            try tree?.edit(0, 0, JSONTreeElementNode(type: "heading", children: [
+                JSONTreeTextNode(value: "Title")
+            ]))
+        }
+
+        // when — invalid: unknown node type "div"
+        do {
+            try await doc.update { root, _ in
+                let tree = root["content"] as? JSONTree
+                try tree?.edit(0, 0, JSONTreeElementNode(type: "div", children: [
+                    JSONTreeTextNode(value: "invalid")
+                ]))
+            }
+            XCTFail("Expected a YorkieError for unknown node type 'div'")
+        } catch let error as YorkieError {
+            XCTAssertFalse(error.message.isEmpty)
+        }
+
+        // when — invalid: text directly under doc (requires block+)
+        do {
+            try await doc.update { root, _ in
+                let tree = root["content"] as? JSONTree
+                try tree?.edit(0, 0, JSONTreeTextNode(value: "text under doc"))
+            }
+            XCTFail("Expected a YorkieError for text directly under doc")
+        } catch let error as YorkieError {
+            XCTAssertFalse(error.message.isEmpty)
+        }
+
+        try await client.deactivate()
+    }
 }
