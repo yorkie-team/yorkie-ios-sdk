@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.1] - 2026-06-15
+
+- Add tree-level schema validation and ProseMirror example in https://github.com/yorkie-team/yorkie-ios-sdk/pull/253
+- Retain peer presence across watch stream reconnections in https://github.com/yorkie-team/yorkie-ios-sdk/pull/253
+
 ## [v0.7.0] - 2026-06-15
 
 - Add undo/redo support for Tree.Edit operations (Phase 1) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/252
