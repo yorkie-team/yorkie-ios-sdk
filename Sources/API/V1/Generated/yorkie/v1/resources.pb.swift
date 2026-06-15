@@ -2465,6 +2465,24 @@ public struct Yorkie_V1_Schema: Sendable {
   fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
+public struct Yorkie_V1_TreeNodeRule: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var nodeType: String = String()
+
+  public var content: String = String()
+
+  public var marks: String = String()
+
+  public var group: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Yorkie_V1_Rule: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2473,6 +2491,8 @@ public struct Yorkie_V1_Rule: Sendable {
   public var path: String = String()
 
   public var type: String = String()
+
+  public var treeNodes: [Yorkie_V1_TreeNodeRule] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -6109,9 +6129,54 @@ extension Yorkie_V1_Schema: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
+extension Yorkie_V1_TreeNodeRule: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TreeNodeRule"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}node_type\0\u{1}content\0\u{1}marks\0\u{1}group\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.nodeType) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.content) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.marks) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.group) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.nodeType.isEmpty {
+      try visitor.visitSingularStringField(value: self.nodeType, fieldNumber: 1)
+    }
+    if !self.content.isEmpty {
+      try visitor.visitSingularStringField(value: self.content, fieldNumber: 2)
+    }
+    if !self.marks.isEmpty {
+      try visitor.visitSingularStringField(value: self.marks, fieldNumber: 3)
+    }
+    if !self.group.isEmpty {
+      try visitor.visitSingularStringField(value: self.group, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_TreeNodeRule, rhs: Yorkie_V1_TreeNodeRule) -> Bool {
+    if lhs.nodeType != rhs.nodeType {return false}
+    if lhs.content != rhs.content {return false}
+    if lhs.marks != rhs.marks {return false}
+    if lhs.group != rhs.group {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension Yorkie_V1_Rule: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Rule"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}path\0\u{1}type\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}path\0\u{1}type\0\u{3}tree_nodes\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6121,6 +6186,7 @@ extension Yorkie_V1_Rule: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.path) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.type) }()
+      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.treeNodes) }()
       default: break
       }
     }
@@ -6133,12 +6199,16 @@ extension Yorkie_V1_Rule: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if !self.type.isEmpty {
       try visitor.visitSingularStringField(value: self.type, fieldNumber: 2)
     }
+    if !self.treeNodes.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.treeNodes, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_Rule, rhs: Yorkie_V1_Rule) -> Bool {
     if lhs.path != rhs.path {return false}
     if lhs.type != rhs.type {return false}
+    if lhs.treeNodes != rhs.treeNodes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

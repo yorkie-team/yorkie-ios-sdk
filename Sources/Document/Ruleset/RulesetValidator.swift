@@ -80,10 +80,18 @@ enum RulesetValidator {
                     ])
                 }
             case .tree:
-                if !(value is CRDTTree) {
+                guard let tree = value as? CRDTTree else {
                     return ValidationResult(valid: false, errors: [
                         ValidationError(path: rule.path, message: "Expected yorkie.Tree at path \(rule.path)")
                     ])
+                }
+                if let treeNodes = rule.treeNodes, !treeNodes.isEmpty {
+                    let treeResult = validateTreeAgainstSchema(tree, treeNodes)
+                    if !treeResult.valid {
+                        return ValidationResult(valid: false, errors: [
+                            ValidationError(path: rule.path, message: treeResult.error ?? "")
+                        ])
+                    }
                 }
             case .counter:
                 // support Int32 and Int64 only

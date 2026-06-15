@@ -89,6 +89,14 @@ enum Rule {
         default: return nil
         }
     }
+
+    /// Tree node rules, present only for a ``YorkieType/tree`` rule carrying schema constraints.
+    var treeNodes: [TreeNodeRule]? {
+        if case .yorkie(let yorkieTypeRule) = self {
+            return yorkieTypeRule.treeNodes
+        }
+        return nil
+    }
 }
 
 protocol RuleProtocol {
@@ -120,7 +128,21 @@ struct ArrayRule: RuleProtocol {
     let type: RuleType = .array
 }
 
+/// `TreeNodeRule` describes the schema constraints for a single tree node type.
+///
+/// It mirrors the `TreeNodeRule` proto message and the yorkie-js-sdk schema package: `content` is a
+/// ProseMirror-style content expression for allowed children, `marks` is the space-separated set of
+/// allowed text marks, and `group` is the space-separated set of groups the node belongs to.
+struct TreeNodeRule {
+    let nodeType: String
+    let content: String?
+    let marks: String?
+    let group: String?
+}
+
 struct YorkieTypeRule: RuleProtocol {
     let path: String
     let type: RuleType
+    /// Tree node rules for a ``YorkieType/tree`` rule, used for tree-level schema validation.
+    var treeNodes: [TreeNodeRule]?
 }

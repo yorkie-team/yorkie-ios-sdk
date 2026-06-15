@@ -358,7 +358,18 @@ extension Converter {
             case "array":
                 result.append(.array(.init(path: r.path)))
             case "yorkie.Text", "yorkie.Tree", "yorkie.Counter", "yorkie.Object", "yorkie.Array":
-                result.append(.yorkie(.init(path: r.path, type: .yorkie(.init(rawValue: r.type) ?? .text))))
+                // Mirror yorkie-js-sdk converter: keep `content` as the raw proto string (even ""),
+                // so the content check always runs for proto-sourced rules ("" = no children
+                // allowed). `marks`/`group` use truthy checks upstream, so treat "" as absent.
+                let treeNodes: [TreeNodeRule]? = r.treeNodes.isEmpty ? nil : r.treeNodes.map {
+                    TreeNodeRule(
+                        nodeType: $0.nodeType,
+                        content: $0.content,
+                        marks: $0.marks.isEmpty ? nil : $0.marks,
+                        group: $0.group.isEmpty ? nil : $0.group
+                    )
+                }
+                result.append(.yorkie(.init(path: r.path, type: .yorkie(.init(rawValue: r.type) ?? .text), treeNodes: treeNodes)))
             default:
                 break
             }
