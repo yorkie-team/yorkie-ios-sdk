@@ -285,7 +285,13 @@ struct ExecutionResult {
 
 /**
  * `Operation` represents an operation to be executed on a document.
- *  Types confiming ``Operation`` must be struct to avoid data racing.
+ *
+ * Most conforming types are value types. Operations that carry reconcilable range state for
+ * undo/redo — ``EditOperation`` and ``TreeEditOperation`` — are intentionally `final class`
+ * (reference) types so ``History`` can mutate the instance parked on the undo/redo stack in place
+ * (see ``History/reconcileTextEdit(parentCreatedAt:rangeFrom:rangeTo:contentLength:)`` and
+ * ``History/reconcileTreeEdit(parentCreatedAt:rangeFrom:rangeTo:contentSize:)``). That mutation must
+ * stay confined to the serialised `Document.update` path, which keeps operations race-free.
  */
 protocol Operation {
     /// `parentCreatedAt` returns the creation time of the target element to

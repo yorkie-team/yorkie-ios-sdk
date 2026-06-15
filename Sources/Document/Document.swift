@@ -795,6 +795,15 @@ public class Document: Attachable {
                         contentLength: (edit.content as NSString).length
                     )
                 }
+                if let treeEdit = op as? TreeEditOperation {
+                    let (from, to) = treeEdit.normalizePos()
+                    self.internalHistory.reconcileTreeEdit(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        rangeFrom: from,
+                        rangeTo: to,
+                        contentSize: treeEdit.getContentSize()
+                    )
+                }
             }
 
             self.changeID = self.changeID.syncClocks(with: change.id)
