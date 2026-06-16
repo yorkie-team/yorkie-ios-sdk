@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.2] - 2026-06-16
+
+- Fix ElementRHT.set() producing duplicate ownKeys on timestamp reversal in https://github.com/yorkie-team/yorkie-ios-sdk/pull/254
+
 ## [v0.7.1] - 2026-06-15
 
 - Add tree-level schema validation in https://github.com/yorkie-team/yorkie-ios-sdk/pull/253
