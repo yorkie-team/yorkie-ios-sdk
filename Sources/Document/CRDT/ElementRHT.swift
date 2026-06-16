@@ -74,6 +74,12 @@ class ElementRHT {
 
         if node == nil || value.createdAt.after(node!.value.createdAt) {
             self.nodeMapByKey[key] = newNode
+        } else if node!.isRemoved == false {
+            // The new node loses the LWW conflict — mark it as removed so it does not appear as a
+            // duplicate in `ownKeys` iteration over `nodeMapByCreatedAt`. The removal uses the same
+            // clock the winner test above uses (`createdAt`); upstream uses `getPositionedAt()`,
+            // which is equivalent here because `set` never assigns `movedAt`.
+            value.remove(node!.value.createdAt)
         }
 
         return removed
