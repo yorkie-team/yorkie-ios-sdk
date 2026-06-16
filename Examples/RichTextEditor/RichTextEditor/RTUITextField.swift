@@ -47,7 +47,13 @@ struct RTUITextField: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
+        // Setting `attributedText` / `selectedRange` below fires the text view's delegate
+        // synchronously. Mark this as a programmatic update so the delegate does not publish the
+        // change back into the view model during this SwiftUI view-update pass (which triggers
+        // "Publishing changes from within view updates is not allowed").
+        context.coordinator.isProgrammaticUpdate = true
         defer {
+            context.coordinator.isProgrammaticUpdate = false
             // save style for checking latter after change style from local or remote
             // compare this style to make sure that is not local change
             context.coordinator.lastEditStyle = lastEditStyle
@@ -122,6 +128,7 @@ struct RTUITextField: UIViewRepresentable {
         var selectRange: UITextRange?
         var lastEditStyle: EditStyle?
         var isComposing: Bool = false // Track IME composition state
+        var isProgrammaticUpdate: Bool = false // True while `updateUIView` is setting the text view
         var textBeforeComposition: String = "" // Store text before composition started
         var compositionDebounceTimer: Timer?
 
@@ -131,9 +138,14 @@ struct RTUITextField: UIViewRepresentable {
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             if let selectedTextRange = textView.selectedTextRange {
+                self.selectRange = selectedTextRange
+                // Ignore selection changes caused by our own programmatic update in `updateUIView`;
+                // only real user-driven selection changes should propagate to the view model.
+                guard !self.isProgrammaticUpdate else {
+                    return
+                }
                 let fromIndex = self.parent.textField.offset(from: textView.beginningOfDocument, to: selectedTextRange.start)
                 let toIndex = self.parent.textField.offset(from: textView.beginningOfDocument, to: selectedTextRange.end)
-                self.selectRange = selectedTextRange
                 self.parent.didChangeSelection(fromIndex, toIndex)
             }
         }
