@@ -99,6 +99,7 @@ public class Document: Attachable {
     private var statusSubscribeCallback: SubscribeCallback?
     private var syncSubscribeCallback: SubscribeCallback?
     private var authErrorSubscribeCallback: SubscribeCallback?
+    private var epochMismatchSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -416,6 +417,15 @@ public class Document: Attachable {
     }
 
     /**
+     * `subscribeEpochMismatch` registers a callback to subscribe to events on the document.
+     * The callback will be called when an epoch mismatch error occurs (the document was compacted
+     * on the server); the client must detach and reattach the document to recover.
+     */
+    public func subscribeEpochMismatch(_ callback: @escaping SubscribeCallback) {
+        self.epochMismatchSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -452,6 +462,13 @@ public class Document: Attachable {
      */
     public func unsubscribeAuthError() {
         self.authErrorSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeEpochMismatch` unregisters the epoch-mismatch callback.
+     */
+    public func unsubscribeEpochMismatch() {
+        self.epochMismatchSubscribeCallback = nil
     }
 
     /**
@@ -921,6 +938,10 @@ public class Document: Attachable {
         self.publish(authErrorEvent)
     }
 
+    func publishEpochMismatchEvent(method: String) {
+        self.publish(EpochMismatchEvent(value: EpochMismatchValue(method: method)))
+    }
+
     /**
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
@@ -973,6 +994,8 @@ public class Document: Attachable {
             self.subscribeCallbacks["$"]?(event, self)
         } else if let authErrorEvent = event as? AuthErrorEvent {
             self.authErrorSubscribeCallback?(authErrorEvent, self)
+        } else if let epochMismatchEvent = event as? EpochMismatchEvent {
+            self.epochMismatchSubscribeCallback?(epochMismatchEvent, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
 
