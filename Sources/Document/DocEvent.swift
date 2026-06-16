@@ -75,6 +75,12 @@ public enum DocEventType: String {
      * `authError` indicates an authorization failure in syncLoop or watchLoop.
      */
     case authError = "auth-error"
+
+    /**
+     * `epochMismatch` indicates the document was compacted on the server and
+     * this client must detach and reattach to recover.
+     */
+    case epochMismatch = "epoch-mismatch"
 }
 
 /**
@@ -320,4 +326,16 @@ public struct AuthErrorEvent: DocEvent {
      * AuthErrorEvent type
      */
     public let value: AuthErrorValue
+}
+
+public struct EpochMismatchValue: Equatable {
+    /// The API method whose response surfaced the epoch mismatch. Currently always `"PushPull"`.
+    public let method: String
+}
+
+/// `EpochMismatchEvent` is published when the server reports that the document was compacted and the
+/// client's epoch is stale. The client must detach and reattach the document to recover.
+public struct EpochMismatchEvent: DocEvent {
+    public let type: DocEventType = .epochMismatch
+    public let value: EpochMismatchValue
 }

@@ -1455,6 +1455,7 @@ public class Client {
         } catch {
             doc.publishSyncEvent(.syncFailed)
             publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .pushPull)
+            publishEpochMismatchIfNeeded(error: error as? ConnectError, attachment: attachment)
 
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 
@@ -1493,6 +1494,13 @@ public class Client {
             let reason = errorMetadataOf(error: connectError)["reason"]
             try? await injectAuthTokenAfterGet(with: authTokenInjector, reason: reason)
             return true
+        }
+
+        // NOTE(hackerwins): If the error is `ErrEpochMismatch`, the document has been compacted and
+        // the client's checkpoint is stale. The sync loop should stop, and the user must detach and
+        // reattach the document to recover.
+        if yorkieErrorCode == .errEpochMismatch {
+            return false
         }
 
         // The client has reached the maximum number of allowed attachments.
@@ -1606,6 +1614,16 @@ public extension Client {
 
         let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
         attachment.resource.publishAuthErrorEvent(reason: reason, method: method)
+    }
+
+    private func publishEpochMismatchIfNeeded(error: ConnectError?, attachment: Attachment<Document>?) {
+        guard let connectError = error, let attachment else { return }
+        let rawValue = errorCodeOf(error: connectError)
+        guard let code = YorkieError.Code(rawValue: rawValue), code == .errEpochMismatch else {
+            return
+        }
+
+        attachment.resource.publishEpochMismatchEvent(method: "PushPull")
     }
 }
 
