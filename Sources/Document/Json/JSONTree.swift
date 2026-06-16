@@ -584,6 +584,40 @@ public class JSONTree {
     }
 
     /**
+     * `styleByPath` sets the attributes to the elements in the given path range.
+     *
+     * The range form takes three arguments: `(fromPath, toPath, attributes)`. Calling
+     * ``styleByPath(_:_:)-`` with two arrays (e.g. `styleByPath([0], [1])`) resolves to the
+     * single-path overload (since `[Int]` is `Codable`) and styles `[0]` with `[1]` as attributes —
+     * to style a range, always pass the attributes as the third argument.
+     */
+    public func styleByPath(_ fromPath: [Int], _ toPath: [Int], _ attributes: Codable) throws {
+        try self.styleByPathRangeInternal(fromPath, toPath, StringValueTypeDictionary.stringifyAttributes(attributes))
+    }
+
+    public func styleByPath(_ fromPath: [Int], _ toPath: [Int], _ attributes: [String: Any]) throws {
+        try self.styleByPathRangeInternal(fromPath, toPath, attributes.stringValueTypeDictionary)
+    }
+
+    func styleByPathRangeInternal(_ fromPath: [Int], _ toPath: [Int], _ stringAttrs: [String: String]) throws {
+        guard let tree else {
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
+        }
+
+        if fromPath.count != toPath.count {
+            throw YorkieError(code: .errInvalidArgument, message: "path length should be equal")
+        }
+        if fromPath.isEmpty || toPath.isEmpty {
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
+        }
+
+        let fromPos = try tree.pathToPos(fromPath)
+        let toPos = try tree.pathToPos(toPath)
+
+        try self.styleInternal(fromPos, toPos, stringAttrs)
+    }
+
+    /**
      * `style` sets the attributes to the elements of the given range.
      */
     public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws {
@@ -648,6 +682,27 @@ public class JSONTree {
         }
 
         let (fromPos, toPos) = try tree.pathToPosRange(path)
+
+        try self.removeStyleInternal(fromPos, toPos, attributesToRemove)
+    }
+
+    /**
+     * `removeStyleByPath` removes the attributes of the elements in the given path range.
+     */
+    public func removeStyleByPath(_ fromPath: [Int], _ toPath: [Int], _ attributesToRemove: [String]) throws {
+        guard let tree else {
+            throw YorkieError(code: .errNotInitialized, message: "\(type(of: self)) is not initialized yet")
+        }
+
+        if fromPath.count != toPath.count {
+            throw YorkieError(code: .errInvalidArgument, message: "path length should be equal")
+        }
+        if fromPath.isEmpty || toPath.isEmpty {
+            throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
+        }
+
+        let fromPos = try tree.pathToPos(fromPath)
+        let toPos = try tree.pathToPos(toPath)
 
         try self.removeStyleInternal(fromPos, toPos, attributesToRemove)
     }
