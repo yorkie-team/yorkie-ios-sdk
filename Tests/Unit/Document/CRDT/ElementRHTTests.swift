@@ -128,4 +128,82 @@ class ElementRHTTests: XCTestCase {
         XCTAssertTrue(target.has(key: "a1"))
         XCTAssertFalse(target.has(key: "a2"))
     }
+
+    // MARK: - Concurrent set / LWW conflict tests (ported from element_rht_test.ts, yorkie-js-sdk 0.7.2)
+
+    func test_should_not_produce_duplicate_keys_on_concurrent_set_with_earlier_timestamp() throws {
+        // given — two clients concurrently set the same key.
+        // Client A sets "color"="red" at T2 (lamport=2, actorA) — this arrives first and wins.
+        // Client B sets "color"="blue" at T1 (lamport=1, actorB) — this arrives later and loses.
+        let rht = ElementRHT()
+
+        let ticketA = TimeTicket(lamport: 2, delimiter: 0, actorID: "actorA")
+        let valueA = Primitive(value: .string("red"), createdAt: ticketA)
+        rht.set(key: "color", value: valueA)
+
+        let ticketB = TimeTicket(lamport: 1, delimiter: 0, actorID: "actorB")
+        let valueB = Primitive(value: .string("blue"), createdAt: ticketB)
+
+        // when — Client B's operation arrives with an earlier timestamp; it loses the LWW conflict.
+        rht.set(key: "color", value: valueB)
+
+        // then — the losing value must be marked removed so it does not appear as a live entry.
+        XCTAssertTrue(valueB.isRemoved, "the losing value must be marked removed by the fix")
+
+        // The object must expose exactly one "color" key and the winner's value.
+        let obj = CRDTObject(createdAt: TimeTicket.initial, memberNodes: rht)
+        let keys = obj.keys
+        XCTAssertEqual(keys.count, 1, "keys must not contain a duplicate")
+        XCTAssertEqual(keys, ["color"], "keys must contain only the single winning key")
+
+        // toJSON() iterates nodeMapByCreatedAt; without the fix the loser (earlier createdAt,
+        // sorted first) would surface here instead of the winner.
+        XCTAssertEqual(obj.toJSON(), "{\"color\":\"red\"}", "toJSON() must reflect the winner's value")
+
+        // get() via nodeMapByKey always returns the winner.
+        let winner = obj.get(key: "color") as? Primitive
+        XCTAssertNotNil(winner)
+        XCTAssertEqual(winner?.toJSON(), "\"red\"", "get(key:) must return the winner's value")
+    }
+
+    func test_should_handle_multiple_concurrent_sets_on_the_same_key() throws {
+        // given — three concurrent set operations targeting the same key, applied out of
+        // timestamp order to simulate late-arriving remote operations.
+        let rht = ElementRHT()
+
+        // Set "key"="first" at T3 (highest lamport) — this is the ultimate winner.
+        let ticket1 = TimeTicket(lamport: 3, delimiter: 0, actorID: "actor1")
+        let value1 = Primitive(value: .string("first"), createdAt: ticket1)
+        rht.set(key: "key", value: value1)
+
+        // Late-arriving "key"="second" at T1 — loses to T3.
+        let ticket2 = TimeTicket(lamport: 1, delimiter: 0, actorID: "actor2")
+        let value2 = Primitive(value: .string("second"), createdAt: ticket2)
+        rht.set(key: "key", value: value2)
+
+        // Late-arriving "key"="third" at T2 — loses to T3, beats T1, but still loses overall.
+        let ticket3 = TimeTicket(lamport: 2, delimiter: 0, actorID: "actor3")
+        let value3 = Primitive(value: .string("third"), createdAt: ticket3)
+
+        // when — all late-arriving operations have been applied.
+        rht.set(key: "key", value: value3)
+
+        // then — both losing values must be marked removed.
+        XCTAssertTrue(value2.isRemoved, "value at T1 must be marked removed")
+        XCTAssertTrue(value3.isRemoved, "value at T2 must be marked removed")
+
+        // Exactly one live key must remain.
+        let obj = CRDTObject(createdAt: TimeTicket.initial, memberNodes: rht)
+        let keys = obj.keys
+        XCTAssertEqual(keys.count, 1, "keys must have exactly one entry")
+        XCTAssertEqual(keys, ["key"], "keys must contain only the single winning key")
+
+        // toJSON() must surface the winner (T3 = "first"), not a loser.
+        XCTAssertEqual(obj.toJSON(), "{\"key\":\"first\"}", "toJSON() must reflect the winning value")
+
+        // get() must also resolve to the winner.
+        let winner = obj.get(key: "key") as? Primitive
+        XCTAssertNotNil(winner)
+        XCTAssertEqual(winner?.toJSON(), "\"first\"", "get(key:) must return the winner's value")
+    }
 }
