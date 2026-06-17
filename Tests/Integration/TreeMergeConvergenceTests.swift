@@ -492,6 +492,15 @@ final class TreeSideBySideMergeConvergenceTests: XCTestCase {
 
     // Ported from yorkie-js-sdk v0.7.4: Tree.edit(concurrent, side by side range)
     // — multi-level-split-with-concurrent-merge-and-text-split (new in v0.7.4).
+    //
+    // NOTE: Upstream intentionally shares the exact setup and operations with
+    // `cascade-delete-across-parent-after-multi-level-split` above. The two
+    // upstream tests differ only in their assertions: the cascade test pins the
+    // deterministic intermediate/final XML, while THIS variant asserts ONLY that
+    // the two replicas converge (d1 == d2) without pinning a specific XML — a
+    // looser guard that must hold regardless of the exact converged shape. This
+    // port mirrors that upstream pair 1:1; the shared operations are deliberate,
+    // not an accidental copy.
     @MainActor
     func test_multi_level_split_with_concurrent_merge_and_text_split() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in

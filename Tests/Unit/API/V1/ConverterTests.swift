@@ -453,5 +453,11 @@ class ConverterTests: XCTestCase {
         let sourceParent = rootNode?.innerChildren.first { $0.isRemoved }
         XCTAssertNotNil(sourceParent, "source parent should be tombstoned")
         XCTAssertNotNil(sourceParent?.mergedInto, "rebuildMergeState should set mergedInto on tombstoned source")
+
+        // and — the merge links point at the right nodes, not merely non-nil:
+        // the moved child's mergedFrom is the tombstoned source parent, and that
+        // source parent's mergedInto forwards to the surviving merge target.
+        XCTAssertEqual(movedChild?.mergedFrom, sourceParent?.id, "movedChild.mergedFrom should reference the tombstoned source parent")
+        XCTAssertEqual(sourceParent?.mergedInto, firstP?.id, "sourceParent.mergedInto should reference the surviving merge target")
     }
 }
