@@ -1059,7 +1059,7 @@ class CRDTTree: CRDTElement {
         var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var toBeMergedNodes = [CRDTTreeNode]()
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { treeToken, ended in
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
             let (node, tokenType) = treeToken
@@ -1460,12 +1460,12 @@ class CRDTTree: CRDTElement {
     /**
      * `toIndex` converts the given CRDTTreeNodeID to the index of the tree.
      */
-    func toIndex(_ parentNode: CRDTTreeNode, _ leftNode: CRDTTreeNode) throws -> Int {
-        guard let treePos = try self.toTreePos(parentNode, leftNode) else {
+    func toIndex(_ parentNode: CRDTTreeNode, _ leftNode: CRDTTreeNode, _ includeRemoved: Bool = false) throws -> Int {
+        guard let treePos = try self.toTreePos(parentNode, leftNode, includeRemoved) else {
             return -1
         }
 
-        return try self.indexTree.indexOf(treePos)
+        return try self.indexTree.indexOf(treePos, includeRemoved)
     }
 
     /**
@@ -1534,10 +1534,11 @@ class CRDTTree: CRDTElement {
                                     _ fromLeft: CRDTTreeNode,
                                     _ toParent: CRDTTreeNode,
                                     _ toLeft: CRDTTreeNode,
+                                    includeRemoved: Bool = false,
                                     callback: @escaping (TreeToken<CRDTTreeNode>, Bool) throws -> Void) throws
     {
-        let fromIdx = try self.toIndex(fromParent, fromLeft)
-        let toIdx = try self.toIndex(toParent, toLeft)
+        let fromIdx = try self.toIndex(fromParent, fromLeft, includeRemoved)
+        let toIdx = try self.toIndex(toParent, toLeft, includeRemoved)
 
         // When a concurrent merge redirects the to-position into an earlier part
         // of the tree, the range becomes empty (prior merge handled it).
@@ -1545,23 +1546,23 @@ class CRDTTree: CRDTElement {
             return
         }
 
-        return try self.indexTree.tokensBetween(fromIdx, toIdx, callback)
+        return try self.indexTree.tokensBetween(fromIdx, toIdx, includeRemoved, callback)
     }
 
     /**
      * `toTreePos` converts the given CRDTTreePos to local TreePos<CRDTTreeNode>.
      */
-    private func toTreePos(_ parentNode: CRDTTreeNode, _ leftNode: CRDTTreeNode) throws -> TreePos<CRDTTreeNode>? {
+    private func toTreePos(_ parentNode: CRDTTreeNode, _ leftNode: CRDTTreeNode, _ includeRemoved: Bool = false) throws -> TreePos<CRDTTreeNode>? {
         var parentNode = parentNode
 
-        if parentNode.isRemoved {
+        if !includeRemoved, parentNode.isRemoved {
             var childNode = parentNode
             while parentNode.isRemoved {
                 childNode = parentNode
                 parentNode = childNode.parent!
             }
 
-            let childOffset = try parentNode.findOffset(node: childNode)
+            let childOffset = try parentNode.findOffset(node: childNode, includeRemoved: includeRemoved)
 
             return TreePos(node: parentNode, offset: Int32(childOffset))
         }
@@ -1570,11 +1571,11 @@ class CRDTTree: CRDTElement {
             return TreePos(node: parentNode, offset: 0)
         }
 
-        var offset = try parentNode.findOffset(node: leftNode)
+        var offset = try parentNode.findOffset(node: leftNode, includeRemoved: includeRemoved)
 
-        if leftNode.isRemoved == false {
+        if includeRemoved || leftNode.isRemoved == false {
             if leftNode.isText {
-                return TreePos(node: leftNode, offset: Int32(leftNode.paddedSize))
+                return TreePos(node: leftNode, offset: Int32(leftNode.paddedLength(includeRemoved: includeRemoved)))
             }
 
             offset += 1
