@@ -408,4 +408,50 @@ class ConverterTests: XCTestCase {
 
         XCTAssertEqual(size1, size2)
     }
+
+    // Ported from yorkie-js-sdk v0.7.4: Converter — should persist merge state across bytes roundtrip.
+    //
+    // Regression test for the snapshot-roundtrip convergence bug fixed by persisting `mergedFrom`
+    // and `mergedAt` on moved children. A tree that undergoes a merge and is then serialized via
+    // objectToBytes must deserialize with mergedFrom/mergedAt preserved on moved children and
+    // mergedInto reconstructed on the source parent by rebuildMergeState.
+    func test_should_persist_merge_state_across_bytes_roundtrip() async throws {
+        // given — build <root><p>a</p><p>b</p></root> then merge into <root><p>ab</p></root>
+        let doc = Document(key: "test-doc")
+
+        try await doc.update { root, _ in
+            root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "root", children: [
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "a")]),
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "b")])
+            ]))
+            // merge the two paragraphs: delete the boundary between them
+            try (root.t as? JSONTree)?.edit(2, 4)
+        }
+
+        let xmlBeforeRoundtrip = await(doc.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(xmlBeforeRoundtrip, "<root><p>ab</p></root>")
+
+        // when — snapshot via objectToBytes then restore via bytesToObject
+        let bytes = try await Converter.objectToBytes(obj: doc.getRootObject())
+        let clonedObj = try Converter.bytesToObject(bytes: bytes)
+
+        // then — XML is preserved after roundtrip
+        let clonedTree = clonedObj.get(key: "t") as? CRDTTree
+        XCTAssertNotNil(clonedTree)
+        XCTAssertEqual(clonedTree?.toXML(), "<root><p>ab</p></root>")
+
+        // and — mergedFrom/mergedAt on the moved child survive serialization
+        let rootNode = clonedTree?.root
+        let firstP = rootNode?.children.first
+        XCTAssertNotNil(firstP)
+
+        let movedChild = firstP?.innerChildren.first { $0.mergedFrom != nil }
+        XCTAssertNotNil(movedChild, "moved child should carry mergedFrom after roundtrip")
+        XCTAssertNotNil(movedChild?.mergedAt, "moved child should carry mergedAt after roundtrip")
+
+        // and — rebuildMergeState restores mergedInto on the tombstoned source parent
+        let sourceParent = rootNode?.innerChildren.first { $0.isRemoved }
+        XCTAssertNotNil(sourceParent, "source parent should be tombstoned")
+        XCTAssertNotNil(sourceParent?.mergedInto, "rebuildMergeState should set mergedInto on tombstoned source")
+    }
 }

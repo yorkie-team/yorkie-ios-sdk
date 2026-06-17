@@ -61,6 +61,59 @@ final class CRDTTreeNodeTests: XCTestCase {
 
         XCTAssertEqual(node.toJSONString, "{\"type\":\"text\",\"value\":\"\\n\"}")
     }
+
+    // Ported from yorkie-js-sdk v0.7.4: CRDTTreeNode — splitText preserves mergedFrom and mergedAt.
+    func test_splitText_preserves_mergedFrom_and_mergedAt() throws {
+        // given
+        let para = CRDTTreeNode(id: posT(), type: "p", children: [])
+        let text = CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "abcd")
+        try para.append(contentsOf: [text])
+
+        let sourceID = CRDTTreeNodeID(createdAt: timeT(), offset: 0)
+        let mergeTicket = timeT()
+        text.mergedFrom = sourceID
+        text.mergedAt = mergeTicket
+
+        // when — split "abcd" at offset 2 into "ab" | "cd"
+        let right = try text.splitText(2, 0).0
+
+        // then — left node retains original value; right inherits merge metadata
+        XCTAssertEqual(text.value, "ab")
+        XCTAssertNotNil(right)
+        XCTAssertEqual(right?.value, "cd")
+
+        XCTAssertEqual(right?.mergedFrom, sourceID)
+        XCTAssertEqual(right?.mergedAt, mergeTicket)
+    }
+
+    // Ported from yorkie-js-sdk v0.7.4: CRDTTreeNode — deepcopy preserves merge metadata.
+    func test_deepcopy_preserves_merge_metadata() throws {
+        // given
+        let para = CRDTTreeNode(id: posT(), type: "p", children: [])
+        let text = CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "hello")
+        try para.append(contentsOf: [text])
+
+        let targetID = CRDTTreeNodeID(createdAt: timeT(), offset: 0)
+        let sourceID = CRDTTreeNodeID(createdAt: timeT(), offset: 0)
+        let mergeTicket = timeT()
+
+        para.mergedInto = targetID
+        text.mergedFrom = sourceID
+        text.mergedAt = mergeTicket
+
+        // when
+        let clone = para.deepcopy()
+
+        // then — element-level mergedInto is preserved
+        XCTAssertNotNil(clone)
+        XCTAssertEqual(clone?.mergedInto, targetID)
+
+        // and the text child's mergedFrom / mergedAt survive the copy
+        let clonedText = clone?.children.first
+        XCTAssertNotNil(clonedText)
+        XCTAssertEqual(clonedText?.mergedFrom, sourceID)
+        XCTAssertEqual(clonedText?.mergedAt, mergeTicket)
+    }
 }
 
 final class CRDTTreeEditTests: XCTestCase {
