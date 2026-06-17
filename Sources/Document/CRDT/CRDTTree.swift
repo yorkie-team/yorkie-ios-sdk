@@ -289,6 +289,29 @@ final class CRDTTreeNode: IndexTreeNode {
      */
     var insNextID: CRDTTreeNodeID?
 
+    /**
+     * `mergedFrom` records the source parent's ID when this node was moved by a
+     * concurrent merge. Persisted in the snapshot encoding as the witness of the
+     * merge relationship.
+     */
+    var mergedFrom: CRDTTreeNodeID?
+
+    /**
+     * `mergedAt` records the immutable ticket of the merge operation. Persisted
+     * alongside ``mergedFrom`` because the source parent's ``removedAt`` may be
+     * overwritten by later LWW tombstones and thus cannot serve as the
+     * merge-time causal boundary for the split's Fix 8 version-vector check.
+     */
+    var mergedAt: TimeTicket?
+
+    /**
+     * `mergedInto` is a runtime cache set on the source parent pointing at the
+     * merge target. Set locally during merge execution and rebuilt from
+     * ``mergedFrom`` on snapshot load. Used for the fast "is this tombstoned
+     * parent a merge source?" check when resolving insertion positions.
+     */
+    var mergedInto: CRDTTreeNodeID?
+
     init(id: CRDTTreeNodeID, type: TreeNodeType, value: NSString? = nil, children: [CRDTTreeNode]? = nil, attributes: RHT? = nil, removedAt: TimeTicket? = nil) {
         self.size = 0
         self.innerValue = ""
@@ -329,6 +352,9 @@ final class CRDTTreeNode: IndexTreeNode {
         }
         clone.insPrevID = self.insPrevID
         clone.insNextID = self.insNextID
+        clone.mergedFrom = self.mergedFrom
+        clone.mergedAt = self.mergedAt
+        clone.mergedInto = self.mergedInto
 
         return clone
     }
@@ -341,9 +367,12 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
-     * `remove` marks the node as removed.
+     * `remove` marks the node as removed. Returns true when this call
+     * transitions a previously-alive node to removed, so the caller can register
+     * a GC pair; a tombstone overwrite by LWW returns false.
      */
-    func remove(_ removedAt: TimeTicket) {
+    @discardableResult
+    func remove(_ removedAt: TimeTicket) -> Bool {
         let alived = !self.isRemoved
 
         if self.removedAt == nil || removedAt <= self.removedAt! {
@@ -352,16 +381,22 @@ final class CRDTTreeNode: IndexTreeNode {
 
         if alived {
             self.updateAncestorsSize()
+            return true
         }
+
+        return false
     }
 
     /**
      * `cloneText` clones this text node with the given offset.
      */
     func cloneText(offset: Int32) -> CRDTTreeNode {
-        CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset),
-                     type: self.type,
-                     removedAt: self.removedAt)
+        let clone = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: self.id.createdAt, offset: offset),
+                                 type: self.type,
+                                 removedAt: self.removedAt)
+        clone.mergedFrom = self.mergedFrom
+        clone.mergedAt = self.mergedAt
+        return clone
     }
 
     /**
@@ -374,19 +409,36 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
+     * `shouldStayLeftOnSplit` keeps a concurrent merge-moved child in the
+     * original (left) node during a split when the merge is unknown to the
+     * editor and the merge source is local to this node (one of `siblings`).
+     */
+    func shouldStayLeftOnSplit(_ child: CRDTTreeNode, siblings: [CRDTTreeNode], versionVector: VersionVector?) -> Bool {
+        guard let mergedFrom = child.mergedFrom, let mergedAt = child.mergedAt else {
+            return false
+        }
+        guard let versionVector, !versionVector.afterOrEqual(other: mergedAt) else {
+            return false
+        }
+
+        return siblings.contains { $0.id == mergedFrom }
+    }
+
+    /**
      * `split` splits the given offset of this node.
      */
     @discardableResult
     func split(
         _ tree: CRDTTree,
         _ offset: Int32,
-        _ issueTimeTicket: TimeTicket? = nil
+        _ issueTimeTicket: TimeTicket? = nil,
+        _ versionVector: VersionVector? = nil
     ) throws -> (CRDTTreeNode?, DataSize) {
         if self.isText == false, issueTimeTicket == nil {
             throw YorkieError(code: .errInvalidArgument, message: "The issueTimeTicket for Text Node have to nil!")
         }
 
-        let (split, diff) = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!)
+        let (split, diff) = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!, versionVector)
 
         if split != nil {
             split?.insPrevID = self.id
@@ -602,6 +654,22 @@ extension CRDTTreeNode: GCChild {
 }
 
 /**
+ * `ticketKnown` returns true if the given ticket is causally known to the
+ * editor, i.e. the editor's version vector covers the ticket's lamport clock
+ * for the same actor. For local operations (no version vector), all tickets are
+ * considered known.
+ */
+private func ticketKnown(_ versionVector: VersionVector?, _ ticket: TimeTicket) -> Bool {
+    guard let versionVector else {
+        return true
+    }
+    guard let lamport = versionVector.get(ticket.actorID) else {
+        return false
+    }
+    return lamport >= ticket.lamport
+}
+
+/**
  * `CRDTTree` is a CRDT implementation of a tree.
  */
 class CRDTTree: CRDTElement {
@@ -620,6 +688,41 @@ class CRDTTree: CRDTElement {
         self.indexTree.traverseAll { node, _ in
             self.nodeMapByID.put(node.id, node)
         }
+
+        // Rebuild runtime merge state from the persisted `mergedFrom` field.
+        // Only `mergedFrom` and `mergedAt` are written to the snapshot encoding;
+        // `mergedInto` is a cache reconstructed here so replicas loaded from a
+        // snapshot can still handle concurrent ops that target merged-away
+        // parents (redirect, propagation, split skip).
+        self.rebuildMergeState()
+    }
+
+    /**
+     * `rebuildMergeState` reconstructs the `mergedInto` cache on source parents
+     * from the persisted ``CRDTTreeNode/mergedFrom`` field on moved children.
+     * For snapshots written before `mergedAt` was added to the proto, it also
+     * falls back to the source's `removedAt` — an approximation that may be
+     * wrong if the source was later overwritten by a concurrent delete, but it
+     * is the best available without the persisted merge ticket.
+     */
+    private func rebuildMergeState() {
+        self.indexTree.traverseAll { node, _ in
+            guard let mergedFrom = node.mergedFrom, let parent = node.parent else {
+                return
+            }
+            guard let src = self.findFloorNode(mergedFrom) else {
+                return
+            }
+
+            // Back-compat: older snapshots lack mergedAt on moved children.
+            if node.mergedAt == nil, let removedAt = src.removedAt {
+                node.mergedAt = removedAt
+            }
+
+            if src.mergedInto == nil {
+                src.mergedInto = parent.id
+            }
+        }
     }
 
     /**
@@ -631,6 +734,67 @@ class CRDTTree: CRDTElement {
         }
 
         return entry.value
+    }
+
+    /**
+     * `advancePastUnknownSplitSiblings` follows the `insNextID` chain of the
+     * given node, advancing past element-type split siblings that the editing
+     * client did not know about (not in `versionVector`).
+     */
+    private func advancePastUnknownSplitSiblings(_ node: CRDTTreeNode, _ versionVector: VersionVector?) -> CRDTTreeNode {
+        guard let versionVector else {
+            return node
+        }
+
+        var current = node
+        while let insNextID = current.insNextID {
+            guard let next = self.findFloorNode(insNextID), !next.isText else {
+                break
+            }
+
+            // Stop if the sibling has been moved to a different parent
+            // (e.g., by a higher-level concurrent split).
+            if next.parent !== current.parent {
+                break
+            }
+
+            let actorID = next.id.createdAt.actorID
+            if let knownLamport = versionVector.get(actorID), knownLamport >= next.id.createdAt.lamport {
+                break
+            }
+
+            current = next
+        }
+
+        return current
+    }
+
+    /**
+     * `hasUnknownSplitSibling` checks whether the given element node has a split
+     * sibling (via `insNextID`) whose creation the editor did not know about.
+     * Used to prevent styling via End tokens when a concurrent split extended
+     * the range into the split sibling.
+     */
+    private func hasUnknownSplitSibling(_ node: CRDTTreeNode, _ versionVector: VersionVector) -> Bool {
+        guard let insNextID = node.insNextID else {
+            return false
+        }
+
+        guard let next = self.findFloorNode(insNextID), !next.isText else {
+            return false
+        }
+
+        // NOTE: Unlike advancePastUnknownSplitSiblings, the parent-equality
+        // check is intentionally omitted. In multi-level splits (splitLevel>=2),
+        // the split sibling may have been moved to a different parent by the
+        // recursive ancestor split. The End-token guard must still fire because
+        // the node WAS split — insNextID is only set by SplitElement.
+        let actorID = next.id.createdAt.actorID
+        guard let knownLamport = versionVector.get(actorID) else {
+            return true
+        }
+
+        return knownLamport < next.id.createdAt.lamport
     }
 
     /**
@@ -661,6 +825,28 @@ class CRDTTree: CRDTElement {
         // in the current tree.
         let isLeftMost = parent === leftNode
         let realParent = leftNode.parent != nil && !isLeftMost ? leftNode.parent! : parent
+
+        // 02-1. If the parent has been tombstoned by a merge, redirect to the
+        // merge destination using the forwarding pointer. The insertion boundary
+        // is the first child in the target whose `mergedFrom` points back at the
+        // tombstoned parent (i.e. the first child moved by the merge, in target
+        // child order).
+        if realParent.isRemoved, isLeftMost, let mergedInto = realParent.mergedInto {
+            if let mergeTarget = self.findFloorNode(mergedInto), !mergeTarget.isRemoved {
+                let allChildren = mergeTarget.innerChildren
+                for (index, targetChild) in allChildren.enumerated() {
+                    guard let childMergedFrom = targetChild.mergedFrom, childMergedFrom == realParent.id else {
+                        continue
+                    }
+                    if index == 0 {
+                        return ((mergeTarget, mergeTarget), diff)
+                    }
+                    return ((mergeTarget, allChildren[index - 1]), diff)
+                }
+                // Fallback: insert at leftmost of merge target.
+                return ((mergeTarget, mergeTarget), diff)
+            }
+        }
 
         // 03. Split text node if the left node is a text node.
         if leftNode.isText {
@@ -698,9 +884,14 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector?
     ) throws -> ([GCPair], [TreeChange], DataSize) {
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeft), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
         diff.addDataSizes(others: fromDiff, toDiff)
+
+        // Advance past split siblings unknown to the editing client so the range
+        // covers all concurrent split products. Skip when leftNode == parent.
+        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
@@ -716,6 +907,13 @@ class CRDTTree: CRDTElement {
                 editedAt,
                 clientLamportAtChange
             ), !node.isText, let attributes {
+                // Skip styling via End token when the node has an unknown split
+                // sibling. The End token is in the range only because a
+                // concurrent split extended the range into the sibling.
+                if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
+                    return
+                }
+
                 let updatedAttrPairs = node.setAttrs(attributes, editedAt)
                 var affectedAttrs = [String: String]()
                 for (_, curr) in updatedAttrPairs {
@@ -766,15 +964,21 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DataSize) {
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeft), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
         diff.addDataSizes(others: fromDiff, toDiff)
+
+        // Advance past split siblings unknown to the editing client so the range
+        // covers all concurrent split products. Skip when leftNode == parent.
+        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
+
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
-            let (node, _) = token
+            let (node, tokenType) = token
             let actorID = node.createdAt.actorID
             var clientLamportAtChange: Int64 = .max
 
@@ -785,6 +989,13 @@ class CRDTTree: CRDTElement {
                 editedAt,
                 clientLamportAtChange
             ), !attributesToRemove.isEmpty {
+                // Skip styling via End token when the node has an unknown split
+                // sibling. The End token is in the range only because a
+                // concurrent split extended the range into the sibling.
+                if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
+                    return
+                }
+
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
@@ -828,9 +1039,18 @@ class CRDTTree: CRDTElement {
     ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeft), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeft), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
         diff.addDataSizes(others: fromDiff, toDiff)
+
+        // 01-1. Advance past split siblings unknown to the editing client.
+        // When a concurrent SplitElement created siblings linked via insNextID,
+        // the editor's position was computed against the unsplit tree. Advance
+        // past siblings the editor could not have seen so that the range
+        // starts/ends after all concurrent split products. Skip when
+        // leftNode == parent (leftmost child position).
+        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
         let fromIdx = try self.toIndex(fromParent, fromLeft)
         let fromPath = try self.toPath(fromParent, fromLeft)
@@ -838,45 +1058,62 @@ class CRDTTree: CRDTElement {
         var nodesToBeRemoved = [CRDTTreeNode]()
         var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
+        var toBeMergedNodes = [CRDTTreeNode]()
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
             let (node, tokenType) = treeToken
             if tokenType == .start, !ended {
-                // TODO(hackerwins): Define more clearly merge-able rules
-                // between two parents. For now, we only merge two parents are
-                // both element nodes having text children.
-                // e.g. <p>a|b</p><p>c|d</p> -> <p>a|d</p>
-                // if (!fromParent.hasTextChild() || !toParent.hasTextChild()) {
-                //   return;
-                // }
-
-                toBeMovedToFromParents.append(contentsOf: node.children)
+                // Fix 9: Skip merge for elements created by concurrent
+                // operations. The editor didn't know about this element, so
+                // crossing into it is an artifact of a concurrent split, not an
+                // intentional merge.
+                if ticketKnown(versionVector, node.createdAt) {
+                    toBeMergedNodes.append(node)
+                    toBeMovedToFromParents.append(contentsOf: node.children)
+                }
             }
 
-            let actorID = node.createdAt.actorID
+            // NOTE(sigmaith): Determine if the node's creation event was visible.
+            let creationKnown = ticketKnown(versionVector, node.createdAt)
+
+            // NOTE(sigmaith): Determine if existing tombstone was already causally known.
+            let tombstoneKnown = node.removedAt != nil && ticketKnown(versionVector, node.removedAt!)
+
             // NOTE(sejongk): If the node is removable or its parent is going to
-            // be removed, then this node should be removed.
-
-            let isLocal = versionVector == nil
-            var creationKnown = isLocal
-            var tombstoneKnown = false
-
-            if let versionVector {
-                let clientLamportAtChange = versionVector.get(actorID) ?? 0
-                creationKnown = node.createdAt.lamport <= clientLamportAtChange
-                tombstoneKnown = node.isRemoved && (isLocal || versionVector.afterOrEqual(other: node.removedAt!))
-            }
-
+            // be removed, then this node should be removed. Do not cascade-delete
+            // children of merge-boundary nodes (toBeMergedNodes), because those
+            // children are moved rather than deleted.
             if node.canDelete(
                 editedAt,
                 creationKnown,
                 tombstoneKnown
-            ) || nodesToBeRemoved.contains(where: { $0 === node.parent }) {
+            ) || (nodesToBeRemoved.contains(where: { $0 === node.parent }) && !toBeMergedNodes.contains(where: { $0 === node.parent })) {
                 // NOTE(hackerwins): If the node overlaps as an end token with the
                 // range then we need to keep the node.
                 if tokenType == .text || tokenType == .start {
                     nodesToBeRemoved.append(node)
+
+                    // Cascade delete to split siblings created by concurrent
+                    // SplitElement. Only for element nodes.
+                    if !node.isText, node.insNextID != nil, !toBeMergedNodes.contains(where: { $0 === node }) {
+                        var nextID = node.insNextID
+                        while let id = nextID, let next = self.findFloorNode(id) {
+                            if !ticketKnown(versionVector, next.id.createdAt) {
+                                nodesToBeRemoved.append(next)
+                                // Cascade through the full subtree, not just immediate children.
+                                traverseAll(node: next) { descendant, _ in
+                                    if descendant !== next {
+                                        nodesToBeRemoved.append(descendant)
+                                    }
+                                }
+                            }
+                            if next.insNextID == nil {
+                                break
+                            }
+                            nextID = next.insNextID
+                        }
+                    }
                 }
                 tokensToBeRemoved.append((node, tokenType))
             }
@@ -889,15 +1126,71 @@ class CRDTTree: CRDTElement {
         // 02. Delete: delete the nodes that are marked as removed.
         var pairs = [GCPair]()
         for node in nodesToBeRemoved {
-            node.remove(editedAt)
-
-            if node.isRemoved {
+            if node.remove(editedAt) {
                 pairs.append(GCPair(parent: self, child: node))
             }
         }
 
-        // 03. Merge: move the nodes that are marked as moved.
-        try fromParent.append(contentsOf: toBeMovedToFromParents.filter { $0.removedAt == nil })
+        // 03. Merge: move the nodes that are marked as moved. Only `mergedFrom`
+        // and `mergedAt` are written on the moved child — both are persisted in
+        // the snapshot encoding. `mergedAt` must be captured explicitly here
+        // (not read from source.removedAt at use time) because the source's
+        // `removedAt` is mutated by LWW when a later concurrent tombstone
+        // targets the same node.
+        for node in toBeMovedToFromParents where node.removedAt == nil {
+            if let parent = node.parent {
+                node.mergedFrom = parent.id
+                node.mergedAt = editedAt
+                // Detach from old parent to prevent ghost references. The child
+                // may already have been detached by a concurrent operation
+                // (e.g., cascade delete of split sibling), so ignore the error.
+                try? parent.detachChild(child: node)
+            }
+            try fromParent.append(contentsOf: [node])
+        }
+
+        // Set forwarding pointer on merge-source nodes. This is a runtime cache
+        // rebuilt from `mergedFrom` on snapshot load.
+        for src in toBeMergedNodes {
+            src.mergedInto = fromParent.id
+        }
+
+        // 03-1. Propagate deletes to children moved by prior merges. When a
+        // merge-source node is fully deleted (not a merge boundary), its former
+        // children in the merge target should also be deleted. Skip when
+        // `mergedInto` points to `fromParent` (concurrent merge). The list of
+        // moved children is recomputed on the fly from the merge target's
+        // children filtered by `mergedFrom`.
+        for node in nodesToBeRemoved {
+            guard let mergedInto = node.mergedInto,
+                  !toBeMergedNodes.contains(where: { $0 === node }),
+                  mergedInto != fromParent.id
+            else {
+                continue
+            }
+            guard let mergeTarget = self.findFloorNode(mergedInto) else {
+                continue
+            }
+            for targetChild in mergeTarget.innerChildren {
+                guard let childMergedFrom = targetChild.mergedFrom, childMergedFrom == node.id else {
+                    continue
+                }
+                if targetChild.removedAt != nil {
+                    continue
+                }
+                if targetChild.remove(editedAt) {
+                    pairs.append(GCPair(parent: self, child: targetChild))
+                }
+                // Also tombstone descendants if the moved child is an element.
+                traverseAll(node: targetChild) { descendant, _ in
+                    if descendant !== targetChild, descendant.removedAt == nil {
+                        if descendant.remove(editedAt) {
+                            pairs.append(GCPair(parent: self, child: descendant))
+                        }
+                    }
+                }
+            }
+        }
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
@@ -905,7 +1198,7 @@ class CRDTTree: CRDTElement {
             var parent = fromParent
             var left = fromLeft
             while splitCount < splitLevel {
-                try parent.split(self, Int32(parent.findOffset(node: left) + 1), issueTimeTicket())
+                try parent.split(self, Int32(parent.findOffset(node: left) + 1), issueTimeTicket(), versionVector)
                 left = parent
                 parent = parent.parent!
                 splitCount += 1
@@ -1219,6 +1512,12 @@ class CRDTTree: CRDTElement {
     {
         let fromIdx = try self.toIndex(fromParent, fromLeft)
         let toIdx = try self.toIndex(toParent, toLeft)
+
+        // When a concurrent merge redirects the to-position into an earlier part
+        // of the tree, the range becomes empty (prior merge handled it).
+        if fromIdx > toIdx {
+            return
+        }
 
         return try self.indexTree.tokensBetween(fromIdx, toIdx, callback)
     }

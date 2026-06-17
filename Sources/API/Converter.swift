@@ -987,6 +987,12 @@ extension Converter {
             if let id = node.insNextID {
                 pbTreeNode.insNextID = toTreeNodeID(id)
             }
+            if let mergedFrom = node.mergedFrom {
+                pbTreeNode.mergedFrom = toTreeNodeID(mergedFrom)
+            }
+            if let mergedAt = node.mergedAt {
+                pbTreeNode.mergedAt = toTimeTicket(mergedAt)
+            }
             if let ticket = node.removedAt {
                 pbTreeNode.removedAt = toTimeTicket(ticket)
             } else {
@@ -1082,6 +1088,8 @@ extension Converter {
         
         node.insPrevID = pbTreeNode.hasInsPrevID ? fromTreeNodeID(pbTreeNode.insPrevID) : nil
         node.insNextID = pbTreeNode.hasInsNextID ? fromTreeNodeID(pbTreeNode.insNextID) : nil
+        node.mergedFrom = pbTreeNode.hasMergedFrom ? fromTreeNodeID(pbTreeNode.mergedFrom) : nil
+        node.mergedAt = pbTreeNode.hasMergedAt ? fromTimeTicket(pbTreeNode.mergedAt) : nil
         node.removedAt = pbTreeNode.hasRemovedAt ? fromTimeTicket(pbTreeNode.removedAt) : nil
         
         return node

@@ -131,6 +131,7 @@ protocol IndexTreeNode: AnyObject {
     func cloneText(offset: Int32) -> Self
     func cloneElement(issueTimeTicket: TimeTicket) -> Self
     func getDataSize() -> DataSize
+    func shouldStayLeftOnSplit(_ child: Self, siblings: [Self], versionVector: VersionVector?) -> Bool
 }
 
 extension IndexTreeNode {
@@ -373,7 +374,10 @@ extension IndexTreeNode {
         }
 
         guard let offset = self.innerChildren.firstIndex(where: { $0 === child }) else {
-            throw YorkieError(code: .errInvalidArgument, message: "child not found")
+            // When a child has been detached by a prior merge operation,
+            // removeChild during GC purge may not find it. This is safe to
+            // skip since the child is already physically removed.
+            return
         }
 
         self.innerChildren.splice(offset, 1, with: [])
@@ -381,9 +385,53 @@ extension IndexTreeNode {
     }
 
     /**
+     * `detachChild` removes the given child from this node's children list and
+     * updates the ancestors' size. Unlike ``removeChild(child:)`` which purges a
+     * tombstoned node during GC, `detachChild` moves an alive node between
+     * parents during a merge, so it subtracts the child's size from the
+     * ancestors.
+     */
+    func detachChild(child: Self) throws {
+        guard self.isText == false else {
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
+        }
+
+        guard let offset = self.innerChildren.firstIndex(where: { $0 === child }) else {
+            throw YorkieError(code: .errInvalidArgument, message: "child not found")
+        }
+
+        self.innerChildren.splice(offset, 1, with: [])
+
+        // The child is alive (merge moves only non-removed nodes), so its
+        // paddedSize is currently counted in this node's ancestor chain.
+        // Subtract it before re-appending the child to a new parent.
+        var ancestor = child.parent
+        while ancestor != nil {
+            ancestor?.size -= child.paddedSize
+            if ancestor!.isRemoved {
+                break
+            }
+            ancestor = ancestor?.parent
+        }
+
+        child.parent = nil
+    }
+
+    /**
+     * `shouldStayLeftOnSplit` returns true when `child` was moved here by a
+     * concurrent merge whose source is one of `siblings`, and that merge is
+     * unknown to `versionVector`. Such a child must remain in the original
+     * (left) node during a split instead of flowing to the split (right) node.
+     * Index trees without merge semantics return false.
+     */
+    func shouldStayLeftOnSplit(_ child: Self, siblings: [Self], versionVector: VersionVector?) -> Bool {
+        false
+    }
+
+    /**
      * `splitElement` splits the given element at the given offset.
      */
-    func splitElement(_ offset: Int32, _ issuedTimeTicket: TimeTicket) throws -> (Self?, DataSize) {
+    func splitElement(_ offset: Int32, _ issuedTimeTicket: TimeTicket, _ versionVector: VersionVector? = nil) throws -> (Self?, DataSize) {
         /**
          * TODO(hackerwins): Define ID of split node for concurrent editing.
          * Text has fixed content and its split nodes could have limited offset
@@ -400,8 +448,24 @@ extension IndexTreeNode {
         try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
         clone.updateAncestorsSize()
 
-        let leftChildren = Array(self.children[0 ..< Int(offset)])
-        let rightChildren = Array(self.children[Int(offset)...])
+        let left = Array(self.innerChildren[0 ..< Int(offset)])
+        let right = Array(self.innerChildren[Int(offset)...])
+
+        // Fix 8: handle concurrent merge-moved children during split.
+        // When a child was merge-moved from a source local to this node, the
+        // content should stay in the original (left) node. When the source is
+        // external, the content flows naturally to the split (right) node.
+        let allChildren = left + right
+        var leftChildren = left
+        var rightChildren = [Self]()
+        for child in right {
+            if self.shouldStayLeftOnSplit(child, siblings: allChildren, versionVector: versionVector) {
+                leftChildren.append(child)
+            } else {
+                rightChildren.append(child)
+            }
+        }
+
         self.innerChildren = leftChildren
         clone.innerChildren = rightChildren
         self.size = self.innerChildren.reduce(0) { acc, child in
