@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.4] - 2026-06-17
+
+- Fix tree style divergence on concurrent split via End-token guard in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+- Mirror tree merge snapshot encoding fix from Go SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+- Fix SplitElement divergence on concurrent split inside merge range in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+- Fix split + delete divergence and splitElement tombstone handling in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+- Fix multi-level split + merge divergence via mergedFrom in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+- Fix split sibling convergence via position forwarding in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+- Fix convergence bugs in concurrent tree merge/split in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256
+
 ## [v0.7.3] - 2026-06-16
 
 - Add range-based styleByPath and removeStyleByPath for Tree in https://github.com/yorkie-team/yorkie-ios-sdk/pull/255
