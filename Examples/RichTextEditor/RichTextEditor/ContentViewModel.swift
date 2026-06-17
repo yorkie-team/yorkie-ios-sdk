@@ -253,7 +253,7 @@ extension ContentViewModel {
         guard self.document.canUndo else { return }
         do {
             try self.document.undo()
-            self.syncTextSnapShot()
+            self.syncTextSnapShot(force: true)
         } catch {
             Log.log("undo failed: \(error.localizedDescription)", level: .warning)
         }
@@ -265,7 +265,7 @@ extension ContentViewModel {
         guard self.document.canRedo else { return }
         do {
             try self.document.redo()
-            self.syncTextSnapShot()
+            self.syncTextSnapShot(force: true)
         } catch {
             Log.log("redo failed: \(error.localizedDescription)", level: .warning)
         }
@@ -642,19 +642,26 @@ extension NSMutableAttributedString {
 }
 
 extension ContentViewModel {
-    func syncTextSnapShot() {
-        Log.log("syncTextSnapShot", level: .debug)
+    /// Re-renders the editor from the document.
+    ///
+    /// - Parameter force: When true, always rebuilds the attributed string from the document and
+    ///   skips the unchanged-string shortcuts. Required after undo/redo: a style-only revert leaves
+    ///   the plain string unchanged, and a content revert can match the stale `content` cache, both
+    ///   of which would otherwise reuse the current on-screen text and drop the reverted state.
+    func syncTextSnapShot(force: Bool = false) {
+        Log.log("syncTextSnapShot force: \(force)", level: .debug)
         let content = self.document.getRoot().content as? JSONText
         guard let attributes = content?.values?.map({ $0.getAttributes() }) else { return }
+        let docString = content?.toString ?? ""
         let attributesString: NSMutableAttributedString
-        if self.content == (content?.toString ?? "") {
+        if !force, self.content == docString {
             attributesString = self.mutableAttributeString
         } else {
-            self.content = (content?.toString ?? "")
-            attributesString = NSMutableAttributedString(string: content!.toString)
+            self.content = docString
+            attributesString = NSMutableAttributedString(string: docString)
         }
-        if self.didFinishSync {
-            guard content?.toString != self.attributeString.string else {
+        if !force, self.didFinishSync {
+            guard docString != self.attributeString.string else {
                 print("nothing todo here!")
                 return
             }

@@ -88,17 +88,17 @@ enum DefaultTreeNodeType: String {
 /**
  * `addSizeOfLeftSiblings` returns the size of left siblings of the given offset.
  */
-func addSizeOfLeftSiblings<T: IndexTreeNode>(parent: T, offset: Int) -> Int {
+func addSizeOfLeftSiblings<T: IndexTreeNode>(parent: T, offset: Int, includeRemoved: Bool = false) -> Int {
     var acc = 0
 
-    let siblings = parent.children
+    let siblings = includeRemoved ? parent.innerChildren : parent.children
 
     for leftSibling in siblings.prefix(upTo: offset) {
-        if leftSibling.isRemoved {
+        if !includeRemoved, leftSibling.isRemoved {
             continue
         }
 
-        acc += leftSibling.paddedSize
+        acc += leftSibling.paddedLength(includeRemoved: includeRemoved)
     }
 
     return acc
@@ -131,6 +131,7 @@ protocol IndexTreeNode: AnyObject {
     func cloneText(offset: Int32) -> Self
     func cloneElement(issueTimeTicket: TimeTicket) -> Self
     func getDataSize() -> DataSize
+    func shouldStayLeftOnSplit(_ child: Self, siblings: [Self], versionVector: VersionVector?) -> Bool
 }
 
 extension IndexTreeNode {
@@ -186,6 +187,26 @@ extension IndexTreeNode {
      */
     var paddedSize: Int {
         self.size + (self.isText ? 0 : elementPaddingSize)
+    }
+
+    /**
+     * `nodeLength` returns the node's size under the given tombstone policy.
+     * Visible (`false`) uses the maintained `size`; total (`true`) sums the raw
+     * children, mirroring yorkie-js-sdk's `totalSize` — iOS keeps only a single
+     * (visible) `size`, so the total is computed on the fly.
+     */
+    func nodeLength(includeRemoved: Bool) -> Int {
+        if !includeRemoved || self.isText {
+            return self.size
+        }
+        return self.innerChildren.reduce(0) { $0 + $1.paddedLength(includeRemoved: true) }
+    }
+
+    /**
+     * `paddedLength` returns ``nodeLength(includeRemoved:)`` plus element padding.
+     */
+    func paddedLength(includeRemoved: Bool) -> Int {
+        self.nodeLength(includeRemoved: includeRemoved) + (self.isText ? 0 : elementPaddingSize)
     }
 
     /**
@@ -373,7 +394,10 @@ extension IndexTreeNode {
         }
 
         guard let offset = self.innerChildren.firstIndex(where: { $0 === child }) else {
-            throw YorkieError(code: .errInvalidArgument, message: "child not found")
+            // When a child has been detached by a prior merge operation,
+            // removeChild during GC purge may not find it. This is safe to
+            // skip since the child is already physically removed.
+            return
         }
 
         self.innerChildren.splice(offset, 1, with: [])
@@ -381,9 +405,53 @@ extension IndexTreeNode {
     }
 
     /**
+     * `detachChild` removes the given child from this node's children list and
+     * updates the ancestors' size. Unlike ``removeChild(child:)`` which purges a
+     * tombstoned node during GC, `detachChild` moves an alive node between
+     * parents during a merge, so it subtracts the child's size from the
+     * ancestors.
+     */
+    func detachChild(child: Self) throws {
+        guard self.isText == false else {
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
+        }
+
+        guard let offset = self.innerChildren.firstIndex(where: { $0 === child }) else {
+            throw YorkieError(code: .errInvalidArgument, message: "child not found")
+        }
+
+        self.innerChildren.splice(offset, 1, with: [])
+
+        // The child is alive (merge moves only non-removed nodes), so its
+        // paddedSize is currently counted in this node's ancestor chain.
+        // Subtract it before re-appending the child to a new parent.
+        var ancestor = child.parent
+        while ancestor != nil {
+            ancestor?.size -= child.paddedSize
+            if ancestor!.isRemoved {
+                break
+            }
+            ancestor = ancestor?.parent
+        }
+
+        child.parent = nil
+    }
+
+    /**
+     * `shouldStayLeftOnSplit` returns true when `child` was moved here by a
+     * concurrent merge whose source is one of `siblings`, and that merge is
+     * unknown to `versionVector`. Such a child must remain in the original
+     * (left) node during a split instead of flowing to the split (right) node.
+     * Index trees without merge semantics return false.
+     */
+    func shouldStayLeftOnSplit(_ child: Self, siblings: [Self], versionVector: VersionVector?) -> Bool {
+        false
+    }
+
+    /**
      * `splitElement` splits the given element at the given offset.
      */
-    func splitElement(_ offset: Int32, _ issuedTimeTicket: TimeTicket) throws -> (Self?, DataSize) {
+    func splitElement(_ offset: Int32, _ issuedTimeTicket: TimeTicket, _ versionVector: VersionVector? = nil) throws -> (Self?, DataSize) {
         /**
          * TODO(hackerwins): Define ID of split node for concurrent editing.
          * Text has fixed content and its split nodes could have limited offset
@@ -400,8 +468,24 @@ extension IndexTreeNode {
         try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
         clone.updateAncestorsSize()
 
-        let leftChildren = Array(self.children[0 ..< Int(offset)])
-        let rightChildren = Array(self.children[Int(offset)...])
+        let left = Array(self.innerChildren[0 ..< Int(offset)])
+        let right = Array(self.innerChildren[Int(offset)...])
+
+        // Fix 8: handle concurrent merge-moved children during split.
+        // When a child was merge-moved from a source local to this node, the
+        // content should stay in the original (left) node. When the source is
+        // external, the content flows naturally to the split (right) node.
+        let allChildren = left + right
+        var leftChildren = left
+        var rightChildren = [Self]()
+        for child in right {
+            if self.shouldStayLeftOnSplit(child, siblings: allChildren, versionVector: versionVector) {
+                leftChildren.append(child)
+            } else {
+                rightChildren.append(child)
+            }
+        }
+
         self.innerChildren = leftChildren
         clone.innerChildren = rightChildren
         self.size = self.innerChildren.reduce(0) { acc, child in
@@ -454,8 +538,16 @@ extension IndexTreeNode {
      * It excludes the removed nodes.
      */
     func findOffset(node: Self) throws -> Int {
+        try self.findOffset(node: node, includeRemoved: false)
+    }
+
+    func findOffset(node: Self, includeRemoved: Bool) throws -> Int {
         guard self.isText == false else {
             throw YorkieError(code: .errRefused, message: "Text node cannot have children")
+        }
+
+        if includeRemoved {
+            return self.innerChildren.firstIndex(where: { $0 === node }) ?? -1
         }
 
         if node.isRemoved {
@@ -590,18 +682,20 @@ typealias TreeToken<T> = (T, TokenType)
 func tokensBetween<T: IndexTreeNode>(root: T,
                                      from: Int,
                                      to: Int,
+                                     includeRemoved: Bool = false,
                                      callback: @escaping (TreeToken<T>, Bool) throws -> Void) throws
 {
     if from > to {
         throw YorkieError(code: .errInvalidArgument, message: "from is greater than to: \(from) > \(to)")
     }
 
-    if from > root.size {
-        throw YorkieError(code: .errInvalidArgument, message: "from is out of range: \(from) > \(root.size)")
+    let rootSize = root.nodeLength(includeRemoved: includeRemoved)
+    if from > rootSize {
+        throw YorkieError(code: .errInvalidArgument, message: "from is out of range: \(from) > \(rootSize)")
     }
 
-    if to > root.size {
-        throw YorkieError(code: .errInvalidArgument, message: "to is out of range: \(to) > \(root.size)")
+    if to > rootSize {
+        throw YorkieError(code: .errInvalidArgument, message: "to is out of range: \(to) > \(rootSize)")
     }
 
     if from == to {
@@ -609,9 +703,11 @@ func tokensBetween<T: IndexTreeNode>(root: T,
     }
 
     var pos = 0
-    for child in root.children {
+    let children = includeRemoved ? root.innerChildren : root.children
+    for child in children {
+        let childPaddedSize = child.paddedLength(includeRemoved: includeRemoved)
         // If the child is an element node, the size of the child.
-        if from - child.paddedSize < pos, pos < to {
+        if from - childPaddedSize < pos, pos < to {
             // If the child is an element node, the range of the child
             // is from - 1 to to - 1. Because the range of the element node is from
             // the open tag to the close tag.
@@ -620,15 +716,17 @@ func tokensBetween<T: IndexTreeNode>(root: T,
 
             // If the range spans outside the child,
             // the callback is called with the child.
+            let childSize = child.nodeLength(includeRemoved: includeRemoved)
             let startContained = !child.isText && fromChild < 0
-            let endContained = !child.isText && toChild > child.size
+            let endContained = !child.isText && toChild > childSize
             if child.isText || startContained {
                 try callback((child, child.isText ? .text : .start), endContained)
             }
 
             try tokensBetween(root: child,
                               from: max(0, fromChild),
-                              to: min(toChild, child.size),
+                              to: min(toChild, childSize),
+                              includeRemoved: includeRemoved,
                               callback: callback)
 
             if endContained {
@@ -636,7 +734,7 @@ func tokensBetween<T: IndexTreeNode>(root: T,
             }
         }
 
-        pos += child.paddedSize
+        pos += childPaddedSize
     }
 }
 
@@ -802,8 +900,8 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `tokensBetween` returns the nodes between the given range.
      */
-    func tokensBetween(_ from: Int, _ to: Int, _ callback: @escaping (TreeToken<T>, Bool) throws -> Void) throws {
-        try Yorkie.tokensBetween(root: self.root, from: from, to: to, callback: callback)
+    func tokensBetween(_ from: Int, _ to: Int, _ includeRemoved: Bool = false, _ callback: @escaping (TreeToken<T>, Bool) throws -> Void) throws {
+        try Yorkie.tokensBetween(root: self.root, from: from, to: to, includeRemoved: includeRemoved, callback: callback)
     }
 
     /**
@@ -938,7 +1036,7 @@ class IndexTree<T: IndexTreeNode> {
     /**
      * `indexOf` returns the index of the given tree position.
      */
-    func indexOf(_ pos: TreePos<T>) throws -> Int {
+    func indexOf(_ pos: TreePos<T>, _ includeRemoved: Bool = false) throws -> Int {
         var node = pos.node
         let offset = Int(pos.offset)
 
@@ -948,26 +1046,26 @@ class IndexTree<T: IndexTreeNode> {
             size += offset
 
             let parent = node.parent!
-            let offsetOfNode = try parent.findOffset(node: node)
+            let offsetOfNode = try parent.findOffset(node: node, includeRemoved: includeRemoved)
             if offsetOfNode == -1 {
                 throw YorkieError(code: .errInvalidArgument, message: "invalid pos")
             }
 
-            size += addSizeOfLeftSiblings(parent: parent, offset: offsetOfNode)
+            size += addSizeOfLeftSiblings(parent: parent, offset: offsetOfNode, includeRemoved: includeRemoved)
 
             node = node.parent!
         } else {
-            size += addSizeOfLeftSiblings(parent: node, offset: offset)
+            size += addSizeOfLeftSiblings(parent: node, offset: offset, includeRemoved: includeRemoved)
         }
 
         while node.parent != nil {
             let parent = node.parent!
-            let offsetOfNode = try parent.findOffset(node: node)
+            let offsetOfNode = try parent.findOffset(node: node, includeRemoved: includeRemoved)
             if offsetOfNode == -1 {
                 throw YorkieError(code: .errInvalidArgument, message: "invalid pos")
             }
 
-            size += addSizeOfLeftSiblings(parent: parent, offset: offsetOfNode)
+            size += addSizeOfLeftSiblings(parent: parent, offset: offsetOfNode, includeRemoved: includeRemoved)
             depth += 1
             node = node.parent!
         }

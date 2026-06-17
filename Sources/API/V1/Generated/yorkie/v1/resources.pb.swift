@@ -1535,6 +1535,30 @@ public struct Yorkie_V1_TreeNode: @unchecked Sendable {
     set {_uniqueStorage()._attributes = newValue}
   }
 
+  /// merged_from is set when this node was moved to a new parent by a
+  /// concurrent merge. It points to the source parent's ID.
+  public var mergedFrom: Yorkie_V1_TreeNodeID {
+    get {_storage._mergedFrom ?? Yorkie_V1_TreeNodeID()}
+    set {_uniqueStorage()._mergedFrom = newValue}
+  }
+  /// Returns true if `mergedFrom` has been explicitly set.
+  public var hasMergedFrom: Bool {_storage._mergedFrom != nil}
+  /// Clears the value of `mergedFrom`. Subsequent reads from it will return its default value.
+  public mutating func clearMergedFrom() {_uniqueStorage()._mergedFrom = nil}
+
+  /// merged_at records the immutable ticket of the merge operation.
+  /// Stored alongside merged_from because the source parent's removed_at
+  /// may be overwritten by later LWW tombstones and thus cannot serve as
+  /// the merge-time causal boundary for SplitElement.
+  public var mergedAt: Yorkie_V1_TimeTicket {
+    get {_storage._mergedAt ?? Yorkie_V1_TimeTicket()}
+    set {_uniqueStorage()._mergedAt = newValue}
+  }
+  /// Returns true if `mergedAt` has been explicitly set.
+  public var hasMergedAt: Bool {_storage._mergedAt != nil}
+  /// Clears the value of `mergedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearMergedAt() {_uniqueStorage()._mergedAt = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -4625,7 +4649,7 @@ extension Yorkie_V1_TextNodeID: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TreeNode"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}type\0\u{1}value\0\u{3}removed_at\0\u{3}ins_prev_id\0\u{3}ins_next_id\0\u{1}depth\0\u{1}attributes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}type\0\u{1}value\0\u{3}removed_at\0\u{3}ins_prev_id\0\u{3}ins_next_id\0\u{1}depth\0\u{1}attributes\0\u{3}merged_from\0\u{3}merged_at\0")
 
   fileprivate class _StorageClass {
     var _id: Yorkie_V1_TreeNodeID? = nil
@@ -4636,6 +4660,8 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     var _insNextID: Yorkie_V1_TreeNodeID? = nil
     var _depth: Int32 = 0
     var _attributes: Dictionary<String,Yorkie_V1_NodeAttr> = [:]
+    var _mergedFrom: Yorkie_V1_TreeNodeID? = nil
+    var _mergedAt: Yorkie_V1_TimeTicket? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -4654,6 +4680,8 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       _insNextID = source._insNextID
       _depth = source._depth
       _attributes = source._attributes
+      _mergedFrom = source._mergedFrom
+      _mergedAt = source._mergedAt
     }
   }
 
@@ -4680,6 +4708,8 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._insNextID) }()
         case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._depth) }()
         case 8: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_NodeAttr>.self, value: &_storage._attributes) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._mergedFrom) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._mergedAt) }()
         default: break
         }
       }
@@ -4716,6 +4746,12 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       if !_storage._attributes.isEmpty {
         try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_NodeAttr>.self, value: _storage._attributes, fieldNumber: 8)
       }
+      try { if let v = _storage._mergedFrom {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._mergedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4733,6 +4769,8 @@ extension Yorkie_V1_TreeNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
         if _storage._insNextID != rhs_storage._insNextID {return false}
         if _storage._depth != rhs_storage._depth {return false}
         if _storage._attributes != rhs_storage._attributes {return false}
+        if _storage._mergedFrom != rhs_storage._mergedFrom {return false}
+        if _storage._mergedAt != rhs_storage._mergedAt {return false}
         return true
       }
       if !storagesAreEqual {return false}
