@@ -53,7 +53,7 @@ enum Converter {
 
     static func countValueFrom(_ valueType: PbValueType, data: Data) throws -> any YorkieCountable {
         switch valueType {
-        case .integerCnt:
+        case .integerCnt, .integerDedupCnt:
             return Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
         case .longCnt:
             return Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
@@ -252,15 +252,16 @@ extension Converter {
 
 // MARK: CounterType
 extension Converter {
-    /**
-     * `toCounterType` converts the given model to Protobuf format.
-     */
-    static func toCounterType(_ valueType: any YorkieCountable) -> PbValueType {
-        if valueType is Int32 {
-            return .integer
-        } else {
-            return .long
+    /// Returns the Protobuf value type for a ``CRDTCounter``, preserving
+    /// dedup mode as `.integerDedupCnt`.
+    static func toCounterTypeForCounter<T: YorkieCountable>(_ counter: CRDTCounter<T>) -> PbValueType {
+        if counter.isDedup {
+            return .integerDedupCnt
         }
+        if counter.value is Int32 {
+            return .integerCnt
+        }
+        return .longCnt
     }
 }
 
@@ -283,7 +284,7 @@ extension Converter {
             pbElementSimple.type = toValueType(primitive)
             pbElementSimple.value = element.toBytes()
         } else if let counter = element as? CRDTCounter<Int32> {
-            pbElementSimple.type = .integerCnt
+            pbElementSimple.type = counter.isDedup ? .integerDedupCnt : .integerCnt
             pbElementSimple.value = counter.toBytes()
         } else if let counter = element as? CRDTCounter<Int64> {
             pbElementSimple.type = .longCnt
@@ -324,6 +325,11 @@ extension Converter {
             return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
             return Primitive(value: try valueFrom(pbElementSimple.type, data: pbElementSimple.value), createdAt: fromTimeTicket(pbElementSimple.createdAt))
+        case .integerDedupCnt:
+            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: fromTimeTicket(pbElementSimple.createdAt))
+            // value bytes encode the last-known cardinality; HLL registers are
+            // restored via fromCounter — not available in the simple form.
+            return counter
         case .integerCnt:
             guard let value = try countValueFrom(pbElementSimple.type, data: pbElementSimple.value) as? Int32 else {
                 throw YorkieError(code: .errInvalidType, message: "unexpected counter value type")
@@ -480,6 +486,7 @@ extension Converter {
             pbIncreaseOperation.parentCreatedAt = toTimeTicket(increaseOperation.parentCreatedAt)
             pbIncreaseOperation.value = toElementSimple(increaseOperation.value)
             pbIncreaseOperation.executedAt = toTimeTicket(increaseOperation.executedAt)
+            pbIncreaseOperation.actor = increaseOperation.actor
             pbOperation.increase = pbIncreaseOperation
         } else if let treeEditOperation = operation as? TreeEditOperation {
             var pbTreeEditOperation = PbOperation.TreeEdit()
@@ -564,7 +571,8 @@ extension Converter {
             } else if case let .increase(pbIncreaseOperation) = pbOperation.body {
                 return IncreaseOperation(parentCreatedAt: fromTimeTicket(pbIncreaseOperation.parentCreatedAt),
                                          value: try fromElementSimple(pbElementSimple: pbIncreaseOperation.value),
-                                         executedAt: fromTimeTicket(pbIncreaseOperation.executedAt))
+                                         executedAt: fromTimeTicket(pbIncreaseOperation.executedAt),
+                                         actor: pbIncreaseOperation.actor)
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
                 return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
@@ -798,8 +806,11 @@ extension Converter {
      */
     static func toCounter<T: YorkieCountable>(_ counter: CRDTCounter<T>) -> PbJSONElement {
         var pbCounter = PbJSONElement.Counter()
-        pbCounter.type = toCounterType(counter.value)
+        pbCounter.type = toCounterTypeForCounter(counter)
         pbCounter.value = counter.toBytes()
+        if let hllData = counter.hllBytes() {
+            pbCounter.hllRegisters = hllData
+        }
         pbCounter.createdAt = toTimeTicket(counter.createdAt)
         if let ticket = counter.movedAt {
             pbCounter.movedAt = toTimeTicket(ticket)
@@ -821,26 +832,32 @@ extension Converter {
      * `fromCounter` converts the given Protobuf format to model format.
      */
     static func fromCounter(_ pbCounter: PbJSONElement.Counter) throws -> CRDTElement {
-        let value = try countValueFrom(pbCounter.type, data: pbCounter.value)
-
         switch pbCounter.type {
+        case .integerDedupCnt:
+            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: fromTimeTicket(pbCounter.createdAt))
+            counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
+            counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
+            if !pbCounter.hllRegisters.isEmpty {
+                try counter.restoreHLL(pbCounter.hllRegisters)
+            }
+            return counter
         case .integerCnt:
+            let value = try countValueFrom(pbCounter.type, data: pbCounter.value)
             guard let value = value as? Int32 else {
                 throw YorkieError(code: .errInvalidType, message: "[\(pbCounter.type)] value is not Int32.")
             }
             let counter = CRDTCounter<Int32>(value: value, createdAt: fromTimeTicket(pbCounter.createdAt))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
             counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
-
             return counter
         case .longCnt:
+            let value = try countValueFrom(pbCounter.type, data: pbCounter.value)
             guard let value = value as? Int64 else {
                 throw YorkieError(code: .errInvalidType, message: "[\(pbCounter.type)] value is not Int64.")
             }
             let counter = CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbCounter.createdAt))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
             counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
-
             return counter
         default:
             throw YorkieError(code: .errUnimplemented, message: "\(pbCounter.type) is not implemented.")

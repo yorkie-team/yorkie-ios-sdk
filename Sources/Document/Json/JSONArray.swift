@@ -458,6 +458,19 @@ public class JSONArray: CustomDebugStringConvertible {
             self.context.push(operation: operation)
 
             return counter
+        } else if let element = value as? JSONDedupCounter {
+            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: ticket)
+            element.initialize(context: self.context, counter: counter)
+
+            let clone = counter.deepcopy()
+
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
+            self.context.push(operation: operation)
+
+            return counter
         } else if let element = value as? JSONText {
             let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: ticket)
             element.initialize(context: self.context, text: text)

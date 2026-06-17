@@ -96,6 +96,10 @@ public class JSONObject {
             let counter = CRDTCounter<Int64>(value: value, createdAt: ticket)
             element.initialize(context: self.context, counter: counter)
             self.setValue(key: key, value: counter, ticket: ticket)
+        } else if let element = value as? JSONDedupCounter {
+            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: ticket)
+            element.initialize(context: self.context, counter: counter)
+            self.setValue(key: key, value: counter, ticket: ticket)
         } else if let element = value as? JSONText {
             let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: ticket)
             element.initialize(context: self.context, text: text)
