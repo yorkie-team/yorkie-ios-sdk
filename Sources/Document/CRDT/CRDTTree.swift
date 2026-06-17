@@ -1097,22 +1097,7 @@ class CRDTTree: CRDTElement {
                     // Cascade delete to split siblings created by concurrent
                     // SplitElement. Only for element nodes.
                     if !node.isText, node.insNextID != nil, !toBeMergedNodes.contains(where: { $0 === node }) {
-                        var nextID = node.insNextID
-                        while let id = nextID, let next = self.findFloorNode(id) {
-                            if !ticketKnown(versionVector, next.id.createdAt) {
-                                nodesToBeRemoved.append(next)
-                                // Cascade through the full subtree, not just immediate children.
-                                traverseAll(node: next) { descendant, _ in
-                                    if descendant !== next {
-                                        nodesToBeRemoved.append(descendant)
-                                    }
-                                }
-                            }
-                            if next.insNextID == nil {
-                                break
-                            }
-                            nextID = next.insNextID
-                        }
+                        nodesToBeRemoved.append(contentsOf: self.collectUnknownSplitSiblings(of: node, versionVector))
                     }
                 }
                 tokensToBeRemoved.append((node, tokenType))
@@ -1126,71 +1111,20 @@ class CRDTTree: CRDTElement {
         // 02. Delete: delete the nodes that are marked as removed.
         var pairs = [GCPair]()
         for node in nodesToBeRemoved {
-            if node.remove(editedAt) {
+            let didRemove = node.remove(editedAt)
+            if didRemove {
                 pairs.append(GCPair(parent: self, child: node))
             }
         }
 
-        // 03. Merge: move the nodes that are marked as moved. Only `mergedFrom`
-        // and `mergedAt` are written on the moved child — both are persisted in
-        // the snapshot encoding. `mergedAt` must be captured explicitly here
-        // (not read from source.removedAt at use time) because the source's
-        // `removedAt` is mutated by LWW when a later concurrent tombstone
-        // targets the same node.
-        for node in toBeMovedToFromParents where node.removedAt == nil {
-            if let parent = node.parent {
-                node.mergedFrom = parent.id
-                node.mergedAt = editedAt
-                // Detach from old parent to prevent ghost references. The child
-                // may already have been detached by a concurrent operation
-                // (e.g., cascade delete of split sibling), so ignore the error.
-                try? parent.detachChild(child: node)
-            }
-            try fromParent.append(contentsOf: [node])
-        }
-
-        // Set forwarding pointer on merge-source nodes. This is a runtime cache
-        // rebuilt from `mergedFrom` on snapshot load.
-        for src in toBeMergedNodes {
-            src.mergedInto = fromParent.id
-        }
+        // 03. Merge: move the nodes that are marked as moved, then set the
+        // forwarding pointer on merge-source nodes.
+        try self.applyMergeMoves(toBeMovedToFromParents, fromParent, toBeMergedNodes, editedAt)
 
         // 03-1. Propagate deletes to children moved by prior merges. When a
         // merge-source node is fully deleted (not a merge boundary), its former
-        // children in the merge target should also be deleted. Skip when
-        // `mergedInto` points to `fromParent` (concurrent merge). The list of
-        // moved children is recomputed on the fly from the merge target's
-        // children filtered by `mergedFrom`.
-        for node in nodesToBeRemoved {
-            guard let mergedInto = node.mergedInto,
-                  !toBeMergedNodes.contains(where: { $0 === node }),
-                  mergedInto != fromParent.id
-            else {
-                continue
-            }
-            guard let mergeTarget = self.findFloorNode(mergedInto) else {
-                continue
-            }
-            for targetChild in mergeTarget.innerChildren {
-                guard let childMergedFrom = targetChild.mergedFrom, childMergedFrom == node.id else {
-                    continue
-                }
-                if targetChild.removedAt != nil {
-                    continue
-                }
-                if targetChild.remove(editedAt) {
-                    pairs.append(GCPair(parent: self, child: targetChild))
-                }
-                // Also tombstone descendants if the moved child is an element.
-                traverseAll(node: targetChild) { descendant, _ in
-                    if descendant !== targetChild, descendant.removedAt == nil {
-                        if descendant.remove(editedAt) {
-                            pairs.append(GCPair(parent: self, child: descendant))
-                        }
-                    }
-                }
-            }
-        }
+        // children in the merge target should also be deleted.
+        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, fromParent, toBeMergedNodes, editedAt))
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
@@ -1273,6 +1207,98 @@ class CRDTTree: CRDTElement {
             }
         }
         return (changes, pairs, diff, nodesToBeRemoved, fromIdx)
+    }
+
+    /**
+     * `applyMergeMoves` moves each alive node marked for merge into `fromParent`,
+     * recording `mergedFrom`/`mergedAt` (both persisted in the snapshot encoding;
+     * `mergedAt` is captured here because the source's `removedAt` may be
+     * overwritten by a later LWW tombstone) and detaching it from its old parent.
+     * It then sets the `mergedInto` forwarding cache on the merge-source nodes.
+     */
+    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) throws {
+        for node in toBeMovedToFromParents where node.removedAt == nil {
+            if let parent = node.parent {
+                node.mergedFrom = parent.id
+                node.mergedAt = editedAt
+                // Detach from old parent to prevent ghost references. The child
+                // may already have been detached by a concurrent operation
+                // (e.g., cascade delete of split sibling), so ignore the error.
+                try? parent.detachChild(child: node)
+            }
+            try fromParent.append(contentsOf: [node])
+        }
+
+        // Forwarding pointer rebuilt from `mergedFrom` on snapshot load.
+        for src in toBeMergedNodes {
+            src.mergedInto = fromParent.id
+        }
+    }
+
+    /**
+     * `collectUnknownSplitSiblings` walks the `insNextID` chain from the given
+     * node and collects the split siblings (and their subtrees) whose creation
+     * the editor did not know about, so they can be cascade-deleted alongside
+     * the node being removed.
+     */
+    private func collectUnknownSplitSiblings(of node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
+        var result = [CRDTTreeNode]()
+        var nextID = node.insNextID
+        while let id = nextID, let next = self.findFloorNode(id) {
+            if !ticketKnown(versionVector, next.id.createdAt) {
+                result.append(next)
+                // Cascade through the full subtree, not just immediate children.
+                traverseAll(node: next) { descendant, _ in
+                    if descendant !== next {
+                        result.append(descendant)
+                    }
+                }
+            }
+            if next.insNextID == nil {
+                break
+            }
+            nextID = next.insNextID
+        }
+        return result
+    }
+
+    /**
+     * `propagateDeletesToMergedChildren` tombstones the children (and their
+     * descendants) that a prior merge moved out of each fully-deleted
+     * merge-source node into its merge target. Skips merge boundaries and the
+     * concurrent-merge case where `mergedInto` points back at `fromParent`. The
+     * moved children are recomputed from the merge target's children filtered by
+     * `mergedFrom`. Returns the GC pairs for the newly tombstoned nodes.
+     */
+    private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
+        var pairs = [GCPair]()
+        for node in nodesToBeRemoved {
+            guard let mergedInto = node.mergedInto,
+                  !toBeMergedNodes.contains(where: { $0 === node }),
+                  mergedInto != fromParent.id,
+                  let mergeTarget = self.findFloorNode(mergedInto)
+            else {
+                continue
+            }
+            for targetChild in mergeTarget.innerChildren {
+                guard let childMergedFrom = targetChild.mergedFrom,
+                      childMergedFrom == node.id,
+                      targetChild.removedAt == nil
+                else {
+                    continue
+                }
+                if targetChild.remove(editedAt) {
+                    pairs.append(GCPair(parent: self, child: targetChild))
+                }
+                // Also tombstone descendants if the moved child is an element.
+                traverseAll(node: targetChild) { descendant, _ in
+                    if descendant !== targetChild, descendant.removedAt == nil, descendant.remove(editedAt) {
+                        pairs.append(GCPair(parent: self, child: descendant))
+                    }
+                }
+            }
+        }
+        return pairs
     }
 
     /**
