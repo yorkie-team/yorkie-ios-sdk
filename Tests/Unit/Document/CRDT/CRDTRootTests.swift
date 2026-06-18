@@ -244,4 +244,49 @@ class CRDTRootTests: XCTestCase {
         // then
         XCTAssertEqual(result?.toSortedJSON(), expectedJson)
     }
+
+    // Ported from yorkie-js-sdk v0.7.6 root_test.ts:
+    // "should register LWW-losing element in GC set on Set conflict" (#1226).
+    // When two concurrent Set operations target the same key and the later-timestamped
+    // value wins LWW, the losing value must be registered as GC garbage immediately.
+    func test_should_register_lww_losing_element_in_gc_set_on_set_conflict() throws {
+        // given — a fresh root
+        let rootObject = CRDTObject(createdAt: TimeTicket.initial)
+        let target = CRDTRoot(rootObject: rootObject)
+
+        let actorA = "000000000000000000000001"
+        let actorB = "000000000000000000000002"
+
+        // actorB > actorA lexicographically, so actorB wins the LWW tie when lamport is equal.
+        let ticketA = TimeTicket(lamport: 1, delimiter: 0, actorID: actorA)
+        let ticketB = TimeTicket(lamport: 1, delimiter: 0, actorID: actorB)
+
+        // when — actorA sets "key" = 1
+        let valueA = Primitive(value: .integer(1), createdAt: ticketA)
+        let setA = SetOperation(key: "key", value: valueA, parentCreatedAt: TimeTicket.initial, executedAt: ticketA)
+        try setA.execute(root: target, source: .remote)
+
+        // then — no garbage yet
+        XCTAssertEqual(target.garbageLength, 0)
+
+        // when — actorB sets "key" = 2 (actorB wins, actorA's value is removed)
+        let valueB = Primitive(value: .integer(2), createdAt: ticketB)
+        let setB = SetOperation(key: "key", value: valueB, parentCreatedAt: TimeTicket.initial, executedAt: ticketB)
+        try setB.execute(root: target, source: .remote)
+
+        // then — actorA's value is registered as garbage
+        XCTAssertEqual(target.garbageLength, 1)
+        XCTAssertEqual(rootObject.toJSON(), "{\"key\":2}")
+
+        // when — actorA sets "key" = 3 with a newer delimiter (still loses to actorB)
+        let ticketA2 = TimeTicket(lamport: 1, delimiter: 1, actorID: actorA)
+        let valueA2 = Primitive(value: .integer(3), createdAt: ticketA2)
+        let setA2 = SetOperation(key: "key", value: valueA2, parentCreatedAt: TimeTicket.initial, executedAt: ticketA2)
+        try setA2.execute(root: target, source: .remote)
+
+        // then — the LWW-losing valueA2 is also registered as garbage
+        // Before the fix (#1226), this was 1 because the losing value was not registered.
+        XCTAssertEqual(target.garbageLength, 2)
+        XCTAssertEqual(rootObject.toJSON(), "{\"key\":2}")
+    }
 }

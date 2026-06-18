@@ -522,6 +522,36 @@ final class CRDTTreeSplitTests: XCTestCase {
         XCTAssertEqual(tree.toXML(), /* html */ "<root><p>abcd</p></root>")
         XCTAssertEqual(tree.size, 6)
     }
+
+    // Ported from yorkie-js-sdk v0.7.6 tree_test.ts:
+    // "Can split element nodes with attributes" (#1224).
+    // Verifies that cloneElement copies attributes to the right sibling created
+    // during a split, so a concurrent style op whose range was computed before
+    // the split also covers the newly-created right sibling.
+    func test_can_split_element_nodes_with_attributes() throws {
+        //       0   1 2 3 4 5 6 7 8 9 10    11
+        // <root> <p> h e l l o w o r l  d  </p>  </root>
+
+        // given — a <p> with bold="true" and text "helloworld"
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: "root"), createdAt: timeT())
+        let pNode = CRDTTreeNode(id: posT(), type: "p")
+        pNode.setAttrs(["bold": "true"], timeT())
+        try tree.editT((0, 0), [pNode], 0, timeT(), timeT)
+        try tree.editT(
+            (1, 1),
+            [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "helloworld")],
+            0,
+            timeT(),
+            timeT
+        )
+        XCTAssertEqual(tree.toXML(), "<root><p bold=true>helloworld</p></root>")
+
+        // when — split at position 6 (after "hello"), splitLevel 1
+        try tree.editT((6, 6), nil, 1, timeT(), timeT)
+
+        // then — both siblings carry bold="true"
+        XCTAssertEqual(tree.toXML(), "<root><p bold=true>hello</p><p bold=true>world</p></root>")
+    }
 }
 
 final class CRDTTreeMergeTests: XCTestCase {
