@@ -214,18 +214,34 @@ extension CRDTArray {
     /**
      * `deepcopy` copies itself deeply.
      *
-     * Iterates live nodes only (the `Sequence` conformance skips dead position nodes),
-     * so the copy does not inherit dead position state — it will be reconstructed from
-     * the snapshot on the next round-trip.
+     * Iterates ALL position nodes (including moved and dead ones) and reconstructs
+     * each with its position timestamps, mirroring JS `CRDTArray.deepcopy`. Copying
+     * only live nodes would lose moved positions and dead slots, so a later move on
+     * the clone could anchor after a wrong or GC'd position.
      */
     func deepcopy() -> CRDTElement {
         let result = CRDTArray(createdAt: self.createdAt)
-        for node in self.elements {
-            guard let entry = node.elementEntry else { continue }
-            _ = try? result.elements.insert(
-                entry.element.deepcopy(),
-                prevCreatedAt: result.elements.getLastCreatedAt()
-            )
+        for node in self.elements.allNodes() {
+            if let entry = node.getElementEntry() {
+                let copied = entry.element.deepcopy()
+                if let posMovedAt = entry.posMovedAt {
+                    try? result.elements.addMovedElement(
+                        value: copied,
+                        positionCreatedAt: node.getPositionCreatedAt(),
+                        positionMovedAt: posMovedAt
+                    )
+                } else {
+                    _ = try? result.elements.insert(
+                        copied,
+                        prevCreatedAt: result.elements.getLastCreatedAt()
+                    )
+                }
+            } else if let removedAt = node.getPositionRemovedAt() {
+                try? result.elements.addDeadPosition(
+                    positionCreatedAt: node.getPositionCreatedAt(),
+                    positionRemovedAt: removedAt
+                )
+            }
         }
         result.remove(self.removedAt)
         return result

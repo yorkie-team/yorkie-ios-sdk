@@ -653,11 +653,12 @@ extension Converter {
                 guard let pbElement = try? toElement(entry.element) else { return nil }
                 pbRGANode.element = pbElement
 
-                let posCreatedAt = node.getPositionCreatedAt()
-                if posCreatedAt != entry.element.createdAt {
-                    // positionCreatedAt differs from element.createdAt → moved node.
-                    pbRGANode.positionCreatedAt = toTimeTicket(posCreatedAt)
-                    pbRGANode.positionMovedAt = toTimeTicket(posCreatedAt)
+                if let posMovedAt = entry.posMovedAt {
+                    // Moved node — encode the position id and the actual move
+                    // ticket (mirrors JS toRGANodes, which branches on
+                    // getPositionMovedAt() and emits it verbatim).
+                    pbRGANode.positionMovedAt = toTimeTicket(posMovedAt)
+                    pbRGANode.positionCreatedAt = toTimeTicket(node.getPositionCreatedAt())
                 }
                 // Otherwise it is a normal node — no position fields needed.
             } else {
