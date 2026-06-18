@@ -715,11 +715,9 @@ final class DocumentIntegrationTests: XCTestCase {
             TestCase(name: "array",
                      input: [Int32(1), Int32(2)],
                      expectedJSON: "{\"array\":[1,2]}"),
-            // TODO(hackerwins): We need to consider the case where the value is
-            // a byte array and a date.
             TestCase(name: "bytes",
                      input: Data([UInt8]([1, 2])),
-                     expectedJSON: "{\"bytes\":[1,2]}")
+                     expectedJSON: "{\"bytes\":\"AQI=\"}")
         ]
 
         for testCase in testCases {
