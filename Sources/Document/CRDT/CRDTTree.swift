@@ -925,7 +925,9 @@ class CRDTTree: CRDTElement {
                 // for the reverse operation (undo).
                 if !capturedPrev {
                     for key in attributes.keys {
-                        if let existing = node.attrs?.getNodeByKey(key)?.value {
+                        // A tombstoned (removed) attribute counts as absent, so the
+                        // reverse op removes the key rather than restoring a stale value.
+                        if node.attrs?.has(key: key) == true, let existing = node.attrs?.getNodeByKey(key)?.value {
                             prevAttributes[key] = existing
                         } else {
                             newAttrKeys.append(key)
@@ -1024,7 +1026,7 @@ class CRDTTree: CRDTElement {
                 // Capture previous attribute values from the first styled node
                 // for the reverse operation (undo).
                 if !capturedPrev {
-                    for key in attributesToRemove {
+                    for key in attributesToRemove where node.attrs?.has(key: key) == true {
                         if let existing = node.attrs?.getNodeByKey(key)?.value {
                             prevAttributes[key] = existing
                         }
