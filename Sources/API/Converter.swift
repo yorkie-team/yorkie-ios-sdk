@@ -633,16 +633,40 @@ extension Converter {
 // MARK: RGNNodes
 extension Converter {
     /**
-     * `toRGANodes` converts the given model to Protobuf format.
+     * `toRGANodes` converts the given ``CRDTArray`` to an array of Protobuf RGA nodes.
+     *
+     * Serialises all nodes in linked-list order, including dead position nodes, so
+     * that the snapshot can be fully restored on the receiving side.
+     *
+     * Three node shapes are produced (matching the JS wire format exactly):
+     * - **Normal**: `element` only (no position fields).
+     * - **Moved**: `element` + `positionCreatedAt` + `positionMovedAt`.
+     * - **Dead**: `positionCreatedAt` + `positionRemovedAt` only — NO element field.
+     *   The JS/Go decoders detect dead nodes via `!hasElement`.
      */
-    static func toRGANodes(_ rgaTreeList: RGATreeList) -> [PbRGANode] {
-        rgaTreeList.compactMap {
-            guard let element = try? toElement($0.value) else {
-                return nil
-            }
-
+    static func toRGANodes(_ arr: CRDTArray) -> [PbRGANode] {
+        arr.getAllRGANodes().compactMap { node in
             var pbRGANode = PbRGANode()
-            pbRGANode.element = element
+
+            if let entry = node.getElementEntry() {
+                // Live or moved node — always encode the element.
+                guard let pbElement = try? toElement(entry.element) else { return nil }
+                pbRGANode.element = pbElement
+
+                let posCreatedAt = node.getPositionCreatedAt()
+                if posCreatedAt != entry.element.createdAt {
+                    // positionCreatedAt differs from element.createdAt → moved node.
+                    pbRGANode.positionCreatedAt = toTimeTicket(posCreatedAt)
+                    pbRGANode.positionMovedAt = toTimeTicket(posCreatedAt)
+                }
+                // Otherwise it is a normal node — no position fields needed.
+            } else {
+                // Dead position node — encode positionCreatedAt + positionRemovedAt only.
+                // Do NOT set element: JS/Go decoders branch on `!hasElement` to detect dead nodes.
+                guard let removedAt = node.getPositionRemovedAt() else { return nil }
+                pbRGANode.positionCreatedAt = toTimeTicket(node.getPositionCreatedAt())
+                pbRGANode.positionRemovedAt = toTimeTicket(removedAt)
+            }
 
             return pbRGANode
         }
@@ -694,7 +718,7 @@ extension Converter {
      */
     static func toArray(_ arr: CRDTArray) -> PbJSONElement {
         var pbArray = PbJSONElement.JSONArray()
-        pbArray.nodes = toRGANodes(arr.getElements())
+        pbArray.nodes = toRGANodes(arr)
         pbArray.createdAt = toTimeTicket(arr.createdAt)
         if let ticket = arr.movedAt {
             pbArray.movedAt = toTimeTicket(ticket)
@@ -714,11 +738,42 @@ extension Converter {
 
     /**
      * `fromArray` converts the given Protobuf format to model format.
+     *
+     * Handles three node shapes produced by ``toRGANodes(_:)``:
+     * - **Dead**: no `element` field — `positionCreatedAt` + `positionRemovedAt` only.
+     *   Detected by `!hasElement`, matching the JS/Go decoder convention.
+     * - **Moved**: `element` + `positionCreatedAt` + `positionMovedAt`.
+     * - **Normal**: `element` only (no position fields).
      */
     static func fromArray(_ pbArray: PbJSONElement.JSONArray) throws -> CRDTArray {
         let rgaTreeList = RGATreeList()
         try pbArray.nodes.forEach { pbRGANode in
-            try rgaTreeList.insert(fromElement(pbElement: pbRGANode.element))
+            if !pbRGANode.hasElement {
+                // Dead position node — no element in the wire format (JS convention).
+                let posCreatedAt = fromTimeTicket(pbRGANode.positionCreatedAt)
+                let posRemovedAt = fromTimeTicket(pbRGANode.positionRemovedAt)
+                try rgaTreeList.addDeadPosition(
+                    positionCreatedAt: posCreatedAt,
+                    positionRemovedAt: posRemovedAt
+                )
+                return
+            }
+
+            let element = try fromElement(pbElement: pbRGANode.element)
+
+            if pbRGANode.hasPositionCreatedAt && pbRGANode.hasPositionMovedAt {
+                // Moved node.
+                let posCreatedAt = fromTimeTicket(pbRGANode.positionCreatedAt)
+                let posMovedAt = fromTimeTicket(pbRGANode.positionMovedAt)
+                try rgaTreeList.addMovedElement(
+                    value: element,
+                    positionCreatedAt: posCreatedAt,
+                    positionMovedAt: posMovedAt
+                )
+            } else {
+                // Normal node.
+                try rgaTreeList.insert(element)
+            }
         }
 
         let arr = CRDTArray(createdAt: fromTimeTicket(pbArray.createdAt), elements: rgaTreeList)

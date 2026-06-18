@@ -48,10 +48,51 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `move` moves the given `createdAt` element after the `prevCreatedAt`.
+     * `move` moves the element identified by `createdAt` after `afterCreatedAt`.
+     *
+     * This is a local-context helper used by ``JSONArray`` during local edit. It delegates
+     * to ``moveAfter(createdAt:prevCreatedAt:executedAt:)`` and discards the dead node
+     * return value; GC pair registration happens later in ``MoveOperation/execute(root:versionVector:source:)``.
      */
     func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
-        try self.elements.move(createdAt: createdAt, afterCreatedAt: afterCreatedAt, executedAt: executedAt)
+        try self.elements.moveAfter(createdAt: createdAt, prevCreatedAt: afterCreatedAt, executedAt: executedAt)
+    }
+
+    /**
+     * `moveAfter` moves the element identified by `createdAt` to after `prevCreatedAt`.
+     *
+     * Uses an LWW position register: the winning position is the one with the latest
+     * `executedAt`. Returns the dead position node if an old position was displaced,
+     * or `nil` if the move lost the LWW race. The caller must register the returned
+     * node as a GC pair.
+     *
+     * - Parameters:
+     *   - createdAt: The `createdAt` of the element to move.
+     *   - prevCreatedAt: The element after which to position the moved element.
+     *   - executedAt: The operation execution time used for LWW comparison.
+     * - Returns: The displaced dead position node, or `nil`.
+     * - Throws: ``YorkieError`` when the target or anchor element is not found.
+     */
+    @discardableResult
+    func moveAfter(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode? {
+        return try self.elements.moveAfter(createdAt: createdAt, prevCreatedAt: prevCreatedAt, executedAt: executedAt)
+    }
+
+    /**
+     * `getRGATreeList` returns the underlying ``RGATreeList``, used as the `GCParent`
+     * when registering dead position nodes.
+     */
+    func getRGATreeList() -> RGATreeList {
+        return self.elements
+    }
+
+    /**
+     * `getAllRGANodes` returns all nodes in linked-list order, including dead position nodes.
+     *
+     * Used by ``CRDTRoot`` to register dead position nodes as GC pairs on snapshot restore.
+     */
+    func getAllRGANodes() -> [RGATreeListNode] {
+        return self.elements.allNodes()
     }
 
     /**
@@ -115,10 +156,20 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `getLastCreatedAt` get last created element.
+     * `getLastCreatedAt` returns the POSITION `createdAt` of the last node.
      */
     func getLastCreatedAt() -> TimeTicket {
         return self.elements.getLastCreatedAt()
+    }
+
+    /**
+     * `posCreatedAt` returns the current position node key for the element identified by `elemCreatedAt`.
+     *
+     * Mirrors the JS `posCreatedAt(elemCreatedAt)` — converts element identity to
+     * position identity for use in ``MoveOperation``.
+     */
+    func posCreatedAt(elemCreatedAt: TimeTicket) throws -> TimeTicket {
+        return try self.elements.posCreatedAt(elemCreatedAt: elemCreatedAt)
     }
 
     /**
@@ -129,7 +180,10 @@ class CRDTArray: CRDTContainer {
     }
 
     /**
-     * `getElements` returns an array of elements contained in this RGATreeList.
+     * `getElements` returns the underlying ``RGATreeList``.
+     *
+     * Prefer ``getRGATreeList()`` for GC-related work; this accessor is retained for
+     * compatibility with the ``Converter``.
      */
     func getElements() -> RGATreeList {
         return self.elements
@@ -159,13 +213,18 @@ extension CRDTArray {
 
     /**
      * `deepcopy` copies itself deeply.
+     *
+     * Iterates live nodes only (the `Sequence` conformance skips dead position nodes),
+     * so the copy does not inherit dead position state — it will be reconstructed from
+     * the snapshot on the next round-trip.
      */
     func deepcopy() -> CRDTElement {
         let result = CRDTArray(createdAt: self.createdAt)
         for node in self.elements {
+            guard let entry = node.elementEntry else { continue }
             _ = try? result.elements.insert(
-                node.value.deepcopy(),
-                prevCreatedAt: result.getLastCreatedAt()
+                entry.element.deepcopy(),
+                prevCreatedAt: result.elements.getLastCreatedAt()
             )
         }
         result.remove(self.removedAt)

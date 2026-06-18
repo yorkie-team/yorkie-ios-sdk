@@ -86,6 +86,15 @@ class CRDTRoot {
                     self.registerGCPair(pair)
                 }
             }
+            // NOTE(#1227): Register dead position nodes in CRDTArray as GC pairs so
+            // they are collected once all peers have applied the winning move.
+            if let array = element as? CRDTArray {
+                for node in array.getAllRGANodes() {
+                    if node.getElementEntry() == nil, node.getPositionRemovedAt() != nil {
+                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node))
+                    }
+                }
+            }
 
             return false
         })
