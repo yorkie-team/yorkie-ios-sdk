@@ -75,7 +75,14 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
             copy.movedAt = self.movedAt
             copy.removedAt = self.removedAt
             if let bytes = counter.hllBytes() {
-                try? copy.restoreHLL(bytes)
+                do {
+                    try copy.restoreHLL(bytes)
+                } catch {
+                    // hllBytes() always returns a valid 16384-byte payload, so this
+                    // should never happen; log loudly rather than silently dropping
+                    // the HLL state and producing an inconsistent copy.
+                    Logger.error("failed to restore HLL on deepcopy", error: error)
+                }
             }
             return copy
         }
