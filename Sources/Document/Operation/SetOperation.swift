@@ -105,6 +105,12 @@ struct SetOperation: Operation {
         if let removed {
             root.registerRemovedElement(removed)
         }
+        // NOTE(#1226): When the new value already has a removedAt (e.g. it was the
+        // LWW-losing side of a concurrent set), register it as removed so GC can
+        // collect it once all peers have seen the winning value.
+        if value.removedAt != nil {
+            root.registerRemovedElement(value)
+        }
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError(code: .errUnexpected, message: "fail to get path")
