@@ -189,6 +189,12 @@ public class Document: Attachable {
         if context.hasChange {
             Logger.trace("trying to update a local change: \(self.toJSON())")
 
+            let prev = PrevPresenceState(
+                hadPresence: self.presences[actorID] != nil,
+                wasOnline: self.status == .attached,
+                presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+            )
+
             let change = context.toChange()
             let executionResult = try? change.execute(root: self.root, presences: &self.presences)
             let opInfos = executionResult?.opInfos ?? []
@@ -226,8 +232,10 @@ public class Document: Attachable {
                 self.publish(changeEvent)
             }
 
-            if change.presenceChange != nil, let presence = self.getPresence(actorID) {
-                self.publish(PresenceChangedEvent(value: (actorID, presence)))
+            if change.presenceChange != nil {
+                if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: .local) {
+                    self.publish(presenceEvent)
+                }
             }
 
             Logger.trace("after update a local change: \(self.toJSON())")
@@ -760,42 +768,17 @@ public class Document: Attachable {
             try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
 
             var changeInfo: ChangeInfo?
-            var presenceEvent: DocEvent?
 
             guard let actorID = change.id.getActorID() else {
                 throw YorkieError(code: .errUnexpected, message: "ActorID is null")
             }
 
-            if let presenceChange = change.presenceChange, self.onlineClients.contains(actorID) {
-                switch presenceChange {
-                case .put(let presence):
-                    // NOTE(chacha912): When the user exists in onlineClients, but
-                    // their presence was initially absent, we can consider that we have
-                    // received their initial presence, so trigger the 'watched' event
-                    if self.onlineClients.contains(actorID) {
-                        let peer = (actorID, presence.toJSONObejct)
-
-                        if self.getPresence(actorID) != nil {
-                            presenceEvent = PresenceChangedEvent(value: peer)
-                        } else {
-                            presenceEvent = WatchedEvent(value: peer)
-                        }
-                    }
-                case .clear:
-                    // NOTE(chacha912): When the user exists in onlineClients, but
-                    // PresenceChange(clear) is received, we can consider it as detachment
-                    // occurring before unwatching.
-                    // Detached user is no longer participating in the document, we remove
-                    // them from the online clients and trigger the 'unwatched' event.
-                    guard let presence = self.getPresence(actorID) else {
-                        throw YorkieError(code: .errUnexpected, message: "No presence!")
-                    }
-
-                    presenceEvent = UnwatchedEvent(value: (actorID, presence))
-
-                    self.removeOnlineClient(actorID)
-                }
-            }
+            // Capture prev state before execute updates this.presences.
+            let prev: PrevPresenceState? = change.presenceChange != nil ? PrevPresenceState(
+                hadPresence: self.presences[actorID] != nil,
+                wasOnline: self.onlineClients.contains(actorID),
+                presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+            ) : nil
 
             let executionResult = try change.execute(root: self.root, presences: &self.presences, source: source)
             let opInfos = executionResult.opInfos
@@ -842,8 +825,15 @@ public class Document: Attachable {
                 self.publish(remoteChangeEvent)
             }
 
-            if let presenceEvent {
-                self.publish(presenceEvent)
+            if let prev, change.presenceChange != nil {
+                // Remove the client from onlineClients when presence is cleared,
+                // mirroring the JS handling of PresenceChangeType.Clear.
+                if case .clear = change.presenceChange {
+                    self.removeOnlineClient(actorID)
+                }
+                if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: source) {
+                    self.publish(presenceEvent)
+                }
             }
         }
 
@@ -888,16 +878,27 @@ public class Document: Attachable {
      * `applyStatus` applies the document status into this document.
      */
     func applyStatus(_ status: DocStatus) {
+        guard let actorID = self.actorID else { return }
+
+        let prev = PrevPresenceState(
+            hadPresence: self.presences[actorID] != nil,
+            wasOnline: self.status == .attached,
+            presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+        )
+
         self.status = status
 
         if status == .detached {
             self.setActor(ActorIDs.initial)
         }
 
-        let event = StatusChangedEvent(source: status == .removed ? .remote : .local,
-                                       value: StatusInfo(status: status, actorID: status == .attached ? self.actorID : nil))
+        if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: .local) {
+            self.publish(presenceEvent)
+        }
 
-        self.publish(event)
+        let statusEvent = StatusChangedEvent(source: status == .removed ? .remote : .local,
+                                             value: StatusInfo(status: status, actorID: status == .attached ? self.actorID : nil))
+        self.publish(statusEvent)
     }
 
     public nonisolated var debugDescription: String {
@@ -1099,6 +1100,54 @@ public class Document: Attachable {
      */
     func removePresence(_ clientID: ActorID) {
         self.presences[clientID] = nil
+    }
+
+    // MARK: - Presence reconciliation
+
+    /// Snapshot of a client's presence/online state captured before a mutation.
+    private struct PrevPresenceState {
+        let hadPresence: Bool
+        let wasOnline: Bool
+        let presence: [String: Any]?
+    }
+
+    /// Compares the previous and current presence/online state of a client and returns
+    /// the appropriate event to emit, or `nil` when no event is warranted.
+    ///
+    /// For remote clients "online" means the client is in `onlineClients`.
+    /// For self "online" means the document status is `attached`.
+    ///
+    /// State transition table:
+    /// - `(!hadP || !wasOn) → (hasP && isOn)` : `watched` (remote) or `presenceChanged` (self)
+    /// - `(hadP && wasOn)   → (hasP && isOn)` : `presenceChanged`
+    /// - `(hadP && wasOn)   → (!hasP || !isOn)`: `unwatched` (remote only)
+    /// - otherwise: `nil` (waiting for both presence and online to be established)
+    private func reconcilePresence(actorID: ActorID, prev: PrevPresenceState, source: OpSource) -> DocEvent? {
+        let isSelf = actorID == self.changeID.getActorID()
+        let hasPresence = self.presences[actorID] != nil
+        let isOnline = isSelf ? self.status == .attached : self.onlineClients.contains(actorID)
+
+        if !hasPresence || !isOnline {
+            // Transitioned from ready → not ready: unwatched (remote only).
+            if prev.hadPresence, prev.wasOnline, !isSelf {
+                let presence = prev.presence ?? [:]
+                return UnwatchedEvent(value: (actorID, presence))
+            }
+            return nil
+        }
+
+        let presence = self.presences[actorID]?.mapValues { $0.toJSONObject } ?? [:]
+
+        if !prev.hadPresence || !prev.wasOnline {
+            // Transitioned from not-ready → ready.
+            if isSelf {
+                return PresenceChangedEvent(value: (actorID, presence))
+            }
+            return WatchedEvent(value: (actorID, presence))
+        }
+
+        // Both were ready and still are: presence value changed.
+        return PresenceChangedEvent(value: (actorID, presence))
     }
 
     /**
