@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.5] - 2026-06-17
+
+- Add Counter dedup mode with HyperLogLog for UV measurement in https://github.com/yorkie-team/yorkie-ios-sdk/pull/257
+- Enable splitLevel=1 concurrent tests and add split undo/redo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/257
+- Add undo/redo support for TreeStyleOperation in https://github.com/yorkie-team/yorkie-ios-sdk/pull/257
+- Add content correctness tests for overlapping undo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/257
+- Simplify Counter interface and replace long with bigint in https://github.com/yorkie-team/yorkie-ios-sdk/pull/257
+
 ## [v0.7.4] - 2026-06-17
 
 - Fix tree style divergence on concurrent split via End-token guard in https://github.com/yorkie-team/yorkie-ios-sdk/pull/256

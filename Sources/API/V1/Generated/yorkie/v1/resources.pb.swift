@@ -56,6 +56,7 @@ public enum Yorkie_V1_ValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
   case integerCnt // = 11
   case longCnt // = 12
   case tree // = 13
+  case integerDedupCnt // = 14
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -78,6 +79,7 @@ public enum Yorkie_V1_ValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 11: self = .integerCnt
     case 12: self = .longCnt
     case 13: self = .tree
+    case 14: self = .integerDedupCnt
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -98,6 +100,7 @@ public enum Yorkie_V1_ValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .integerCnt: return 11
     case .longCnt: return 12
     case .tree: return 13
+    case .integerDedupCnt: return 14
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -118,6 +121,7 @@ public enum Yorkie_V1_ValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
     .integerCnt,
     .longCnt,
     .tree,
+    .integerDedupCnt,
   ]
 
 }
@@ -765,6 +769,11 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    public var actor: String {
+      get {_storage._actor}
+      set {_uniqueStorage()._actor = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1272,6 +1281,8 @@ public struct Yorkie_V1_JSONElement: Sendable {
     public var hasRemovedAt: Bool {self._removedAt != nil}
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
+
+    public var hllRegisters: Data = Data()
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2557,7 +2568,7 @@ public struct Yorkie_V1_RevisionSummary: Sendable {
 fileprivate let _protobuf_package = "yorkie.v1"
 
 extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VALUE_TYPE_NULL\0\u{1}VALUE_TYPE_BOOLEAN\0\u{1}VALUE_TYPE_INTEGER\0\u{1}VALUE_TYPE_LONG\0\u{1}VALUE_TYPE_DOUBLE\0\u{1}VALUE_TYPE_STRING\0\u{1}VALUE_TYPE_BYTES\0\u{1}VALUE_TYPE_DATE\0\u{1}VALUE_TYPE_JSON_OBJECT\0\u{1}VALUE_TYPE_JSON_ARRAY\0\u{1}VALUE_TYPE_TEXT\0\u{1}VALUE_TYPE_INTEGER_CNT\0\u{1}VALUE_TYPE_LONG_CNT\0\u{1}VALUE_TYPE_TREE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VALUE_TYPE_NULL\0\u{1}VALUE_TYPE_BOOLEAN\0\u{1}VALUE_TYPE_INTEGER\0\u{1}VALUE_TYPE_LONG\0\u{1}VALUE_TYPE_DOUBLE\0\u{1}VALUE_TYPE_STRING\0\u{1}VALUE_TYPE_BYTES\0\u{1}VALUE_TYPE_DATE\0\u{1}VALUE_TYPE_JSON_OBJECT\0\u{1}VALUE_TYPE_JSON_ARRAY\0\u{1}VALUE_TYPE_TEXT\0\u{1}VALUE_TYPE_INTEGER_CNT\0\u{1}VALUE_TYPE_LONG_CNT\0\u{1}VALUE_TYPE_TREE\0\u{1}VALUE_TYPE_INTEGER_DEDUP_CNT\0")
 }
 
 extension Yorkie_V1_DocEventType: SwiftProtobuf._ProtoNameProviding {
@@ -3504,12 +3515,13 @@ extension Yorkie_V1_Operation.Style: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".Increase"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}value\0\u{3}executed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}value\0\u{3}executed_at\0\u{1}actor\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _actor: String = String()
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3523,6 +3535,7 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
       _parentCreatedAt = source._parentCreatedAt
       _value = source._value
       _executedAt = source._executedAt
+      _actor = source._actor
     }
   }
 
@@ -3544,6 +3557,7 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 1: try { try decoder.decodeSingularMessageField(value: &_storage._parentCreatedAt) }()
         case 2: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._actor) }()
         default: break
         }
       }
@@ -3565,6 +3579,9 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
       } }()
+      if !_storage._actor.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._actor, fieldNumber: 4)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3577,6 +3594,7 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._parentCreatedAt != rhs_storage._parentCreatedAt {return false}
         if _storage._value != rhs_storage._value {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._actor != rhs_storage._actor {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -4293,7 +4311,7 @@ extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".Counter"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}value\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}value\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{4}\u{2}hll_registers\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4306,6 +4324,7 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
       case 3: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 7: try { try decoder.decodeSingularBytesField(value: &self.hllRegisters) }()
       default: break
       }
     }
@@ -4331,6 +4350,9 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
     try { if let v = self._removedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
+    if !self.hllRegisters.isEmpty {
+      try visitor.visitSingularBytesField(value: self.hllRegisters, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4340,6 +4362,7 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
+    if lhs.hllRegisters != rhs.hllRegisters {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

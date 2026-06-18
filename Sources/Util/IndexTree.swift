@@ -489,11 +489,11 @@ extension IndexTreeNode {
         self.innerChildren = leftChildren
         clone.innerChildren = rightChildren
         self.size = self.innerChildren.reduce(0) { acc, child in
-            acc + child.paddedSize
+            acc + (child.isRemoved ? 0 : child.paddedSize)
         }
 
         clone.size = clone.innerChildren.reduce(0) { acc, child in
-            acc + child.paddedSize
+            acc + (child.isRemoved ? 0 : child.paddedSize)
         }
         for innerChild in clone.innerChildren {
             innerChild.parent = clone

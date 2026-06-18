@@ -61,6 +61,10 @@ final class TreeEditOperation: Operation {
     private var lastFromIdx: Int?
     /// The pre-edit end index captured by the most recent `execute`, used to reconcile parked ops.
     private var lastToIdx: Int?
+    /// Set on boundary-deletion ops that were generated to reverse a split. When this op executes
+    /// (as undo), ``toReverseOperation(_:_:_:)`` uses this value to regenerate a proper split op
+    /// for redo, rather than re-inserting the tombstoned boundary nodes as content.
+    fileprivate var redoSplitLevel: Int32?
 
     init(parentCreatedAt: TimeTicket,
          fromPos: CRDTTreePos,
@@ -135,10 +139,21 @@ final class TreeEditOperation: Operation {
         let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
         self.lastToIdx = preEditFromIdx + removedSize
 
-        // Build the reverse op for undo. Phase 1 skips split edits (splitLevel > 0).
-        let reverseOp = self.splitLevel == 0
-            ? try self.toReverseOperation(tree, removedNodes, preEditFromIdx)
-            : nil
+        // Build the reverse op for undo.
+        // A pure level-1 split (no content inserted, no nodes removed) gets a boundary-deletion
+        // reverse so that undo merges the split elements back. All other splits are skipped for
+        // now — only splitLevel=0 (regular edits) and pure level-1 splits produce a reverse op.
+        let isPureL1Split = self.splitLevel == 1
+            && (self.contents?.isEmpty ?? true)
+            && removedNodes.isEmpty
+        let reverseOp: Operation?
+        if self.splitLevel == 0 {
+            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx)
+        } else if isPureL1Split {
+            reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx)
+        } else {
+            reverseOp = nil
+        }
 
         root.acc(diff)
 
@@ -183,6 +198,25 @@ final class TreeEditOperation: Operation {
     ///   - preEditFromIdx: The start index captured before the edit deletions.
     /// - Returns: The reverse ``TreeEditOperation``, or `nil` when the edit was a no-op.
     private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int) throws -> Operation? {
+        // Special case: this op is a boundary-deletion that was generated to reverse a split.
+        // Its redo (i.e. the reverse of this reverse) should re-split at the merged position,
+        // not re-insert the tombstoned boundary nodes as raw content.
+        if let redoSplitLevel, redoSplitLevel > 0 {
+            let splitRedoFromPos = try tree.findPos(preEditFromIdx)
+            let splitRedoOp = TreeEditOperation(
+                parentCreatedAt: self.parentCreatedAt,
+                fromPos: splitRedoFromPos,
+                toPos: splitRedoFromPos,
+                contents: nil,
+                splitLevel: redoSplitLevel,
+                executedAt: TimeTicket.initial,
+                isUndoOp: true,
+                fromIdx: preEditFromIdx,
+                toIdx: preEditFromIdx
+            )
+            return splitRedoOp
+        }
+
         // Total tree-index tokens inserted by this edit.
         let insertedContentSize = self.contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
 
@@ -230,6 +264,49 @@ final class TreeEditOperation: Operation {
             fromIdx: preEditFromIdx,
             toIdx: preEditFromIdx + insertedContentSize
         )
+    }
+
+    /// `toSplitReverseOperation` creates the reverse operation for a pure level-1 split edit.
+    ///
+    /// A split creates element boundaries (one close token + one open token per level). The reverse
+    /// is a boundary-deletion: a `splitLevel=0` edit that removes those `2 * splitLevel` tokens,
+    /// merging the split elements back together.
+    ///
+    /// The boundary-deletion op carries ``redoSplitLevel`` so that *its* reverse regenerates a
+    /// proper split (redo) rather than re-inserting the tombstoned boundary nodes as content.
+    ///
+    /// - Parameters:
+    ///   - tree: The tree after the split has been applied.
+    ///   - preEditFromIdx: The from index captured before the split.
+    /// - Returns: The boundary-deletion ``TreeEditOperation``, or `nil` when the split was a no-op.
+    private func toSplitReverseOperation(_ tree: CRDTTree, _ preEditFromIdx: Int) throws -> Operation? {
+        let boundarySize = 2 * Int(self.splitLevel)
+        let reverseFromIdx = preEditFromIdx
+        let reverseToIdx = preEditFromIdx + boundarySize
+
+        // Guard: if the indices exceed the post-split tree size, the split was a no-op
+        // (e.g. a concurrent parent deletion tombstoned the split result).
+        if reverseToIdx > tree.size {
+            return nil
+        }
+
+        let reverseFromPos = try tree.findPos(reverseFromIdx)
+        let reverseToPos = try tree.findPos(reverseToIdx)
+
+        let boundaryDeletionOp = TreeEditOperation(
+            parentCreatedAt: self.parentCreatedAt,
+            fromPos: reverseFromPos,
+            toPos: reverseToPos,
+            contents: nil,
+            splitLevel: 0,
+            executedAt: TimeTicket.initial,
+            isUndoOp: true,
+            fromIdx: reverseFromIdx,
+            toIdx: reverseToIdx
+        )
+        // Tag the op so its own reverse (redo) regenerates a split rather than raw content.
+        boundaryDeletionOp.redoSplitLevel = self.splitLevel
+        return boundaryDeletionOp
     }
 
     /// `normalizePos` returns the visible-index `(from, to)` range of this operation.

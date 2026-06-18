@@ -63,13 +63,6 @@ class TreeStyleOperation: Operation {
         versionVector: VersionVector? = nil,
         source: OpSource = .local
     ) throws -> ExecutionResult? {
-        try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
-    }
-
-    private func executeOpInfos(
-        root: CRDTRoot,
-        versionVector: VersionVector? = nil
-    ) throws -> [any OperationInfo] {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
             Logger.critical(log)
@@ -83,21 +76,30 @@ class TreeStyleOperation: Operation {
         let changes: [TreeChange]
         let pairs: [GCPair]
         var diff: DataSize
+        // Attribute state captured from the first styled node, used to build the reverse op.
+        var reversePrevAttributes = [String: String]()
+        var reverseAttrsToRemove = [String]()
 
         if self.attributes.isEmpty == false {
-            (pairs, changes, diff) = try tree.style(
+            let prevAttributes: [String: String]
+            let newAttrKeys: [String]
+            (pairs, changes, diff, prevAttributes, newAttrKeys) = try tree.style(
                 (self.fromPos, self.toPos),
                 self.attributes,
                 self.executedAt,
                 versionVector
             )
+            reversePrevAttributes = prevAttributes
+            reverseAttrsToRemove = newAttrKeys
         } else {
-            (pairs, changes, diff) = try tree.removeStyle(
+            let prevAttributes: [String: String]
+            (pairs, changes, diff, prevAttributes) = try tree.removeStyle(
                 (self.fromPos, self.toPos),
                 self.attributesToRemove,
                 self.executedAt,
                 versionVector
             )
+            reversePrevAttributes = prevAttributes
         }
 
         root.acc(diff)
@@ -108,7 +110,43 @@ class TreeStyleOperation: Operation {
             root.registerGCPair(pair)
         }
 
-        return changes.compactMap { change in
+        // Build the reverse operation for undo.
+        let reverseOp: Operation?
+        if !reversePrevAttributes.isEmpty, !reverseAttrsToRemove.isEmpty {
+            // Both existing attrs to restore and new attrs to remove — combined style op.
+            reverseOp = TreeStyleOperation(
+                parentCreatedAt: self.parentCreatedAt,
+                fromPos: self.fromPos,
+                toPos: self.toPos,
+                attributes: reversePrevAttributes,
+                attributesToRemove: reverseAttrsToRemove,
+                executedAt: TimeTicket.initial
+            )
+        } else if !reverseAttrsToRemove.isEmpty {
+            // Only new attrs to remove — reverse is a removeStyle.
+            reverseOp = TreeStyleOperation(
+                parentCreatedAt: self.parentCreatedAt,
+                fromPos: self.fromPos,
+                toPos: self.toPos,
+                attributes: [:],
+                attributesToRemove: reverseAttrsToRemove,
+                executedAt: TimeTicket.initial
+            )
+        } else if !reversePrevAttributes.isEmpty {
+            // Only existing attrs to restore — reverse is a style.
+            reverseOp = TreeStyleOperation(
+                parentCreatedAt: self.parentCreatedAt,
+                fromPos: self.fromPos,
+                toPos: self.toPos,
+                attributes: reversePrevAttributes,
+                attributesToRemove: [],
+                executedAt: TimeTicket.initial
+            )
+        } else {
+            reverseOp = nil
+        }
+
+        let opInfos: [any OperationInfo] = changes.compactMap { change in
             let values: TreeStyleOpValue? = {
                 switch change.value {
                 case .attributes(let attributes):
@@ -129,6 +167,8 @@ class TreeStyleOperation: Operation {
                 value: values
             )
         }
+
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
     }
 
     /**

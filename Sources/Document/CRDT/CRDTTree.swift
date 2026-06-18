@@ -875,6 +875,10 @@ class CRDTTree: CRDTElement {
 
     /**
      * `style` applies the given attributes of the given range.
+     *
+     * - Returns: A tuple of GC pairs, tree changes, data size delta, previous attribute values
+     *   captured from the first styled node (for undo reverse op), and keys of attributes that
+     *   did not previously exist on the first styled node (for undo reverse op).
      */
     @discardableResult
     func style(
@@ -882,7 +886,7 @@ class CRDTTree: CRDTElement {
         _ attributes: [String: String]?,
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector?
-    ) throws -> ([GCPair], [TreeChange], DataSize) {
+    ) throws -> ([GCPair], [TreeChange], DataSize, [String: String], [String]) {
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
         let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -895,6 +899,9 @@ class CRDTTree: CRDTElement {
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
+        var prevAttributes = [String: String]()
+        var newAttrKeys = [String]()
+        var capturedPrev = false
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, tokenType) = token
             let actorID = node.createdAt.actorID
@@ -912,6 +919,21 @@ class CRDTTree: CRDTElement {
                 // concurrent split extended the range into the sibling.
                 if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
                     return
+                }
+
+                // Capture previous attribute values from the first styled node
+                // for the reverse operation (undo).
+                if !capturedPrev {
+                    for key in attributes.keys {
+                        // A tombstoned (removed) attribute counts as absent, so the
+                        // reverse op removes the key rather than restoring a stale value.
+                        if node.attrs?.has(key: key) == true, let existing = node.attrs?.getNodeByKey(key)?.value {
+                            prevAttributes[key] = existing
+                        } else {
+                            newAttrKeys.append(key)
+                        }
+                    }
+                    capturedPrev = true
                 }
 
                 let updatedAttrPairs = node.setAttrs(attributes, editedAt)
@@ -951,18 +973,21 @@ class CRDTTree: CRDTElement {
             }
         }
 
-        return (pairs, changes, diff)
+        return (pairs, changes, diff, prevAttributes, newAttrKeys)
     }
 
     /**
      * `removeStyle` removes the given attributes of the given range.
+     *
+     * - Returns: A tuple of GC pairs, tree changes, data size delta, and previous attribute values
+     *   captured from the first styled node (for undo reverse op).
      */
     func removeStyle(
         _ range: TreePosRange,
         _ attributesToRemove: [String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], [TreeChange], DataSize) {
+    ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
         let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
@@ -976,6 +1001,8 @@ class CRDTTree: CRDTElement {
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
+        var prevAttributes = [String: String]()
+        var capturedPrev = false
 
         try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
             let (node, tokenType) = token
@@ -994,6 +1021,17 @@ class CRDTTree: CRDTElement {
                 // concurrent split extended the range into the sibling.
                 if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
                     return
+                }
+
+                // Capture previous attribute values from the first styled node
+                // for the reverse operation (undo).
+                if !capturedPrev {
+                    for key in attributesToRemove where node.attrs?.has(key: key) == true {
+                        if let existing = node.attrs?.getNodeByKey(key)?.value {
+                            prevAttributes[key] = existing
+                        }
+                    }
+                    capturedPrev = true
                 }
 
                 if node.attrs == nil {
@@ -1021,7 +1059,7 @@ class CRDTTree: CRDTElement {
             }
         }
 
-        return (pairs, changes, diff)
+        return (pairs, changes, diff, prevAttributes)
     }
 
     /**
@@ -1132,7 +1170,7 @@ class CRDTTree: CRDTElement {
             var parent = fromParent
             var left = fromLeft
             while splitCount < splitLevel {
-                try parent.split(self, Int32(parent.findOffset(node: left) + 1), issueTimeTicket(), versionVector)
+                try parent.split(self, Int32(parent.findOffset(node: left, includeRemoved: true) + 1), issueTimeTicket(), versionVector)
                 left = parent
                 parent = parent.parent!
                 splitCount += 1

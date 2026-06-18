@@ -53,6 +53,10 @@ enum ElementConverter {
             return JSONObject(target: object, context: context)
         } else if let array = value as? CRDTArray {
             return JSONArray(target: array, changeContext: context)
+        } else if let value = value as? CRDTCounter<Int32>, value.isDedup {
+            let counter = JSONDedupCounter()
+            counter.initialize(context: context, counter: value)
+            return counter
         } else if let value = value as? CRDTCounter<Int32> {
             let counter = JSONCounter(value: value.value)
             counter.initialize(context: context, counter: value)

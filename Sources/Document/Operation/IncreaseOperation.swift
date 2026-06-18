@@ -19,6 +19,7 @@ import Foundation
 /**
  * `IncreaseOperation` represents an operation that increments a numeric value to Counter.
  * Among Primitives, numeric types Integer, Long, and Double are used as values.
+ * For dedup counters the `actor` field identifies the unique actor being recorded.
  */
 struct IncreaseOperation: Operation {
     var parentCreatedAt: TimeTicket
@@ -26,10 +27,14 @@ struct IncreaseOperation: Operation {
 
     let value: CRDTElement
 
-    init(parentCreatedAt: TimeTicket, value: CRDTElement, executedAt: TimeTicket) {
+    /// The actor identifier used by dedup counters; empty string for regular counters.
+    let actor: String
+
+    init(parentCreatedAt: TimeTicket, value: CRDTElement, executedAt: TimeTicket, actor: String = "") {
         self.parentCreatedAt = parentCreatedAt
         self.executedAt = executedAt
         self.value = value
+        self.actor = actor
     }
 
     var effectedCreatedAt: TimeTicket {
@@ -40,8 +45,17 @@ struct IncreaseOperation: Operation {
         "\(self.parentCreatedAt.toTestString).INCREASE"
     }
 
+    /// Returns the actor identifier; empty string for regular counters.
+    func getActor() -> String {
+        return self.actor
+    }
+
     /**
      * `execute` executes this operation on the given document(`root`).
+     *
+     * Dedup counters use ``CRDTCounter/increaseDedup(_:actor:)`` and produce
+     * no undo operation (HLL state cannot be reversed). Regular counters use
+     * the standard ``CRDTCounter/increase(_:)`` path.
      */
     @discardableResult
     func execute(
@@ -61,7 +75,18 @@ struct IncreaseOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        if let counter = parentObject as? CRDTCounter<Int32> {
+        if let counter = parentObject as? CRDTCounter<Int32>, counter.isDedup {
+            // Dedup path — actor must be provided.
+            guard !self.actor.isEmpty else {
+                throw YorkieError(
+                    code: .errInvalidArgument,
+                    message: "dedup counter requires actor"
+                )
+            }
+            if let primitive = self.value.deepcopy() as? Primitive {
+                try counter.increaseDedup(primitive, actor: self.actor)
+            }
+        } else if let counter = parentObject as? CRDTCounter<Int32> {
             if let value = self.value.deepcopy() as? Primitive {
                 try counter.increase(value)
             }

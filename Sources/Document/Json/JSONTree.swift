@@ -650,7 +650,7 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _, diff) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
+        let (pairs, _, diff, _, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
         self.context?.acc(diff)
 
         context.push(
@@ -732,7 +732,7 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _, diff) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+        let (pairs, _, diff, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
         self.context?.acc(diff)
 
         for pair in pairs {
