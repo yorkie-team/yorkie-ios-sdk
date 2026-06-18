@@ -404,11 +404,14 @@ class RGATreeList {
 
         self.insertNodeIntoStructures(node: newPosNode, after: anchor)
 
-        // Kill the old position node.
-        // Remove from splay tree (it no longer contributes to indexed length), but keep in
-        // linked list and position map so Converter can serialise it.
+        // Kill the old position node. Keep it in the splay tree with length 0
+        // (re-splay to refresh weights) rather than deleting it — JS keeps dead
+        // position nodes splayed until GC purge, and a subsequent insert/append
+        // may still use this node as its anchor (e.g. when it is `last` after a
+        // tail move). Deleting it here would leave that anchor unresolvable in
+        // the index tree, so the appended element would never be indexed.
         oldPosNode.markDead(at: executedAt)
-        self.nodeMapByIndex.delete(oldPosNode)
+        self.nodeMapByIndex.splayNode(oldPosNode)
         // NOTE: do NOT reassign `last` here. JS leaves `last` pointing at the
         // now-dead slot when the moved element was the tail, so that subsequent
         // ops emit the same position-identity anchor as JS/Go peers. The
