@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.7] - 2026-06-19
+
+- Support splitLevel>=2 undo/redo with multi-client convergence in https://github.com/yorkie-team/yorkie-ios-sdk/pull/259
+- Add DedupCounter parse support in YSON in https://github.com/yorkie-team/yorkie-ios-sdk/pull/259
+- Port splitLevel>=2 convergence fixes from Go server in https://github.com/yorkie-team/yorkie-ios-sdk/pull/259
+
 ## [v0.7.6] - 2026-06-18
 
 - Implement toJSON for Bytes and Date primitive types in https://github.com/yorkie-team/yorkie-ios-sdk/pull/258
