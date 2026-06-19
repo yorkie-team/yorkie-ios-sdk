@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.8] - 2026-06-19
+
+- Add SyncMode.Polling for Document in https://github.com/yorkie-team/yorkie-ios-sdk/pull/NNN
+- Filter pre-tombstoned descendants in tree reverseOp in https://github.com/yorkie-team/yorkie-ios-sdk/pull/NNN
+- Clear history after attach and make undo/redo no-op on empty stack in https://github.com/yorkie-team/yorkie-ios-sdk/pull/NNN
+- Fix editByPath split-then-merge and cross-boundary merge undo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/NNN
+
 ## [v0.7.7] - 2026-06-19
 
 - Support splitLevel>=2 undo/redo with multi-client convergence in https://github.com/yorkie-team/yorkie-ios-sdk/pull/259
