@@ -327,6 +327,10 @@ public class Client {
     /**
      *   `attach` attaches the given document to this client. It tells the server that
      *   the client will synchronize the given document.
+     *
+     *   - Parameter documentPollInterval: The poll interval in **seconds** (iOS `TimeInterval`),
+     *     used only when `syncMode` is `.polling`. Unlike the JS SDK's millisecond `documentPollInterval`
+     *     (default 3000), this is seconds (default `3.0`). Must be greater than 0.
      */
     @discardableResult
     public func attach(_ doc: Document,
@@ -1000,7 +1004,7 @@ public class Client {
         if (prevSyncMode == .manual || prevSyncMode == .polling)
             && syncMode != .manual && syncMode != .polling
         {
-            // runWatchLoop already resets cancelled (line 1244), no extra reset needed.
+            // runWatchLoop already resets the attachment's `cancelled` flag, no extra reset needed.
             try self.runWatchLoop(docKey)
         }
 
