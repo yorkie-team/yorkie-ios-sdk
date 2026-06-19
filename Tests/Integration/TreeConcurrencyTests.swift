@@ -699,7 +699,8 @@ final class TreeConcurrencyTests: XCTestCase {
         print("\(self.description) Test Count: \(testCount)")
     }
 
-    func skip_test_concurrently_split_split_test() async throws {
+    @MainActor
+    func test_concurrently_split_split_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
                                 children: [
@@ -707,7 +708,7 @@ final class TreeConcurrencyTests: XCTestCase {
                                         JSONTreeElementNode(type: "p", children: [
                                             JSONTreeElementNode(type: "p", children: [
                                                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")]),
-                                                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")])
+                                                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "efgh")])
                                             ]),
                                             JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ijkl")])
                                         ])
@@ -800,14 +801,15 @@ final class TreeConcurrencyTests: XCTestCase {
         print("\(self.description) Test Count: \(testCount)")
     }
 
-    func skip_test_concurrently_split_edit_test() async throws {
+    @MainActor
+    func test_concurrently_split_edit_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
                                 children: [
                                     JSONTreeElementNode(type: "p", children: [
                                         JSONTreeElementNode(type: "p", children: [
                                             JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")], attributes: ["italic": "a"]),
-                                            JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")], attributes: ["italic": "a"])
+                                            JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "efgh")], attributes: ["italic": "a"])
                                         ]),
                                         JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ijkl")], attributes: ["italic": "a"])
                                     ])

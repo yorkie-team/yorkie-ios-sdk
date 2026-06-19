@@ -173,6 +173,45 @@ final class YSONTests: XCTestCase {
         XCTAssertEqual(obj["value"], .counter(.long(100)))
     }
 
+    func test_should_parse_dedupcounter_with_int() throws {
+        guard case .object(let obj) = try YSON.parse("{\"value\":DedupCounter(Int(15),\"AQID\")}") else {
+            return XCTFail("expected object")
+        }
+        XCTAssertEqual(obj["value"], .dedupCounter(value: .int(15), registers: "AQID"))
+    }
+
+    func test_should_parse_dedupcounter_with_negative_int() throws {
+        guard case .object(let obj) = try YSON.parse("{\"value\":DedupCounter(Int(-7),\"base64data\")}") else {
+            return XCTFail("expected object")
+        }
+        XCTAssertEqual(obj["value"], .dedupCounter(value: .int(-7), registers: "base64data"))
+    }
+
+    func test_isDedupCounter_should_identify_dedupcounter_values() {
+        let dc = YSONValue.dedupCounter(value: .int(5), registers: "AQID")
+        XCTAssertTrue(YSON.isDedupCounter(dc))
+        XCTAssertFalse(YSON.isDedupCounter(.counter(.int(5))))
+        XCTAssertFalse(YSON.isDedupCounter(.int(5)))
+        XCTAssertFalse(YSON.isDedupCounter(.object(["x": .int(1)])))
+    }
+
+    func test_isObject_should_exclude_dedupcounter() {
+        let dc = YSONValue.dedupCounter(value: .int(5), registers: "AQID")
+        XCTAssertFalse(YSON.isObject(dc))
+        XCTAssertTrue(YSON.isObject(.object(["x": .string("y")])))
+    }
+
+    func test_should_not_confuse_dedupcounter_with_counter_during_parse() throws {
+        // Ensures DedupCounter is handled before Counter in preprocessing so that
+        // Counter(Int(10)) inside a DedupCounter literal is not incorrectly consumed.
+        let yson = "{\"dc\":DedupCounter(Int(15),\"AQID\"),\"c\":Counter(Int(10))}"
+        guard case .object(let obj) = try YSON.parse(yson) else {
+            return XCTFail("expected object")
+        }
+        XCTAssertEqual(obj["dc"], .dedupCounter(value: .int(15), registers: "AQID"))
+        XCTAssertEqual(obj["c"], .counter(.int(10)))
+    }
+
     // MARK: - Complex document
 
     func test_should_parse_document_with_all_types() throws {
@@ -187,6 +226,7 @@ final class YSONTests: XCTestCase {
             "bytes": BinData("AQID"),
             "date": Date("2025-01-02T15:04:05.058Z"),
             "counter": Counter(Int(10)),
+            "dedupCounter": DedupCounter(Int(5),"AQID"),
             "text": Text([{"val":"Hello"}]),
             "tree": Tree({"type":"p","children":[{"type":"text","value":"Hello World"}]})
         }
@@ -205,6 +245,7 @@ final class YSONTests: XCTestCase {
         XCTAssertTrue(YSON.isCounter(obj["counter"]!))
         XCTAssertTrue(YSON.isText(obj["text"]!))
         XCTAssertTrue(YSON.isTree(obj["tree"]!))
+        XCTAssertTrue(YSON.isDedupCounter(obj["dedupCounter"]!))
     }
 
     // MARK: - Error handling
@@ -219,5 +260,11 @@ final class YSONTests: XCTestCase {
 
     func test_should_throw_on_invalid_tree_format() {
         XCTAssertThrowsError(try YSON.parse("{\"content\":Tree({\"invalid\":\"tree\"})}"))
+    }
+
+    func test_should_throw_on_dedupcounter_missing_registers() {
+        // Manually crafted JSON that bypasses preprocessing — __yson_registers is absent.
+        let malformed = "{\"v\":{\"__yson_type\":\"DedupCounter\",\"__yson_data\":{\"__yson_type\":\"Int\",\"__yson_data\":5}}}"
+        XCTAssertThrowsError(try YSON.parse(malformed))
     }
 }
