@@ -1291,7 +1291,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1319,6 +1319,7 @@ class CRDTTree: CRDTElement {
         var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var toBeMergedNodes = [CRDTTreeNode]()
+        var preTombstoned = Set<String>()
         try self.traverseInPosRange(collectFromParent, collectFromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
@@ -1352,6 +1353,11 @@ class CRDTTree: CRDTElement {
                 // NOTE(hackerwins): If the node overlaps as an end token with the
                 // range then we need to keep the node.
                 if tokenType == .text || tokenType == .start {
+                    // Track nodes already tombstoned before this edit so the
+                    // reverse operation does not accidentally resurrect them.
+                    if node.isRemoved {
+                        preTombstoned.insert(node.toIDString)
+                    }
                     nodesToBeRemoved.append(node)
 
                     // Cascade delete to split siblings created by concurrent
@@ -1463,7 +1469,7 @@ class CRDTTree: CRDTElement {
                 }
             }
         }
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel)
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned)
     }
 
     /**
@@ -1567,7 +1573,7 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         return try self.edit(

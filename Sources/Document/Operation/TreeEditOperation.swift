@@ -16,21 +16,56 @@
 
 import Foundation
 
-/// `clearRemovedAt` clears the `removedAt` tombstone markers from a node and all its descendants,
-/// so they can be re-inserted as live nodes on undo.
+/// `cloneAndDropPreTombstoned` deep-copies `node` and drops descendants whose ID is in
+/// `preTombstoned` — i.e., descendants that were already tombstoned before this edit ran.
+/// Those descendants represent the user's earlier delete intent and must not be resurrected
+/// by undoing this edit.
 ///
+/// For nodes kept in the clone, `removedAt` is cleared so the redo re-inserts them as live.
 /// iOS tracks a single visible `size` per node (unlike the JS SDK's separate `visibleSize` /
-/// `totalSize`), so removal only decreases an element's `size`. The traversal is postorder, so by
-/// the time an element node is visited its descendants are already live again — recomputing the
-/// element's `size` from its (now all-live) `children` restores the full visible size. Text nodes
-/// keep their `size`, which removal never decreased.
-private func clearRemovedAt(_ node: CRDTTreeNode) {
-    traverseAll(node: node) { node, _ in
-        node.removedAt = nil
-        if node.isText == false {
-            node.size = node.children.reduce(0) { $0 + $1.paddedSize }
+/// `totalSize`). The traversal clears tombstones and recomputes `size` bottom-up: element
+/// nodes derive size from their children's `paddedSize`; text nodes keep their value-length
+/// size unchanged.
+///
+/// - Parameters:
+///   - node: The node to deep-copy and filter.
+///   - preTombstoned: IDs of nodes already tombstoned before this edit.
+/// - Returns: A deep copy of `node` with pre-tombstoned descendants removed and
+///   `removedAt` cleared on surviving nodes.
+private func cloneAndDropPreTombstoned(_ node: CRDTTreeNode, _ preTombstoned: Set<String>) -> CRDTTreeNode? {
+    guard let clone = node.deepcopy() else { return nil }
+    filterChildren(clone, preTombstoned)
+    // Post-order: clear tombstone on every survivor and recompute size from its
+    // (already-resized) children. The deepcopy carried the original node's size;
+    // after filterChildren dropped descendants that size is stale and must be
+    // recomputed bottom-up.
+    traverseAll(node: clone) { n, _ in
+        n.removedAt = nil
+        if n.isText == false {
+            n.size = n.innerChildren.reduce(0) { $0 + $1.paddedSize }
         }
     }
+    return clone
+}
+
+/// `filterChildren` walks `node.innerChildren` and drops descendants whose IDs are in
+/// `preTombstoned`. Used by ``cloneAndDropPreTombstoned(_:_:)`` to keep only nodes that
+/// this edit actually transitioned from visible to tombstoned.
+///
+/// - Parameters:
+///   - node: The node (within a deep copy) whose children to filter.
+///   - preTombstoned: IDs of nodes already tombstoned before this edit.
+private func filterChildren(_ node: CRDTTreeNode, _ preTombstoned: Set<String>) {
+    var kept = [CRDTTreeNode]()
+    for child in node.innerChildren {
+        if preTombstoned.contains(child.toIDString) {
+            // Already tombstoned before this edit — drop from reverseOp.
+            continue
+        }
+        filterChildren(child, preTombstoned)
+        kept.append(child)
+    }
+    node.innerChildren = kept
 }
 
 /// `TreeEditOperation` is an operation representing Tree editing.
@@ -121,7 +156,7 @@ final class TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
@@ -148,7 +183,7 @@ final class TreeEditOperation: Operation {
             && removedNodes.isEmpty
         let reverseOp: Operation?
         if self.splitLevel == 0 {
-            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, mergeLevel: mergeLevel)
+            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, preTombstoned: preTombstoned, mergeLevel: mergeLevel)
         } else if isPureSplit {
             reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx)
         } else {
@@ -197,14 +232,19 @@ final class TreeEditOperation: Operation {
     /// re-insertion — so a split op with `splitLevel = mergeLevel` is returned instead of
     /// the normal content-reinsertion reverse.
     ///
+    /// Nodes whose IDs appear in `preTombstoned` were already tombstoned before this edit ran.
+    /// They represent the user's earlier delete intent and must not be resurrected when undoing
+    /// this edit. They are excluded from `topLevelRemoved` and from the cloned content.
+    ///
     /// - Parameters:
     ///   - tree: The tree after this edit has been applied.
     ///   - removedNodes: The nodes removed by this edit, to be re-inserted on undo.
     ///   - preEditFromIdx: The start index captured before the edit deletions.
+    ///   - preTombstoned: IDs of nodes already tombstoned before this edit ran.
     ///   - mergeLevel: The number of element boundaries merged by this edit. When greater than
     ///     zero the reverse op is a split rather than a content reinsertion.
     /// - Returns: The reverse ``TreeEditOperation``, or `nil` when the edit was a no-op.
-    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, mergeLevel: Int = 0) throws -> Operation? {
+    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, preTombstoned: Set<String> = [], mergeLevel: Int = 0) throws -> Operation? {
         // Special case: this op is a boundary-deletion that was generated to reverse a split.
         // Its redo (i.e. the reverse of this reverse) should re-split at the merged position,
         // not re-insert the tombstoned boundary nodes as raw content.
@@ -253,23 +293,28 @@ final class TreeEditOperation: Operation {
             return nil
         }
 
-        // Keep only top-level removed nodes (whose parent is not also removed).
+        // Filter to top-level removed nodes (whose parent is NOT also removed).
+        // Also exclude nodes that were already tombstoned before this edit ran:
+        // those represent the user's earlier delete intent and must not be
+        // resurrected by a parent-level undo, even at the root of topLevelRemoved.
         let topLevelRemoved = removedNodes.filter { node in
+            if preTombstoned.contains(node.toIDString) {
+                return false
+            }
             guard let parent = node.parent else {
                 return true
             }
             return removedNodes.contains { $0 === parent } == false
         }
 
-        // Deep copy for re-insertion on undo, clearing tombstone markers.
+        // Deep copy for re-insertion on undo, but drop descendants that were
+        // already tombstoned before this edit. Without this filter, undoing a
+        // parent delete would resurrect the user's earlier independent deletes —
+        // causing accumulation across undo/redo cycles in nested-edit scenarios.
         let reverseContents: [CRDTTreeNode]? = topLevelRemoved.isEmpty
             ? nil
             : topLevelRemoved.compactMap { node in
-                guard let clone = node.deepcopy() else {
-                    return nil
-                }
-                clearRemovedAt(clone)
-                return clone
+                cloneAndDropPreTombstoned(node, preTombstoned)
             }
 
         // Positions for the reverse range, computed on the post-edit tree from the pre-edit index.
