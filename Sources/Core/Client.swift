@@ -59,6 +59,11 @@ public enum SyncMode {
      * but the watch stream is kept active.
      */
     case realtimeSyncOff
+
+    /// `polling` mode runs the sync loop without opening a watch stream.
+    /// `PushPullChanges` runs at the polling interval; remote changes arrive on the next tick
+    /// (latency = interval). Not suitable for collaborative editing — use `realtime` for that.
+    case polling
 }
 
 /**
@@ -181,6 +186,7 @@ public class Client {
     private let retrySyncLoopDelay: Int
     private let maximumAttachmentTimeout: Int
     private let channelHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
+    private let defaultPollingInterval: TimeInterval = 3.0 // 3 seconds
 
     private var yorkieService: YorkieService
     private var authTokenInjector: AuthTokenInjector?
@@ -327,7 +333,8 @@ public class Client {
                        _ initialPresence: PresenceData = [:],
                        _ syncMode: SyncMode = .realtime,
                        _ schema: String = "",
-                       initialRoot: [String: JSONValuable?]? = nil) async throws -> Document
+                       initialRoot: [String: JSONValuable?]? = nil,
+                       documentPollInterval: TimeInterval? = nil) async throws -> Document
     {
         // 01. Check if the client is ready to attach documents.
         guard self.isActive else {
@@ -341,6 +348,17 @@ public class Client {
         guard doc.status == .detached else {
             throw YorkieError(code: .errNotDetached, message: "\(self.key) is not detached.")
         }
+
+        if let interval = documentPollInterval, interval <= 0 {
+            throw YorkieError(code: .errInvalidArgument, message: "documentPollInterval must be greater than 0")
+        }
+        let pollIntervalPinned = documentPollInterval != nil
+        let pollInterval: TimeInterval = {
+            if let interval = documentPollInterval {
+                return interval
+            }
+            return syncMode == .polling ? self.defaultPollingInterval : 0
+        }()
 
         doc.setActor(clientID)
         try doc.update { _, presence in
@@ -385,9 +403,13 @@ public class Client {
             self.attachmentMap[doc.getKey()] = Attachment<Document>(resource: doc,
                                                                     resourceID: message.documentID,
                                                                     syncMode: syncMode,
-                                                                    changeEventReceived: false)
+                                                                    changeEventReceived: false,
+                                                                    pollInterval: pollInterval,
+                                                                    pollIntervalPinned: pollIntervalPinned)
 
-            if syncMode != .manual {
+            // Polling mode opens no watch stream; the timer-driven sync loop drives pushpull
+            // via needRealtimeSync. Skip waitForInitialization too — no stream to wait for.
+            if syncMode != .manual && syncMode != .polling {
                 try self.runWatchLoop(docKey)
                 try await self.waitForInitialization(semaphore, docKey)
             }
@@ -954,13 +976,12 @@ public class Client {
             return doc
         }
 
-        docAttachment.syncMode = syncMode
-
-        // realtime to manual
-        if syncMode == .manual {
+        // Tear down stream when leaving a stream-using mode.
+        if syncMode == .manual || syncMode == .polling {
             try self.stopWatchLoop(docKey, with: docAttachment)
-            return doc
         }
+
+        docAttachment.syncMode = syncMode
 
         if syncMode == .realtime {
             // NOTE(hackerwins): In non-pushpull mode, the client does not receive change events
@@ -970,8 +991,16 @@ public class Client {
             docAttachment.changeEventReceived = true
         }
 
-        // manual to realtime
-        if prevSyncMode == .manual {
+        // Recompute interval default if the user did not pin it.
+        if !docAttachment.pollIntervalPinned {
+            docAttachment.pollInterval = (syncMode == .polling) ? self.defaultPollingInterval : 0
+        }
+
+        // Start watch stream when entering a stream-using mode from a stream-less one.
+        if (prevSyncMode == .manual || prevSyncMode == .polling)
+            && syncMode != .manual && syncMode != .polling
+        {
+            // runWatchLoop already resets cancelled (line 1244), no extra reset needed.
             try self.runWatchLoop(docKey)
         }
 
@@ -1445,6 +1474,7 @@ public class Client {
             }
 
             try doc.applyChangePack(responsePack)
+            attachment.updateHeartbeatTime()
 
             if doc.status == .removed {
                 self.attachmentMap.removeValue(forKey: docKey)
