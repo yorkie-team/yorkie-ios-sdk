@@ -413,6 +413,28 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
+     * `isSplitSiblingSkipForBoundaryMigration` returns true when `child` is an
+     * element split sibling (has `insPrevID` and is not a text node). Such nodes
+     * are split products handled by §7.4 and must be skipped during §7.3
+     * boundary insert migration in ``IndexTreeNode/splitElement(_:_:_:)``.
+     */
+    func isSplitSiblingSkipForBoundaryMigration(_ child: CRDTTreeNode) -> Bool {
+        child.insPrevID != nil && !child.isText
+    }
+
+    /**
+     * `isUnknownToEditor` returns true when the editor did not know about
+     * `child` at the time of the split. Used by §7.3 to decide whether a child
+     * migrates left during boundary insert migration.
+     */
+    func isUnknownToEditor(_ child: CRDTTreeNode, versionVector: VersionVector) -> Bool {
+        guard let lamport = versionVector.get(child.id.createdAt.actorID) else {
+            return true
+        }
+        return lamport < child.id.createdAt.lamport
+    }
+
+    /**
      * `shouldStayLeftOnSplit` keeps a concurrent merge-moved child in the
      * original (left) node during a split when the merge is unknown to the
      * editor and the merge source is local to this node (one of `siblings`).
@@ -444,15 +466,34 @@ final class CRDTTreeNode: IndexTreeNode {
 
         let (split, diff) = self.isText ? try self.splitText(offset, self.id.offset) : try self.splitElement(offset, issueTimeTicket!, versionVector)
 
-        if split != nil {
-            split?.insPrevID = self.id
-            if self.insNextID != nil {
-                let insNext = tree.findFloorNode(self.insNextID!)
-                insNext?.insPrevID = split?.id
-                split?.insNextID = self.insNextID
+        if let split {
+            split.insPrevID = self.id
+            if let insNextID = self.insNextID {
+                let insNext = tree.findFloorNode(insNextID)
+                split.insNextID = insNextID
+
+                if let insNext {
+                    insNext.insPrevID = split.id
+
+                    // §7.4 Empty Sibling Re-Parenting: when the existing insNext
+                    // sibling lives in a different parent (due to a prior
+                    // parent-level split), move the new empty split sibling into
+                    // that parent. Skip when insNext has been tombstoned (e.g. by
+                    // an undo boundary deletion): re-parenting into a removed
+                    // element would make the new split sibling invisible.
+                    if !self.isText,
+                       let insNextParent = insNext.parent,
+                       !insNext.isRemoved,
+                       insNextParent !== split.parent,
+                       split.innerChildren.isEmpty
+                    {
+                        try split.parent?.detachChild(child: split)
+                        try insNextParent.insertBefore(split, insNext)
+                    }
+                }
             }
-            self.insNextID = split?.id
-            tree.registerNode(split!)
+            self.insNextID = split.id
+            tree.registerNode(split)
         }
 
         return (split, diff)
@@ -745,7 +786,12 @@ class CRDTTree: CRDTElement {
      * given node, advancing past element-type split siblings that the editing
      * client did not know about (not in `versionVector`).
      */
-    private func advancePastUnknownSplitSiblings(_ node: CRDTTreeNode, _ versionVector: VersionVector?) -> CRDTTreeNode {
+    private func advancePastUnknownSplitSiblings(
+        _ node: CRDTTreeNode,
+        _ versionVector: VersionVector?,
+        relaxParentCheck: Bool = false,
+        skipActorID: String? = nil
+    ) -> CRDTTreeNode {
         guard let versionVector else {
             return node
         }
@@ -756,13 +802,21 @@ class CRDTTree: CRDTElement {
                 break
             }
 
-            // Stop if the sibling has been moved to a different parent
-            // (e.g., by a higher-level concurrent split).
-            if next.parent !== current.parent {
+            // §7.5: Skip the parent check when relaxParentCheck is true — at
+            // ancestor iterations of the split loop, a concurrent recursive
+            // split may have moved the sibling to a different parent.
+            if !relaxParentCheck, next.parent !== current.parent {
                 break
             }
 
             let actorID = next.id.createdAt.actorID
+
+            // §7.7: Stop at siblings created by the current operation's actor.
+            // They are our own split products, not concurrent ones.
+            if let skipActorID, actorID == skipActorID {
+                break
+            }
+
             if let knownLamport = versionVector.get(actorID), knownLamport >= next.id.createdAt.lamport {
                 break
             }
@@ -1151,6 +1205,67 @@ class CRDTTree: CRDTElement {
     }
 
     /**
+     * `applySplitLevel` performs the `splitLevel` ancestor splits for an edit,
+     * advancing past concurrent split siblings at each level (§7.5/§7.7) and
+     * skipping the current operation's own split products.
+     */
+    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws {
+        var splitCount: Int32 = 0
+        var parent = from.parent
+        var left: CRDTTreeNode = from.left
+        while splitCount < splitLevel {
+            // §7.5 Per-Iteration Advance: advance past unknown element split
+            // siblings at the current ancestor level. skipActorID (§7.7) prevents
+            // advancing past our own split products.
+            if left !== parent {
+                left = self.advancePastUnknownSplitSiblings(
+                    left,
+                    versionVector,
+                    relaxParentCheck: true,
+                    skipActorID: editedAt.actorID
+                )
+                if let leftParent = left.parent, leftParent !== parent {
+                    parent = leftParent
+                }
+            }
+
+            let rawOffset = left !== parent ? try parent.findOffset(node: left, includeRemoved: true) + 1 : 0
+            try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            left = parent
+            guard let nextParent = parent.parent else {
+                break
+            }
+            parent = nextParent
+            splitCount += 1
+        }
+    }
+
+    /**
+     * `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
+     * `toLeft` straddle a concurrent element split: it follows `fromLeft`'s
+     * `insNextID` chain to find a split sibling in `toParent`. Returns the
+     * (parent, left) pair to traverse; the original `fromParent`/`fromLeft` are
+     * preserved by the caller for the merge, split, and insert steps.
+     * VV-independent for clone/root consistency.
+     */
+    private func narrowedCollectRange(fromParent: CRDTTreeNode, fromLeft: CRDTTreeNode, toParent: CRDTTreeNode) -> (CRDTTreeNode, CRDTTreeNode) {
+        guard fromLeft !== fromParent, fromParent !== toParent else {
+            return (fromParent, fromLeft)
+        }
+        var current = fromLeft
+        while let insNextID = current.insNextID {
+            guard let next = self.findFloorNode(insNextID), !next.isText else {
+                break
+            }
+            if let nextParent = next.parent, nextParent === toParent {
+                return (toParent, next)
+            }
+            current = next
+        }
+        return (fromParent, fromLeft)
+    }
+
+    /**
      * `edit` edits the tree with the given range and content.
      * If the content is undefined, the range will be removed.
      */
@@ -1178,6 +1293,11 @@ class CRDTTree: CRDTElement {
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
+        // Phase 3: Range Narrowing — narrow the traversal range when fromLeft and
+        // toLeft straddle a concurrent element split. The original
+        // fromParent/fromLeft are preserved for merge, split, and insert steps.
+        let (collectFromParent, collectFromLeft) = self.narrowedCollectRange(fromParent: fromParent, fromLeft: fromLeft, toParent: toParent)
+
         let fromIdx = try self.toIndex(fromParent, fromLeft)
         let fromPath = try self.toPath(fromParent, fromLeft)
 
@@ -1185,7 +1305,7 @@ class CRDTTree: CRDTElement {
         var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var toBeMergedNodes = [CRDTTreeNode]()
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
+        try self.traverseInPosRange(collectFromParent, collectFromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
             let (node, tokenType) = treeToken
@@ -1254,15 +1374,7 @@ class CRDTTree: CRDTElement {
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
-            var splitCount = 0
-            var parent = fromParent
-            var left = fromLeft
-            while splitCount < splitLevel {
-                try parent.split(self, Int32(parent.findOffset(node: left, includeRemoved: true) + 1), issueTimeTicket(), versionVector)
-                left = parent
-                parent = parent.parent!
-                splitCount += 1
-            }
+            try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
 
             changes.append(TreeChange(actor: editedAt.actorID,
                                       type: .content,
