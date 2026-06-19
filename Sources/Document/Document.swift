@@ -304,7 +304,7 @@ public class Document: Attachable {
         }
 
         guard let ops = isUndo ? self.internalHistory.popUndo() : self.internalHistory.popRedo() else {
-            throw YorkieError(code: .errRefused, message: "There is no operation to be \(isUndo ? "undone" : "redone")")
+            return
         }
 
         guard let actorID = self.actorID else {
