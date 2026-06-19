@@ -1285,3 +1285,66 @@ final class TreeHistoryMultiClientEdgeCasesTests: XCTestCase {
         }
     }
 }
+
+// MARK: - 8. Clear history after attach (PR #1238)
+
+/// Ports: "should not allow undoing past initialRoot after attach"
+/// from packages/sdk/test/integration/history_tree_test.ts (PR #1238).
+///
+/// `Client.attach` must call `clearHistory()` after applying `initialRoot` so that
+/// the tree-creation op is NOT on the undo stack. The user should only be able to
+/// undo the typed characters, not the tree itself.
+final class TreeHistoryClearAfterAttachTests: XCTestCase {
+    @MainActor
+    func test_initialRoot_ops_are_not_undoable_after_attach() async throws {
+        // given
+        let rpcAddress = "http://localhost:8080"
+        let c1 = Client(rpcAddress)
+        try await c1.activate()
+        defer { Task { try await c1.deactivate() } }
+
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let doc = Document(key: docKey)
+
+        // Attach with initialRoot containing a Tree (like wafflebase ensureTree).
+        _ = try await c1.attach(doc, initialRoot: [
+            "content": JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "block", children: [
+                        JSONTreeElementNode(type: "inline", children: [])
+                    ])
+                ])
+            ) as JSONValuable?
+        ])
+
+        let initialXML = (doc.getRoot().content as? JSONTree)?.toXML() ?? ""
+
+        // After attach, the undo stack must be empty — initialRoot is not a
+        // user-action and must not be undoable.
+        let undoStack = doc.getUndoStackForTest()
+        XCTAssertTrue(undoStack.isEmpty, "undo stack must be empty after attach; got \(undoStack.count) entries")
+        XCTAssertFalse(doc.canUndo)
+
+        // when — type 4 characters
+        for ch in ["a", "s", "d", "f"] {
+            try doc.update { root, _ in
+                try (root.content as? JSONTree)?.editByPath([0, 0, 0], [0, 0, 0], JSONTreeTextNode(value: ch))
+            }
+        }
+
+        // Undo 4 times — should revert each character
+        for i in 0 ..< 4 {
+            XCTAssertTrue(doc.canUndo, "should be able to undo character \(i)")
+            try doc.undo()
+        }
+        let xmlAfterAllUndos = (doc.getRoot().content as? JSONTree)?.toXML() ?? ""
+        XCTAssertEqual(xmlAfterAllUndos, initialXML)
+
+        // 5th undo — stack is empty so it must be a no-op (PR #1238)
+        XCTAssertFalse(doc.canUndo, "should not be able to undo past initialRoot")
+        try doc.undo()
+        let xmlAfterExtraUndo = (doc.getRoot().content as? JSONTree)?.toXML() ?? ""
+        XCTAssertEqual(xmlAfterExtraUndo, initialXML, "tree must stay intact after empty-stack undo")
+    }
+}
+

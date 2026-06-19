@@ -26,14 +26,78 @@ final class DocumentUndoRedoTests: XCTestCase {
         XCTAssertFalse(canRedo)
     }
 
-    func test_undo_throws_when_there_is_nothing_to_undo() async {
+    // Ports: upstream PR #1238 changed undo/redo on an empty stack from throwing
+    // ErrRefused to being a no-op. This test was previously asserting a throw;
+    // it now asserts the no-op behaviour instead.
+    func test_undo_is_noop_when_stack_is_empty() async throws {
+        // given
         let doc = Document(key: "undo-nothing")
-        do {
+
+        // when / then — must NOT throw and must leave the document unchanged
+        try await doc.undo()
+        let json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{}")
+        let canUndo = await doc.canUndo
+        XCTAssertFalse(canUndo)
+    }
+
+    // Ports: upstream PR #1238 — redo on an empty stack is also a no-op.
+    func test_redo_is_noop_when_stack_is_empty() async throws {
+        // given
+        let doc = Document(key: "redo-nothing")
+
+        // when / then — must NOT throw and must leave the document unchanged
+        try await doc.redo()
+        let json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{}")
+        let canRedo = await doc.canRedo
+        XCTAssertFalse(canRedo)
+    }
+
+    // Ports: upstream PR #1238 — calling undo more times than operations on the stack
+    // should succeed (extra calls are no-ops) and stop at the earliest state.
+    func test_extra_undo_calls_beyond_stack_depth_are_noops() async throws {
+        // given
+        let doc = Document(key: "undo-overflow")
+        try await doc.update { root, _ in root.a = Int64(1) }
+        try await doc.update { root, _ in root.b = Int64(2) }
+        var json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{\"a\":1,\"b\":2}")
+
+        // when — undo 5 times; only 2 ops on the stack
+        for _ in 0 ..< 5 {
             try await doc.undo()
-            XCTFail("expected undo to throw")
-        } catch {
-            // expected
         }
+
+        // then — stopped at empty state, no throw
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{}")
+        let canUndo = await doc.canUndo
+        XCTAssertFalse(canUndo)
+    }
+
+    // Ports: upstream PR #1238 — calling redo more times than ops on the stack
+    // should succeed (extra calls are no-ops) and stop at the latest state.
+    func test_extra_redo_calls_beyond_stack_depth_are_noops() async throws {
+        // given
+        let doc = Document(key: "redo-overflow")
+        try await doc.update { root, _ in root.a = Int64(1) }
+        try await doc.update { root, _ in root.b = Int64(2) }
+        try await doc.undo()
+        try await doc.undo()
+        var json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{}")
+
+        // when — redo 5 times; only 2 ops on the stack
+        for _ in 0 ..< 5 {
+            try await doc.redo()
+        }
+
+        // then — stopped at full state, no throw
+        json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{\"a\":1,\"b\":2}")
+        let canRedo = await doc.canRedo
+        XCTAssertFalse(canRedo)
     }
 
     func test_undo_and_redo_object_set() async throws {
