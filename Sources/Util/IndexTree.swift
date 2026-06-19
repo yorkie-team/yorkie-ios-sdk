@@ -132,6 +132,17 @@ protocol IndexTreeNode: AnyObject {
     func cloneElement(issueTimeTicket: TimeTicket) -> Self
     func getDataSize() -> DataSize
     func shouldStayLeftOnSplit(_ child: Self, siblings: [Self], versionVector: VersionVector?) -> Bool
+
+    /// Returns true when `child` is an element split sibling (i.e. it has an
+    /// `insPrevID` and is not a text node) and should be skipped during
+    /// §7.3 boundary insert migration in ``splitElement(_:_:_:)``. These are
+    /// split products handled by §7.4, not concurrent inserts.
+    func isSplitSiblingSkipForBoundaryMigration(_ child: Self) -> Bool
+
+    /// Returns true when the editor did not know about `child` at the time of
+    /// the split, based on the given `versionVector`. Used by §7.3 to decide
+    /// whether a child migrates left during boundary insert migration.
+    func isUnknownToEditor(_ child: Self, versionVector: VersionVector) -> Bool
 }
 
 extension IndexTreeNode {
@@ -448,6 +459,16 @@ extension IndexTreeNode {
         false
     }
 
+    /// Default no-op: non-CRDT nodes have no split-sibling concept.
+    func isSplitSiblingSkipForBoundaryMigration(_: Self) -> Bool {
+        false
+    }
+
+    /// Default no-op: non-CRDT nodes treat all children as known.
+    func isUnknownToEditor(_ child: Self, versionVector: VersionVector) -> Bool {
+        false
+    }
+
     /**
      * `splitElement` splits the given element at the given offset.
      */
@@ -483,6 +504,39 @@ extension IndexTreeNode {
                 leftChildren.append(child)
             } else {
                 rightChildren.append(child)
+            }
+        }
+
+        // §7.3 Boundary Insert Migration: move concurrent inserts at the split
+        // boundary to the left node. Element split siblings (those with an
+        // insPrevID) are skipped — they are split products handled by §7.4.
+        // Stop (mark boundaryReached) at the first child the editor already knew
+        // about (knownLamport >= child's lamport). Children unknown to the editor
+        // migrate left.
+        if let vv = versionVector {
+            var movedToLeft = [Self]()
+            var remaining = [Self]()
+            var boundaryReached = false
+            for child in rightChildren {
+                if !boundaryReached {
+                    // Skip element split siblings — they are split products, not
+                    // concurrent inserts. Text split siblings have deterministic
+                    // IDs and act as normal boundary markers.
+                    if self.isSplitSiblingSkipForBoundaryMigration(child) {
+                        remaining.append(child)
+                        continue
+                    }
+                    if self.isUnknownToEditor(child, versionVector: vv) {
+                        movedToLeft.append(child)
+                        continue
+                    }
+                }
+                boundaryReached = true
+                remaining.append(child)
+            }
+            if !movedToLeft.isEmpty {
+                leftChildren.append(contentsOf: movedToLeft)
+                rightChildren = remaining
             }
         }
 

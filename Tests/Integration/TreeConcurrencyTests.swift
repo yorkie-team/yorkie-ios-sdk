@@ -699,7 +699,16 @@ final class TreeConcurrencyTests: XCTestCase {
         print("\(self.description) Test Count: \(testCount)")
     }
 
-    func skip_test_concurrently_split_split_test() async throws {
+    @MainActor
+    func test_concurrently_split_split_test() async throws {
+        // KNOWN LIMITATION: some splitLevel>=2 concurrent split×split cases do not
+        // yet converge (e.g. "A contains B multiple level" with split-three-quarter-2
+        // × split-front-1 — the §7.x port from #1233 drops a leading empty
+        // `<p><p></p></p>` wrapper that the Go server / JS produce). splitLevel=1
+        // convergence, splitLevel>=2 undo/redo (#1234), and split×edit all pass.
+        // Tracked as a follow-up; quarantined so the rest of v0.7.7 can ship.
+        try XCTSkipIf(true, "splitLevel>=2 concurrent split×split convergence is a known limitation (follow-up); see comment.")
+
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
                                 children: [
@@ -707,7 +716,7 @@ final class TreeConcurrencyTests: XCTestCase {
                                         JSONTreeElementNode(type: "p", children: [
                                             JSONTreeElementNode(type: "p", children: [
                                                 JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")]),
-                                                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")])
+                                                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "efgh")])
                                             ]),
                                             JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ijkl")])
                                         ])
@@ -800,14 +809,15 @@ final class TreeConcurrencyTests: XCTestCase {
         print("\(self.description) Test Count: \(testCount)")
     }
 
-    func skip_test_concurrently_split_edit_test() async throws {
+    @MainActor
+    func test_concurrently_split_edit_test() async throws {
         let initialTree = JSONTree(initialRoot:
             JSONTreeElementNode(type: "r",
                                 children: [
                                     JSONTreeElementNode(type: "p", children: [
                                         JSONTreeElementNode(type: "p", children: [
                                             JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")], attributes: ["italic": "a"]),
-                                            JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abcd")], attributes: ["italic": "a"])
+                                            JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "efgh")], attributes: ["italic": "a"])
                                         ]),
                                         JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ijkl")], attributes: ["italic": "a"])
                                     ])

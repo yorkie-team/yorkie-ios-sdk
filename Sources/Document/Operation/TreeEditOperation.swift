@@ -140,16 +140,16 @@ final class TreeEditOperation: Operation {
         self.lastToIdx = preEditFromIdx + removedSize
 
         // Build the reverse op for undo.
-        // A pure level-1 split (no content inserted, no nodes removed) gets a boundary-deletion
-        // reverse so that undo merges the split elements back. All other splits are skipped for
-        // now — only splitLevel=0 (regular edits) and pure level-1 splits produce a reverse op.
-        let isPureL1Split = self.splitLevel == 1
+        // A pure split (splitLevel > 0, no content inserted, no nodes removed) gets a
+        // boundary-deletion reverse so that undo merges the split elements back. This
+        // covers both level-1 and level-2+ splits, enabling undo/redo of splitLevel>=2.
+        let isPureSplit = self.splitLevel > 0
             && (self.contents?.isEmpty ?? true)
             && removedNodes.isEmpty
         let reverseOp: Operation?
         if self.splitLevel == 0 {
             reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx)
-        } else if isPureL1Split {
+        } else if isPureSplit {
             reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx)
         } else {
             reverseOp = nil
@@ -266,7 +266,7 @@ final class TreeEditOperation: Operation {
         )
     }
 
-    /// `toSplitReverseOperation` creates the reverse operation for a pure level-1 split edit.
+    /// `toSplitReverseOperation` creates the reverse operation for a pure split edit (splitLevel > 0).
     ///
     /// A split creates element boundaries (one close token + one open token per level). The reverse
     /// is a boundary-deletion: a `splitLevel=0` edit that removes those `2 * splitLevel` tokens,

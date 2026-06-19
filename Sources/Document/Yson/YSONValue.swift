@@ -95,6 +95,8 @@ public indirect enum YSONValue: Equatable {
     case binData(String)
     /// A Counter CRDT wrapping an ``YSONValue/int(_:)`` or ``YSONValue/long(_:)`` value.
     case counter(YSONValue)
+    /// A DedupCounter CRDT wrapping an ``YSONValue/int(_:)`` value and a base64-encoded HyperLogLog registers string.
+    case dedupCounter(value: YSONValue, registers: String)
     /// A Text CRDT.
     case text(YSONText)
     /// A Tree CRDT.

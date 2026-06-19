@@ -100,7 +100,17 @@ public enum YSON {
         return false
     }
 
+    /// Returns whether the value is a DedupCounter CRDT.
+    public static func isDedupCounter(_ value: YSONValue) -> Bool {
+        if case .dedupCounter = value { return true }
+        return false
+    }
+
     /// Returns whether the value is a plain object (not a special type).
+    ///
+    /// Returns `false` for special CRDT types such as ``YSONValue/counter(_:)`` and
+    /// ``YSONValue/dedupCounter(value:registers:)`` even if they could otherwise appear
+    /// as object-shaped values in other representations.
     public static func isObject(_ value: YSONValue) -> Bool {
         if case .object = value { return true }
         return false
@@ -109,9 +119,36 @@ public enum YSON {
     // MARK: - Preprocessing
 
     /// Converts YSON special syntax to a JSON-compatible representation using `__yson_type` markers.
+    ///
+    /// DedupCounter is handled first because its compound literal `DedupCounter(Int(n),"b64")`
+    /// would be partially matched by the Counter or Int patterns if those ran first.
     private static func preprocessYSON(_ yson: String) -> String {
         var result = yson
-        // Counter is handled first as it may contain Int/Long.
+
+        // DedupCounter must be replaced before Counter and Int, as its literal contains
+        // an Int(…) sub-expression and a quoted registers string.
+        // DedupCounter(Int(15),"b64") →
+        //   {"__yson_type":"DedupCounter","__yson_data":{"__yson_type":"Int","__yson_data":15},"__yson_registers":"b64"}
+        let dedupPattern = "DedupCounter\\(Int\\((-?\\d+)\\),\"([^\"]+)\"\\)"
+        if let regex = try? NSRegularExpression(pattern: dedupPattern) {
+            var output = ""
+            var lastEnd = result.startIndex
+            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+            for match in matches {
+                let matchRange = Range(match.range, in: result)!
+                output += result[lastEnd ..< matchRange.lowerBound]
+                let valueRange = Range(match.range(at: 1), in: result)!
+                let regsRange = Range(match.range(at: 2), in: result)!
+                let value = String(result[valueRange])
+                let regs = String(result[regsRange])
+                output += "{\"__yson_type\":\"DedupCounter\",\"__yson_data\":{\"__yson_type\":\"Int\",\"__yson_data\":\(value)},\"__yson_registers\":\"\(regs)\"}"
+                lastEnd = matchRange.upperBound
+            }
+            output += result[lastEnd...]
+            result = output
+        }
+
+        // Counter and the remaining types are handled in order.
         let replacements: [(pattern: String, template: String)] = [
             ("Counter\\((Int|Long)\\((-?\\d+)\\)\\)",
              "{\"__yson_type\":\"Counter\",\"__yson_data\":{\"__yson_type\":\"$1\",\"__yson_data\":$2}}"),
@@ -162,6 +199,10 @@ public enum YSON {
 
         if let dict = value as? [String: Any] {
             if let marker = dict[typeKey] as? String {
+                // DedupCounter requires both __yson_data and __yson_registers from the same dict.
+                if marker == "DedupCounter" {
+                    return try self.postprocessDedupCounter(dict)
+                }
                 return try self.postprocessMarked(marker, data: dict[self.dataKey] as Any)
             }
 
@@ -206,6 +247,20 @@ public enum YSON {
         }
 
         throw YorkieError(code: .errInvalidArgument, message: "invalid YSON \(marker) format")
+    }
+
+    /// Restores a DedupCounter value from a dict that contains both `__yson_data` and `__yson_registers`.
+    ///
+    /// - Throws: ``YorkieError`` with code `errInvalidArgument` when the inner value is not an Int.
+    private static func postprocessDedupCounter(_ dict: [String: Any]) throws -> YSONValue {
+        guard let registers = dict["__yson_registers"] as? String else {
+            throw YorkieError(code: .errInvalidArgument, message: "invalid YSON DedupCounter format")
+        }
+        let innerValue = try postprocessValue(dict[dataKey] as Any)
+        guard YSON.isInt(innerValue) else {
+            throw YorkieError(code: .errInvalidArgument, message: "DedupCounter must contain Int")
+        }
+        return .dedupCounter(value: innerValue, registers: registers)
     }
 
     private static func postprocessTextNode(_ node: Any) throws -> YSONTextNode {
