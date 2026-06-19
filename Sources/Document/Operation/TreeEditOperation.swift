@@ -121,7 +121,7 @@ final class TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let (changes, pairs, diff, removedNodes, preEditFromIdx) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
@@ -148,7 +148,7 @@ final class TreeEditOperation: Operation {
             && removedNodes.isEmpty
         let reverseOp: Operation?
         if self.splitLevel == 0 {
-            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx)
+            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, mergeLevel: mergeLevel)
         } else if isPureSplit {
             reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx)
         } else {
@@ -192,12 +192,19 @@ final class TreeEditOperation: Operation {
     /// reconciliation when remote edits arrive). At undo time the integer indices take precedence
     /// and are converted to positions via `tree.findPos`.
     ///
+    /// When `mergeLevel > 0`, the edit was a cross-boundary merge (it moved children by
+    /// deleting element boundaries). The reverse of a merge is a split — not content
+    /// re-insertion — so a split op with `splitLevel = mergeLevel` is returned instead of
+    /// the normal content-reinsertion reverse.
+    ///
     /// - Parameters:
     ///   - tree: The tree after this edit has been applied.
     ///   - removedNodes: The nodes removed by this edit, to be re-inserted on undo.
     ///   - preEditFromIdx: The start index captured before the edit deletions.
+    ///   - mergeLevel: The number of element boundaries merged by this edit. When greater than
+    ///     zero the reverse op is a split rather than a content reinsertion.
     /// - Returns: The reverse ``TreeEditOperation``, or `nil` when the edit was a no-op.
-    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int) throws -> Operation? {
+    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, mergeLevel: Int = 0) throws -> Operation? {
         // Special case: this op is a boundary-deletion that was generated to reverse a split.
         // Its redo (i.e. the reverse of this reverse) should re-split at the merged position,
         // not re-insert the tombstoned boundary nodes as raw content.
@@ -215,6 +222,25 @@ final class TreeEditOperation: Operation {
                 toIdx: preEditFromIdx
             )
             return splitRedoOp
+        }
+
+        // Cross-boundary merge: the reverse is a split, not content re-insertion.
+        // A merge deletes element boundaries (e.g., </p><p>), moving children
+        // into the target. The undo re-creates those boundaries via split.
+        if mergeLevel > 0 {
+            let splitFromPos = try tree.findPos(preEditFromIdx)
+            let splitUndoOp = TreeEditOperation(
+                parentCreatedAt: self.parentCreatedAt,
+                fromPos: splitFromPos,
+                toPos: splitFromPos,
+                contents: nil,
+                splitLevel: Int32(mergeLevel),
+                executedAt: TimeTicket.initial,
+                isUndoOp: true,
+                fromIdx: preEditFromIdx,
+                toIdx: preEditFromIdx
+            )
+            return splitUndoOp
         }
 
         // Total tree-index tokens inserted by this edit.
