@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.6] - 2026-06-18
+
+- Implement toJSON for Bytes and Date primitive types in https://github.com/yorkie-team/yorkie-ios-sdk/pull/258
+- Unify presence event emission with reconcilePresence in https://github.com/yorkie-team/yorkie-ios-sdk/pull/258
+- Copy attributes to split node in cloneElement in https://github.com/yorkie-team/yorkie-ios-sdk/pull/258
+- Apply array-move-convergence with LWW position register in https://github.com/yorkie-team/yorkie-ios-sdk/pull/258
+- Register LWW-losing element in GC set on Set conflict in https://github.com/yorkie-team/yorkie-ios-sdk/pull/258
+
 ## [v0.7.5] - 2026-06-17
 
 - Add Counter dedup mode with HyperLogLog for UV measurement in https://github.com/yorkie-team/yorkie-ios-sdk/pull/257

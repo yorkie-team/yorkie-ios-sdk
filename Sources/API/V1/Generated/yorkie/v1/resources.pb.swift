@@ -1385,6 +1385,33 @@ public struct Yorkie_V1_RGANode: @unchecked Sendable {
   /// Clears the value of `element`. Subsequent reads from it will return its default value.
   public mutating func clearElement() {_uniqueStorage()._element = nil}
 
+  public var positionCreatedAt: Yorkie_V1_TimeTicket {
+    get {_storage._positionCreatedAt ?? Yorkie_V1_TimeTicket()}
+    set {_uniqueStorage()._positionCreatedAt = newValue}
+  }
+  /// Returns true if `positionCreatedAt` has been explicitly set.
+  public var hasPositionCreatedAt: Bool {_storage._positionCreatedAt != nil}
+  /// Clears the value of `positionCreatedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearPositionCreatedAt() {_uniqueStorage()._positionCreatedAt = nil}
+
+  public var positionMovedAt: Yorkie_V1_TimeTicket {
+    get {_storage._positionMovedAt ?? Yorkie_V1_TimeTicket()}
+    set {_uniqueStorage()._positionMovedAt = newValue}
+  }
+  /// Returns true if `positionMovedAt` has been explicitly set.
+  public var hasPositionMovedAt: Bool {_storage._positionMovedAt != nil}
+  /// Clears the value of `positionMovedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearPositionMovedAt() {_uniqueStorage()._positionMovedAt = nil}
+
+  public var positionRemovedAt: Yorkie_V1_TimeTicket {
+    get {_storage._positionRemovedAt ?? Yorkie_V1_TimeTicket()}
+    set {_uniqueStorage()._positionRemovedAt = newValue}
+  }
+  /// Returns true if `positionRemovedAt` has been explicitly set.
+  public var hasPositionRemovedAt: Bool {_storage._positionRemovedAt != nil}
+  /// Clears the value of `positionRemovedAt`. Subsequent reads from it will return its default value.
+  public mutating func clearPositionRemovedAt() {_uniqueStorage()._positionRemovedAt = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -4458,11 +4485,14 @@ extension Yorkie_V1_RHTNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RGANode"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}next\0\u{1}element\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}next\0\u{1}element\0\u{3}position_created_at\0\u{3}position_moved_at\0\u{3}position_removed_at\0")
 
   fileprivate class _StorageClass {
     var _next: Yorkie_V1_RGANode? = nil
     var _element: Yorkie_V1_JSONElement? = nil
+    var _positionCreatedAt: Yorkie_V1_TimeTicket? = nil
+    var _positionMovedAt: Yorkie_V1_TimeTicket? = nil
+    var _positionRemovedAt: Yorkie_V1_TimeTicket? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -4475,6 +4505,9 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     init(copying source: _StorageClass) {
       _next = source._next
       _element = source._element
+      _positionCreatedAt = source._positionCreatedAt
+      _positionMovedAt = source._positionMovedAt
+      _positionRemovedAt = source._positionRemovedAt
     }
   }
 
@@ -4495,6 +4528,9 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularMessageField(value: &_storage._next) }()
         case 2: try { try decoder.decodeSingularMessageField(value: &_storage._element) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._positionCreatedAt) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._positionMovedAt) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._positionRemovedAt) }()
         default: break
         }
       }
@@ -4513,6 +4549,15 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       try { if let v = _storage._element {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
       } }()
+      try { if let v = _storage._positionCreatedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._positionMovedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._positionRemovedAt {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4524,6 +4569,9 @@ extension Yorkie_V1_RGANode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         let rhs_storage = _args.1
         if _storage._next != rhs_storage._next {return false}
         if _storage._element != rhs_storage._element {return false}
+        if _storage._positionCreatedAt != rhs_storage._positionCreatedAt {return false}
+        if _storage._positionMovedAt != rhs_storage._positionMovedAt {return false}
+        if _storage._positionRemovedAt != rhs_storage._positionRemovedAt {return false}
         return true
       }
       if !storagesAreEqual {return false}

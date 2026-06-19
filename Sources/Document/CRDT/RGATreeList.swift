@@ -16,401 +16,684 @@
 
 import Foundation
 
-/**
- * `RGATreeListNode` is a node of RGATreeList.
- */
-final class RGATreeListNode: SplayNode<CRDTElement> {
-    fileprivate private(set) var previous: RGATreeListNode?
-    fileprivate var next: RGATreeListNode?
-    fileprivate var movedFrom: RGATreeListNode?
+// MARK: - RGATreeListElementEntry
 
-    override init(_ value: CRDTElement) {
+/// Holds the stable identity of an element in the list.
+///
+/// A live element maps 1-to-1 with its current position node. When a move operation wins
+/// the LWW race, the old position node becomes a *dead position node* (its `elementEntry`
+/// is set to `nil`) and a new position node is inserted at the winning location.
+final class RGATreeListElementEntry {
+    /// The actual CRDT element.
+    let element: CRDTElement
+
+    /// The current winning position node for this element.
+    ///
+    /// Updated whenever a `moveAfter` wins the LWW race for this element.
+    var positionNode: RGATreeListNode
+
+    /// The `executedAt` of the move operation that established the current position.
+    ///
+    /// `nil` for elements that have never been moved. Mirrors `posMovedAt` in the JS implementation.
+    var posMovedAt: TimeTicket?
+
+    init(element: CRDTElement, positionNode: RGATreeListNode) {
+        self.element = element
+        self.positionNode = positionNode
+        self.posMovedAt = nil
+    }
+}
+
+// MARK: - RGATreeListNode
+
+/// A node of ``RGATreeList``.
+///
+/// Each node represents a *position slot* in the list, not necessarily a live element.
+/// A *dead position node* has `elementEntry == nil` and its `positionRemovedAt` is set;
+/// it contributes zero to the splay-tree length and is a GC target.
+final class RGATreeListNode: SplayNode<CRDTElement> {
+    fileprivate var previous: RGATreeListNode?
+    fileprivate var next: RGATreeListNode?
+
+    /// The position creation time, which is the stable key for this position slot.
+    ///
+    /// For normal (non-moved) nodes this equals `value.createdAt`.
+    /// For nodes inserted by `moveAfter`, this is the `executedAt` ticket of the move.
+    private(set) var positionCreatedAt: TimeTicket
+
+    /// Set when this position node is superseded by a later LWW-winning move.
+    /// A non-nil value means this is a dead position node.
+    private(set) var positionRemovedAt: TimeTicket?
+
+    /// The ``RGATreeListElementEntry`` this position node is the winning slot for.
+    /// `nil` for dead position nodes.
+    private(set) var elementEntry: RGATreeListElementEntry?
+
+    // MARK: Initializers
+
+    /// Creates a node wrapping a live element.
+    fileprivate init(value: CRDTElement, positionCreatedAt: TimeTicket) {
+        self.positionCreatedAt = positionCreatedAt
         super.init(value)
     }
 
-    /**
-     * `create` creates a new node after the previous node.
-     */
-    static func create(with value: CRDTElement, previousNode: RGATreeListNode) -> RGATreeListNode {
-        let newNode = RGATreeListNode(value)
-        let prevNext = previousNode.next
-        previousNode.next = newNode
-        newNode.previous = previousNode
-        newNode.next = prevNext
-        if let prevNext = prevNext {
-            prevNext.previous = newNode
-        }
-
-        return newNode
+    /// Creates the sentinel dummy-head node.
+    fileprivate static func createDummy() -> RGATreeListNode {
+        let dummyValue = Primitive(value: .null, createdAt: .initial)
+        dummyValue.removedAt = .initial
+        let node = RGATreeListNode(value: dummyValue, positionCreatedAt: .initial)
+        // Dummy head has no entry; it is never a GC target.
+        return node
     }
 
-    /**
-     * `length` returns the length of this node.
-     */
+    // MARK: SplayNode overrides
+
+    /// Zero for removed elements *and* for dead position nodes.
     override var length: Int {
+        if self.elementEntry == nil {
+            // Dead position node — contributes no length.
+            return 0
+        }
         return self.value.isRemoved ? 0 : 1
     }
 
-    /**
-     * `remove` removes value based on removing time.
-     */
-    fileprivate func remove(_ removedAt: TimeTicket) -> Bool {
-        return self.value.remove(removedAt)
-    }
+    // MARK: Internal helpers
 
-    /**
-     * `getCreatedAt` returns creation time of this value
-     */
+    /// The element-level `createdAt`, used to look up the element entry.
     fileprivate var createdAt: TimeTicket {
         return self.value.createdAt
     }
 
-    /**
-     * `getPositionedAt` returns time this element was positioned in the array.
-     */
+    /// The positioned-at time for insertion-order arbitration.
+    ///
+    /// Uses `positionCreatedAt` as the LWW register key, mirroring the JS implementation.
     fileprivate var positionedAt: TimeTicket {
-        if let movedAt = self.value.movedAt {
-            return movedAt
-        }
-
-        return self.value.createdAt
+        return self.positionCreatedAt
     }
 
-    /**
-     * `release` deletes prev and next node.
-     */
+    /// Returns `true` when the underlying element has been removed.
+    fileprivate var isRemoved: Bool {
+        return self.value.isRemoved
+    }
+
+    /// Removes the underlying element value at the given time.
+    @discardableResult
+    fileprivate func remove(_ at: TimeTicket) -> Bool {
+        return self.value.remove(at)
+    }
+
+    /// Unlinks this node from its neighbours (doubly-linked list surgery).
     fileprivate func release() {
-        if let previous = self.previous {
+        if let previous {
             previous.next = self.next
         }
-        if let next = self.next {
+        if let next {
             next.previous = self.previous
         }
         self.previous = nil
         self.next = nil
     }
 
-    /**
-     * `isRemoved` checks if the value was removed.
-     */
-    fileprivate var isRemoved: Bool {
-        return self.value.isRemoved
+    // MARK: Public accessors
+
+    /// Returns the position creation time, which is the stable identifier for this slot.
+    func getPositionCreatedAt() -> TimeTicket {
+        return self.positionCreatedAt
     }
 
-    /**
-     * `getMovedFrom` returns the previous element before the element moved.
-     */
-    func getMovedFrom() -> RGATreeListNode? {
-        return self.movedFrom
+    /// Returns the time at which this position slot was garbage-collected (killed).
+    func getPositionRemovedAt() -> TimeTicket? {
+        return self.positionRemovedAt
     }
 
-    /**
-     * `setMovedFrom` sets the previous element before the element moved.
-     */
-    func setMovedFrom(_ movedFrom: RGATreeListNode?) {
-        self.movedFrom = movedFrom
+    /// Returns the element entry for this position, or `nil` if this is a dead node.
+    func getElementEntry() -> RGATreeListElementEntry? {
+        return self.elementEntry
+    }
+
+    /// Marks this position node as dead by setting the removal time and clearing the entry.
+    fileprivate func markDead(at removedAt: TimeTicket) {
+        self.positionRemovedAt = removedAt
+        self.elementEntry = nil
+    }
+
+    /// Attaches an element entry to this position node (used during snapshot restore).
+    fileprivate func setElementEntry(_ entry: RGATreeListElementEntry?) {
+        self.elementEntry = entry
     }
 }
 
-/**
- * `RGATreeList` is replicated growable array.
- */
+// MARK: GCChild conformance
+
+extension RGATreeListNode: GCChild {
+    /// Returns the ID string keyed on `positionCreatedAt` so the GC pair map can
+    /// address dead position nodes independently of their element's `createdAt`.
+    var toIDString: String {
+        return self.positionCreatedAt.toIDString
+    }
+
+    /// Returns the time this position node was killed (i.e., `positionRemovedAt`).
+    var removedAt: TimeTicket? {
+        return self.positionRemovedAt
+    }
+
+    /// Returns the meta data size of this position node: one ticket for the
+    /// position, plus another when the position has been removed (matching JS).
+    func getDataSize() -> DataSize {
+        var meta = timeTicketSize
+        if self.positionRemovedAt != nil {
+            meta += timeTicketSize
+        }
+        return DataSize(data: 0, meta: meta)
+    }
+}
+
+// MARK: - RGATreeList
+
+/// A replicated growable array using an LWW position register for convergent array moves.
+///
+/// Each element has a stable identity held in ``RGATreeListElementEntry``, separate from
+/// its current position slot. When two concurrent moves target the same element the one
+/// with the later `executedAt` wins; the old position becomes a *dead position node*
+/// that is eventually garbage-collected.
 class RGATreeList {
     private let dummyHead: RGATreeListNode
     private var last: RGATreeListNode
     private let nodeMapByIndex: SplayTree<CRDTElement>
-    private var nodeMapByCreatedAt: [TimeTicket: RGATreeListNode]
+
+    /// Maps a position node's `positionCreatedAt` to the node itself.
+    private var nodeMapByPositionCreatedAt: [TimeTicket: RGATreeListNode]
+
+    /// Maps an element's `createdAt` to its ``RGATreeListElementEntry``.
+    private var elementMapByCreatedAt: [TimeTicket: RGATreeListElementEntry]
 
     init() {
-        let dummyValue = Primitive(value: .null, createdAt: .initial)
-        dummyValue.removedAt = .initial
-        self.dummyHead = RGATreeListNode(dummyValue)
+        self.dummyHead = RGATreeListNode.createDummy()
         self.last = self.dummyHead
         self.nodeMapByIndex = SplayTree()
         self.nodeMapByIndex.insert(self.dummyHead)
-        self.nodeMapByCreatedAt = [self.dummyHead.createdAt: self.dummyHead]
+        self.nodeMapByPositionCreatedAt = [self.dummyHead.positionCreatedAt: self.dummyHead]
+        self.elementMapByCreatedAt = [:]
     }
 
-    /**
-     * `length` returns size of RGATreeList.
-     */
+    // MARK: Length
+
+    /// The number of live (non-removed) elements in this list.
     var length: Int {
         return self.nodeMapByIndex.length
     }
 
-    /**
-     * `findNode` returns the node by the given createdAt and
-     * executedAt. It passes through nodes created after executedAt from the
-     * given node and returns the next node.
-     *
-     * - Parameters:
-     *   - createdAt: created time
-     *   - executedAt: executed time
-     * - Returns: next node
-     */
-    private func findNode(fromCreatedAt createdAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode {
-        guard var node = self.nodeMapByCreatedAt[createdAt] else {
-            let log = "can't find the given node: \(createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
+    // MARK: Private helpers
 
-        while
-            let movedAt = node.value.movedAt,
-            movedAt.after(executedAt),
-            let movedFrom = node.getMovedFrom()
-        {
-            node = movedFrom
+    /// Walks forward from `node` skipping nodes whose `positionedAt` is after `executedAt`.
+    ///
+    /// This is the LWW-correct way to find the insertion point: we skip over any
+    /// concurrent insertions that were committed *after* `executedAt`.
+    private func findNextBeforeExecutedAt(node: RGATreeListNode, executedAt: TimeTicket) -> RGATreeListNode {
+        var current = node
+        while let next = current.next, next.positionedAt > executedAt {
+            current = next
         }
-
-        while let next = node.next, next.positionedAt.after(executedAt) {
-            node = next
-        }
-
-        return node
+        return current
     }
 
+    /// Removes `node` from the splay tree and position map, updating `last` if needed.
     private func release(node: RGATreeListNode) {
-        if self.last === node, let previousNode = node.previous {
-            self.last = previousNode
+        if self.last === node, let prev = node.previous {
+            self.last = prev
         }
 
         node.release()
         self.nodeMapByIndex.delete(node)
-        self.nodeMapByCreatedAt.removeValue(forKey: node.value.createdAt)
+        self.nodeMapByPositionCreatedAt.removeValue(forKey: node.positionCreatedAt)
     }
 
-    /**
-     * `insert` adds a new node with the value after the given node.
-     */
+    // MARK: Core insertion (private)
+
+    /// Inserts a node into the linked list and splay tree after the anchor.
+    ///
+    /// The `node` must have its `elementEntry` set before this call if it is a live node,
+    /// so that `SplayTree.updateWeight` sees the correct `length` during insertion.
+    private func insertNodeIntoStructures(node: RGATreeListNode, after anchor: RGATreeListNode) {
+        // Link into doubly-linked list.
+        let anchorNext = anchor.next
+        anchor.next = node
+        node.previous = anchor
+        node.next = anchorNext
+        anchorNext?.previous = node
+
+        if anchor === self.last {
+            self.last = node
+        }
+
+        self.nodeMapByIndex.insert(previousNode: anchor, newNode: node)
+        self.nodeMapByPositionCreatedAt[node.positionCreatedAt] = node
+    }
+
+    /// Inserts a bare position node (no element) after the node identified by `prevPositionCreatedAt`.
+    ///
+    /// This is used by `moveAfter` for both the winning and losing LWW paths to create a
+    /// new position slot. The node is inserted using RGA ordering (skipping concurrent nodes
+    /// with later timestamps) and added to the splay tree and position map.
+    ///
+    /// - Parameters:
+    ///   - prevPositionCreatedAt: The `positionCreatedAt` of the node to insert after.
+    ///   - executedAt: The `executedAt` of the move, used as the new node's `positionCreatedAt`.
+    /// - Returns: The newly created position node.
+    @discardableResult
+    private func insertPositionAfter(prevPositionCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode {
+        guard let prevNode = self.nodeMapByPositionCreatedAt[prevPositionCreatedAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(prevPositionCreatedAt)")
+        }
+        let anchor = self.findNextBeforeExecutedAt(node: prevNode, executedAt: executedAt)
+        // Use a null placeholder as the SplayNode value — callers must check `elementEntry == nil`
+        // to detect bare position nodes rather than accessing `.value` directly.
+        let placeholder = Primitive(value: .null, createdAt: executedAt)
+        let node = RGATreeListNode(value: placeholder, positionCreatedAt: executedAt)
+        // No elementEntry set — this is a bare position node.
+        self.insertNodeIntoStructures(node: node, after: anchor)
+        return node
+    }
+
+    // MARK: Public insert (used by CRDTArray / Converter)
+
+    /// Inserts `value` after the element identified by `prevCreatedAt`.
+    ///
+    /// This is the normal (non-move) insertion path; the new position slot's key is
+    /// set to `value.createdAt`. The `prevCreatedAt` is interpreted as either a position
+    /// node key (checked first in `nodeMapByPositionCreatedAt`) or an element key
+    /// (fallback via `elementMapByCreatedAt`), mirroring the JS `insertAfter` algorithm.
     @discardableResult
     func insert(
         _ value: CRDTElement,
-        prevCreatedAt createdAt: TimeTicket,
+        prevCreatedAt: TimeTicket,
         executedAt: TimeTicket? = nil
     ) throws -> RGATreeListNode {
-        let executedAt: TimeTicket = executedAt ?? value.createdAt
-
-        let previousNode = try findNode(fromCreatedAt: createdAt, executedAt: executedAt)
-        let newNode = RGATreeListNode.create(with: value, previousNode: previousNode)
-        if previousNode === self.last {
-            self.last = newNode
+        let et = executedAt ?? value.createdAt
+        // Resolve prevCreatedAt to the correct anchor position node.
+        // JS insertAfter checks nodeMapByCreatedAt (position map) first, then elementMapByCreatedAt.
+        let anchorNode: RGATreeListNode
+        if let directNode = self.nodeMapByPositionCreatedAt[prevCreatedAt] {
+            // prevCreatedAt is a known position node key (covers dummy head, normal nodes, and
+            // position-identity keys from moved nodes).
+            anchorNode = directNode
+        } else if let prevEntry = self.elementMapByCreatedAt[prevCreatedAt] {
+            // prevCreatedAt is an element key — use the element's current position node.
+            anchorNode = prevEntry.positionNode
+        } else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(prevCreatedAt)")
         }
+        let anchor = self.findNextBeforeExecutedAt(node: anchorNode, executedAt: et)
+        let newNode = RGATreeListNode(value: value, positionCreatedAt: value.createdAt)
 
-        self.nodeMapByIndex.insert(previousNode: previousNode, newNode: newNode)
-        self.nodeMapByCreatedAt[newNode.createdAt] = newNode
+        // Create and attach the entry BEFORE splay-tree insertion so that `newNode.length`
+        // returns 1 when `updateWeight` is called during `insertNodeIntoStructures`.
+        let entry = RGATreeListElementEntry(element: value, positionNode: newNode)
+        newNode.setElementEntry(entry)
+        self.elementMapByCreatedAt[value.createdAt] = entry
+
+        self.insertNodeIntoStructures(node: newNode, after: anchor)
         return newNode
     }
 
-    /**
-     * `move` moves the given `createdAt` element
-     * after the `previousCreatedAt` element.
-     */
-    func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
-        guard var prevNode = self.nodeMapByCreatedAt[afterCreatedAt] else {
-            let log = "can't find the given node: \(afterCreatedAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
-
-        guard var node = self.nodeMapByCreatedAt[createdAt] else {
-            let log = "can't find the given node: \(createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
-
-        if prevNode !== node, executedAt > node.positionedAt {
-            let movedFrom = node.previous
-            var nextNode = node.next
-            self.release(node: node)
-
-            node = try self.insert(
-                node.value,
-                prevCreatedAt: prevNode.createdAt,
-                executedAt: executedAt
-            )
-            node.value.setMovedAt(executedAt)
-            node.setMovedFrom(movedFrom)
-
-            while let next = nextNode, next.positionedAt > executedAt {
-                prevNode = node
-                node = next
-                nextNode = node.next
-
-                self.release(node: node)
-                node = try self.insert(
-                    node.value,
-                    prevCreatedAt: prevNode.createdAt,
-                    executedAt: executedAt
-                )
-                node.value.setMovedAt(executedAt)
-                node.setMovedFrom(movedFrom)
-            }
-        }
-    }
-
-    /**
-     * `insert` adds the given element after the last node.
-     */
+    /// Appends `value` after the last node.
     func insert(_ value: CRDTElement) throws {
-        try self.insert(value, prevCreatedAt: self.last.createdAt)
+        // Use the last node's positionCreatedAt (position identity) as the anchor.
+        try self.insert(value, prevCreatedAt: self.last.positionCreatedAt)
     }
 
-    /**
-     * `get` returns the element of the given creation time.
-     */
-    func get(createdAt: TimeTicket) throws -> CRDTElement {
-        guard let node = self.nodeMapByCreatedAt[createdAt] else {
-            let log = "can't find the given node: \(createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
+    // MARK: moveAfter — LWW position register
 
-        return node.value
-    }
-
-    /**
-     * `subPath` returns the sub path of the given element.
-     */
-    func subPath(createdAt: TimeTicket) throws -> String {
-        guard let node = self.nodeMapByCreatedAt[createdAt] else {
-            let log = "can't find the given node: \(createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
-
-        return String(self.nodeMapByIndex.indexOf(node))
-    }
-
-    /**
-     * `purge` physically purges element.
-     */
-    func purge(_ value: CRDTElement) throws {
-        guard let node = self.nodeMapByCreatedAt[value.createdAt] else {
-            let log = "failed to find the given createdAt: \(value.createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
-
-        self.release(node: node)
-    }
-
-    /**
-     * `set` sets the given element at the given creation time.
-     */
+    /// Moves the element identified by `createdAt` to after `prevCreatedAt`, returning
+    /// the dead position node that must be registered as a GC pair.
+    ///
+    /// Faithful port of the yorkie-js-sdk v0.7.6 `moveAfter` algorithm:
+    /// - **LWW winner**: Creates a new position node at `prevCreatedAt`, wires up the entry,
+    ///   kills the old position node (sets `positionRemovedAt`), and returns it for GC.
+    /// - **LWW loser**: Creates a bare dead position node at `prevCreatedAt` (no entry,
+    ///   `positionRemovedAt = executedAt`), splays it, and returns it for GC.
+    ///   Returns `nil` only when the node was already processed (idempotency check).
+    ///
+    /// No cascade re-linking is performed — that is not in the JS specification.
+    ///
+    /// - Parameters:
+    ///   - createdAt: The `createdAt` of the element to move (element identity).
+    ///   - prevCreatedAt: The POSITION node key after which to insert (position identity).
+    ///   - executedAt: The operation's execution time, used as the LWW clock.
+    /// - Returns: The dead position node (GC target), or `nil` if already processed.
+    /// - Throws: ``YorkieError`` when the target element or previous position cannot be found.
     @discardableResult
-    func set(
-        createdAt: TimeTicket,
-        element: CRDTElement,
-        executedAt: TimeTicket
-    ) throws -> CRDTElement {
-        guard let node = nodeMapByCreatedAt[createdAt] else {
-            throw YorkieError(
-                code: .errInvalidArgument,
-                message: "cant find the given node: \(createdAt.toIDString)"
-            )
+    func moveAfter(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode? {
+        guard let entry = self.elementMapByCreatedAt[createdAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given element: \(createdAt)")
         }
 
-        try self.insert(element, prevCreatedAt: node.createdAt, executedAt: executedAt)
-        return try self.delete(createdAt: createdAt, executedAt: executedAt)
+        guard self.nodeMapByPositionCreatedAt[prevCreatedAt] != nil else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the previous node: \(prevCreatedAt)")
+        }
+
+        // Idempotency: if a node with this executedAt was already created, skip entirely.
+        if self.nodeMapByPositionCreatedAt[executedAt] != nil {
+            return nil
+        }
+
+        // LWW loser path — this move was superseded by a later move of the same element.
+        if let posMovedAt = entry.posMovedAt, !executedAt.after(posMovedAt) {
+            // Still create a bare dead position node so GC pairs are complete.
+            let deadPosNode = try self.insertPositionAfter(prevPositionCreatedAt: prevCreatedAt, executedAt: executedAt)
+            deadPosNode.markDead(at: executedAt)
+            self.nodeMapByIndex.splayNode(deadPosNode)
+            return deadPosNode
+        }
+
+        // LWW winner path.
+        // Build the new position node carrying the actual element value (not a placeholder),
+        // so callers that access `.value` on indexed nodes get the real element.
+        let oldPosNode = entry.positionNode
+        guard let prevNode = self.nodeMapByPositionCreatedAt[prevCreatedAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the previous node: \(prevCreatedAt)")
+        }
+        let anchor = self.findNextBeforeExecutedAt(node: prevNode, executedAt: executedAt)
+        let newPosNode = RGATreeListNode(value: entry.element, positionCreatedAt: executedAt)
+
+        // Wire the entry BEFORE splay-tree insertion so `newPosNode.length == 1`.
+        newPosNode.setElementEntry(entry)
+        entry.positionNode = newPosNode
+        entry.posMovedAt = executedAt
+        _ = entry.element.setMovedAt(executedAt)
+
+        self.insertNodeIntoStructures(node: newPosNode, after: anchor)
+
+        // Kill the old position node. Keep it in the splay tree with length 0
+        // (re-splay to refresh weights) rather than deleting it — JS keeps dead
+        // position nodes splayed until GC purge, and a subsequent insert/append
+        // may still use this node as its anchor (e.g. when it is `last` after a
+        // tail move). Deleting it here would leave that anchor unresolvable in
+        // the index tree, so the appended element would never be indexed.
+        oldPosNode.markDead(at: executedAt)
+        self.nodeMapByIndex.splayNode(oldPosNode)
+        // NOTE: do NOT reassign `last` here. JS leaves `last` pointing at the
+        // now-dead slot when the moved element was the tail, so that subsequent
+        // ops emit the same position-identity anchor as JS/Go peers. The
+        // newPosNode insertion above already advanced `last` in the only case
+        // JS does (when the anchor was `last`).
+
+        return oldPosNode
     }
 
-    /**
-     * `getNode` returns node of the given index.
-     */
-    func getNode(index: Int) throws -> RGATreeListNode {
-        guard index < self.length else {
-            let log = "length is smaller than or equal to: \(index)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
+    // MARK: Snapshot restore helpers
 
-        let node = try self.nodeMapByIndex.findForArray(index)
-        guard let rgaNode = node as? RGATreeListNode else {
-            let log = "failed to find the given index: \(index)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
-        }
+    /// Restores a dead position node from a snapshot.
+    ///
+    /// Called by `fromArray` when decoding a node that has `positionCreatedAt` +
+    /// `positionRemovedAt` but **no** element (the JS wire format for dead nodes).
+    /// Inserts the node into the splay tree and updates `last`, exactly as JS `addDeadPosition` does.
+    func addDeadPosition(
+        positionCreatedAt: TimeTicket,
+        positionRemovedAt: TimeTicket
+    ) throws {
+        let placeholder = Primitive(value: .null, createdAt: positionCreatedAt)
+        let node = RGATreeListNode(value: placeholder, positionCreatedAt: positionCreatedAt)
+        node.markDead(at: positionRemovedAt)
 
-        return rgaNode
+        let prevNode = self.last
+        // Link into doubly-linked list.
+        prevNode.next = node
+        node.previous = prevNode
+        // Update last (mirrors JS: `this.last = node`).
+        self.last = node
+        // Insert into splay tree (mirrors JS: `this.nodeMapByIndex.insertAfter(prevNode, node)`).
+        self.nodeMapByIndex.insert(previousNode: prevNode, newNode: node)
+        self.nodeMapByPositionCreatedAt[positionCreatedAt] = node
     }
 
-    /**
-     * `getPreviousCreatedAt` returns a creation time of the previous node.
-     */
-    func getPreviousCreatedAt(ofCreatedAt createdAt: TimeTicket) throws -> TimeTicket {
-        guard let node = self.nodeMapByCreatedAt[createdAt] else {
-            let log = "can't find the given node: \(createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
+    /// Restores a moved element's position from a snapshot.
+    ///
+    /// Called by `fromArray` when decoding a node that has `element` +
+    /// `positionCreatedAt` + `positionMovedAt`.
+    func addMovedElement(
+        value: CRDTElement,
+        positionCreatedAt: TimeTicket,
+        positionMovedAt: TimeTicket
+    ) throws {
+        guard let prevNode = self.nodeMapByPositionCreatedAt[self.last.positionCreatedAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the last node")
         }
-        var previousNode: RGATreeListNode? = node
-        repeat {
-            previousNode = previousNode?.previous
-        } while self.dummyHead !== previousNode && previousNode?.isRemoved == true
+        let anchor = self.findNextBeforeExecutedAt(node: prevNode, executedAt: positionCreatedAt)
+        let node = RGATreeListNode(value: value, positionCreatedAt: positionCreatedAt)
 
-        return previousNode?.value.createdAt ?? self.getHead().createdAt
+        // Set entry BEFORE splay-tree insertion so `node.length == 1`.
+        let entry = RGATreeListElementEntry(element: value, positionNode: node)
+        entry.posMovedAt = positionMovedAt
+        node.setElementEntry(entry)
+        self.elementMapByCreatedAt[value.createdAt] = entry
+
+        self.insertNodeIntoStructures(node: node, after: anchor)
     }
 
-    /**
-     * `delete` deletes the node of the given creation time.
-     */
+    // MARK: Backward-compatible move (tests + JSONArray local path)
+
+    /// Moves the element identified by `createdAt` after `afterCreatedAt`.
+    ///
+    /// Delegates to ``moveAfter(createdAt:prevCreatedAt:executedAt:)`` and discards the
+    /// dead position node return value. GC pair registration is the caller's responsibility
+    /// (``MoveOperation`` does it via ``CRDTArray/moveAfter(createdAt:prevCreatedAt:executedAt:)``).
+    @discardableResult
+    func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode? {
+        return try self.moveAfter(createdAt: createdAt, prevCreatedAt: afterCreatedAt, executedAt: executedAt)
+    }
+
+    // MARK: Element access
+
+    /// Returns the element for the given `createdAt`, or throws if not found.
+    func get(createdAt: TimeTicket) throws -> CRDTElement {
+        guard let entry = self.elementMapByCreatedAt[createdAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(createdAt)")
+        }
+        return entry.element
+    }
+
+    /// Returns the index string for the element with the given `createdAt`.
+    func subPath(createdAt: TimeTicket) throws -> String {
+        guard let entry = self.elementMapByCreatedAt[createdAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(createdAt)")
+        }
+        return String(self.nodeMapByIndex.indexOf(entry.positionNode))
+    }
+
+    // MARK: Deletion
+
+    /// Marks the element identified by `createdAt` as deleted at `executedAt`.
+    @discardableResult
     func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement {
-        guard let node = self.nodeMapByCreatedAt[createdAt] else {
-            let log = "can't find the given node: \(createdAt)"
-            throw YorkieError(code: .errInvalidArgument, message: log)
+        guard let entry = self.elementMapByCreatedAt[createdAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(createdAt)")
         }
-
+        let node = entry.positionNode
         let alreadyRemoved = node.isRemoved
-        if node.remove(executedAt), alreadyRemoved == false {
+        if node.remove(executedAt), !alreadyRemoved {
             self.nodeMapByIndex.splayNode(node)
         }
         return node.value
     }
 
-    /**
-     * `deleteByIndex` deletes the node of the given index.
-     */
+    /// Deletes the element at `index`.
+    @discardableResult
     func deleteByIndex(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
         let node = try self.getNode(index: index)
-
         if node.remove(executedAt) {
             self.nodeMapByIndex.splayNode(node)
         }
         return node.value
     }
 
-    /**
-     * `getHead` returns the value of head elements.
-     */
-    func getHead() -> CRDTElement {
-        return self.dummyHead.value
+    // MARK: Purge (hard delete)
+
+    /// Physically removes the element node from the list (GC final step).
+    func purge(_ value: CRDTElement) throws {
+        guard let entry = self.elementMapByCreatedAt[value.createdAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "failed to find the given createdAt: \(value.createdAt)")
+        }
+        let node = entry.positionNode
+        self.release(node: node)
+        self.elementMapByCreatedAt.removeValue(forKey: value.createdAt)
     }
 
-    /**
-     * `getLast` returns the value of last elements.
-     */
+    /// Physically removes a dead position node from the list (GC final step for move-dead slots).
+    func purgeDeadPosition(positionCreatedAt: TimeTicket) {
+        guard let node = self.nodeMapByPositionCreatedAt[positionCreatedAt] else {
+            return
+        }
+        // Dead nodes may or may not be in nodeMapByIndex; use delete which is safe either way.
+        if self.last === node, let prev = node.previous {
+            self.last = prev
+        }
+        node.release()
+        self.nodeMapByIndex.delete(node)
+        self.nodeMapByPositionCreatedAt.removeValue(forKey: positionCreatedAt)
+    }
+
+    // MARK: Set (replace element at position)
+
+    /// Replaces the element at `createdAt` with `element`.
+    @discardableResult
+    func set(
+        createdAt: TimeTicket,
+        element: CRDTElement,
+        executedAt: TimeTicket
+    ) throws -> CRDTElement {
+        guard let existingEntry = self.elementMapByCreatedAt[createdAt] else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "cant find the given node: \(createdAt.toIDString)"
+            )
+        }
+        let prevPosCreatedAt = existingEntry.positionNode.positionCreatedAt
+        try self.insert(element, prevCreatedAt: prevPosCreatedAt, executedAt: executedAt)
+        return try self.delete(createdAt: createdAt, executedAt: executedAt)
+    }
+
+    // MARK: Node access by index
+
+    /// Returns the position node at `index` in the splay tree.
+    func getNode(index: Int) throws -> RGATreeListNode {
+        guard index < self.length else {
+            throw YorkieError(code: .errInvalidArgument, message: "length is smaller than or equal to: \(index)")
+        }
+        let node = try self.nodeMapByIndex.findForArray(index)
+        guard let rgaNode = node as? RGATreeListNode else {
+            throw YorkieError(code: .errInvalidArgument, message: "failed to find the given index: \(index)")
+        }
+        return rgaNode
+    }
+
+    // MARK: Previous / last
+
+    /// Returns the position `createdAt` of the node immediately before the element at `createdAt`.
+    ///
+    /// Returns the POSITION node's `positionCreatedAt` (position identity), not the element's
+    /// `value.createdAt`. This matches the JS `findPrevCreatedAt` which returns
+    /// `node.getPositionCreatedAt()`.
+    func getPreviousCreatedAt(ofCreatedAt createdAt: TimeTicket) throws -> TimeTicket {
+        guard let entry = self.elementMapByCreatedAt[createdAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(createdAt)")
+        }
+        var previousNode: RGATreeListNode? = entry.positionNode
+        repeat {
+            previousNode = previousNode?.previous
+        } while self.dummyHead !== previousNode && previousNode?.isRemoved == true
+
+        // Return POSITION identity (`positionCreatedAt`).
+        // Dummy head's positionCreatedAt == .initial, which is the sentinel for "insert at front".
+        return previousNode?.positionCreatedAt ?? self.dummyHead.positionCreatedAt
+    }
+
+    /// Returns the last element.
     func getLast() -> CRDTElement {
         return self.last.value
     }
 
-    /**
-     * `getLastCreatedAt` returns the creation time of last element.
-     */
+    /// Returns the POSITION `createdAt` of the last node.
+    ///
+    /// Returns `last.positionCreatedAt` (position identity), not element identity,
+    /// mirroring the JS `getLastCreatedAt()` which calls `this.last.getPositionCreatedAt()`.
     func getLastCreatedAt() -> TimeTicket {
-        return self.last.createdAt
+        return self.last.positionCreatedAt
     }
 
-    /**
-     * `toTestString` returns a String containing the meta data of the node id
-     * for debugging purpose.
-     */
-    var toTestString: String {
-        var result: [String] = []
+    /// Returns the dummy head's element.
+    func getHead() -> CRDTElement {
+        return self.dummyHead.value
+    }
 
-        for node in self {
-            let value = "\(node.createdAt):\(node.value.toJSON())"
-            if node.isRemoved {
-                result.append("{\(value)}")
-            } else {
-                result.append("[\(value)]")
-            }
+    /// Returns the dummy head's position creation time.
+    func getHeadPositionCreatedAt() -> TimeTicket {
+        return self.dummyHead.positionCreatedAt
+    }
+
+    /// Returns the current POSITION node key for the element identified by `elemCreatedAt`.
+    ///
+    /// Mirrors the JS `posCreatedAt(elemCreatedAt)` which returns
+    /// `entry.positionNode.getPositionCreatedAt()`.
+    func posCreatedAt(elemCreatedAt: TimeTicket) throws -> TimeTicket {
+        guard let entry = self.elementMapByCreatedAt[elemCreatedAt] else {
+            throw YorkieError(code: .errInvalidArgument, message: "can't find the given element: \(elemCreatedAt)")
         }
+        return entry.positionNode.positionCreatedAt
+    }
 
-        return result.joined(separator: "-")
+    // MARK: All nodes (for snapshot serialisation and GC registration)
+
+    /// Returns all nodes in linked-list order, including dead position nodes.
+    ///
+    /// Used by the Converter to serialise the full list (including dead position
+    /// slots) and by `CRDTRoot` to register dead position nodes as GC pairs.
+    func allNodes() -> [RGATreeListNode] {
+        var result: [RGATreeListNode] = []
+        var current = self.dummyHead.next
+        while let node = current {
+            result.append(node)
+            current = node.next
+        }
+        return result
+    }
+
+    // MARK: Debug
+
+    /// Returns a human-readable representation for testing.
+    ///
+    /// Dead position nodes are excluded — tests assert on element order only.
+    var toTestString: String {
+        var parts: [String] = []
+        var current = self.dummyHead.next
+        while let node = current {
+            if let entry = node.elementEntry {
+                // Use element's own createdAt for test readability, matching the prior format.
+                let str = "\(entry.element.createdAt):\(entry.element.toJSON())"
+                if node.isRemoved {
+                    parts.append("{\(str)}")
+                } else {
+                    parts.append("[\(str)]")
+                }
+            }
+            // Dead position nodes (elementEntry == nil) are not rendered.
+            current = node.next
+        }
+        return parts.joined(separator: "-")
     }
 }
+
+// MARK: - GCParent conformance
+
+extension RGATreeList: GCParent {
+    /// Purges a dead position node from the linked list.
+    func purge(node: any GCChild) {
+        guard let posNode = node as? RGATreeListNode else { return }
+        self.purgeDeadPosition(positionCreatedAt: posNode.positionCreatedAt)
+    }
+}
+
+// MARK: - Sequence conformance
 
 extension RGATreeList: Sequence {
     typealias Element = RGATreeListNode
@@ -420,6 +703,10 @@ extension RGATreeList: Sequence {
     }
 }
 
+/// Iterates over all nodes in linked-list order (live and removed, but not dead position nodes).
+///
+/// Dead position nodes are excluded because they have no `elementEntry` and callers
+/// that iterate via `Sequence` expect `RGATreeListNode` values with a live `value`.
 class RGATreeListIterator: IteratorProtocol {
     private weak var iteratorNext: RGATreeListNode?
 
@@ -428,6 +715,11 @@ class RGATreeListIterator: IteratorProtocol {
     }
 
     func next() -> RGATreeListNode? {
+        // Skip dead position nodes.
+        while let current = self.iteratorNext, current.elementEntry == nil {
+            self.iteratorNext = current.next
+        }
+
         guard let result = self.iteratorNext else {
             return nil
         }

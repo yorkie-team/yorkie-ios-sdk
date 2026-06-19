@@ -146,21 +146,9 @@ public class JSONArray: CustomDebugStringConvertible {
                 message: "index out of bounds: \(targetIndex)"
             )
         }
-        let ticket = self.context.issueTimeTicket
-        let operation = MoveOperation(
-            parentCreatedAt: self.target.createdAt,
-            previousCreatedAt: prevElem.createdAt,
-            createdAt: targetElem.createdAt,
-            executedAt: ticket
-        )
-
-        self.context.push(operation: operation)
-
-        try self.target.move(
-            createdAt: targetElem.createdAt,
-            afterCreatedAt: prevElem.createdAt,
-            executedAt: ticket
-        )
+        // Delegate to moveAfterInternal so the element-identity anchor is
+        // converted to position identity, matching JS moveAfterByIndexInternal.
+        try self.moveAfterInternal(previousCreatedAt: prevElem.createdAt, createdAt: targetElem.createdAt)
     }
 
     /**
@@ -333,12 +321,18 @@ public class JSONArray: CustomDebugStringConvertible {
     /**
      * `moveAfterInternal` moves the given `createdAt` element
      * after the specific element.
+     *
+     * Converts the element-identity `previousCreatedAt` to its current POSITION identity
+     * before building the ``MoveOperation``, matching the JS `moveAfterInternal` which calls
+     * `this.target.posCreatedAt(previousCreatedAt)`.
      */
     private func moveAfterInternal(previousCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
+        // Convert element identity → position identity for the operation wire format.
+        let prevPosCreatedAt = try self.target.posCreatedAt(elemCreatedAt: previousCreatedAt)
         let operation = MoveOperation(
             parentCreatedAt: self.target.createdAt,
-            previousCreatedAt: previousCreatedAt,
+            previousCreatedAt: prevPosCreatedAt,
             createdAt: createdAt,
             executedAt: ticket
         )
@@ -346,7 +340,7 @@ public class JSONArray: CustomDebugStringConvertible {
 
         try self.target.move(
             createdAt: createdAt,
-            afterCreatedAt: previousCreatedAt,
+            afterCreatedAt: prevPosCreatedAt,
             executedAt: ticket
         )
     }

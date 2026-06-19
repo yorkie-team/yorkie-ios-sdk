@@ -732,6 +732,46 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c3.deactivate()
     }
 
+    // Ported from yorkie-js-sdk v0.7.6 doc_presence_test.ts:
+    // "Should emit presence-changed event with initial presence value on attach" (#1229).
+    // Verifies that reconcilePresence emits a .presenceChanged event for the local client
+    // after attach, so callers can observe their own initial presence immediately.
+    @MainActor
+    func test_should_emit_presence_changed_event_with_initial_presence_on_attach() async throws {
+        // given
+        let rpcAddr = self.rpcAddress
+        let docKey = "\(self.description)-\(Date().description)".toDocKey
+
+        let client1 = Client(rpcAddr)
+        try await client1.activate()
+        let c1ID = client1.id!
+
+        let doc1 = Document(key: docKey)
+        let expectPresence = expectation(description: "initial presence-changed")
+
+        var receivedEvent: PresenceChangedEvent?
+
+        doc1.subscribePresence { event, _ in
+            if let event = event as? PresenceChangedEvent,
+               event.value.clientID == c1ID
+            {
+                receivedEvent = event
+                expectPresence.fulfill()
+            }
+        }
+
+        // when — attach with initial presence
+        try await client1.attach(doc1, ["key": "val1"])
+
+        // then — a .presenceChanged event is emitted for the local client
+        await fulfillment(of: [expectPresence], timeout: 5.0)
+        XCTAssertNotNil(receivedEvent)
+        XCTAssertEqual(receivedEvent?.value.clientID, c1ID)
+        XCTAssertEqual(receivedEvent?.value.presence["key"] as? String, "val1")
+
+        try await client1.deactivate()
+    }
+
     private func decodeDictionary(_ dictionary: Any?) -> CRDTTreePosStruct? {
         guard let dictionary = dictionary as? [String: Any],
               let data = try? JSONSerialization.data(withJSONObject: dictionary, options: [])

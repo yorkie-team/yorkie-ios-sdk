@@ -354,4 +354,139 @@ class RGATreeListTests: XCTestCase {
         let result2 = try target.getNode(index: 2).value.toJSON()
         XCTAssertEqual(result2, "\"C123\"")
     }
+
+    // Ported from yorkie-js-sdk v0.7.6 (#1227): move × move LWW test.
+    // When two concurrent move operations target the same element, the later
+    // `executedAt` wins. The earlier one must be a no-op (returns nil).
+    func test_move_lww_later_op_wins() throws {
+        // given — list [A, B, C, D]
+        let target = RGATreeList()
+        let e1 = Primitive(value: .string("A"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
+        let e2 = Primitive(value: .string("B"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
+        let e3 = Primitive(value: .string("C"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
+        let e4 = Primitive(value: .string("D"), createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
+        try target.insert(e1)
+        try target.insert(e2)
+        try target.insert(e3)
+        try target.insert(e4)
+
+        XCTAssertEqual(target.length, 4)
+
+        // when — concurrent moves of element A:
+        // op1 (lamport=5): move A after C  → would give [B, C, A, D]
+        // op2 (lamport=6): move A after D  → would give [B, C, D, A]
+        // Apply op2 first (out of order), then op1 which should lose.
+        let move2 = TimeTicket(lamport: 6, delimiter: 0, actorID: actorId)
+        let deadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e4.createdAt, executedAt: move2)
+
+        // then — op2 wins: A moved after D → [B, C, D, A]
+        XCTAssertNotNil(deadNode)
+        XCTAssertEqual(target.length, 4)
+        XCTAssertEqual(try target.getNode(index: 3).value.toJSON(), "\"A\"")
+
+        // when — apply op1 (lamport=5 < lamport=6 of op2): must lose
+        let move1 = TimeTicket(lamport: 5, delimiter: 0, actorID: actorId)
+        let losingDeadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e3.createdAt, executedAt: move1)
+
+        // then — op1 loses LWW but still creates a bare dead position node for GC (JS-faithful).
+        // List stays [B, C, D, A].
+        XCTAssertNotNil(losingDeadNode)
+        XCTAssertNotNil(losingDeadNode?.getPositionRemovedAt())
+        XCTAssertNil(losingDeadNode?.getElementEntry())
+        XCTAssertEqual(try target.getNode(index: 3).value.toJSON(), "\"A\"")
+    }
+
+    // Ported from yorkie-js-sdk v0.7.6 (#1227): move on different elements commutes.
+    // Two concurrent moves of different elements must each land at their intended
+    // destinations regardless of application order.
+    func test_concurrent_moves_on_different_elements_commute() throws {
+        // given — list [A, B, C, D]
+        let target = RGATreeList()
+        let e1 = Primitive(value: .string("A"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
+        let e2 = Primitive(value: .string("B"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
+        let e3 = Primitive(value: .string("C"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
+        let e4 = Primitive(value: .string("D"), createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
+        try target.insert(e1)
+        try target.insert(e2)
+        try target.insert(e3)
+        try target.insert(e4)
+
+        // when — op1 (lamport=5): move A after B  → [B, A, C, D]
+        //        op2 (lamport=6): move C after D  → [A, B, D, C]
+        // Apply both concurrently (op1 first, then op2).
+        let move1 = TimeTicket(lamport: 5, delimiter: 0, actorID: actorId)
+        try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e2.createdAt, executedAt: move1)
+
+        let move2 = TimeTicket(lamport: 6, delimiter: 0, actorID: actorId)
+        try target.moveAfter(createdAt: e3.createdAt, prevCreatedAt: e4.createdAt, executedAt: move2)
+
+        // then — both moves applied: [B, A, D, C]
+        XCTAssertEqual(target.length, 4)
+        XCTAssertEqual(try target.getNode(index: 0).value.toJSON(), "\"B\"")
+        XCTAssertEqual(try target.getNode(index: 1).value.toJSON(), "\"A\"")
+        XCTAssertEqual(try target.getNode(index: 2).value.toJSON(), "\"D\"")
+        XCTAssertEqual(try target.getNode(index: 3).value.toJSON(), "\"C\"")
+    }
+
+    // Ported from yorkie-js-sdk v0.7.6 (#1227): moveAfter returns a dead position node
+    // for GC registration regardless of whether it wins or loses the LWW race.
+    func test_moveAfter_returns_dead_node_on_both_lww_win_and_loss() throws {
+        // given — list [A, B, C]
+        let target = RGATreeList()
+        let e1 = Primitive(value: .string("A"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
+        let e2 = Primitive(value: .string("B"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
+        let e3 = Primitive(value: .string("C"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
+        try target.insert(e1)
+        try target.insert(e2)
+        try target.insert(e3)
+
+        // when — move A after C (executedAt=5): should win and return the dead position node
+        let win = TimeTicket(lamport: 5, delimiter: 0, actorID: actorId)
+        let deadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e3.createdAt, executedAt: win)
+
+        // then — returns non-nil dead position node; position removed at is set
+        XCTAssertNotNil(deadNode)
+        XCTAssertNotNil(deadNode?.getPositionRemovedAt())
+        XCTAssertNil(deadNode?.getElementEntry())
+        XCTAssertEqual(target.length, 3)
+
+        // when — try to move A again with older executedAt=4 (should lose)
+        let lose = TimeTicket(lamport: 4, delimiter: 0, actorID: actorId)
+        let losingNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e2.createdAt, executedAt: lose)
+
+        // then — LWW loser still creates a bare dead position node for GC (JS-faithful).
+        XCTAssertNotNil(losingNode)
+        XCTAssertNotNil(losingNode?.getPositionRemovedAt())
+        XCTAssertNil(losingNode?.getElementEntry())
+    }
+
+    // Ported from yorkie-js-sdk v0.7.6 (#1227): snapshot round-trip — moved and dead
+    // position nodes survive a Document-level deep-copy (simulates snapshot restore).
+    // A snapshot round-trip re-constructs the CRDTRoot from the serialised form; the
+    // moved element must appear at its new position and the dead position node must
+    // not leak into the live count.
+    func test_move_snapshot_roundtrip() async throws {
+        // given — document with an array, then a move
+        let doc = Document(key: "test-move-snapshot")
+        try await doc.update { root, _ in
+            root.list = [Int64(0), Int64(1), Int64(2)]
+        }
+
+        try await doc.update { root, _ in
+            guard let arr = root.list as? JSONArray else { return }
+            guard let prev = arr.getElement(byIndex: 0) as? CRDTElement,
+                  let item = arr.getElement(byIndex: 2) as? CRDTElement else { return }
+            try arr.moveAfter(previousID: prev.id, id: item.id)
+        }
+
+        // when — round-trip via changePack proto serialisation
+        let pack = await doc.createChangePack()
+        let pbPack = Converter.toChangePack(pack: pack)
+        let decodedPack = try Converter.fromChangePack(pbPack)
+        XCTAssertNotNil(decodedPack)
+
+        // then — the live JSON after the move is correct
+        let json = await doc.toSortedJSON()
+        XCTAssertEqual(json, "{\"list\":[0,2,1]}")
+    }
 }

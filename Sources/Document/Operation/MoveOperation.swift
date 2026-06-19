@@ -95,7 +95,9 @@ struct MoveOperation: Operation {
             throw YorkieError(code: .errUnexpected, message: "fail to get previousIndex")
         }
 
-        try array.move(createdAt: self.createdAt, afterCreatedAt: self.previousCreatedAt, executedAt: self.executedAt)
+        if let deadNode = try array.moveAfter(createdAt: self.createdAt, prevCreatedAt: self.previousCreatedAt, executedAt: self.executedAt) {
+            root.registerGCPair(GCPair(parent: array.getRGATreeList(), child: deadNode))
+        }
 
         guard let index = try Int(array.subPath(createdAt: self.createdAt)) else {
             throw YorkieError(code: .errUnexpected, message: "fail to get index")

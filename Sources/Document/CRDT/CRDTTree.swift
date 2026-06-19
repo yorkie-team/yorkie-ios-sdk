@@ -401,11 +401,15 @@ final class CRDTTreeNode: IndexTreeNode {
 
     /**
      * `cloneElement` clones this element node with the given issueTimeTicket function.
+     * Attributes are deep-copied so that a concurrent style operation whose range
+     * was computed before a split also covers the right part of the split.
      */
     func cloneElement(issueTimeTicket: TimeTicket) -> CRDTTreeNode {
-        CRDTTreeNode(id: CRDTTreeNodeID(createdAt: issueTimeTicket, offset: 0),
-                     type: self.type,
-                     removedAt: self.removedAt)
+        let clone = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: issueTimeTicket, offset: 0),
+                                 type: self.type,
+                                 removedAt: self.removedAt)
+        clone.attrs = self.attrs?.deepcopy()
+        return clone
     }
 
     /**
@@ -970,6 +974,51 @@ class CRDTTree: CRDTElement {
                         diff.addDataSizes(others: curr.getDataSize())
                     }
                 }
+
+                // Propagate style to unknown split siblings so that a style
+                // operation whose range was determined before the split also
+                // covers the right part of the split node.
+                if tokenType == .start, let versionVector {
+                    var current = node
+                    while let insNextID = current.insNextID {
+                        guard let next = self.findFloorNode(insNextID), !next.isText else {
+                            break
+                        }
+                        if ticketKnown(versionVector, next.id.createdAt) {
+                            break
+                        }
+                        let siblingPairs = next.setAttrs(attributes, editedAt)
+                        var siblingAffectedAttrs = [String: String]()
+                        for (_, curr) in siblingPairs {
+                            if let key = curr?.key {
+                                siblingAffectedAttrs[key] = attributes[key]
+                            }
+                        }
+                        if !siblingAffectedAttrs.isEmpty {
+                            let parentOfNext = next.parent!
+                            let previousNext = next.prevSibling ?? next.parent!
+                            try changes.append(TreeChange(actor: editedAt.actorID,
+                                                          type: .style,
+                                                          from: self.toIndex(parentOfNext, previousNext),
+                                                          to: self.toIndex(next, next),
+                                                          fromPath: self.toPath(parentOfNext, previousNext),
+                                                          toPath: self.toPath(next, next),
+                                                          value: TreeChangeValue.attributes(siblingAffectedAttrs),
+                                                          splitLevel: 0))
+                            for (prev, _) in siblingPairs where prev != nil {
+                                pairs.append(GCPair(parent: next, child: prev))
+                            }
+                        }
+                        for attr in attributes {
+                            let key = attr.key
+                            let curr = next.attrs?.getNodeByKey(key)
+                            if let curr {
+                                diff.addDataSizes(others: curr.getDataSize())
+                            }
+                        }
+                        current = next
+                    }
+                }
             }
         }
 
@@ -1056,6 +1105,45 @@ class CRDTTree: CRDTElement {
                                               value: value,
                                               splitLevel: 0) // dummy value.
                 )
+
+                // Propagate remove-style to unknown split siblings so that a
+                // removeStyle operation whose range was determined before the
+                // split also covers the right part of the split node.
+                if tokenType == .start, let versionVector {
+                    var current = node
+                    while let insNextID = current.insNextID {
+                        guard let next = self.findFloorNode(insNextID), !next.isText else {
+                            break
+                        }
+                        if ticketKnown(versionVector, next.id.createdAt) {
+                            break
+                        }
+                        if next.attrs == nil {
+                            next.attrs = RHT()
+                        }
+                        var removedAny = false
+                        for key in attributesToRemove {
+                            let nodesToBeRemoved = next.attrs!.remove(key: key, executedAt: editedAt)
+                            removedAny = removedAny || !nodesToBeRemoved.isEmpty
+                            for rhtNode in nodesToBeRemoved {
+                                pairs.append(GCPair(parent: next, child: rhtNode))
+                            }
+                        }
+                        if removedAny {
+                            let parentOfNext = next.parent!
+                            let previousNext = next.prevSibling ?? next.parent!
+                            try changes.append(TreeChange(actor: editedAt.actorID,
+                                                          type: .removeStyle,
+                                                          from: self.toIndex(parentOfNext, previousNext),
+                                                          to: self.toIndex(next, next),
+                                                          fromPath: self.toPath(parentOfNext, previousNext),
+                                                          toPath: self.toPath(next, next),
+                                                          value: TreeChangeValue.attributesToRemove(attributesToRemove),
+                                                          splitLevel: 0))
+                        }
+                        current = next
+                    }
+                }
             }
         }
 
