@@ -169,18 +169,74 @@ final class DocumentPollingTests: XCTestCase {
         // Switch c1 to Realtime — should open a watch stream.
         try c1.changeSyncMode(d1, .realtime)
 
+        // Fulfilled when realtime push delivers c2's change to d1. Event-driven
+        // (not Task.sleep) so the wait is deterministic and the run loop is pumped.
+        let received = expectation(description: "realtime delivers remote change")
+        received.assertForOverFulfill = false
+        d1.subscribe { _, doc in
+            if doc.getRoot().k as? String == "rt" {
+                received.fulfill()
+            }
+        }
+
         // when — c2 makes a change
         try await d2.update { root, _ in
             root.k = "rt"
         }
         try await c2.sync()
 
-        // Realtime should deliver within 2s (much faster than the 5s polling interval).
-        try await Task.sleep(milliseconds: 2000)
+        // then — realtime delivers (well before the 5s polling interval)
+        await fulfillment(of: [received], timeout: 5.0)
+        XCTAssertEqual(d1.getRoot().k as? String, "rt")
 
-        // then
-        let value = d1.getRoot().k as? String
-        XCTAssertEqual(value, "rt")
+        try await c1.detach(d1)
+        try await c2.detach(d2)
+    }
+
+    // Regression (PR #260 review): switching Realtime → Polling must keep the
+    // document on the stream-less polling path — a stale watch-stream reconnect
+    // must not fire. The change still arrives, now via a polling tick.
+    @MainActor
+    func test_changeSyncMode_transitions_realtime_to_polling() async throws {
+        // given
+        let rpcAddress = "http://localhost:8080"
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+        defer {
+            Task {
+                try await c1.deactivate()
+                try await c2.deactivate()
+            }
+        }
+
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+
+        // c1 starts in Realtime, then switches to Polling (default interval).
+        _ = try await c1.attach(d1, [:], .realtime)
+        _ = try await c2.attach(d2)
+        try c1.changeSyncMode(d1, .polling)
+
+        let received = expectation(description: "polling delivers after realtime->polling switch")
+        received.assertForOverFulfill = false
+        d1.subscribe { _, doc in
+            if doc.getRoot().k as? String == "p" {
+                received.fulfill()
+            }
+        }
+
+        // when — c2 makes a change and syncs
+        try await d2.update { root, _ in
+            root.k = "p"
+        }
+        try await c2.sync()
+
+        // then — d1 receives via a polling tick after the transition
+        await fulfillment(of: [received], timeout: 8.0)
+        XCTAssertEqual(d1.getRoot().k as? String, "p")
 
         try await c1.detach(d1)
         try await c2.detach(d2)
