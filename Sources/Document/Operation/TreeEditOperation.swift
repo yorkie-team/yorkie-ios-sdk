@@ -39,10 +39,10 @@ private func cloneAndDropPreTombstoned(_ node: CRDTTreeNode, _ preTombstoned: Se
     // (already-resized) children. The deepcopy carried the original node's size;
     // after filterChildren dropped descendants that size is stale and must be
     // recomputed bottom-up.
-    traverseAll(node: clone) { n, _ in
-        n.removedAt = nil
-        if n.isText == false {
-            n.size = n.innerChildren.reduce(0) { $0 + $1.paddedSize }
+    traverseAll(node: clone) { node, _ in
+        node.removedAt = nil
+        if node.isText == false {
+            node.size = node.innerChildren.reduce(0) { $0 + $1.paddedSize }
         }
     }
     return clone
