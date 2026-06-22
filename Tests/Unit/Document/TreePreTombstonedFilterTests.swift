@@ -130,8 +130,8 @@ final class TreePreTombstonedFilterTests: XCTestCase {
         // All cycles must produce the same count — no accumulation.
         XCTAssertFalse(redoOpSizes.isEmpty, "expected at least one cycle")
         let first = redoOpSizes[0]
-        for (i, size) in redoOpSizes.enumerated() {
-            XCTAssertEqual(size, first, "cycle \(i) redo size \(size) != cycle-0 size \(first)")
+        for (idx, size) in redoOpSizes.enumerated() {
+            XCTAssertEqual(size, first, "cycle \(idx) redo size \(size) != cycle-0 size \(first)")
         }
     }
 

@@ -41,10 +41,10 @@ final class DocumentPollingTests: XCTestCase {
     func test_attach_rejects_documentPollInterval_zero_with_errInvalidArgument() async throws {
         // given
         let rpcAddress = "http://localhost:8080"
-        let c = Client(rpcAddress)
-        try await c.activate()
+        let client = Client(rpcAddress)
+        try await client.activate()
         defer {
-            Task { try await c.deactivate() }
+            Task { try await client.deactivate() }
         }
 
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
@@ -52,7 +52,7 @@ final class DocumentPollingTests: XCTestCase {
 
         // when / then — documentPollInterval: 0 must throw errInvalidArgument
         do {
-            _ = try await c.attach(doc, [:], .realtime, documentPollInterval: 0)
+            _ = try await client.attach(doc, [:], .realtime, documentPollInterval: 0)
             XCTFail("attach with documentPollInterval:0 should throw errInvalidArgument")
         } catch let error as YorkieError {
             XCTAssertEqual(error.code, .errInvalidArgument,
@@ -65,10 +65,10 @@ final class DocumentPollingTests: XCTestCase {
     func test_attach_rejects_negative_documentPollInterval_with_errInvalidArgument() async throws {
         // given
         let rpcAddress = "http://localhost:8080"
-        let c = Client(rpcAddress)
-        try await c.activate()
+        let client = Client(rpcAddress)
+        try await client.activate()
         defer {
-            Task { try await c.deactivate() }
+            Task { try await client.deactivate() }
         }
 
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
@@ -76,7 +76,7 @@ final class DocumentPollingTests: XCTestCase {
 
         // when / then — documentPollInterval: -1 must throw errInvalidArgument
         do {
-            _ = try await c.attach(doc, [:], .realtime, documentPollInterval: -1)
+            _ = try await client.attach(doc, [:], .realtime, documentPollInterval: -1)
             XCTFail("attach with documentPollInterval:-1 should throw errInvalidArgument")
         } catch let error as YorkieError {
             XCTAssertEqual(error.code, .errInvalidArgument)
@@ -111,18 +111,27 @@ final class DocumentPollingTests: XCTestCase {
         _ = try await c1.attach(d1, [:], .polling, documentPollInterval: 0.3)
         _ = try await c2.attach(d2)
 
-        // when — c2 makes a change and syncs
+        // Fulfilled when a polling tick pulls c2's change into d1. Use an
+        // expectation rather than `Task.sleep`: the periodic sync loop runs on a
+        // `RunLoop.main` timer that fires while `XCTWaiter` pumps the run loop, but
+        // NOT while an async test is merely suspended in `Task.sleep`.
+        let received = expectation(description: "polling delivers remote change")
+        received.assertForOverFulfill = false
+        d1.subscribe { _, doc in
+            if doc.getRoot().k as? String == "v" {
+                received.fulfill()
+            }
+        }
+
+        // when — c2 makes a change and syncs it to the server
         try await d2.update { root, _ in
             root.k = "v"
         }
         try await c2.sync()
 
-        // Wait for at least 2 polling ticks (~600ms)
-        try await Task.sleep(milliseconds: 900)
-
-        // then — d1 should have received the remote change via polling
-        let value = d1.getRoot().k as? String
-        XCTAssertEqual(value, "v")
+        // then — d1 receives the change via a polling tick (interval 0.3s)
+        await fulfillment(of: [received], timeout: 5.0)
+        XCTAssertEqual(d1.getRoot().k as? String, "v")
 
         try await c1.detach(d1)
         try await c2.detach(d2)
@@ -184,11 +193,11 @@ final class DocumentPollingTests: XCTestCase {
     func test_attach_documentPollInterval_zero_throws_before_network_contact() async {
         // given — inactive client (never activated)
         let rpcAddress = "http://localhost:8080"
-        let c = Client(rpcAddress)
+        let client = Client(rpcAddress)
         let doc = Document(key: "poll-guard-unit")
 
         do {
-            _ = try await c.attach(doc, [:], .realtime, documentPollInterval: 0)
+            _ = try await client.attach(doc, [:], .realtime, documentPollInterval: 0)
             // Either errClientNotActivated or errInvalidArgument is acceptable;
             // what must NOT happen is a silent success.
             XCTFail("attach must throw when client is not active or poll interval is invalid")

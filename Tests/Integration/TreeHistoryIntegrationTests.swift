@@ -1333,8 +1333,8 @@ final class TreeHistoryClearAfterAttachTests: XCTestCase {
         }
 
         // Undo 4 times — should revert each character
-        for i in 0 ..< 4 {
-            XCTAssertTrue(doc.canUndo, "should be able to undo character \(i)")
+        for idx in 0 ..< 4 {
+            XCTAssertTrue(doc.canUndo, "should be able to undo character \(idx)")
             try doc.undo()
         }
         let xmlAfterAllUndos = (doc.getRoot().content as? JSONTree)?.toXML() ?? ""
@@ -1347,4 +1347,3 @@ final class TreeHistoryClearAfterAttachTests: XCTestCase {
         XCTAssertEqual(xmlAfterExtraUndo, initialXML, "tree must stay intact after empty-stack undo")
     }
 }
-
