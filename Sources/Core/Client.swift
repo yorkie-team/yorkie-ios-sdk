@@ -980,12 +980,14 @@ public class Client {
             return doc
         }
 
+        // Set the mode first so an in-flight stream-disconnect callback observes
+        // the new (stream-less) mode and does not reschedule a reconnect.
+        docAttachment.syncMode = syncMode
+
         // Tear down stream when leaving a stream-using mode.
         if syncMode == .manual || syncMode == .polling {
             try self.stopWatchLoop(docKey, with: docAttachment)
         }
-
-        docAttachment.syncMode = syncMode
 
         if syncMode == .realtime {
             // NOTE(hackerwins): In non-pushpull mode, the client does not receive change events
@@ -1389,8 +1391,12 @@ public class Client {
     private func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
         let cancelled = attachment.cancelled
         self.disconnectWatchStream(key, with: attachment)
-        // check if watch loop is stopped
-        guard self.attachmentMap[key] != nil, attachment.syncMode != .manual else {
+        // check if watch loop is stopped. `.manual` and `.polling` are stream-less
+        // modes — never reschedule a watch-stream reconnect for them.
+        guard self.attachmentMap[key] != nil,
+              attachment.syncMode != .manual,
+              attachment.syncMode != .polling
+        else {
             return
         }
         // NOTE: Only schedule reconnect if the stream was not explicitly cancelled
