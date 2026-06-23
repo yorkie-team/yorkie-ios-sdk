@@ -94,6 +94,12 @@ public protocol Yorkie_V1_YorkieServiceClientInterface: Sendable {
     func `refreshChannel`(request: Yorkie_V1_RefreshChannelRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_RefreshChannelResponse>
 
     @discardableResult
+    func `peekChannel`(request: Yorkie_V1_PeekChannelRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_PeekChannelResponse>) -> Void) -> Connect.Cancelable
+
+    @available(iOS 13, *)
+    func `peekChannel`(request: Yorkie_V1_PeekChannelRequest, headers: Connect.Headers) async -> ResponseMessage<Yorkie_V1_PeekChannelResponse>
+
+    @discardableResult
     func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers, completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_BroadcastResponse>) -> Void) -> Connect.Cancelable
 
     @available(iOS 13, *)
@@ -248,6 +254,16 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
     }
 
     @discardableResult
+    public func `peekChannel`(request: Yorkie_V1_PeekChannelRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_PeekChannelResponse>) -> Void) -> Connect.Cancelable {
+        return self.client.unary(path: "/yorkie.v1.YorkieService/PeekChannel", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
+    }
+
+    @available(iOS 13, *)
+    public func `peekChannel`(request: Yorkie_V1_PeekChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_PeekChannelResponse> {
+        return await self.client.unary(path: "/yorkie.v1.YorkieService/PeekChannel", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @discardableResult
     public func `broadcast`(request: Yorkie_V1_BroadcastRequest, headers: Connect.Headers = [:], completion: @escaping @Sendable (ResponseMessage<Yorkie_V1_BroadcastResponse>) -> Void) -> Connect.Cancelable {
         return self.client.unary(path: "/yorkie.v1.YorkieService/Broadcast", idempotencyLevel: .unknown, request: request, headers: headers, completion: completion)
     }
@@ -273,6 +289,7 @@ public final class Yorkie_V1_YorkieServiceClient: Yorkie_V1_YorkieServiceClientI
             public static let attachChannel = Connect.MethodSpec(name: "AttachChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let detachChannel = Connect.MethodSpec(name: "DetachChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let refreshChannel = Connect.MethodSpec(name: "RefreshChannel", service: "yorkie.v1.YorkieService", type: .unary)
+            public static let peekChannel = Connect.MethodSpec(name: "PeekChannel", service: "yorkie.v1.YorkieService", type: .unary)
             public static let broadcast = Connect.MethodSpec(name: "Broadcast", service: "yorkie.v1.YorkieService", type: .unary)
         }
     }
