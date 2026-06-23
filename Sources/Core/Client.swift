@@ -855,7 +855,10 @@ public class Client {
             throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh channel error")
         }
 
-        _ = channel.updateSessionCount(Int(message.sessionCount), 0)
+        let previousSessionCount = channel.getSessionCount()
+        if channel.updateSessionCount(Int(message.sessionCount), 0), channel.getSessionCount() != previousSessionCount {
+            channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: channel.getSessionCount()))
+        }
         attachment.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
