@@ -18,15 +18,15 @@ import Connect
 import XCTest
 @testable import Yorkie
 
-// Port of yorkie-js-sdk packages/sdk/test/integration/channel_polling_test.ts
-// at v0.7.9 (yorkie-js-sdk#1247 "Fix Polling channel subscriber notification"
-// and yorkie-js-sdk#1256 "Add PeekChannel client").
-//
-// Covered scenarios:
-//   1. peekChannel returns a live session count without creating a server session.
-//   2. peekChannel throws errClientNotActivated when the client is not active.
-//   3. refreshChannel publishes ChannelPresenceEvent only when the session count changes.
-//   4. refreshChannel does NOT re-publish ChannelPresenceEvent when the count is unchanged.
+/// Port of yorkie-js-sdk packages/sdk/test/integration/channel_polling_test.ts
+/// at v0.7.9 (yorkie-js-sdk#1247 "Fix Polling channel subscriber notification"
+/// and yorkie-js-sdk#1256 "Add PeekChannel client").
+///
+/// Covered scenarios:
+///   1. peekChannel returns a live session count without creating a server session.
+///   2. peekChannel throws errClientNotActivated when the client is not active.
+///   3. refreshChannel publishes ChannelPresenceEvent only when the session count changes.
+///   4. refreshChannel does NOT re-publish ChannelPresenceEvent when the count is unchanged.
 final class ChannelPollingTests: XCTestCase {
     private let rpcAddress = "http://localhost:8080"
 
@@ -41,6 +41,14 @@ final class ChannelPollingTests: XCTestCase {
     // Requires a yorkie server >= 0.7.9 that implements the PeekChannel RPC.
     // The test is skipped automatically when the running server returns
     // `unimplemented` (older server via SSH tunnel).
+    //
+    // Stability note (line ~58): the `defer` teardown block uses
+    // `Task { try? await ... }`, which is the idiomatic fire-and-forget cleanup
+    // pattern used throughout the integration suite.  It is not fragile because
+    // XCTest keeps the process alive long enough for those tasks to complete, and
+    // any failure there is non-fatal by design.  The channel key uniqueness was
+    // the only fragility here; it is addressed by `channelTestKey` using a UUID
+    // suffix instead of a second-resolution timestamp.
     @MainActor
     func test_peekChannel_returns_session_count_without_creating_a_session() async throws {
         // given — one client attached to a known channel key
@@ -204,6 +212,13 @@ final class ChannelPollingTests: XCTestCase {
     // PR #1247 fixed a bug where `refreshChannel` published a presence event
     // even when the returned count was identical to the cached value.
     // After the fix, the event must be suppressed when the count does not change.
+    //
+    // The assertion uses an inverted XCTestExpectation so that any late-arriving
+    // callback fired after the syncChannel call but before the timeout window
+    // closes is caught as a test failure.  A plain `XCTAssertEqual(eventCount, 0)`
+    // immediately after syncChannel would race against callbacks delivered on
+    // RunLoop.main; the inverted expectation holds the RunLoop open so those
+    // callbacks have a chance to arrive before the verdict is recorded.
     @MainActor
     func test_refreshChannel_does_not_publish_presenceChanged_when_count_is_unchanged() async throws {
         // given — c1 attached, initial count cached via syncChannel
@@ -222,29 +237,40 @@ final class ChannelPollingTests: XCTestCase {
         let countAfterFirstSync = ch1.getSessionCount()
 
         // Register a presence callback AFTER the seed so only subsequent events
-        // are counted.
-        var eventCount = 0
-        ch1.subscribePresenceChange { _ in eventCount += 1 }
+        // are counted.  The inverted expectation is fulfilled (i.e. fails the
+        // test) if any presence callback fires within the observation window.
+        let noEventExp = expectation(description: "no presenceChanged event when count is unchanged")
+        noEventExp.isInverted = true
+
+        ch1.subscribePresenceChange { _ in
+            noEventExp.fulfill()
+        }
 
         // when — refresh again with no membership change; count must stay the same
         _ = try await c1.syncChannel(ch1)
         let countAfterSecondSync = ch1.getSessionCount()
 
-        // then — count did not change, so no presence event should have fired
+        // then — hold the RunLoop open for 1 s so any late callback has time to
+        // arrive.  XCTWaiter pumps RunLoop.main, which is where the channel timer
+        // and callbacks are dispatched.  If a callback fires inside this window the
+        // inverted expectation is fulfilled, which causes wait() to return
+        // `.incorrectOrder` / `.invertedFulfillment` and fails the test.
+        await fulfillment(of: [noEventExp], timeout: 1.0)
+
         XCTAssertEqual(countAfterFirstSync, countAfterSecondSync,
                        "session count should not change between two consecutive syncs without membership change")
-        XCTAssertEqual(eventCount, 0,
-                       "refreshChannel must not publish presenceChanged when the count is unchanged (PR#1247 regression guard)")
     }
 }
 
 // MARK: - Helpers
 
-// Builds a unique, server-safe channel key from the test description.
+/// Builds a unique, server-safe channel key from the test description.
+/// Uses a UUID suffix instead of a second-resolution timestamp to prevent
+/// key collisions across concurrent or rapidly-repeated test runs.
 private func channelTestKey(_ description: String) -> String {
-    let timestamp = Int(Date().timeIntervalSince1970)
-    return "\(timestamp)-ch"
-        .appending("-")
+    let uniqueSuffix = UUID().uuidString.lowercased().prefix(8)
+    return String(uniqueSuffix)
+        .appending("-ch-")
         .appending(
             description
                 .lowercased()
@@ -255,9 +281,9 @@ private func channelTestKey(_ description: String) -> String {
         )
 }
 
-// Skips the calling test when the server returns `.unimplemented` for
-// PeekChannel.  This happens when the SSH-tunneled server predates v0.7.9
-// and does not have the PeekChannel RPC registered.
+/// Skips the calling test when the server returns `.unimplemented` for
+/// PeekChannel.  This happens when the SSH-tunneled server predates v0.7.9
+/// and does not have the PeekChannel RPC registered.
 private func skipIfPeekChannelUnavailable(_ error: Error) throws {
     if let connectError = error as? ConnectError, connectError.code == Connect.Code.unimplemented {
         throw XCTSkip("PeekChannel RPC is not available on this server (requires yorkie >= 0.7.9)")
