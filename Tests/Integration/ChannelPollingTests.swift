@@ -215,13 +215,19 @@ final class ChannelPollingTests: XCTestCase {
     //
     // The assertion uses an inverted XCTestExpectation so that any late-arriving
     // callback fired after the syncChannel call but before the timeout window
-    // closes is caught as a test failure.  A plain `XCTAssertEqual(eventCount, 0)`
-    // immediately after syncChannel would race against callbacks delivered on
-    // RunLoop.main; the inverted expectation holds the RunLoop open so those
-    // callbacks have a chance to arrive before the verdict is recorded.
+    // closes is caught as a test failure.
+    //
+    // Determinism note: `attachChannel` starts a Watch stream that can deliver an
+    // `initialized` ChannelPresenceEvent asynchronously after `attachChannel`
+    // returns.  Registering the "no event" callback before this stream event
+    // arrives would cause a spurious inverted-expectation failure.  We therefore
+    // seed with a first `syncChannel`, then wait for the watch-stream initialized
+    // event (via `subscribePresenceChange`), and only THEN swap in the inverted
+    // expectation so the observation window starts after the stream is fully
+    // settled.
     @MainActor
     func test_refreshChannel_does_not_publish_presenceChanged_when_count_is_unchanged() async throws {
-        // given — c1 attached, initial count cached via syncChannel
+        // given — c1 attached, watch stream and initial count both settled
         let channelKey = channelTestKey(self.description)
         let c1 = Client(rpcAddress)
 
@@ -232,19 +238,35 @@ final class ChannelPollingTests: XCTestCase {
         _ = try await c1.attachChannel(ch1)
         defer { Task { try? await c1.detachChannel(ch1) } }
 
-        // Seed the cached count with a first refresh call.
+        // Drain the watch-stream initialization event so it cannot race with the
+        // "no event" expectation registered below.  The watch stream delivers an
+        // `.initialized` ChannelPresenceEvent asynchronously after attachChannel;
+        // waiting for any presence event here guarantees the stream is settled
+        // before we install the inverted expectation.
+        //
+        // NOTE: `refreshChannel` (called by `syncChannel`) uses seq == 0, which
+        // always updates `updateSessionCount`; the watch stream's initialized
+        // message uses a real seq (> 0).  Either path can fire the callback here,
+        // so we use assertForOverFulfill = false and a short timeout to catch
+        // whichever arrives first without failing if both arrive.
+        let drainExp = expectation(description: "drain initial presence event from watch stream")
+        drainExp.assertForOverFulfill = false
+        ch1.subscribePresenceChange { _ in drainExp.fulfill() }
+
+        // First syncChannel seeds the refresh-path's cached count AND may itself
+        // fire the presenceCallback (if refreshChannel is faster than the stream).
         _ = try await c1.syncChannel(ch1)
         let countAfterFirstSync = ch1.getSessionCount()
 
-        // Register a presence callback AFTER the seed so only subsequent events
-        // are counted.  The inverted expectation is fulfilled (i.e. fails the
-        // test) if any presence callback fires within the observation window.
+        // Wait for at least one presence event to ensure both the refresh RPC and
+        // the watch-stream initialization have been processed.
+        await fulfillment(of: [drainExp], timeout: 5.0)
+
+        // Now swap in the inverted expectation.  Any callback from here on means
+        // a spurious event fired when the count did not change.
         let noEventExp = expectation(description: "no presenceChanged event when count is unchanged")
         noEventExp.isInverted = true
-
-        ch1.subscribePresenceChange { _ in
-            noEventExp.fulfill()
-        }
+        ch1.subscribePresenceChange { _ in noEventExp.fulfill() }
 
         // when — refresh again with no membership change; count must stay the same
         _ = try await c1.syncChannel(ch1)
