@@ -1018,13 +1018,21 @@ public class Document: Attachable {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
-    func publish(_ event: DocEvent) {
-        if self.enableDevtools {
-            if self.devtoolsRecorder == nil {
-                self.devtoolsRecorder = DevtoolsRecorder(docKey: self.key)
-            }
-            self.devtoolsRecorder?.record(event)
+    /// Forwards an event to the devtools recorder, lazily creating it when
+    /// devtools is enabled. Kept separate from ``publish(_:)`` so it does not
+    /// add to that method's cyclomatic complexity.
+    private func recordForDevtools(_ event: DocEvent) {
+        guard self.enableDevtools else {
+            return
         }
+        if self.devtoolsRecorder == nil {
+            self.devtoolsRecorder = DevtoolsRecorder(docKey: self.key)
+        }
+        self.devtoolsRecorder?.record(event)
+    }
+
+    func publish(_ event: DocEvent) {
+        self.recordForDevtools(event)
 
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
