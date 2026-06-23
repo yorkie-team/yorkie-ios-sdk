@@ -58,7 +58,10 @@ public final class DevtoolsRecorder {
     }
 
     private func notifyObservers() {
-        for observer in self.observers.values {
+        // Snapshot before iterating: an observer callback may add or remove an
+        // observer, which would mutate the dictionary mid-iteration.
+        let callbacks = Array(self.observers.values)
+        for observer in callbacks {
             observer()
         }
     }

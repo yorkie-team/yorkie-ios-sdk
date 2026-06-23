@@ -40,14 +40,22 @@ public struct JSONNode: Identifiable {
 
     /// Builds a node tree rooted at `value`, labelled `key`.
     public static func build(key: String, value: Any) -> JSONNode {
-        self.build(key: key, value: value, path: key)
+        self.build(key: key, value: value, path: self.escape(key))
+    }
+
+    /// Escapes `/` (the path separator) and `\` within a single key segment so a
+    /// key that itself contains `/` cannot collide with a deeper path.
+    private static func escape(_ segment: String) -> String {
+        segment
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "/", with: "\\/")
     }
 
     private static func build(key: String, value: Any, path: String) -> JSONNode {
         switch value {
         case let dictionary as [String: Any]:
             let children = dictionary.keys.sorted().map { childKey in
-                self.build(key: childKey, value: dictionary[childKey] as Any, path: "\(path)/\(childKey)")
+                self.build(key: childKey, value: dictionary[childKey] as Any, path: "\(path)/\(self.escape(childKey))")
             }
             return JSONNode(id: path, key: key, valuePreview: "{\(children.count)}", children: children.isEmpty ? nil : children)
 
