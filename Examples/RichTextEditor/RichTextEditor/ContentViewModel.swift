@@ -17,6 +17,7 @@
 import Combine
 import UIKit
 import Yorkie
+import YorkieDevtoolsServer
 
 @MainActor
 class ContentViewModel: ObservableObject {
@@ -38,6 +39,16 @@ class ContentViewModel: ObservableObject {
 
     private var client: Client
     private var document: Document
+    /// The document currently attached, exposed for the in-app Yorkie inspector.
+    var currentDocument: Document {
+        self.document
+    }
+
+    /// The live browser inspector server, started once the document is attached.
+    private var devtoolsServer: DevtoolsServer?
+    /// URLs at which the browser inspector is reachable (localhost + LAN).
+    @Published var devtoolsURLs: [String] = []
+
     var selection: NSRange? {
         didSet {
             self.updateMySelection()
@@ -98,7 +109,7 @@ class ContentViewModel: ObservableObject {
         // use for local server
         self.client = Client(Constant.serverAddress)
 
-        self.document = Document(key: self.documentKey)
+        self.document = Document(key: self.documentKey, opts: DocumentOptions(disableGC: false, enableDevtools: true))
         Log.log("Document key: \(self.documentKey)", level: .info)
         Log.log("API key: \(self.apiKey)", level: .info)
     }
@@ -114,7 +125,7 @@ extension ContentViewModel {
 
         Task {
             try await self.client.detach(self.document)
-            self.document = Document(key: self.documentKey)
+            self.document = Document(key: self.documentKey, opts: DocumentOptions(disableGC: false, enableDevtools: true))
             await self.initializeClient()
         }
     }
@@ -175,10 +186,25 @@ extension ContentViewModel {
             self.document.clearHistory()
             self.syncTextSnapShot()
             self.refreshUndoRedoState()
+            self.startInspectorServer()
 
             await self.watch()
         } catch {
             Log.log("initializeClient Error: \(error.localizedDescription)", level: .error)
+        }
+    }
+
+    /// Starts (or restarts) the live browser inspector for the current document.
+    private func startInspectorServer() {
+        self.devtoolsServer?.stop()
+        let server = DevtoolsServer(document: self.document)
+        do {
+            try server.start()
+            self.devtoolsServer = server
+            self.devtoolsURLs = server.urls()
+            Log.log("Devtools inspector live at \(self.devtoolsURLs.joined(separator: ", "))", level: .info)
+        } catch {
+            Log.log("Devtools inspector failed to start: \(error)", level: .error)
         }
     }
 

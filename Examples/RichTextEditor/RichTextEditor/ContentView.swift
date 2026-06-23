@@ -16,11 +16,14 @@
 
 import SwiftUI
 import UIKit
+import YorkieDevtoolsUI
 
 struct ContentView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject var viewModel = ContentViewModel()
     @State private var showSettings = false
+    @State private var showInspector = false
+    @State private var showBrowserInspector = false
     @State private var documentKey = ""
 
     var appVersion: String {
@@ -54,6 +57,38 @@ struct ContentView: View {
 
             // Toolbar
             HStack(spacing: 12) {
+                // Undo button
+                Button(action: { self.viewModel.undo() }) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 18))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Color(UIColor.systemBackground))
+                        .foregroundColor(self.viewModel.canUndo ? .primary : Color(UIColor.systemGray3))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(UIColor.systemGray4), lineWidth: 1)
+                        )
+                }
+                .disabled(!self.viewModel.canUndo)
+
+                // Redo button
+                Button(action: { self.viewModel.redo() }) {
+                    Image(systemName: "arrow.uturn.forward")
+                        .font(.system(size: 18))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Color(UIColor.systemBackground))
+                        .foregroundColor(self.viewModel.canRedo ? .primary : Color(UIColor.systemGray3))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(UIColor.systemGray4), lineWidth: 1)
+                        )
+                }
+                .disabled(!self.viewModel.canRedo)
+
                 // Bold button
                 Button(action: {
                     if let selection = self.viewModel.selection, selection.length > 0 {
@@ -162,21 +197,25 @@ struct ContentView: View {
                 }
             }
             ToolbarItemGroup(placement: .navigationBarTrailing) {
-                Button(action: { self.viewModel.undo() }) {
-                    Image(systemName: "arrow.uturn.backward")
+                Button(action: { self.showInspector = true }) {
+                    Image(systemName: "ladybug")
                 }
-                .disabled(!self.viewModel.canUndo)
 
-                Button(action: { self.viewModel.redo() }) {
-                    Image(systemName: "arrow.uturn.forward")
+                Button(action: { self.showBrowserInspector = true }) {
+                    Image(systemName: "globe")
                 }
-                .disabled(!self.viewModel.canRedo)
             }
         })
         .navigationTitle("Rich Text Editor")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await self.viewModel.initializeClient()
+        }
+        .sheet(isPresented: self.$showInspector) {
+            YorkieInspectorView(document: self.viewModel.currentDocument)
+        }
+        .sheet(isPresented: self.$showBrowserInspector) {
+            BrowserInspectorInfo(urls: self.viewModel.devtoolsURLs)
         }
         .sheet(isPresented: self.$showSettings) {
             NavigationView {
@@ -234,5 +273,48 @@ struct RichTextEditorView: UIViewRepresentable {
 #Preview {
     NavigationView {
         ContentView()
+    }
+}
+
+/// Shows the URLs at which the live browser inspector is reachable.
+struct BrowserInspectorInfo: View {
+    @Environment(\.dismiss) private var dismiss
+    let urls: [String]
+
+    var body: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Open one of these in a browser to watch this document's changes stream in live:")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                if self.urls.isEmpty {
+                    Text("Inspector not running yet — attach the document first.")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(self.urls, id: \.self) { url in
+                        Text(url)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .padding(.vertical, 4)
+                    }
+                }
+
+                Text("Simulator: use the localhost URL on this Mac. Device: use the LAN URL from a browser on the same Wi-Fi.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Browser inspector")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { self.dismiss() }
+                }
+            }
+        }
     }
 }
