@@ -1240,15 +1240,22 @@ class CRDTTree: CRDTElement {
         }
     }
 
-    /**
-     * `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
-     * `toLeft` straddle a concurrent element split: it follows `fromLeft`'s
-     * `insNextID` chain to find a split sibling in `toParent`. Returns the
-     * (parent, left) pair to traverse; the original `fromParent`/`fromLeft` are
-     * preserved by the caller for the merge, split, and insert steps.
-     * VV-independent for clone/root consistency.
-     */
-    private func narrowedCollectRange(fromParent: CRDTTreeNode, fromLeft: CRDTTreeNode, toParent: CRDTTreeNode) -> (CRDTTreeNode, CRDTTreeNode) {
+    /// `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
+    /// `toLeft` straddle a concurrent element split: it follows `fromLeft`'s
+    /// `insNextID` chain to find a split sibling in `toParent`. Returns the
+    /// (parent, left) pair to traverse; the original `fromParent`/`fromLeft` are
+    /// preserved by the caller for the merge, split, and insert steps.
+    /// VV-independent for clone/root consistency.
+    ///
+    /// - Parameters:
+    ///   - fromParent: The parent node at the start of the edit range.
+    ///   - fromLeft: The left sibling node at the start of the edit range.
+    ///   - toParent: The parent node at the end of the edit range.
+    ///   - toLeft: The left sibling node at the end of the edit range. When
+    ///     `toLeft === toParent` (offset 0, leftmost child position), narrowing
+    ///     is skipped because the narrowed `collectFromLeft` would be a child at
+    ///     offset >= 1, producing a backwards range that suppresses the intended merge.
+    private func narrowedCollectRange(fromParent: CRDTTreeNode, fromLeft: CRDTTreeNode, toParent: CRDTTreeNode, toLeft: CRDTTreeNode) -> (CRDTTreeNode, CRDTTreeNode) {
         guard fromLeft !== fromParent, fromParent !== toParent else {
             return (fromParent, fromLeft)
         }
@@ -1258,7 +1265,14 @@ class CRDTTree: CRDTElement {
                 break
             }
             if let nextParent = next.parent, nextParent === toParent {
-                return (toParent, next)
+                // Skip narrowing when toLeft === toParent (leftmost child
+                // position, offset 0). The narrowed collectFromLeft would be
+                // a child at offset >= 1, producing a backwards range that
+                // suppresses the intended merge.
+                if toLeft !== toParent {
+                    return (toParent, next)
+                }
+                break
             }
             current = next
         }
@@ -1277,7 +1291,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1296,7 +1310,7 @@ class CRDTTree: CRDTElement {
         // Phase 3: Range Narrowing — narrow the traversal range when fromLeft and
         // toLeft straddle a concurrent element split. The original
         // fromParent/fromLeft are preserved for merge, split, and insert steps.
-        let (collectFromParent, collectFromLeft) = self.narrowedCollectRange(fromParent: fromParent, fromLeft: fromLeft, toParent: toParent)
+        let (collectFromParent, collectFromLeft) = self.narrowedCollectRange(fromParent: fromParent, fromLeft: fromLeft, toParent: toParent, toLeft: toLeft)
 
         let fromIdx = try self.toIndex(fromParent, fromLeft)
         let fromPath = try self.toPath(fromParent, fromLeft)
@@ -1305,6 +1319,7 @@ class CRDTTree: CRDTElement {
         var tokensToBeRemoved = [TreeToken<CRDTTreeNode>]()
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var toBeMergedNodes = [CRDTTreeNode]()
+        var preTombstoned = Set<String>()
         try self.traverseInPosRange(collectFromParent, collectFromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
@@ -1338,6 +1353,11 @@ class CRDTTree: CRDTElement {
                 // NOTE(hackerwins): If the node overlaps as an end token with the
                 // range then we need to keep the node.
                 if tokenType == .text || tokenType == .start {
+                    // Track nodes already tombstoned before this edit so the
+                    // reverse operation does not accidentally resurrect them.
+                    if node.isRemoved {
+                        preTombstoned.insert(node.toIDString)
+                    }
                     nodesToBeRemoved.append(node)
 
                     // Cascade delete to split siblings created by concurrent
@@ -1353,6 +1373,11 @@ class CRDTTree: CRDTElement {
         // NOTE(hackerwins): If concurrent deletion happens, we need to seperate the
         // range(from, to) into multiple ranges.
         var changes = try self.makeDeletionChanges(tokensToBeRemoved, editedAt)
+
+        // 01-2. Count merged nodes before children are moved (step 03).
+        // The undo system uses this count to generate a split reverse op
+        // instead of re-inserting empty shells.
+        let mergeLevel = toBeMergedNodes.count
 
         // 02. Delete: delete the nodes that are marked as removed.
         var pairs = [GCPair]()
@@ -1444,7 +1469,7 @@ class CRDTTree: CRDTElement {
                 }
             }
         }
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx)
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned)
     }
 
     /**
@@ -1539,20 +1564,19 @@ class CRDTTree: CRDTElement {
         return pairs
     }
 
-    /**
-     * `editT` edits the given range with the given value.
-     * This method uses indexes instead of a pair of TreePos for testing.
-     */
+    /// `editT` edits the given range with the given value.
+    /// Uses integer indexes instead of a ``CRDTTreePos`` pair. For testing only.
+    @discardableResult
     func editT(
         _ range: (Int, Int),
         _ contents: [CRDTTreeNode]?,
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
-        try self.edit(
+        return try self.edit(
             (fromPos, toPos),
             contents,
             splitLevel,

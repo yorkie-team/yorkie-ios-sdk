@@ -27,6 +27,8 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     var syncMode: SyncMode?
     var changeEventReceived: Bool?
     var lastHeartbeatTime: TimeInterval
+    var pollInterval: TimeInterval
+    var pollIntervalPinned: Bool
     var remoteWatchStream: YorkieServerStream?
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
@@ -38,13 +40,17 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         syncMode: SyncMode? = nil,
         changeEventReceived: Bool? = nil,
         watchLoopReconnectTimer: Timer? = nil,
-        cancelled: Bool = false
+        cancelled: Bool = false,
+        pollInterval: TimeInterval = 0,
+        pollIntervalPinned: Bool = false
     ) {
         self.resource = resource
         self.resourceID = resourceID
         self.syncMode = syncMode
         self.changeEventReceived = changeEventReceived
         self.lastHeartbeatTime = Date().timeIntervalSince1970
+        self.pollInterval = pollInterval
+        self.pollIntervalPinned = pollIntervalPinned
         self.watchLoopReconnectTimer = watchLoopReconnectTimer
         self.isDisconnected = false
         self.cancelled = cancelled
@@ -68,9 +74,19 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
             return await self.resource.hasLocalChanges()
         }
 
+        if syncMode == .polling {
+            // Time-based: pull at every poll interval, regardless of local changes.
+            return Date().timeIntervalSince1970 - self.lastHeartbeatTime >= self.pollInterval
+        }
+
         let hasLocalChanges = await self.resource.hasLocalChanges()
 
         return syncMode != .manual && (hasLocalChanges || (self.changeEventReceived ?? false))
+    }
+
+    /// Updates the last heartbeat timestamp to the current time.
+    func updateHeartbeatTime() {
+        self.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
     func connectStream(_ stream: YorkieServerStream?) {
