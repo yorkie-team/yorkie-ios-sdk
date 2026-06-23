@@ -72,6 +72,7 @@ struct ContentView: View {
                         )
                 }
                 .disabled(!self.viewModel.canUndo)
+                .accessibilityLabel("Undo")
 
                 // Redo button
                 Button(action: { self.viewModel.redo() }) {
@@ -88,6 +89,7 @@ struct ContentView: View {
                         )
                 }
                 .disabled(!self.viewModel.canRedo)
+                .accessibilityLabel("Redo")
 
                 // Bold button
                 Button(action: {
@@ -200,10 +202,12 @@ struct ContentView: View {
                 Button(action: { self.showInspector = true }) {
                     Image(systemName: "ladybug")
                 }
+                .accessibilityLabel("Open Yorkie inspector")
 
                 Button(action: { self.showBrowserInspector = true }) {
                     Image(systemName: "globe")
                 }
+                .accessibilityLabel("Show browser inspector URLs")
             }
         })
         .navigationTitle("Rich Text Editor")

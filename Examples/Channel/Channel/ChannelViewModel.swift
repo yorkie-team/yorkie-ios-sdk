@@ -67,9 +67,12 @@ final class ChannelViewModel: ObservableObject {
 
         for channel in self.channels {
             // `peekChannel` requires a yorkie >= 0.7.9 server; older servers return
-            // `unimplemented`. Ignore failures and leave the count unset.
+            // `unimplemented`. On failure, clear any stale count rather than
+            // leaving the previous value showing.
             if let count = try? await self.client.peekChannel(self.channelKey(for: channel)) {
                 self.memberCounts[channel.id] = count
+            } else {
+                self.memberCounts.removeValue(forKey: channel.id)
             }
         }
     }

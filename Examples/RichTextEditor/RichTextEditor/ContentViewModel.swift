@@ -17,7 +17,9 @@
 import Combine
 import UIKit
 import Yorkie
+#if DEBUG
 import YorkieDevtoolsServer
+#endif
 
 @MainActor
 class ContentViewModel: ObservableObject {
@@ -44,8 +46,15 @@ class ContentViewModel: ObservableObject {
         self.document
     }
 
+    // Devtools recording + the LAN browser inspector are debug-only — never
+    // record document contents or expose them over the network in release.
+    #if DEBUG
+    private static let devtoolsEnabled = true
     /// The live browser inspector server, started once the document is attached.
     private var devtoolsServer: DevtoolsServer?
+    #else
+    private static let devtoolsEnabled = false
+    #endif
     /// URLs at which the browser inspector is reachable (localhost + LAN).
     @Published var devtoolsURLs: [String] = []
 
@@ -109,7 +118,7 @@ class ContentViewModel: ObservableObject {
         // use for local server
         self.client = Client(Constant.serverAddress)
 
-        self.document = Document(key: self.documentKey, opts: DocumentOptions(disableGC: false, enableDevtools: true))
+        self.document = Document(key: self.documentKey, opts: DocumentOptions(disableGC: false, enableDevtools: Self.devtoolsEnabled))
         Log.log("Document key: \(self.documentKey)", level: .info)
         Log.log("API key: \(self.apiKey)", level: .info)
     }
@@ -125,7 +134,7 @@ extension ContentViewModel {
 
         Task {
             try await self.client.detach(self.document)
-            self.document = Document(key: self.documentKey, opts: DocumentOptions(disableGC: false, enableDevtools: true))
+            self.document = Document(key: self.documentKey, opts: DocumentOptions(disableGC: false, enableDevtools: Self.devtoolsEnabled))
             await self.initializeClient()
         }
     }
@@ -186,7 +195,9 @@ extension ContentViewModel {
             self.document.clearHistory()
             self.syncTextSnapShot()
             self.refreshUndoRedoState()
+            #if DEBUG
             self.startInspectorServer()
+            #endif
 
             await self.watch()
         } catch {
@@ -194,6 +205,7 @@ extension ContentViewModel {
         }
     }
 
+    #if DEBUG
     /// Starts (or restarts) the live browser inspector for the current document.
     private func startInspectorServer() {
         self.devtoolsServer?.stop()
@@ -207,6 +219,7 @@ extension ContentViewModel {
             Log.log("Devtools inspector failed to start: \(error)", level: .error)
         }
     }
+    #endif
 
     func updateText(ranges: [NSValue], value: String, fonts: [CustomFont]) {
         Log.log("updateText: ranges: \(ranges), value: \(value), fonts: \(fonts.sorted(by: { $0.rawValue > $1.rawValue }).map { $0.rawValue }.joined(separator: ", "))", level: .info)

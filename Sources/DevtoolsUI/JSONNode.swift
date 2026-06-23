@@ -23,7 +23,10 @@ import Foundation
 /// (objects / arrays) carry their `children`; scalars have `children == nil` so the
 /// outline shows no disclosure control.
 public struct JSONNode: Identifiable {
-    public let id = UUID()
+    /// Stable identity derived from the node's path, so `OutlineGroup` preserves
+    /// expansion state across live refreshes (a fresh `UUID()` per build would
+    /// collapse the tree on every poll).
+    public let id: String
 
     /// The object key or array index label for this node.
     public let key: String
@@ -37,36 +40,40 @@ public struct JSONNode: Identifiable {
 
     /// Builds a node tree rooted at `value`, labelled `key`.
     public static func build(key: String, value: Any) -> JSONNode {
+        self.build(key: key, value: value, path: key)
+    }
+
+    private static func build(key: String, value: Any, path: String) -> JSONNode {
         switch value {
         case let dictionary as [String: Any]:
             let children = dictionary.keys.sorted().map { childKey in
-                self.build(key: childKey, value: dictionary[childKey] as Any)
+                self.build(key: childKey, value: dictionary[childKey] as Any, path: "\(path)/\(childKey)")
             }
-            return JSONNode(key: key, valuePreview: "{\(children.count)}", children: children.isEmpty ? nil : children)
+            return JSONNode(id: path, key: key, valuePreview: "{\(children.count)}", children: children.isEmpty ? nil : children)
 
         case let array as [Any]:
             let children = array.enumerated().map { index, element in
-                self.build(key: "[\(index)]", value: element)
+                self.build(key: "[\(index)]", value: element, path: "\(path)/\(index)")
             }
-            return JSONNode(key: key, valuePreview: "[\(children.count)]", children: children.isEmpty ? nil : children)
+            return JSONNode(id: path, key: key, valuePreview: "[\(children.count)]", children: children.isEmpty ? nil : children)
 
         case is NSNull:
-            return JSONNode(key: key, valuePreview: "null", children: nil)
+            return JSONNode(id: path, key: key, valuePreview: "null", children: nil)
 
         case let number as NSNumber:
             // JSON booleans and integers both bridge to NSNumber; only a real
             // `CFBoolean` (e.g. JSON `true`/`false`) should render as a bool.
             // Otherwise integer `0`/`1` would be shown as `false`/`true`.
             if CFGetTypeID(number) == CFBooleanGetTypeID() {
-                return JSONNode(key: key, valuePreview: number.boolValue ? "true" : "false", children: nil)
+                return JSONNode(id: path, key: key, valuePreview: number.boolValue ? "true" : "false", children: nil)
             }
-            return JSONNode(key: key, valuePreview: number.stringValue, children: nil)
+            return JSONNode(id: path, key: key, valuePreview: number.stringValue, children: nil)
 
         case let string as String:
-            return JSONNode(key: key, valuePreview: "\"\(string)\"", children: nil)
+            return JSONNode(id: path, key: key, valuePreview: "\"\(string)\"", children: nil)
 
         default:
-            return JSONNode(key: key, valuePreview: String(describing: value), children: nil)
+            return JSONNode(id: path, key: key, valuePreview: String(describing: value), children: nil)
         }
     }
 

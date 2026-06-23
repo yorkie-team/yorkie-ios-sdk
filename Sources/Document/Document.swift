@@ -747,7 +747,7 @@ public class Document: Attachable {
     /**
      * `attachDevtoolsRecorder` eagerly creates the devtools recorder (if not
      * already present) and returns it, so an inspector UI can observe events
-     * live via ``DevtoolsRecorder/onUpdate``.
+     * live via ``DevtoolsRecorder/addObserver(_:)``.
      *
      * - Returns: The recorder, or `nil` when devtools is disabled for this
      *   document.

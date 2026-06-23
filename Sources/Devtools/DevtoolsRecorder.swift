@@ -37,9 +37,31 @@ public final class DevtoolsRecorder {
     /// Encoded replayable events, oldest first.
     private var events: [[String: Any]] = []
 
-    /// Invoked on the main actor after each recorded event, so an inspector UI
-    /// can refresh. Not called for ignored (non-replayable) events.
-    public var onUpdate: (() -> Void)?
+    /// Observers notified on the main actor after the buffer changes (a recorded
+    /// event or ``clear()``). Multiple inspectors (e.g. the browser server and
+    /// the in-app SwiftUI inspector) can observe concurrently without clobbering
+    /// each other — register with ``addObserver(_:)`` and release with
+    /// ``removeObserver(_:)``.
+    private var observers: [UUID: () -> Void] = [:]
+
+    /// Registers an observer, returning a token to pass to ``removeObserver(_:)``.
+    @discardableResult
+    public func addObserver(_ observer: @escaping () -> Void) -> UUID {
+        let token = UUID()
+        self.observers[token] = observer
+        return token
+    }
+
+    /// Removes a previously-registered observer.
+    public func removeObserver(_ token: UUID) {
+        self.observers.removeValue(forKey: token)
+    }
+
+    private func notifyObservers() {
+        for observer in self.observers.values {
+            observer()
+        }
+    }
 
     init(docKey: String, maxEvents: Int = DevtoolsRecorder.defaultMaxEvents) {
         self.docKey = docKey
@@ -65,12 +87,13 @@ public final class DevtoolsRecorder {
         if self.events.count > self.maxEvents {
             self.events.removeFirst(self.events.count - self.maxEvents)
         }
-        self.onUpdate?()
+        self.notifyObservers()
     }
 
-    /// Clears the buffer.
+    /// Clears the buffer and notifies observers so inspectors refresh.
     public func clear() {
         self.events.removeAll()
+        self.notifyObservers()
     }
 
     /// Returns the recording as `Array<DocEventsForReplay>`.

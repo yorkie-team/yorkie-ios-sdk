@@ -50,20 +50,25 @@ public final class YorkieInspectorModel: ObservableObject {
         self.recorder?.count ?? 0
     }
 
+    private var observerToken: UUID?
+
     /// Attaches to `document` and performs an initial refresh.
     public func start(document: Document) {
         self.document = document
         self.recorder = document.attachDevtoolsRecorder()
         self.isRecording = self.recorder != nil
-        self.recorder?.onUpdate = { [weak self] in
+        self.observerToken = self.recorder?.addObserver { [weak self] in
             self?.refresh()
         }
         self.refresh()
     }
 
-    /// Detaches the update hook.
+    /// Detaches the update observer.
     public func stop() {
-        self.recorder?.onUpdate = nil
+        if let token = self.observerToken {
+            self.recorder?.removeObserver(token)
+            self.observerToken = nil
+        }
         self.isRecording = false
     }
 

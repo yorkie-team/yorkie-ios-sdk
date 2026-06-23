@@ -46,6 +46,7 @@ public final class DevtoolsServer {
     private let document: Document
     private var listener: NWListener?
     private var recorder: DevtoolsRecorder?
+    private var observerToken: UUID?
     private let store = SnapshotStore()
     private let queue = DispatchQueue(label: "dev.yorkie.devtools.server")
 
@@ -71,7 +72,7 @@ public final class DevtoolsServer {
         }
         self.recorder = recorder
         self.refreshSnapshot()
-        recorder.onUpdate = { [weak self] in self?.refreshSnapshot() }
+        self.observerToken = recorder.addObserver { [weak self] in self?.refreshSnapshot() }
 
         guard let nwPort = NWEndpoint.Port(rawValue: self.port) else {
             throw DevtoolsServerError.invalidPort(self.port)
@@ -95,7 +96,10 @@ public final class DevtoolsServer {
 
     /// Stops listening and detaches from the recorder.
     public func stop() {
-        self.recorder?.onUpdate = nil
+        if let token = self.observerToken {
+            self.recorder?.removeObserver(token)
+            self.observerToken = nil
+        }
         self.listener?.cancel()
         self.listener = nil
         self.isRunning = false

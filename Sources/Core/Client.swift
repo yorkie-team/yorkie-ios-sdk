@@ -1612,13 +1612,18 @@ public extension Client {
         var request = PeekChannelRequest()
         request.channelKey = channelKey
 
-        let response = await self.yorkieService.peekChannel(request: request, headers: self.authHeader.makeHeader(firstKeyPath))
+        do {
+            let response = await self.yorkieService.peekChannel(request: request, headers: self.authHeader.makeHeader(firstKeyPath))
 
-        guard response.error == nil, let message = response.message else {
-            throw self.handleErrorResponse(response.error, defaultMessage: "Unknown peek channel error")
+            guard response.error == nil, let message = response.message else {
+                throw self.handleErrorResponse(response.error, defaultMessage: "Unknown peek channel error")
+            }
+
+            return Int(message.sessionCount)
+        } catch {
+            await self.handleConnectError(error)
+            throw error
         }
-
-        return Int(message.sessionCount)
     }
 }
 

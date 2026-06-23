@@ -310,8 +310,8 @@
       var fresh = rec.live && i >= state.freshFrom && i >= rec.events.length - 1 ? " fresh" : "";
       return '<button class="ev ' + direction(e.type) + fresh + '" role="option" aria-selected="' + (i === state.selected) + '" data-i="' + i + '" type="button">' +
         '<span class="arrow">' + arrowFor(e.type) + '</span>' +
-        '<span class="summary"><span class="type">' + e.type + '</span> · ' + esc(eventSummary(e)) + '</span>' +
-        '<span class="seq">' + seqLabel(e) + '</span></button>';
+        '<span class="summary"><span class="type">' + esc(e.type) + '</span> · ' + esc(eventSummary(e)) + '</span>' +
+        '<span class="seq">' + esc(seqLabel(e)) + '</span></button>';
     }).join("");
     var title = rec.live ? "Live timeline" : "Timeline";
     return '<div class="inspect"><div class="card"><h2>' + title + ' <span class="count">' + rec.events.length + ' events</span></h2>' +
@@ -322,7 +322,7 @@
 
   function detailHTML(ev) {
     var v = ev.value || {}, d = direction(ev.type);
-    var kv = '<dl class="kv"><dt>type</dt><dd>' + ev.type + '</dd><dt>source</dt><dd><span class="badge ' + d + '">' + (ev.source || "—") + '</span></dd>';
+    var kv = '<dl class="kv"><dt>type</dt><dd>' + esc(ev.type) + '</dd><dt>source</dt><dd><span class="badge ' + d + '">' + esc(ev.source || "—") + '</span></dd>';
     if (v.actor) kv += '<dt>actor</dt><dd>' + esc(v.actor) + '</dd>';
     if (v.clientSeq != null) kv += '<dt>clientSeq</dt><dd>' + v.clientSeq + '</dd>';
     if (v.serverSeq != null) kv += '<dt>serverSeq</dt><dd>' + v.serverSeq + '</dd>';
@@ -330,7 +330,7 @@
     kv += '</dl>';
     var opsBlock = "";
     if (v.operations && v.operations.length) {
-      var trs = v.operations.map(function (op) { return '<tr><td class="optype">' + op.type + '</td><td class="path">' + esc(op.path != null ? op.path : "") + '</td><td>' + esc(opDetail(op)) + '</td></tr>'; }).join("");
+      var trs = v.operations.map(function (op) { return '<tr><td class="optype">' + esc(op.type) + '</td><td class="path">' + esc(op.path != null ? op.path : "") + '</td><td>' + esc(opDetail(op)) + '</td></tr>'; }).join("");
       opsBlock = '<p class="section-label">Operations (' + v.operations.length + ') — what this change carries</p><table class="ops"><thead><tr><th>op</th><th>path</th><th>detail</th></tr></thead><tbody>' + trs + '</tbody></table>';
     }
     return kv + opsBlock + '<p class="section-label">Raw event</p><pre class="json">' + pretty(ev.raw) + '</pre>';
@@ -348,13 +348,13 @@
     }
   }
   function pathsTreeHTML(events) {
-    var root = {};
+    var root = Object.create(null);
     events.forEach(function (e) {
       var v = e.value || {};
       (v.operations || []).forEach(function (op) {
         var segs = String(op.path != null ? op.path : "$").split(".");
         var node = root;
-        segs.forEach(function (s) { node[s] = node[s] || { __ops: {}, __c: {} }; node = node[s].__c; });
+        segs.forEach(function (s) { node[s] = node[s] || { __ops: Object.create(null), __c: Object.create(null) }; node = node[s].__c; });
         var cur = root;
         segs.forEach(function (s, i) { if (i < segs.length - 1) cur = cur[s].__c; });
         var leaf = cur[segs[segs.length - 1]];
