@@ -645,8 +645,8 @@ final class DevtoolsRecorderTests: XCTestCase {
         let recorder = DevtoolsRecorder(docKey: "doc-3", maxEvents: 3)
 
         // when — record 5 events with distinguishable messages
-        for i in 1 ... 5 {
-            recorder.record(LocalChangeEvent(value: makeChangeInfo(message: "msg-\(i)")))
+        for index in 1 ... 5 {
+            recorder.record(LocalChangeEvent(value: makeChangeInfo(message: "msg-\(index)")))
         }
 
         // then — buffer holds only the last 3

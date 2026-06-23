@@ -366,7 +366,7 @@ final class DevtoolsTimelineEntryTests: XCTestCase {
         // then
         XCTAssertFalse(entry.prettyJSON.isEmpty)
         let data = try XCTUnwrap(entry.prettyJSON.data(using: .utf8))
-        let parsed = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(parsed["type"] as? String, entry.type)
     }
 
