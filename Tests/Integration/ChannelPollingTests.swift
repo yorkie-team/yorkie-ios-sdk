@@ -42,13 +42,12 @@ final class ChannelPollingTests: XCTestCase {
     // The test is skipped automatically when the running server returns
     // `unimplemented` (older server via SSH tunnel).
     //
-    // Stability note (line ~58): the `defer` teardown block uses
-    // `Task { try? await ... }`, which is the idiomatic fire-and-forget cleanup
-    // pattern used throughout the integration suite.  It is not fragile because
-    // XCTest keeps the process alive long enough for those tasks to complete, and
-    // any failure there is non-fatal by design.  The channel key uniqueness was
-    // the only fragility here; it is addressed by `channelTestKey` using a UUID
-    // suffix instead of a second-resolution timestamp.
+    // Cleanup uses `addTeardownBlock { try? await ... }` rather than
+    // `defer { Task { ... } }`: XCTest awaits async teardown blocks before the
+    // test completes, so deactivation/detachment finishes before the next test
+    // runs (a fire-and-forget `Task` could leak activated clients across tests).
+    // Channel keys are made unique via `channelTestKey` (UUID suffix) so parallel
+    // or rapidly-repeated runs never collide.
     @MainActor
     func test_peekChannel_returns_session_count_without_creating_a_session() async throws {
         // given — one client attached to a known channel key
@@ -58,16 +57,14 @@ final class ChannelPollingTests: XCTestCase {
 
         try await c1.activate()
         try await observer.activate()
-        defer {
-            Task {
-                try? await c1.deactivate()
-                try? await observer.deactivate()
-            }
+        self.addTeardownBlock {
+            try? await c1.deactivate()
+            try? await observer.deactivate()
         }
 
         let ch1 = try Channel(key: channelKey)
         _ = try await c1.attachChannel(ch1)
-        defer { Task { try? await c1.detachChannel(ch1) } }
+        self.addTeardownBlock { try? await c1.detachChannel(ch1) }
 
         // when — observer peeks (no attach, no session created)
         let count: Int
@@ -98,20 +95,18 @@ final class ChannelPollingTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
         try await observer.activate()
-        defer {
-            Task {
-                try? await c1.deactivate()
-                try? await c2.deactivate()
-                try? await observer.deactivate()
-            }
+        self.addTeardownBlock {
+            try? await c1.deactivate()
+            try? await c2.deactivate()
+            try? await observer.deactivate()
         }
 
         let ch1 = try Channel(key: channelKey)
         let ch2 = try Channel(key: channelKey)
         _ = try await c1.attachChannel(ch1)
-        defer { Task { try? await c1.detachChannel(ch1) } }
+        self.addTeardownBlock { try? await c1.detachChannel(ch1) }
         _ = try await c2.attachChannel(ch2)
-        defer { Task { try? await c2.detachChannel(ch2) } }
+        self.addTeardownBlock { try? await c2.detachChannel(ch2) }
 
         // when — observer peeks after both clients have attached
         let count: Int
@@ -168,16 +163,14 @@ final class ChannelPollingTests: XCTestCase {
 
         try await c1.activate()
         try await c2.activate()
-        defer {
-            Task {
-                try? await c1.deactivate()
-                try? await c2.deactivate()
-            }
+        self.addTeardownBlock {
+            try? await c1.deactivate()
+            try? await c2.deactivate()
         }
 
         let ch1 = try Channel(key: channelKey)
         _ = try await c1.attachChannel(ch1)
-        defer { Task { try? await c1.detachChannel(ch1) } }
+        self.addTeardownBlock { try? await c1.detachChannel(ch1) }
 
         let presenceExp = expectation(description: "presenceChanged event after second client attaches")
         presenceExp.assertForOverFulfill = false
@@ -193,7 +186,7 @@ final class ChannelPollingTests: XCTestCase {
         // when — second client attaches, then c1 manually refreshes its session count
         let ch2 = try Channel(key: channelKey)
         _ = try await c2.attachChannel(ch2)
-        defer { Task { try? await c2.detachChannel(ch2) } }
+        self.addTeardownBlock { try? await c2.detachChannel(ch2) }
 
         // Manually trigger refreshChannel via the public syncChannel wrapper.
         // Using syncChannel rather than waiting for the heartbeat timer avoids
@@ -232,11 +225,11 @@ final class ChannelPollingTests: XCTestCase {
         let c1 = Client(rpcAddress)
 
         try await c1.activate()
-        defer { Task { try? await c1.deactivate() } }
+        self.addTeardownBlock { try? await c1.deactivate() }
 
         let ch1 = try Channel(key: channelKey)
         _ = try await c1.attachChannel(ch1)
-        defer { Task { try? await c1.detachChannel(ch1) } }
+        self.addTeardownBlock { try? await c1.detachChannel(ch1) }
 
         // Drain the watch-stream initialization event so it cannot race with the
         // "no event" expectation registered below.  The watch stream delivers an
