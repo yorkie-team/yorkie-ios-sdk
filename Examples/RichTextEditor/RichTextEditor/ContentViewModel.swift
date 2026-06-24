@@ -229,6 +229,9 @@ extension ContentViewModel {
         Log.log("updateText: ranges: \(ranges), value: \(value), fonts: \(fonts.sorted(by: { $0.rawValue > $1.rawValue }).map { $0.rawValue }.joined(separator: ", "))", level: .info)
         // Local edit: let the text view follow the caret (e.g. newline past bottom).
         self.isRemoteUpdate = false
+        // A delete replacing a selection shrinks the text under the still-selected
+        // multi-char range; collapse it to a caret afterwards (see below).
+        let deletedRange = value.isEmpty ? (ranges as? [NSRange])?.first : nil
         try? self.document.update { [weak self] root, _ in
             guard let self, let content = root.content as? JSONText else {
                 Log.log("content not found: \(String(describing: root.content))", level: .warning)
@@ -279,6 +282,20 @@ extension ContentViewModel {
                 att.insert(newAttribute, at: safeLocation)
                 self.updateAttribute(att)
             }
+        }
+        // After deleting a selected range, collapse the selection to a caret so
+        // RTUITextField doesn't re-apply the now-stale multi-char selection (a
+        // UITextRange from the pre-delete, longer text) onto the shortened text and
+        // highlight the wrong span. Collapse to the *end* of the selection, not the
+        // start: RTUITextField.updateUIView treats a delete like a backspace (caret
+        // sits after the removed text) and subtracts the length difference, which
+        // lands the caret back at the selection start — e.g. deleting 8...10 leaves
+        // the caret at 8. Collapsing to the start would double-subtract to 6.
+        if let deletedRange {
+            let end = deletedRange.location + deletedRange.length
+            let caret = min(end, self.uitextView.attributedText.length)
+            self.uitextView.selectedRange = NSRange(location: caret, length: 0)
+            self.selection = nil
         }
     }
 
