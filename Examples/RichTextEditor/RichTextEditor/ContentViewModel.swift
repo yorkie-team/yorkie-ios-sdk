@@ -70,6 +70,10 @@ class ContentViewModel: ObservableObject {
     private var content: String = ""
     @Published var attributeString = NSMutableAttributedString(string: "")
     @Published var lastEditStyle: EditStyle?
+    /// True when the pending `attributeString` change came from a remote peer, so
+    /// the text view preserves the local scroll position instead of following the
+    /// caret. Set alongside `attributeString` so SwiftUI passes a consistent pair.
+    @Published var isRemoteUpdate = false
     @Published var isBold: Bool = false
     @Published var isItalic: Bool = false
     @Published var isUnderline: Bool = false
@@ -179,7 +183,7 @@ extension ContentViewModel {
             try await self.client.activate()
 
             try await self.client.attach(self.document, [
-                "username": self.localUsername,
+                "username": "iOS",
                 "color": self.localUserColor
             ])
 
@@ -223,6 +227,8 @@ extension ContentViewModel {
 
     func updateText(ranges: [NSValue], value: String, fonts: [CustomFont]) {
         Log.log("updateText: ranges: \(ranges), value: \(value), fonts: \(fonts.sorted(by: { $0.rawValue > $1.rawValue }).map { $0.rawValue }.joined(separator: ", "))", level: .info)
+        // Local edit: let the text view follow the caret (e.g. newline past bottom).
+        self.isRemoteUpdate = false
         try? self.document.update { [weak self] root, _ in
             guard let self, let content = root.content as? JSONText else {
                 Log.log("content not found: \(String(describing: root.content))", level: .warning)
@@ -354,33 +360,40 @@ extension ContentViewModel {
             self?.refreshUndoRedoState()
             if let event = event as? RemoteChangeEvent {
                 // adding text from FE and sync to iOS
-                // receive when peer changes text
+                // receive when peer changes text — preserve local scroll position
+                self?.isRemoteUpdate = true
                 let events = self?.decodeEvent(event)
                 self?.applyEvents(events)
             } else if let event = event as? PresenceChangedEvent {
-                // receive when peer change cursor
+                // peer changed cursor/selection — applying their selection highlight
+                // mutates attributeString, so preserve the local scroll position
+                self?.isRemoteUpdate = true
                 self?.decodeEvent(event.value)
             } else if let event = event as? LocalChangeEvent {
-                // apply local changes for style
+                // apply local changes for style — follow the local caret
+                self?.isRemoteUpdate = false
                 let events = self?.decodeEvent(event)
                 self?.applyEvents(events)
             } else if let _ = event as? SyncStatusChangedEvent {
                 self?.syncTextSnapShot()
             } else if let event = event as? UnwatchedEvent {
-                if let name = event.value.presence["username"] as? String {
-                    var peers = self?.peers ?? []
-                    let previous = peers.first(where: { $0.name == name })
-                    self?.updatePeerSelection(with: previous, peer: nil)
+                // peer left — removing their cursor/selection highlight re-styles the
+                // text, so preserve the local scroll position
+                self?.isRemoteUpdate = true
+                let clientID = event.value.clientID
+                var peers = self?.peers ?? []
+                let previous = peers.first(where: { $0.clientID == clientID })
+                self?.updatePeerSelection(with: previous, peer: nil)
 
-                    if let previous, let uitextView = self?.uitextView {
-                        self?.removePeerCursor(previous, in: uitextView)
-                    }
-                    peers.removeAll(where: { $0.name == name })
-                    self?.update(peers: peers)
-                } else {
-                    Log.log("Can not get this peer name :\(event.value.presence)", level: .error)
+                if let previous, let uitextView = self?.uitextView {
+                    self?.removePeerCursor(previous, in: uitextView)
                 }
+                peers.removeAll(where: { $0.clientID == clientID })
+                self?.update(peers: peers)
             } else if let event = event as? WatchedEvent {
+                // peer joined — applying their cursor/selection highlight re-styles the
+                // text, so preserve the local scroll position
+                self?.isRemoteUpdate = true
                 self?.decodeEvent(event.value)
             }
         }
@@ -410,9 +423,12 @@ extension ContentViewModel {
     func decodeEvent(_ peer: PeerElement) {
         // change selection
         // change cursors
-        let peerUsername = peer.presence["username"] as? String ?? "iOS"
-        if peerUsername == self.localUsername {
-            Log.log("Local change, no update", level: .debug)
+        // Identify self by clientID (actorID), not username: the published username
+        // may differ from `localUsername` and is not unique across clients, so a
+        // username comparison can fail to exclude self (self then shows up as a peer)
+        // or wrongly merge two peers that share a name.
+        if peer.clientID == self.client.id {
+            Log.log("Local presence, no update", level: .debug)
             return
         }
         guard let presencesChanges = peer.presence["selection"] as? [Any] else {
@@ -421,9 +437,9 @@ extension ContentViewModel {
             let color = peer.presence["color"] as? String ?? "anonymous"
             // cache previous peer selection for reuse
             var peers = self.peers
-            let previous = peers.first(where: { $0.name == name })
+            let previous = peers.first(where: { $0.clientID == peer.clientID })
 
-            peers.removeAll(where: { $0.name == name })
+            peers.removeAll(where: { $0.clientID == peer.clientID })
             let nextPeer = Peer(clientID: peer.clientID, name: name, position: .init(), color: color)
             peers.append(
                 nextPeer
@@ -459,9 +475,9 @@ extension ContentViewModel {
 
             // cache previous peer selection for reuse
             var peers = self.peers
-            let previous = peers.first(where: { $0.name == name })
+            let previous = peers.first(where: { $0.clientID == peer.clientID })
 
-            peers.removeAll(where: { $0.name == name })
+            peers.removeAll(where: { $0.clientID == peer.clientID })
             let nextPeer = Peer(clientID: peer.clientID, name: name, position: range, color: color)
             peers.append(
                 nextPeer
@@ -553,42 +569,24 @@ extension ContentViewModel {
     func decodeStyle(from atrributes: [String: Any]?) -> [Style] {
         guard let atrributes else { return [] }
         var styles = [Style]()
-        if let bold = atrributes["bold"] as? String {
-            if bold == "true" {
-                styles.append(.bold)
-            } else if bold == "null" || bold == "false" {
-                styles.append(.unBold)
+        /// A style attribute arrives with value "true" when a peer ADDED the
+        /// style, and with a removal marker when a peer REMOVED it. The removal
+        /// marker is JSON `null` (decoded as `NSNull`), not always the string
+        /// "null"/"false" — so match on the non-"true" case rather than `as? String`,
+        /// otherwise un-bold/italic/underline/strike from a peer is silently dropped.
+        func decode(_ key: String, add: Style, remove: Style) {
+            guard let value = atrributes[key] else { return }
+            if let string = value as? String, string == "true" {
+                styles.append(add)
             } else {
-                Log.log("can not decode style: \(String(describing: atrributes["bold"]))", level: .error)
+                styles.append(remove)
             }
         }
-        if let italic = atrributes["italic"] as? String {
-            if italic == "true" {
-                styles.append(.italic)
-            } else if italic == "null" || italic == "false" {
-                styles.append(.unItalic)
-            } else {
-                Log.log("can not decode style: \(String(describing: atrributes["italic"]))", level: .error)
-            }
-        }
-        if let underline = atrributes["underline"] as? String {
-            if underline == "true" {
-                styles.append(.underline)
-            } else if underline == "null" || underline == "false" {
-                styles.append(.nonUnderline)
-            } else {
-                Log.log("can not decode style: \(String(describing: atrributes["underline"]))", level: .error)
-            }
-        }
-        if let strike = atrributes["strike"] as? String {
-            if strike == "true" {
-                styles.append(.strike)
-            } else if strike == "null" || strike == "false" {
-                styles.append(.unStrike)
-            } else {
-                Log.log("can not decode style: \(String(describing: atrributes["strike"]))", level: .error)
-            }
-        }
+
+        decode("bold", add: .bold, remove: .unBold)
+        decode("italic", add: .italic, remove: .unItalic)
+        decode("underline", add: .underline, remove: .nonUnderline)
+        decode("strike", add: .strike, remove: .unStrike)
 
         Log.log("decoded styles: \(styles)", level: .debug)
         return styles
@@ -904,7 +902,7 @@ extension ContentViewModel {
     func update(peers: [Peer]) {
         Log.log("peers: \(peers.map { $0.name }.sorted().joined(separator: ", "))", level: .debug)
         self.peers = peers
-        for i in peers where i.name != self.localUsername {
+        for i in peers where i.clientID != self.client.id {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                 // TODO: - Refactor this to wait until the text is updated after adding cursor without using DispatchQueueMain
                 self.placeCursor(at: i.position.location, in: self.uitextView, with: i)
