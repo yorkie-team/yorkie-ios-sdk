@@ -4,4 +4,7 @@ coverage:
     patch: off
 ignore:
   - Tests/
-  - "**/Generated/**"      # Ignore all Generated files]
+  - "**/Generated/**"      # Ignore all Generated files
+  - Sources/Devtools/      # Devtools recorder — debug-only tooling
+  - Sources/DevtoolsServer/  # Devtools live browser server — debug-only tooling
+  - Sources/DevtoolsUI/    # Devtools SwiftUI inspector — debug-only tooling

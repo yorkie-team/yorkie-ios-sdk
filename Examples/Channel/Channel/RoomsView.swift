@@ -35,7 +35,7 @@ struct RoomsView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 20) {
                     ForEach(self.viewModel.categories) { category in
-                        CategorySection(category: category, channels: self.viewModel.channels(in: category))
+                        CategorySection(category: category, channels: self.viewModel.channels(in: category), memberCounts: self.viewModel.memberCounts)
                     }
                 }
                 .padding()
@@ -48,12 +48,23 @@ struct RoomsView: View {
         .navigationDestination(for: ChannelModel.self) { channel in
             ChannelRoomView(channel: channel)
         }
+        .task {
+            // Poll each room's live member count without joining, using peekChannel.
+            while !Task.isCancelled {
+                await self.viewModel.refreshMemberCounts()
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+            }
+        }
+        .onDisappear {
+            Task { await self.viewModel.stop() }
+        }
     }
 }
 
 struct CategorySection: View {
     let category: ChannelCategory
     let channels: [ChannelModel]
+    let memberCounts: [String: Int]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -68,7 +79,7 @@ struct CategorySection: View {
             }
 
             ForEach(self.channels) { channel in
-                RoomView(channel: channel)
+                RoomView(channel: channel, memberCount: self.memberCounts[channel.id] ?? 0)
             }
         }
     }
@@ -76,12 +87,21 @@ struct CategorySection: View {
 
 struct RoomView: View {
     let channel: ChannelModel
+    let memberCount: Int
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text(self.channel.name)
-                .font(.title)
-                .foregroundStyle(.black)
+            HStack {
+                Text(self.channel.name)
+                    .font(.title)
+                    .foregroundStyle(.black)
+
+                Spacer()
+
+                Label("\(self.memberCount)", systemImage: "person.2.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(self.memberCount > 0 ? Color.green : Color.secondary)
+            }
 
             HStack {
                 Text(self.channel.roomDescription)

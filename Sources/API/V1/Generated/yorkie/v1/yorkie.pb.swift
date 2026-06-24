@@ -764,6 +764,34 @@ public struct Yorkie_V1_RefreshChannelResponse: Sendable {
   public init() {}
 }
 
+/// PeekChannel reads the current session_count of a channel without creating
+/// a session on the server. Use this when a client only needs to display the
+/// count (e.g. "N people writing") without contributing to it and without
+/// receiving broadcasts. Caller polls on its own cadence.
+public struct Yorkie_V1_PeekChannelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var channelKey: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct Yorkie_V1_PeekChannelResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionCount: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 public struct Yorkie_V1_BroadcastRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2294,6 +2322,66 @@ extension Yorkie_V1_RefreshChannelResponse: SwiftProtobuf.Message, SwiftProtobuf
   }
 
   public static func ==(lhs: Yorkie_V1_RefreshChannelResponse, rhs: Yorkie_V1_RefreshChannelResponse) -> Bool {
+    if lhs.sessionCount != rhs.sessionCount {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_PeekChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PeekChannelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}channel_key\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.channelKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.channelKey, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_PeekChannelRequest, rhs: Yorkie_V1_PeekChannelRequest) -> Bool {
+    if lhs.channelKey != rhs.channelKey {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_PeekChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".PeekChannelResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_count\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.sessionCount) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.sessionCount != 0 {
+      try visitor.visitSingularInt64Field(value: self.sessionCount, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_PeekChannelResponse, rhs: Yorkie_V1_PeekChannelResponse) -> Bool {
     if lhs.sessionCount != rhs.sessionCount {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

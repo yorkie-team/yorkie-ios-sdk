@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.9] - 2026-06-23
+
+- Add PeekChannel client in https://github.com/yorkie-team/yorkie-ios-sdk/pull/262
+- Fix Polling channel subscriber notification in https://github.com/yorkie-team/yorkie-ios-sdk/pull/262
+
 ## [v0.7.8] - 2026-06-19
 
 - Add SyncMode.Polling for Document in https://github.com/yorkie-team/yorkie-ios-sdk/pull/260

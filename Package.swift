@@ -9,6 +9,14 @@ let package = Package(
         .library(
             name: "Yorkie",
             targets: ["Yorkie"]
+        ),
+        .library(
+            name: "YorkieDevtoolsUI",
+            targets: ["YorkieDevtoolsUI"]
+        ),
+        .library(
+            name: "YorkieDevtoolsServer",
+            targets: ["YorkieDevtoolsServer"]
         )
     ],
     dependencies: [
@@ -26,12 +34,25 @@ let package = Package(
                            .product(name: "Semaphore", package: "Semaphore")],
             path: "Sources",
             exclude: ["Info.plist",
+                      "DevtoolsUI",
+                      "DevtoolsServer",
                       "API/V1/yorkie/v1/resources.proto",
                       "API/V1/yorkie/v1/yorkie.proto",
                       "API/V1/googleapis/google/rpc/error_details.proto",
                       "API/V1/buf.gen.yaml",
                       "API/V1/buf.yaml",
                       "API/V1/run_protoc.sh"]
+        ),
+        .target(
+            name: "YorkieDevtoolsUI",
+            dependencies: ["Yorkie"],
+            path: "Sources/DevtoolsUI"
+        ),
+        .target(
+            name: "YorkieDevtoolsServer",
+            dependencies: ["Yorkie"],
+            path: "Sources/DevtoolsServer",
+            resources: [.process("Resources/viewer.html")]
         ),
         .target(
             name: "YorkieTestHelper",
@@ -58,6 +79,12 @@ let package = Package(
             dependencies: ["Yorkie", "YorkieTestHelper"],
             path: "Tests/Benchmark",
             resources: [.process("editing-trace.json")],
+            swiftSettings: [.define("SWIFT_TEST")]
+        ),
+        .testTarget(
+            name: "YorkieDevtoolsUITests",
+            dependencies: ["YorkieDevtoolsUI", "Yorkie"],
+            path: "Tests/DevtoolsUI",
             swiftSettings: [.define("SWIFT_TEST")]
         )
     ]

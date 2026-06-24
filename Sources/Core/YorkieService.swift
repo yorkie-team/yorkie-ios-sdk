@@ -149,6 +149,14 @@ public final class YorkieService {
         }
         return await self.rpcClient.refreshChannel(request: request, headers: headers)
     }
+
+    @available(iOS 15, *)
+    public func peekChannel(request: Yorkie_V1_PeekChannelRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_PeekChannelResponse> {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.peekChannel) {
+            return .init(result: .failure(error))
+        }
+        return await self.rpcClient.peekChannel(request: request, headers: headers)
+    }
 }
 
 extension YorkieService {

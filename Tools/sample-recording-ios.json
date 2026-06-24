@@ -1,0 +1,7 @@
+[
+  [{ "type": "status-changed", "source": "local", "value": { "status": "attached", "actorID": "ios-aaaa-1111" } }],
+  [{ "type": "local-change", "source": "local", "value": { "message": "set title", "operations": [{ "type": "set", "path": "$", "key": "title" }], "actor": "ios-aaaa-1111", "clientSeq": 1, "serverSeq": "0" } }],
+  [{ "type": "local-change", "source": "local", "value": { "message": "type hello", "operations": [{ "type": "edit", "path": "$.content", "from": 0, "to": 0, "value": { "attributes": {}, "content": "hello" } }], "actor": "ios-aaaa-1111", "clientSeq": 2, "serverSeq": "0" } }],
+  [{ "type": "remote-change", "source": "remote", "value": { "message": "", "operations": [{ "type": "edit", "path": "$.content", "from": 5, "to": 5, "value": { "attributes": {}, "content": " world" } }], "actor": "js-bbbb-2222", "clientSeq": 3, "serverSeq": "7" } }],
+  [{ "type": "local-change", "source": "local", "value": { "message": "add list item", "operations": [{ "type": "add", "path": "$.list", "index": 0 }], "actor": "ios-aaaa-1111", "clientSeq": 3, "serverSeq": "7" } }]
+]

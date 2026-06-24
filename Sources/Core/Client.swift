@@ -855,7 +855,10 @@ public class Client {
             throw self.handleErrorResponse(refreshResponse.error, defaultMessage: "Unknown refresh channel error")
         }
 
-        _ = channel.updateSessionCount(Int(message.sessionCount), 0)
+        let previousSessionCount = channel.getSessionCount()
+        if channel.updateSessionCount(Int(message.sessionCount), 0), channel.getSessionCount() != previousSessionCount {
+            channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: channel.getSessionCount()))
+        }
         attachment.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
@@ -1580,6 +1583,46 @@ public class Client {
             return error
         } else {
             return YorkieError(code: .errRPC, message: defaultMessage)
+        }
+    }
+}
+
+public extension Client {
+    /**
+     * `peekChannel` reads the current session count of a channel without
+     * creating a session on the server. Use this when the caller only needs to
+     * display the count (e.g. "N people writing") without contributing to it
+     * and without receiving broadcasts.
+     *
+     * Unlike attaching with read-only access, this does not occupy a session
+     * entry on the server, does not generate heartbeat RPCs, and does not
+     * subscribe to channel events. Polling is the caller's responsibility.
+     *
+     * - Parameter channelKey: The key of the channel to peek.
+     * - Returns: The current online session count of the channel.
+     * - Throws: ``YorkieError`` when the client is not active or the request fails.
+     */
+    func peekChannel(_ channelKey: String) async throws -> Int {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        let firstKeyPath = channelKey.components(separatedBy: ".").first ?? channelKey
+
+        var request = PeekChannelRequest()
+        request.channelKey = channelKey
+
+        do {
+            let response = await self.yorkieService.peekChannel(request: request, headers: self.authHeader.makeHeader(firstKeyPath))
+
+            guard response.error == nil, let message = response.message else {
+                throw self.handleErrorResponse(response.error, defaultMessage: "Unknown peek channel error")
+            }
+
+            return Int(message.sessionCount)
+        } catch {
+            await self.handleConnectError(error)
+            throw error
         }
     }
 }

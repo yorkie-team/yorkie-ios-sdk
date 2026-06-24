@@ -28,8 +28,17 @@ public struct DocumentOptions {
      */
     var disableGC: Bool
 
-    public init(disableGC: Bool) {
+    /**
+     * `enableDevtools` enables the devtools recorder if true. When enabled, the
+     * document captures its replayable events into a bounded ring buffer that
+     * can be exported in the yorkie-js-sdk devtools format for cross-platform
+     * debugging. See ``DevtoolsRecorder``.
+     */
+    var enableDevtools: Bool
+
+    public init(disableGC: Bool, enableDevtools: Bool = false) {
         self.disableGC = disableGC
+        self.enableDevtools = enableDevtools
     }
 }
 
@@ -78,6 +87,12 @@ public class Document: Attachable {
     private let key: DocKey
     private(set) var status: DocStatus = .detached
     private let disableGC: Bool
+    private let enableDevtools: Bool
+
+    /// Records replayable events into a ring buffer when `enableDevtools` is set.
+    /// Created lazily on the first published event, or eagerly via
+    /// ``attachDevtoolsRecorder()`` when an inspector UI needs to observe it.
+    public private(set) var devtoolsRecorder: DevtoolsRecorder?
     private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
@@ -118,6 +133,7 @@ public class Document: Attachable {
     public nonisolated init(key: DocKey, opts: DocumentOptions) {
         self.key = key
         self.disableGC = opts.disableGC
+        self.enableDevtools = opts.enableDevtools
         self.maxSizeLimit = 0
     }
 
@@ -707,6 +723,61 @@ public class Document: Attachable {
     }
 
     /**
+     * `isEnableDevtools` returns whether the devtools recorder is enabled for
+     * this document.
+     */
+    public func isEnableDevtools() -> Bool {
+        return self.enableDevtools
+    }
+
+    /**
+     * `dumpDevtools` returns the recorded devtools event log encoded as JSON in
+     * the yorkie-js-sdk devtools format.
+     *
+     * The result is `Array<DocEventsForReplay>`, directly comparable against a
+     * JS recording of the same session. Returns `nil` when devtools is disabled
+     * or no events have been recorded yet.
+     *
+     * - Parameter pretty: Pretty-prints with sorted keys when `true`.
+     */
+    public func dumpDevtools(pretty: Bool = true) -> Data? {
+        return self.devtoolsRecorder?.exportJSON(pretty: pretty)
+    }
+
+    /**
+     * `attachDevtoolsRecorder` eagerly creates the devtools recorder (if not
+     * already present) and returns it, so an inspector UI can observe events
+     * live via ``DevtoolsRecorder/addObserver(_:)``.
+     *
+     * - Returns: The recorder, or `nil` when devtools is disabled for this
+     *   document.
+     */
+    @discardableResult
+    public func attachDevtoolsRecorder() -> DevtoolsRecorder? {
+        guard self.enableDevtools else {
+            return nil
+        }
+        if self.devtoolsRecorder == nil {
+            self.devtoolsRecorder = DevtoolsRecorder(docKey: self.key)
+        }
+        return self.devtoolsRecorder
+    }
+
+    /**
+     * `exportDevtools` writes the recorded devtools event log to `url` as JSON.
+     *
+     * - Parameter url: The destination file URL.
+     * - Throws: A ``YorkieError`` when devtools is disabled, plus any error
+     *   raised while serialising or writing.
+     */
+    public func exportDevtools(to url: URL) throws {
+        guard let recorder = self.devtoolsRecorder else {
+            throw YorkieError(code: .errNotReady, message: "Devtools is not enabled or has not recorded any events for \(self.key).")
+        }
+        try recorder.export(to: url)
+    }
+
+    /**
      * `getClone` returns this clone.
      */
     func getClone() -> (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])? {
@@ -947,7 +1018,22 @@ public class Document: Attachable {
      * `publish` triggers an event in this document, which can be received by
      * callback functions from document.subscribe().
      */
+    /// Forwards an event to the devtools recorder, lazily creating it when
+    /// devtools is enabled. Kept separate from ``publish(_:)`` so it does not
+    /// add to that method's cyclomatic complexity.
+    private func recordForDevtools(_ event: DocEvent) {
+        guard self.enableDevtools else {
+            return
+        }
+        if self.devtoolsRecorder == nil {
+            self.devtoolsRecorder = DevtoolsRecorder(docKey: self.key)
+        }
+        self.devtoolsRecorder?.record(event)
+    }
+
     func publish(_ event: DocEvent) {
+        self.recordForDevtools(event)
+
         let presenceEvents: [DocEventType] = [.initialized, .watched, .unwatched, .presenceChanged]
 
         if presenceEvents.contains(event.type) {

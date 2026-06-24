@@ -27,6 +27,8 @@
 		587BA7FF2E964B55007FF45B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587BA7FB2E964B55007FF45B /* ContentView.swift */; };
 		587BA8002E964B55007FF45B /* RichTextEditorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587BA7FC2E964B55007FF45B /* RichTextEditorApp.swift */; };
 		587BA8022E964B5F007FF45B /* Yorkie in Frameworks */ = {isa = PBXBuildFile; productRef = 587BA8012E964B5F007FF45B /* Yorkie */; };
+		DEF7001B2E96000000000002 /* YorkieDevtoolsUI in Frameworks */ = {isa = PBXBuildFile; productRef = DEF7001A2E96000000000001 /* YorkieDevtoolsUI */; };
+		DEF7002B2E96000000000004 /* YorkieDevtoolsServer in Frameworks */ = {isa = PBXBuildFile; productRef = DEF7002A2E96000000000003 /* YorkieDevtoolsServer */; };
 		587BA8052E964C50007FF45B /* ContentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 587BA8042E964C4E007FF45B /* ContentViewModel.swift */; };
 /* End PBXBuildFile section */
 
@@ -62,6 +64,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				587BA8022E964B5F007FF45B /* Yorkie in Frameworks */,
+				DEF7001B2E96000000000002 /* YorkieDevtoolsUI in Frameworks */,
+				DEF7002B2E96000000000004 /* YorkieDevtoolsServer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -173,6 +177,8 @@
 			name = RichTextEditor;
 			packageProductDependencies = (
 				587BA8012E964B5F007FF45B /* Yorkie */,
+				DEF7001A2E96000000000001 /* YorkieDevtoolsUI */,
+				DEF7002A2E96000000000003 /* YorkieDevtoolsServer */,
 			);
 			productName = RichTextEditor;
 			productReference = 587BA7D32E964B44007FF45B /* RichTextEditor.app */;
@@ -522,6 +528,14 @@
 		587BA8012E964B5F007FF45B /* Yorkie */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Yorkie;
+		};
+		DEF7001A2E96000000000001 /* YorkieDevtoolsUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YorkieDevtoolsUI;
+		};
+		DEF7002A2E96000000000003 /* YorkieDevtoolsServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = YorkieDevtoolsServer;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
