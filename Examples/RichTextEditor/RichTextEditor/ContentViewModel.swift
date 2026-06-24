@@ -290,8 +290,10 @@ extension ContentViewModel {
     /// Undoes the last local change and re-renders the editor from the document.
     func undo() {
         guard self.document.canUndo else { return }
+        let textBefore = self.documentPlainText()
         do {
             try self.document.undo()
+            self.deselectIfTextChanged(from: textBefore)
             self.syncTextSnapShot(force: true)
         } catch {
             Log.log("undo failed: \(error.localizedDescription)", level: .warning)
@@ -302,13 +304,35 @@ extension ContentViewModel {
     /// Redoes the last undone local change and re-renders the editor from the document.
     func redo() {
         guard self.document.canRedo else { return }
+        let textBefore = self.documentPlainText()
         do {
             try self.document.redo()
+            self.deselectIfTextChanged(from: textBefore)
             self.syncTextSnapShot(force: true)
         } catch {
             Log.log("redo failed: \(error.localizedDescription)", level: .warning)
         }
         self.refreshUndoRedoState()
+    }
+
+    /// The document's current plain text (no attributes).
+    private func documentPlainText() -> String {
+        (self.document.getRoot().content as? JSONText)?.toString ?? ""
+    }
+
+    /// Collapses the editor selection to a caret when an undo/redo changed the
+    /// text. A style-only revert leaves the text unchanged, so the selection is
+    /// kept; a text revert shifts the characters under a stale selection range,
+    /// which would otherwise highlight the wrong text (e.g. selecting "SDK", then
+    /// undoing "SDK"→"SD" leaving "SD " selected). Android deselects in the same
+    /// case. Collapsing makes `RTUITextField` take its no-selection render path
+    /// instead of re-applying the stale range.
+    private func deselectIfTextChanged(from textBefore: String) {
+        guard self.documentPlainText() != textBefore else { return }
+        let currentLength = self.uitextView.attributedText.length
+        let caret = min(self.uitextView.selectedRange.location, currentLength)
+        self.uitextView.selectedRange = NSRange(location: caret, length: 0)
+        self.selection = nil
     }
 
     /// Syncs the undo/redo button state from the document's history.
