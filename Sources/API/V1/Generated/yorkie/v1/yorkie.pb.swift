@@ -108,6 +108,12 @@ public struct Yorkie_V1_AttachDocumentRequest: Sendable {
 
   public var schemaKey: String = String()
 
+  /// disable_gc declares that this attachment will not produce or consume
+  /// tombstones. The server skips minVV tracking and omits the response
+  /// VersionVector for this client. Use only with Counter / primitive
+  /// workloads; misuse leads to undefined GC behavior on this client.
+  public var disableGc: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -517,6 +523,12 @@ public struct Yorkie_V1_PushPullChangesRequest: Sendable {
   public mutating func clearChangePack() {self._changePack = nil}
 
   public var pushOnly: Bool = false
+
+  /// disable_gc declares that this PushPull will not produce or consume
+  /// tombstones. The server skips minVV tracking and omits the response
+  /// VersionVector. Clients that attached with disableGC=true must keep
+  /// setting this on every subsequent PushPullChanges.
+  public var disableGc: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -945,7 +957,7 @@ extension Yorkie_V1_DeactivateClientResponse: SwiftProtobuf.Message, SwiftProtob
 
 extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AttachDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}change_pack\0\u{3}schema_key\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}change_pack\0\u{3}schema_key\0\u{3}disable_gc\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -956,6 +968,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.schemaKey) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.disableGc) }()
       default: break
       }
     }
@@ -975,6 +988,9 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if !self.schemaKey.isEmpty {
       try visitor.visitSingularStringField(value: self.schemaKey, fieldNumber: 3)
     }
+    if self.disableGc != false {
+      try visitor.visitSingularBoolField(value: self.disableGc, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -982,6 +998,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.clientID != rhs.clientID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.schemaKey != rhs.schemaKey {return false}
+    if lhs.disableGc != rhs.disableGc {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1745,7 +1762,7 @@ extension Yorkie_V1_RemoveDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PushPullChangesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}change_pack\0\u{3}push_only\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}document_id\0\u{3}change_pack\0\u{3}push_only\0\u{3}disable_gc\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1757,6 +1774,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
       case 2: try { try decoder.decodeSingularStringField(value: &self.documentID) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.pushOnly) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.disableGc) }()
       default: break
       }
     }
@@ -1779,6 +1797,9 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     if self.pushOnly != false {
       try visitor.visitSingularBoolField(value: self.pushOnly, fieldNumber: 4)
     }
+    if self.disableGc != false {
+      try visitor.visitSingularBoolField(value: self.disableGc, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1787,6 +1808,7 @@ extension Yorkie_V1_PushPullChangesRequest: SwiftProtobuf.Message, SwiftProtobuf
     if lhs.documentID != rhs.documentID {return false}
     if lhs._changePack != rhs._changePack {return false}
     if lhs.pushOnly != rhs.pushOnly {return false}
+    if lhs.disableGc != rhs.disableGc {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

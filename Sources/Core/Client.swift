@@ -338,7 +338,8 @@ public class Client {
                        _ syncMode: SyncMode = .realtime,
                        _ schema: String = "",
                        initialRoot: [String: JSONValuable?]? = nil,
-                       documentPollInterval: TimeInterval? = nil) async throws -> Document
+                       documentPollInterval: TimeInterval? = nil,
+                       disableGC: Bool = false) async throws -> Document
     {
         // 01. Check if the client is ready to attach documents.
         guard self.isActive else {
@@ -373,6 +374,7 @@ public class Client {
         attachRequest.clientID = clientID
         attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
         attachRequest.schemaKey = schema
+        attachRequest.disableGc = disableGC
         // 02. Attach the document to the client.
         do {
             let docKey = doc.getKey()
@@ -409,7 +411,8 @@ public class Client {
                                                                     syncMode: syncMode,
                                                                     changeEventReceived: false,
                                                                     pollInterval: pollInterval,
-                                                                    pollIntervalPinned: pollIntervalPinned)
+                                                                    pollIntervalPinned: pollIntervalPinned,
+                                                                    disableGC: disableGC)
 
             // Polling mode opens no watch stream; the timer-driven sync loop drives pushpull
             // via needRealtimeSync. Skip waitForInitialization too — no stream to wait for.
@@ -1468,6 +1471,7 @@ public class Client {
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.resourceID
         pushPullRequest.pushOnly = syncMode == .realtimePushOnly
+        pushPullRequest.disableGc = attachment.disableGC
 
         do {
             let docKey = doc.getKey()
