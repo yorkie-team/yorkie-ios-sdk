@@ -308,6 +308,18 @@ extension ContentViewModel {
             Log.log("custom range set style: [\(range.location):\(toIdx)] -> \(font), value: \(value)", level: .debug)
             content.setStyle(range.location, toIdx, [font.rawValue: value])
         }
+        // Reflect the just-applied style on the toolbar immediately. `custom` applies
+        // `value` uniformly across the range, so the selection now uniformly carries
+        // it. Without this the button state only refreshes on the next selection
+        // change ("reselect to activate"), and — worse — the next tap would send the
+        // same value again (e.g. bold:true on already-bold text), producing a
+        // same-value no-op style op that pollutes undo/redo and syncs needlessly.
+        switch font {
+        case .bold: self.isBold = value
+        case .italic: self.isItalic = value
+        case .underline: self.isUnderline = value
+        case .strike: self.isStrikethrough = value
+        }
     }
 
     /// Undoes the last local change and re-renders the editor from the document.
@@ -740,7 +752,6 @@ extension ContentViewModel {
         }
         if !force, self.didFinishSync {
             guard docString != self.attributeString.string else {
-                print("nothing todo here!")
                 return
             }
         }
