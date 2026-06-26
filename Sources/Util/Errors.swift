@@ -97,6 +97,11 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrTooManySubscribers is returned when the number of subscribers exceeds the limit.
         case errTooManySubscribers = "ErrTooManySubscribers"
+
+        // ErrSessionNotFound is returned when the channel session is not found on the
+        // server (e.g. reclaimed via TTL). The client clears its local session id and
+        // re-attaches transparently on the next first-call RefreshChannel.
+        case errSessionNotFound = "ErrSessionNotFound"
     }
 }
 

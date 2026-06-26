@@ -759,6 +759,14 @@ public struct Yorkie_V1_RefreshChannelRequest: Sendable {
 
   public var sessionID: String = String()
 
+  /// client_key and metadata are used only on the first call (when session_id
+  /// is empty). The server activates the client and attaches it to the channel
+  /// before refreshing, collapsing ActivateClient + AttachChannel +
+  /// RefreshChannel into a single round trip.
+  public var clientKey: String = String()
+
+  public var metadata: Dictionary<String,String> = [:]
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -770,6 +778,13 @@ public struct Yorkie_V1_RefreshChannelResponse: Sendable {
   // methods supported on all messages.
 
   public var sessionCount: Int64 = 0
+
+  /// client_id and session_id are populated only when the request was a
+  /// first-call (i.e. session_id was empty). Subsequent heartbeats leave
+  /// these empty.
+  public var clientID: String = String()
+
+  public var sessionID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2282,7 +2297,7 @@ extension Yorkie_V1_DetachChannelResponse: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_RefreshChannelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RefreshChannelRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0\u{3}session_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}channel_key\0\u{3}session_id\0\u{3}client_key\0\u{1}metadata\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2293,6 +2308,8 @@ extension Yorkie_V1_RefreshChannelRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.channelKey) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.clientKey) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -2308,6 +2325,12 @@ extension Yorkie_V1_RefreshChannelRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if !self.sessionID.isEmpty {
       try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 3)
     }
+    if !self.clientKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientKey, fieldNumber: 4)
+    }
+    if !self.metadata.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2315,6 +2338,8 @@ extension Yorkie_V1_RefreshChannelRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.clientID != rhs.clientID {return false}
     if lhs.channelKey != rhs.channelKey {return false}
     if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.clientKey != rhs.clientKey {return false}
+    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2322,7 +2347,7 @@ extension Yorkie_V1_RefreshChannelRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_RefreshChannelResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RefreshChannelResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_count\0\u{3}client_id\0\u{3}session_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2331,6 +2356,8 @@ extension Yorkie_V1_RefreshChannelResponse: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularInt64Field(value: &self.sessionCount) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
       default: break
       }
     }
@@ -2340,11 +2367,19 @@ extension Yorkie_V1_RefreshChannelResponse: SwiftProtobuf.Message, SwiftProtobuf
     if self.sessionCount != 0 {
       try visitor.visitSingularInt64Field(value: self.sessionCount, fieldNumber: 1)
     }
+    if !self.clientID.isEmpty {
+      try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 2)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_RefreshChannelResponse, rhs: Yorkie_V1_RefreshChannelResponse) -> Bool {
     if lhs.sessionCount != rhs.sessionCount {return false}
+    if lhs.clientID != rhs.clientID {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
