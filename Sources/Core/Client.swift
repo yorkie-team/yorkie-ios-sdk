@@ -1599,8 +1599,7 @@ extension Client {
 
         // Register the attachment locally with an empty session id; the first-call
         // refresh below populates it from the server response.
-        self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel,
-                                                                    resourceID: "")
+        self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel, resourceID: "")
 
         // Forward local broadcasts to the server. The Channel publishes a
         // local-broadcast event when its `broadcast` method is called; here we
