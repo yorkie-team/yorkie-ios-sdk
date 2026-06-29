@@ -21,6 +21,10 @@ struct RTUITextField: UIViewRepresentable {
     var lastEditStyle: EditStyle?
     var text: NSMutableAttributedString
     let textField: UITextView
+    /// Preserve the scroll position across the re-render. True for remote (peer)
+    /// changes so they don't move the local viewport; false for local edits so the
+    /// view follows the caret (e.g. inserting a newline past the bottom).
+    var preserveScrollPosition: Bool
     var didChangeSelection: (Int, Int) -> Void
     var didChangeText: ([NSValue], String) -> Void
 
@@ -28,6 +32,7 @@ struct RTUITextField: UIViewRepresentable {
         text: NSMutableAttributedString,
         textField: UITextView,
         lastEditStyle: EditStyle?,
+        preserveScrollPosition: Bool,
         didChangeSelection: @escaping (Int, Int) -> Void,
         didChangeText: @escaping ([NSValue], String) -> Void
     ) {
@@ -36,6 +41,7 @@ struct RTUITextField: UIViewRepresentable {
         self.didChangeSelection = didChangeSelection
         self.didChangeText = didChangeText
         self.lastEditStyle = lastEditStyle
+        self.preserveScrollPosition = preserveScrollPosition
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -65,6 +71,12 @@ struct RTUITextField: UIViewRepresentable {
         }
 
         UIView.setAnimationsEnabled(false)
+        // Preserve the scroll position across this programmatic re-render. Setting
+        // `attributedText` / `selectedRange` makes UITextView scroll to the caret —
+        // for a remote (peer) change that yanks the viewport to wherever the local
+        // caret is (often the end → "jumps to the last line"). Restoring the offset
+        // afterwards keeps a peer's edit from moving what the local user is viewing.
+        let savedContentOffset = uiView.contentOffset
         if let selectedRange = context.coordinator.selectRange, !selectedRange.isEmpty {
             uiView.attributedText = self.text
 
@@ -113,6 +125,11 @@ struct RTUITextField: UIViewRepresentable {
             // Ensure cursor position doesn't exceed text bounds
             currentRange.location = min(currentRange.location, newText.length)
             uiView.selectedRange = currentRange
+        }
+        // Only restore the offset for remote changes. For local edits, let the
+        // text view follow the caret (e.g. a newline pushing past the bottom).
+        if self.preserveScrollPosition {
+            uiView.setContentOffset(savedContentOffset, animated: false)
         }
         UIView.setAnimationsEnabled(true)
     }

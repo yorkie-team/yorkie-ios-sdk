@@ -29,6 +29,10 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     var lastHeartbeatTime: TimeInterval
     var pollInterval: TimeInterval
     var pollIntervalPinned: Bool
+    /// Set when the document was attached with `disableGC: true`. The client sets the
+    /// matching wire field on every `PushPullChanges` so the server can skip minVV
+    /// tracking and omit the response version vector. Documents only.
+    var disableGC: Bool
     var remoteWatchStream: YorkieServerStream?
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
@@ -42,7 +46,8 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         watchLoopReconnectTimer: Timer? = nil,
         cancelled: Bool = false,
         pollInterval: TimeInterval = 0,
-        pollIntervalPinned: Bool = false
+        pollIntervalPinned: Bool = false,
+        disableGC: Bool = false
     ) {
         self.resource = resource
         self.resourceID = resourceID
@@ -51,6 +56,7 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         self.lastHeartbeatTime = Date().timeIntervalSince1970
         self.pollInterval = pollInterval
         self.pollIntervalPinned = pollIntervalPinned
+        self.disableGC = disableGC
         self.watchLoopReconnectTimer = watchLoopReconnectTimer
         self.isDisconnected = false
         self.cancelled = cancelled

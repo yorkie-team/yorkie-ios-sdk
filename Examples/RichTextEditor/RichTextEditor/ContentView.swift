@@ -42,7 +42,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Header with peers and version
             HStack(alignment: .top) {
-                Text("Participants: [\(self.viewModel.localUsername), \(self.viewModel.peers.filter { $0.name != self.viewModel.localUsername }.map { $0.name }.joined(separator: ", "))]")
+                Text("Participants: [\(self.viewModel.localUsername), \(self.viewModel.peers.map { $0.name }.joined(separator: ", "))]")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)
@@ -182,7 +182,7 @@ struct ContentView: View {
             .frame(height: 60)
             .background(Color(UIColor.systemGray6))
 
-            RTUITextField(text: self.viewModel.attributeString, textField: self.viewModel.uitextView, lastEditStyle: self.viewModel.lastEditStyle, didChangeSelection: { fromIndex, toIndex in
+            RTUITextField(text: self.viewModel.attributeString, textField: self.viewModel.uitextView, lastEditStyle: self.viewModel.lastEditStyle, preserveScrollPosition: self.viewModel.isRemoteUpdate, didChangeSelection: { fromIndex, toIndex in
                 self.viewModel.selection = NSRange(location: fromIndex, length: toIndex - fromIndex)
             }, didChangeText: { range, value in
                 let pendingFormats = self.viewModel.getPendingFormats()
