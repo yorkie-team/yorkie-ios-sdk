@@ -190,6 +190,197 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
         // then
         XCTAssertGreaterThanOrEqual(count, 2, "syncChannel must return >= 2 when two clients are attached")
     }
+
+    // MARK: - Guard / error-branch coverage
+
+    // `attachChannel` must throw `errClientNotActivated` when the client has not
+    // been activated. (~line 1587 in Client.swift)
+    @MainActor
+    func test_attachChannel_throws_errClientNotActivated_when_client_is_not_active() async throws {
+        // given — a client that has never been activated
+        let channelKey = channelTestKey(self.description)
+        let client = Client(rpcAddress)
+        let ch = try Channel(key: channelKey)
+
+        // when / then
+        do {
+            _ = try await client.attachChannel(ch)
+            XCTFail("attachChannel must throw when the client is not activated")
+        } catch let error as YorkieError {
+            XCTAssertEqual(error.code, .errClientNotActivated)
+        } catch {
+            XCTFail("expected YorkieError, got \(error)")
+        }
+    }
+
+    // `attachChannel` must throw `errNotDetached` when the channel is already
+    // in the `.attached` state. (~line 1595 in Client.swift)
+    @MainActor
+    func test_attachChannel_throws_errNotDetached_when_channel_is_already_attached() async throws {
+        // given — an active client with an already-attached channel
+        let channelKey = channelTestKey(self.description)
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let ch = try Channel(key: channelKey)
+        _ = try await client.attachChannel(ch)
+        self.addTeardownBlock { try? await client.detachChannel(ch) }
+
+        // when — attempt to attach the same channel a second time
+        do {
+            _ = try await client.attachChannel(ch)
+            XCTFail("attachChannel must throw for an already-attached channel")
+        } catch let error as YorkieError {
+            XCTAssertEqual(error.code, .errNotDetached)
+        } catch {
+            XCTFail("expected YorkieError, got \(error)")
+        }
+    }
+
+    // `detachChannel` must throw `errNotAttached` when the channel has never
+    // been attached to this client. (~line 1662 in Client.swift)
+    @MainActor
+    func test_detachChannel_throws_errNotAttached_for_never_attached_channel() async throws {
+        // given — an active client and a channel that was never attached
+        let channelKey = channelTestKey(self.description)
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let ch = try Channel(key: channelKey)
+
+        // when / then
+        do {
+            _ = try await client.detachChannel(ch)
+            XCTFail("detachChannel must throw for a never-attached channel")
+        } catch let error as YorkieError {
+            XCTAssertEqual(error.code, .errNotAttached)
+        } catch {
+            XCTFail("expected YorkieError, got \(error)")
+        }
+    }
+
+    // `syncChannel` must throw `errNotAttached` when the channel has never been
+    // attached to this client. (~line 1807 in Client.swift)
+    @MainActor
+    func test_syncChannel_throws_errNotAttached_for_never_attached_channel() async throws {
+        // given — an active client and a channel that was never attached
+        let channelKey = channelTestKey(self.description)
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let ch = try Channel(key: channelKey)
+
+        // when / then
+        do {
+            _ = try await client.syncChannel(ch)
+            XCTFail("syncChannel must throw for a never-attached channel")
+        } catch let error as YorkieError {
+            XCTAssertEqual(error.code, .errNotAttached)
+        } catch {
+            XCTFail("expected YorkieError, got \(error)")
+        }
+    }
+
+    // When `attachChannel`'s first-call `refreshChannel` fails (simulated via
+    // mock injection), the client must roll back the local registration so the
+    // channel ends up `.detached` and `client.has(channelKey)` returns `false`.
+    // (~lines 1639-1645 in Client.swift)
+    @MainActor
+    func test_attachChannel_rolls_back_on_first_call_refresh_failure() async throws {
+        // given — a mock-enabled client that will reject the first refreshChannel call
+        let channelKey = channelTestKey(self.description)
+        let client = Client(rpcAddress, isMockingEnabled: true)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let ch = try Channel(key: channelKey)
+
+        // Inject the error BEFORE attachChannel so the first-call refresh fails immediately.
+        client.setMockError(
+            for: YorkieServiceClient.Metadata.Methods.refreshChannel,
+            error: connectError(from: .failedPrecondition)
+        )
+
+        // when
+        do {
+            _ = try await client.attachChannel(ch)
+            XCTFail("attachChannel must throw when the first-call refresh fails")
+        } catch {
+            // expected — any error is acceptable here
+        }
+
+        // then — the rollback must have run: channel is detached and not tracked
+        XCTAssertEqual(ch.getStatus(), .detached, "channel must be rolled back to .detached")
+        XCTAssertFalse(client.has(channelKey), "client must not track the channel after rollback")
+    }
+
+    // `refreshChannel` must silently clear the session id and return (no throw, no
+    // ChannelSyncErrorEvent) when the server signals `ErrSessionNotFound`. The next
+    // refresh then re-enters the first-call branch to re-attach. (~lines 1722-1725)
+    //
+    // The mock error is built by packing an `ErrorInfo` proto whose `metadata`
+    // carries `"code": "ErrSessionNotFound"` — the same structure the real server
+    // sends and that `isErrorCode(_:_:)` inspects.
+    @MainActor
+    func test_syncChannel_clears_session_and_does_not_throw_on_ErrSessionNotFound() async throws {
+        // given — activate, attach (real server populates the session id), then
+        // swap in a mock that returns ErrSessionNotFound on the next refresh.
+        let channelKey = channelTestKey(self.description)
+        let client = Client(rpcAddress, isMockingEnabled: true)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let ch = try Channel(key: channelKey)
+        _ = try await client.attachChannel(ch)
+        self.addTeardownBlock { try? await client.detachChannel(ch) }
+
+        // Confirm a session id was established by the real first-call refresh.
+        XCTAssertFalse(ch.getSessionID()?.isEmpty ?? true, "session id must be set after attach")
+
+        // Build a ConnectError whose unpacked ErrorInfo carries the Yorkie code.
+        var errorInfo = ErrorInfo()
+        errorInfo.metadata = ["code": YorkieError.Code.errSessionNotFound.rawValue]
+        let payload = try errorInfo.serializedData()
+        let detail = ConnectError.Detail(type: ErrorInfo.protoMessageName, payload: payload)
+        let sessionNotFoundError = ConnectError(code: .notFound, message: "session not found", details: [detail])
+
+        // Verify the helper recognises the injected error as ErrSessionNotFound.
+        XCTAssertTrue(
+            isErrorCode(sessionNotFoundError, YorkieError.Code.errSessionNotFound.rawValue),
+            "pre-condition: isErrorCode must match ErrSessionNotFound"
+        )
+
+        // Subscribe to detect whether a ChannelSyncErrorEvent is incorrectly published.
+        var unexpectedSyncError: ChannelSyncErrorEvent?
+        ch.subscribeAll { event in
+            if let syncErr = event as? ChannelSyncErrorEvent {
+                unexpectedSyncError = syncErr
+            }
+        }
+
+        client.setMockError(
+            for: YorkieServiceClient.Metadata.Methods.refreshChannel,
+            error: sessionNotFoundError
+        )
+
+        // when — syncChannel calls refreshChannel which returns ErrSessionNotFound
+        // The recoverable path must NOT throw and must NOT publish a sync-error event.
+        do {
+            _ = try await client.syncChannel(ch)
+        } catch {
+            XCTFail("syncChannel must not throw for ErrSessionNotFound; got \(error)")
+        }
+
+        // then — session id cleared (re-attach will happen on next heartbeat)
+        XCTAssertTrue(
+            ch.getSessionID()?.isEmpty ?? true,
+            "session id must be cleared so the next refresh re-attaches"
+        )
+        XCTAssertNil(unexpectedSyncError, "ErrSessionNotFound must not publish a ChannelSyncErrorEvent")
+    }
 }
 
 // MARK: - Helpers
