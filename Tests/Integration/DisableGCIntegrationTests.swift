@@ -38,19 +38,19 @@ final class DisableGCIntegrationTests: XCTestCase {
     func test_can_attach_with_disableGC_true_and_sync_without_error() async throws {
         // given
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
-        let c = Client(rpcAddress)
-        try await c.activate()
-        self.addTeardownBlock { try? await c.deactivate() }
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
 
         // when
         let doc = Document(key: docKey)
-        try await c.attach(doc, [:], .manual, disableGC: true)
-        self.addTeardownBlock { try? await c.detach(doc) }
+        try await client.attach(doc, [:], .manual, disableGC: true)
+        self.addTeardownBlock { try? await client.detach(doc) }
 
         try doc.update { root, _ in
             root.counter = JSONCounter(value: Int64(0))
         }
-        try await c.sync()
+        try await client.sync()
 
         // then — document synced successfully; the counter is reachable
         let value = (doc.getRoot().counter as? JSONCounter<Int64>)?.value
@@ -110,28 +110,28 @@ final class DisableGCIntegrationTests: XCTestCase {
     func test_reattach_without_disableGC_restores_normal_sync() async throws {
         // given
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
-        let c = Client(rpcAddress)
-        try await c.activate()
-        self.addTeardownBlock { try? await c.deactivate() }
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
 
         // when — first attach with disableGC = true
         let d1 = Document(key: docKey)
-        try await c.attach(d1, [:], .manual, disableGC: true)
+        try await client.attach(d1, [:], .manual, disableGC: true)
         try d1.update { root, _ in
             root.counter = JSONCounter(value: Int64(0))
             (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
         }
-        try await c.sync()
-        try await c.detach(d1)
+        try await client.sync()
+        try await client.detach(d1)
 
         // re-attach on a fresh document without the option
         let d2 = Document(key: docKey)
-        try await c.attach(d2, [:], .manual)
-        self.addTeardownBlock { try? await c.detach(d2) }
+        try await client.attach(d2, [:], .manual)
+        self.addTeardownBlock { try? await client.detach(d2) }
         try d2.update { root, _ in
             (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
         }
-        try await c.sync()
+        try await client.sync()
 
         // then — counter accumulated across both sessions
         let value = (d2.getRoot().counter as? JSONCounter<Int64>)?.value

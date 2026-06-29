@@ -43,15 +43,15 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
     func test_attachChannel_sets_attached_status_and_sessionID_after_first_call_refresh() async throws {
         // given
         let channelKey = channelTestKey(self.description)
-        let c = Client(rpcAddress)
-        try await c.activate()
-        self.addTeardownBlock { try? await c.deactivate() }
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
 
         let ch = try Channel(key: channelKey)
 
         // when
-        _ = try await c.attachChannel(ch)
-        self.addTeardownBlock { try? await c.detachChannel(ch) }
+        _ = try await client.attachChannel(ch)
+        self.addTeardownBlock { try? await client.detachChannel(ch) }
 
         // then — channel is attached with a real session id from the server
         XCTAssertEqual(ch.getStatus(), .attached, "channel must be .attached after attachChannel")
@@ -67,20 +67,20 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
     func test_detachChannel_transitions_channel_to_detached_without_rpc() async throws {
         // given
         let channelKey = channelTestKey(self.description)
-        let c = Client(rpcAddress)
-        try await c.activate()
-        self.addTeardownBlock { try? await c.deactivate() }
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
 
         let ch = try Channel(key: channelKey)
-        _ = try await c.attachChannel(ch)
+        _ = try await client.attachChannel(ch)
 
         // when
-        _ = try await c.detachChannel(ch)
+        _ = try await client.detachChannel(ch)
 
         // then
         XCTAssertEqual(ch.getStatus(), .detached)
         // The client no longer tracks the channel
-        XCTAssertFalse(c.has(channelKey))
+        XCTAssertFalse(client.has(channelKey))
     }
 
     // MARK: - syncChannel (manual refresh)
@@ -91,16 +91,16 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
     func test_syncChannel_returns_positive_session_count_after_attach() async throws {
         // given
         let channelKey = channelTestKey(self.description)
-        let c = Client(rpcAddress)
-        try await c.activate()
-        self.addTeardownBlock { try? await c.deactivate() }
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
 
         let ch = try Channel(key: channelKey)
-        _ = try await c.attachChannel(ch)
-        self.addTeardownBlock { try? await c.detachChannel(ch) }
+        _ = try await client.attachChannel(ch)
+        self.addTeardownBlock { try? await client.detachChannel(ch) }
 
         // when
-        let count = try await c.syncChannel(ch)
+        let count = try await client.syncChannel(ch)
 
         // then
         XCTAssertGreaterThanOrEqual(count, 1)
@@ -116,13 +116,13 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
     func test_syncChannel_publishes_syncErrorEvent_on_non_recoverable_error() async throws {
         // given — activate and attach using a real server, then inject a mock error
         let channelKey = channelTestKey(self.description)
-        let c = Client(rpcAddress, isMockingEnabled: true)
-        try await c.activate()
-        self.addTeardownBlock { try? await c.deactivate() }
+        let client = Client(rpcAddress, isMockingEnabled: true)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
 
         let ch = try Channel(key: channelKey)
-        _ = try await c.attachChannel(ch)
-        self.addTeardownBlock { try? await c.detachChannel(ch) }
+        _ = try await client.attachChannel(ch)
+        self.addTeardownBlock { try? await client.detachChannel(ch) }
 
         var capturedSyncError: ChannelSyncErrorEvent?
         let errorExp = expectation(description: "ChannelSyncErrorEvent published")
@@ -136,14 +136,14 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
         // Inject a non-recoverable error for the next refreshChannel call.
         // `failedPrecondition` is not in the retryable set and carries no
         // Yorkie-specific metadata, so the state machine publishes the sync error.
-        c.setMockError(
+        client.setMockError(
             for: YorkieServiceClient.Metadata.Methods.refreshChannel,
             error: connectError(from: .failedPrecondition)
         )
 
         // when — manually trigger a refresh via the public syncChannel API
         do {
-            _ = try await c.syncChannel(ch)
+            _ = try await client.syncChannel(ch)
             XCTFail("syncChannel must throw when refreshChannel returns an error")
         } catch {
             // expected
