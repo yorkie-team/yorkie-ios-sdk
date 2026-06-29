@@ -1568,7 +1568,6 @@ private extension Client {
     }
 }
 
-
 // MARK: - Channel Methods
 
 extension Client {
