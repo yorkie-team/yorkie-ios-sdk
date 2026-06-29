@@ -715,249 +715,6 @@ public class Client {
         }
     }
 
-    // MARK: - Channel Methods
-
-    /**
-     * `attachChannel` attaches the given channel to this client.
-     *
-     * The channel is registered locally and the server is notified on the first
-     * ``refreshChannel(_:)`` (the "first-call", carrying `client_key` + `metadata`),
-     * which attaches the session and returns its id. There is no longer a dedicated
-     * AttachChannel RPC — the lifecycle is consolidated onto RefreshChannel
-     * (yorkie 0.7.10). Detach likewise needs no RPC: the server reclaims the session
-     * via TTL once heartbeats stop.
-     */
-    @discardableResult
-    public func attachChannel(_ channel: Channel) async throws -> Channel {
-        guard self.isActive else {
-            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
-        }
-
-        guard let clientID = self.id else {
-            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
-        }
-
-        guard channel.getStatus() == .detached else {
-            throw YorkieError(code: .errNotDetached, message: "\(channel.getKey()) is not detached.")
-        }
-
-        channel.setActor(clientID)
-
-        // Register the attachment locally with an empty session id; the first-call
-        // refresh below populates it from the server response.
-        self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel,
-                                                                    resourceID: "")
-
-        // Forward local broadcasts to the server. The Channel publishes a
-        // local-broadcast event when its `broadcast` method is called; here we
-        // bridge that event to the Broadcast RPC. `detachInternal` clears this
-        // callback so a re-attach does not leave a stale forwarder installed.
-        channel.subscribeLocalBroadcast { [weak self, weak channel] event in
-            guard let channel else { return }
-            let topic = event.topic
-            let payload = event.payload
-            let errorFn = event.options?.error
-            let channelKey = channel.getKey()
-
-            Task { [weak self] in
-                guard let self else { return }
-                do {
-                    try await self.broadcast(channelKey, topic: topic, payload: payload, options: event.options)
-                } catch {
-                    errorFn?(error)
-                }
-            }
-        }
-
-        do {
-            // First-call refresh attaches the session on the server and populates
-            // the session id and session count.
-            try await self.refreshChannel(channel)
-
-            try self.runWatchLoop(channel.getKey())
-
-            // Start heartbeat timer if not already running
-            self.startHeartbeatTimer()
-
-            Logger.info("[AP] c:\"\(self.key)\" attaches p:\"\(channel.getKey())\"")
-
-            return channel
-        } catch {
-            // Roll back the local registration if the first-call attach failed.
-            try? self.detachInternal(channel.getKey())
-            channel.setStatus(.detached)
-            Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
-            await self.handleConnectError(error)
-            throw error
-        }
-    }
-
-    /**
-     * `detachChannel` detaches the given channel from this client.
-     *
-     * This is a local cleanup only: there is no DetachChannel RPC. The server
-     * reclaims the session via TTL once heartbeats stop (RefreshChannel-only
-     * lifecycle, yorkie 0.7.10).
-     */
-    @discardableResult
-    public func detachChannel(_ channel: Channel) async throws -> Channel {
-        guard self.isActive else {
-            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
-        }
-
-        guard self.getChannelAttachment(channel.getKey()) != nil else {
-            throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached when \(#function).")
-        }
-
-        // NOTE: JS awaits `attachment.waitForSyncComplete()` before tearing down so an
-        // in-flight first-call refresh cannot re-create the session after detach. iOS
-        // does not need that barrier: `Client`/`Channel` are `@MainActor`, and a refresh
-        // suspended at its await re-checks `getChannelAttachment` after resuming (see
-        // `refreshChannel`), so it cannot mutate channel state post-detach. The only
-        // residue is a server session reclaimed by TTL if detach lands inside the
-        // first-call window — heartbeats have already stopped, so it does expire.
-        try self.detachInternal(channel.getKey())
-        channel.setStatus(.detached)
-
-        Logger.info("[DP] c:\"\(self.key)\" detaches p:\"\(channel.getKey())\" (local)")
-
-        return channel
-    }
-
-    /**
-     * `refreshChannel` sends a heartbeat to keep the channel session alive, and on
-     * the first call (when no session id is held yet) attaches the session on the
-     * server by carrying `client_key` + `metadata`. It also recovers transparently
-     * when the server has reclaimed the session.
-     */
-    private func refreshChannel(_ channel: Channel) async throws {
-        guard let clientID = self.id else {
-            return
-        }
-
-        guard let attachment = getChannelAttachment(channel.getKey()) else {
-            return
-        }
-
-        // First call: no session id yet, so carry `client_key` + `metadata` so the
-        // server activates/attaches and returns a session id. The server ignores
-        // these fields once a session id is established.
-        let isFirstCall = attachment.resourceID.isEmpty
-
-        var refreshRequest = RefreshChannelRequest()
-        refreshRequest.clientID = clientID
-        refreshRequest.channelKey = channel.getKey()
-        refreshRequest.sessionID = attachment.resourceID
-        if isFirstCall {
-            refreshRequest.clientKey = self.key
-            refreshRequest.metadata = self.metadata
-        }
-
-        let refreshResponse = await self.yorkieService.refreshChannel(request: refreshRequest, headers: self.authHeader.makeHeader(channel.getFirstKeyPath()))
-
-        // A detach (or deactivate) may have run while the RPC was suspended at the
-        // await. Drop late responses/errors so we don't resurrect events on a channel
-        // the app considers gone. Mirrors the JS `!deactivating && !isDetaching` guard
-        // around both the success and error publishes.
-        let stillAttached = self.getChannelAttachment(channel.getKey()) != nil
-
-        if let error = refreshResponse.error {
-            // The server reclaimed our session (TTL expiry, restart, etc.). Clear the
-            // local session id so the next refresh re-enters the first-call branch and
-            // re-attaches transparently; do not surface this to the caller.
-            if isErrorCode(error, YorkieError.Code.errSessionNotFound.rawValue) {
-                Logger.info("[RP] c:\"\(self.key)\" session expired for p:\"\(channel.getKey())\", re-attaching")
-                channel.setSessionID("")
-                attachment.resourceID = ""
-                return
-            }
-            // Surface non-recoverable sync errors to channel subscribers so a UI layer
-            // can render an error state — but only while still attached, so a detach
-            // mid-flight doesn't flash a spurious error. A later successful event
-            // implies recovery (there is no separate "recovered" event).
-            if stillAttached {
-                channel.publish(ChannelSyncErrorEvent(error: error, method: "RefreshChannel"))
-            }
-            throw self.handleErrorResponse(error, defaultMessage: "Unknown refresh channel error")
-        }
-
-        // Tolerate an empty (non-error) heartbeat ack, and drop a late response whose
-        // channel was detached while the RPC was in flight.
-        guard stillAttached, let message = refreshResponse.message else {
-            return
-        }
-
-        if isFirstCall, !message.sessionID.isEmpty {
-            // Defer the Attached transition until a real session id arrives. An empty
-            // one (protocol drift / partial response) leaves the channel Detached so
-            // the next tick re-enters the first-call branch instead of flapping.
-            channel.setSessionID(message.sessionID)
-            attachment.resourceID = message.sessionID
-            channel.setStatus(.attached)
-        }
-
-        let previousSessionCount = channel.getSessionCount()
-        if channel.updateSessionCount(Int(message.sessionCount), 0), channel.getSessionCount() != previousSessionCount {
-            channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: channel.getSessionCount()))
-        }
-        attachment.lastHeartbeatTime = Date().timeIntervalSince1970
-    }
-
-    /**
-     * `startHeartbeatTimer` starts the periodic heartbeat timer for all attached channels.
-     */
-    private func startHeartbeatTimer() {
-        guard self.channelHeartbeatTimer == nil else {
-            return // Timer already running
-        }
-
-        self.channelHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: self.channelHeartbeatInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self = self else { return }
-                await self.sendHeartbeats()
-            }
-        }
-    }
-
-    /**
-     * `sendHeartbeats` sends heartbeats for all attached channels.
-     */
-    private func sendHeartbeats() async {
-        for (_, attachment) in self.attachmentMap {
-            if let channelAttachment = attachment as? Attachment<Channel> {
-                // Only send heartbeats for realtime channels
-                if channelAttachment.resource.isRealtime() {
-                    let now = Date().timeIntervalSince1970
-                    if now - channelAttachment.lastHeartbeatTime >= self.channelHeartbeatInterval {
-                        do {
-                            try await self.refreshChannel(channelAttachment.resource)
-                        } catch {
-                            Logger.error("Failed heartbeat for channel(\(channelAttachment.resource.getKey())).", error: error)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * `syncChannel` manually refreshes the channel count for manual mode channels.
-     * Returns the updated count.
-     */
-    @discardableResult
-    public func syncChannel(_ channel: Channel) async throws -> Int {
-        guard self.isActive else {
-            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
-        }
-
-        guard let attachment = getChannelAttachment(channel.getKey()) else {
-            throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached")
-        }
-
-        try await self.refreshChannel(attachment.resource)
-        return attachment.resource.getSessionCount()
-    }
-
     /**
      * `getCondition` returns the condition of this client.
      */
@@ -1808,5 +1565,251 @@ private extension Client {
         }
         let reason = errorMetadataOf(error: connectError)["reason"] ?? ""
         channel.publish(ChannelAuthErrorEvent(reason: reason, method: method))
+    }
+}
+
+
+// MARK: - Channel Methods
+
+extension Client {
+    /**
+     * `attachChannel` attaches the given channel to this client.
+     *
+     * The channel is registered locally and the server is notified on the first
+     * ``refreshChannel(_:)`` (the "first-call", carrying `client_key` + `metadata`),
+     * which attaches the session and returns its id. There is no longer a dedicated
+     * AttachChannel RPC — the lifecycle is consolidated onto RefreshChannel
+     * (yorkie 0.7.10). Detach likewise needs no RPC: the server reclaims the session
+     * via TTL once heartbeats stop.
+     */
+    @discardableResult
+    public func attachChannel(_ channel: Channel) async throws -> Channel {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let clientID = self.id else {
+            throw YorkieError(code: .errUnexpected, message: "Invalid client ID! [\(self.id ?? "nil")]")
+        }
+
+        guard channel.getStatus() == .detached else {
+            throw YorkieError(code: .errNotDetached, message: "\(channel.getKey()) is not detached.")
+        }
+
+        channel.setActor(clientID)
+
+        // Register the attachment locally with an empty session id; the first-call
+        // refresh below populates it from the server response.
+        self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel,
+                                                                    resourceID: "")
+
+        // Forward local broadcasts to the server. The Channel publishes a
+        // local-broadcast event when its `broadcast` method is called; here we
+        // bridge that event to the Broadcast RPC. `detachInternal` clears this
+        // callback so a re-attach does not leave a stale forwarder installed.
+        channel.subscribeLocalBroadcast { [weak self, weak channel] event in
+            guard let channel else { return }
+            let topic = event.topic
+            let payload = event.payload
+            let errorFn = event.options?.error
+            let channelKey = channel.getKey()
+
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try await self.broadcast(channelKey, topic: topic, payload: payload, options: event.options)
+                } catch {
+                    errorFn?(error)
+                }
+            }
+        }
+
+        do {
+            // First-call refresh attaches the session on the server and populates
+            // the session id and session count.
+            try await self.refreshChannel(channel)
+
+            try self.runWatchLoop(channel.getKey())
+
+            // Start heartbeat timer if not already running
+            self.startHeartbeatTimer()
+
+            Logger.info("[AP] c:\"\(self.key)\" attaches p:\"\(channel.getKey())\"")
+
+            return channel
+        } catch {
+            // Roll back the local registration if the first-call attach failed.
+            try? self.detachInternal(channel.getKey())
+            channel.setStatus(.detached)
+            Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
+            await self.handleConnectError(error)
+            throw error
+        }
+    }
+
+    /**
+     * `detachChannel` detaches the given channel from this client.
+     *
+     * This is a local cleanup only: there is no DetachChannel RPC. The server
+     * reclaims the session via TTL once heartbeats stop (RefreshChannel-only
+     * lifecycle, yorkie 0.7.10).
+     */
+    @discardableResult
+    public func detachChannel(_ channel: Channel) async throws -> Channel {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard self.getChannelAttachment(channel.getKey()) != nil else {
+            throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached when \(#function).")
+        }
+
+        // NOTE: JS awaits `attachment.waitForSyncComplete()` before tearing down so an
+        // in-flight first-call refresh cannot re-create the session after detach. iOS
+        // does not need that barrier: `Client`/`Channel` are `@MainActor`, and a refresh
+        // suspended at its await re-checks `getChannelAttachment` after resuming (see
+        // `refreshChannel`), so it cannot mutate channel state post-detach. The only
+        // residue is a server session reclaimed by TTL if detach lands inside the
+        // first-call window — heartbeats have already stopped, so it does expire.
+        try self.detachInternal(channel.getKey())
+        channel.setStatus(.detached)
+
+        Logger.info("[DP] c:\"\(self.key)\" detaches p:\"\(channel.getKey())\" (local)")
+
+        return channel
+    }
+
+    /**
+     * `refreshChannel` sends a heartbeat to keep the channel session alive, and on
+     * the first call (when no session id is held yet) attaches the session on the
+     * server by carrying `client_key` + `metadata`. It also recovers transparently
+     * when the server has reclaimed the session.
+     */
+    private func refreshChannel(_ channel: Channel) async throws {
+        guard let clientID = self.id else {
+            return
+        }
+
+        guard let attachment = getChannelAttachment(channel.getKey()) else {
+            return
+        }
+
+        // First call: no session id yet, so carry `client_key` + `metadata` so the
+        // server activates/attaches and returns a session id. The server ignores
+        // these fields once a session id is established.
+        let isFirstCall = attachment.resourceID.isEmpty
+
+        var refreshRequest = RefreshChannelRequest()
+        refreshRequest.clientID = clientID
+        refreshRequest.channelKey = channel.getKey()
+        refreshRequest.sessionID = attachment.resourceID
+        if isFirstCall {
+            refreshRequest.clientKey = self.key
+            refreshRequest.metadata = self.metadata
+        }
+
+        let refreshResponse = await self.yorkieService.refreshChannel(request: refreshRequest, headers: self.authHeader.makeHeader(channel.getFirstKeyPath()))
+
+        // A detach (or deactivate) may have run while the RPC was suspended at the
+        // await. Drop late responses/errors so we don't resurrect events on a channel
+        // the app considers gone. Mirrors the JS `!deactivating && !isDetaching` guard
+        // around both the success and error publishes.
+        let stillAttached = self.getChannelAttachment(channel.getKey()) != nil
+
+        if let error = refreshResponse.error {
+            // The server reclaimed our session (TTL expiry, restart, etc.). Clear the
+            // local session id so the next refresh re-enters the first-call branch and
+            // re-attaches transparently; do not surface this to the caller.
+            if isErrorCode(error, YorkieError.Code.errSessionNotFound.rawValue) {
+                Logger.info("[RP] c:\"\(self.key)\" session expired for p:\"\(channel.getKey())\", re-attaching")
+                channel.setSessionID("")
+                attachment.resourceID = ""
+                return
+            }
+            // Surface non-recoverable sync errors to channel subscribers so a UI layer
+            // can render an error state — but only while still attached, so a detach
+            // mid-flight doesn't flash a spurious error. A later successful event
+            // implies recovery (there is no separate "recovered" event).
+            if stillAttached {
+                channel.publish(ChannelSyncErrorEvent(error: error, method: "RefreshChannel"))
+            }
+            throw self.handleErrorResponse(error, defaultMessage: "Unknown refresh channel error")
+        }
+
+        // Tolerate an empty (non-error) heartbeat ack, and drop a late response whose
+        // channel was detached while the RPC was in flight.
+        guard stillAttached, let message = refreshResponse.message else {
+            return
+        }
+
+        if isFirstCall, !message.sessionID.isEmpty {
+            // Defer the Attached transition until a real session id arrives. An empty
+            // one (protocol drift / partial response) leaves the channel Detached so
+            // the next tick re-enters the first-call branch instead of flapping.
+            channel.setSessionID(message.sessionID)
+            attachment.resourceID = message.sessionID
+            channel.setStatus(.attached)
+        }
+
+        let previousSessionCount = channel.getSessionCount()
+        if channel.updateSessionCount(Int(message.sessionCount), 0), channel.getSessionCount() != previousSessionCount {
+            channel.publish(ChannelPresenceEvent(type: .presenceChanged, count: channel.getSessionCount()))
+        }
+        attachment.lastHeartbeatTime = Date().timeIntervalSince1970
+    }
+
+    /**
+     * `startHeartbeatTimer` starts the periodic heartbeat timer for all attached channels.
+     */
+    private func startHeartbeatTimer() {
+        guard self.channelHeartbeatTimer == nil else {
+            return // Timer already running
+        }
+
+        self.channelHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: self.channelHeartbeatInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                await self.sendHeartbeats()
+            }
+        }
+    }
+
+    /**
+     * `sendHeartbeats` sends heartbeats for all attached channels.
+     */
+    private func sendHeartbeats() async {
+        for (_, attachment) in self.attachmentMap {
+            if let channelAttachment = attachment as? Attachment<Channel> {
+                // Only send heartbeats for realtime channels
+                if channelAttachment.resource.isRealtime() {
+                    let now = Date().timeIntervalSince1970
+                    if now - channelAttachment.lastHeartbeatTime >= self.channelHeartbeatInterval {
+                        do {
+                            try await self.refreshChannel(channelAttachment.resource)
+                        } catch {
+                            Logger.error("Failed heartbeat for channel(\(channelAttachment.resource.getKey())).", error: error)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * `syncChannel` manually refreshes the channel count for manual mode channels.
+     * Returns the updated count.
+     */
+    @discardableResult
+    public func syncChannel(_ channel: Channel) async throws -> Int {
+        guard self.isActive else {
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+
+        guard let attachment = getChannelAttachment(channel.getKey()) else {
+            throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached")
+        }
+
+        try await self.refreshChannel(attachment.resource)
+        return attachment.resource.getSessionCount()
     }
 }
