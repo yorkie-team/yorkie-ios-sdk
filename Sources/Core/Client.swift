@@ -1627,6 +1627,13 @@ extension Client {
             // the session id and session count.
             try await self.refreshChannel(channel)
 
+            // A first-call refresh that returns without a session leaves the channel
+            // `.detached`; treat that as a failed attach (the catch below rolls back)
+            // so callers never receive a "successful" channel without an active session.
+            guard channel.getStatus() == .attached, !(channel.getSessionID()?.isEmpty ?? true) else {
+                throw YorkieError(code: .errUnexpected, message: "RefreshChannel did not establish a session for \(channel.getKey())")
+            }
+
             try self.runWatchLoop(channel.getKey())
 
             // Start heartbeat timer if not already running
@@ -1722,6 +1729,13 @@ extension Client {
                 Logger.info("[RP] c:\"\(self.key)\" session expired for p:\"\(channel.getKey())\", re-attaching")
                 channel.setSessionID("")
                 attachment.resourceID = ""
+                // Re-attach immediately rather than waiting for the next heartbeat. The
+                // retry re-enters as a first-call (session id is now empty); only retry
+                // from a heartbeat refresh (`!isFirstCall`) and while still attached, so a
+                // failing first-call can't recurse and a detached channel is left alone.
+                if !isFirstCall, stillAttached {
+                    try await self.refreshChannel(channel)
+                }
                 return
             }
             // Surface non-recoverable sync errors to channel subscribers so a UI layer

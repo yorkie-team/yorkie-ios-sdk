@@ -317,9 +317,12 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
         XCTAssertFalse(client.has(channelKey), "client must not track the channel after rollback")
     }
 
-    // `refreshChannel` must silently clear the session id and return (no throw, no
-    // ChannelSyncErrorEvent) when the server signals `ErrSessionNotFound`. The next
-    // refresh then re-enters the first-call branch to re-attach. (~lines 1722-1725)
+    // `refreshChannel` recovers from `ErrSessionNotFound` without throwing or
+    // publishing a ChannelSyncErrorEvent: it clears the local session id and, when the
+    // error hit a heartbeat refresh, immediately re-attaches via a first-call refresh.
+    // Here the mock returns ErrSessionNotFound for BOTH the heartbeat refresh and the
+    // immediate first-call retry (count: 2), so the channel stays cleared and the
+    // bounded retry does not recurse. (~lines 1728-1740)
     //
     // The mock error is built by packing an `ErrorInfo` proto whose `metadata`
     // carries `"code": "ErrSessionNotFound"` — the same structure the real server
@@ -361,23 +364,27 @@ final class ChannelRefreshIntegrationTests: XCTestCase {
             }
         }
 
+        // Fail both the heartbeat refresh and its immediate first-call retry so the
+        // channel stays cleared (otherwise the retry re-attaches against the server).
         client.setMockError(
             for: YorkieServiceClient.Metadata.Methods.refreshChannel,
-            error: sessionNotFoundError
+            error: sessionNotFoundError,
+            count: 2
         )
 
-        // when — syncChannel calls refreshChannel which returns ErrSessionNotFound
-        // The recoverable path must NOT throw and must NOT publish a sync-error event.
+        // when — syncChannel's refresh and its immediate re-attach retry both hit
+        // ErrSessionNotFound. The recoverable path must NOT throw and must NOT publish
+        // a sync-error event.
         do {
             _ = try await client.syncChannel(ch)
         } catch {
             XCTFail("syncChannel must not throw for ErrSessionNotFound; got \(error)")
         }
 
-        // then — session id cleared (re-attach will happen on next heartbeat)
+        // then — session id stays cleared (both attempts failed; bounded retry didn't recurse)
         XCTAssertTrue(
             ch.getSessionID()?.isEmpty ?? true,
-            "session id must be cleared so the next refresh re-attaches"
+            "session id must be cleared after ErrSessionNotFound"
         )
         XCTAssertNil(unexpectedSyncError, "ErrSessionNotFound must not publish a ChannelSyncErrorEvent")
     }

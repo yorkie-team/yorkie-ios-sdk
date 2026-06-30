@@ -939,14 +939,14 @@ extension ContentViewModel {
     }
 
     func removePeerCursor(_ peer: Peer, in textView: UITextView) {
-        let subviews = textView.subviews.filter { $0.accessibilityLabel == peer.name }
+        let subviews = textView.subviews.filter { $0.accessibilityLabel == peer.clientID }
         for subview in subviews {
             subview.removeFromSuperview()
         }
     }
 
     func placeCursor(at index: Int, in textView: UITextView, with peer: Peer) {
-        let subviews = textView.subviews.filter { $0.accessibilityLabel == peer.name }
+        let subviews = textView.subviews.filter { $0.accessibilityLabel == peer.clientID }
         for subview in subviews {
             subview.removeFromSuperview()
         }
@@ -965,7 +965,9 @@ extension ContentViewModel {
                 frame: CGRect(x: caretRect.origin.x, y: caretRect.origin.y, width: 2, height: caretRect.height),
                 color: color
             )
-            cursor.accessibilityLabel = peer.name
+            // Identify cursor subviews by clientID (unique) so duplicate display
+            // names (e.g. every iOS client shows "iOS") don't collide on removal.
+            cursor.accessibilityLabel = peer.clientID
 
             // Remove old cursor if needed
             textView.subviews.filter { $0.accessibilityLabel == peer.clientID }.forEach { $0.removeFromSuperview() }
@@ -988,7 +990,7 @@ extension ContentViewModel {
                 width: contentView.frame.width + 12,
                 height: contentView.frame.height + 6
             )
-            contentView.accessibilityLabel = peer.name
+            contentView.accessibilityLabel = peer.clientID
             textView.addSubview(contentView)
         }
     }
