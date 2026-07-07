@@ -323,6 +323,38 @@ class RGATreeListTests: XCTestCase {
         XCTAssertEqual(target.getLast().toJSON(), "\"C123\"")
     }
 
+    // Ported from yorkie-js-sdk (PR #1272): getLast skips trailing bare position nodes.
+    // When the tail element is moved elsewhere, `moveAfter` leaves the old tail position
+    // node in place as `last` (dead, no `elementEntry`) rather than reassigning it —
+    // mirroring JS, which keeps dead position nodes around until GC purge. `getLast()`
+    // must walk back over that bare node and return the last LIVE element instead.
+    func test_getLast_skips_trailing_bare_position_node() throws {
+        // given — list [A, B, C], C is the tail
+        let target = RGATreeList()
+        let e1 = Primitive(value: .string("A"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
+        let e2 = Primitive(value: .string("B"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
+        let e3 = Primitive(value: .string("C"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
+        try target.insert(e1)
+        try target.insert(e2)
+        try target.insert(e3)
+
+        XCTAssertEqual(target.getLast().toJSON(), "\"C\"")
+
+        // when — move the tail element (C) elsewhere; the old tail position node becomes
+        // a bare/dead position node, and `last` keeps pointing at it (JS-faithful).
+        let moveAt = TimeTicket(lamport: 4, delimiter: 0, actorID: actorId)
+        let deadNode = try target.moveAfter(createdAt: e3.createdAt, prevCreatedAt: e1.createdAt, executedAt: moveAt)
+
+        // then — the physically last node is still the bare/dead position node left behind
+        XCTAssertNotNil(deadNode)
+        XCTAssertNil(deadNode?.getElementEntry())
+        XCTAssertEqual(target.getLastCreatedAt(), deadNode?.positionCreatedAt)
+
+        // and — getLast() skips it, returning the last LIVE element ("B", now at the tail
+        // of the live sequence [A, C, B]) instead of the bare position node.
+        XCTAssertEqual(target.getLast().toJSON(), "\"B\"")
+    }
+
     func test_getLastCreatedAt() throws {
         let target = RGATreeList()
         let e1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))

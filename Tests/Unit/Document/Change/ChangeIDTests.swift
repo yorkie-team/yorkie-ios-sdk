@@ -64,4 +64,64 @@ class ChangeIDTests: XCTestCase {
 
         XCTAssertEqual(result.toTestString, "2:actor-1:3")
     }
+
+    // syncLamport (v0.7.11): advances the lamport clock like syncClocks, but does NOT
+    // merge the other ID's version vector entries into the receiver's — only the
+    // receiver's own actor entry is set. This keeps VV size O(1) for attachments that
+    // opt out of GC participation.
+    func test_syncLamport_advances_lamport_without_merging_the_other_actors_vv_entry() {
+        let actor = "actor-1"
+        let otherActor = "actor-2"
+
+        let currentVector = VersionVector(vector: [actor: 2])
+        let otherVector = VersionVector(vector: [otherActor: 10])
+
+        let current = ChangeID(clientSeq: 1, lamport: 2, actor: actor, versionVector: currentVector)
+        let other = ChangeID(clientSeq: 2, lamport: 10, actor: otherActor, versionVector: otherVector)
+
+        let synced = current.syncLamport(with: other)
+
+        // Lamport advances to other.lamport + 1, same as syncClocks would.
+        XCTAssertEqual(synced.getLamport(), other.getLamport() + 1)
+
+        // But the version vector keeps only the receiver's own actor entry —
+        // the other actor's entry is NOT merged in.
+        XCTAssertEqual(synced.getVersionVector().size(), 1)
+        XCTAssertEqual(synced.getVersionVector().get(actor), other.getLamport() + 1)
+        XCTAssertNil(synced.getVersionVector().get(otherActor))
+    }
+
+    // Contrast with syncClocks: given the same inputs, syncClocks DOES merge the other
+    // actor's version-vector entry, growing the vector to size 2.
+    func test_syncClocks_merges_the_other_actors_vv_entry_unlike_syncLamport() {
+        let actor = "actor-1"
+        let otherActor = "actor-2"
+
+        let currentVector = VersionVector(vector: [actor: 2])
+        let otherVector = VersionVector(vector: [otherActor: 10])
+
+        let current = ChangeID(clientSeq: 1, lamport: 2, actor: actor, versionVector: currentVector)
+        let other = ChangeID(clientSeq: 2, lamport: 10, actor: otherActor, versionVector: otherVector)
+
+        let synced = current.syncClocks(with: other)
+
+        XCTAssertEqual(synced.getVersionVector().size(), 2)
+        XCTAssertEqual(synced.getVersionVector().get(otherActor), 10)
+    }
+
+    func test_syncLamport_returns_self_unchanged_when_other_has_no_clocks() {
+        let actor = "actor-1"
+        let currentVector = VersionVector(vector: [actor: 2])
+        let current = ChangeID(clientSeq: 1, lamport: 2, actor: actor, versionVector: currentVector)
+
+        // ChangeID.initial has lamport == initialLamport and an empty version vector,
+        // so hasClocks() is false.
+        let other = ChangeID.initial
+
+        let synced = current.syncLamport(with: other)
+
+        XCTAssertEqual(synced.toTestString, current.toTestString)
+        XCTAssertEqual(synced.getVersionVector().size(), current.getVersionVector().size())
+        XCTAssertEqual(synced.getVersionVector().get(actor), current.getVersionVector().get(actor))
+    }
 }
