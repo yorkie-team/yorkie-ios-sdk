@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.11] - 2026-07-07
+
+- Introduce treelist to optimize random access in Array in https://github.com/yorkie-team/yorkie-ios-sdk/pull/265
+- Stop accumulating per-Change VV under disableGC in https://github.com/yorkie-team/yorkie-ios-sdk/pull/265
+- Skip bare position nodes in RGATreeList.getLast in https://github.com/yorkie-team/yorkie-ios-sdk/pull/265
+
 ## [v0.7.10] - 2026-06-26
 
 - Add disableGC attach option in https://github.com/yorkie-team/yorkie-ios-sdk/pull/263
