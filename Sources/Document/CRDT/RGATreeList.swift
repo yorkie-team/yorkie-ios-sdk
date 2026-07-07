@@ -628,9 +628,15 @@ class RGATreeList {
         return previousNode?.positionCreatedAt ?? self.dummyHead.positionCreatedAt
     }
 
-    /// Returns the last element.
+    /// Returns the last element, skipping bare position nodes (created by
+    /// `moveAfter`/`addDeadPosition`) that have no element.
     func getLast() -> CRDTElement {
-        return self.last.value
+        var node = self.last
+        while node.elementEntry == nil, node !== self.dummyHead {
+            guard let prev = node.previous else { break }
+            node = prev
+        }
+        return node.value
     }
 
     /// Returns the POSITION `createdAt` of the last node.
