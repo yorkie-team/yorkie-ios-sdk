@@ -86,7 +86,14 @@ public class Document: Attachable {
 
     private let key: DocKey
     private(set) var status: DocStatus = .detached
-    private let disableGC: Bool
+    /// The construction-time GC opt-out from ``DocumentOptions``. Gates whether
+    /// ``garbageCollect(minSyncedVersionVector:)`` runs. Immutable — mirrors the JS
+    /// `opts.disableGC`.
+    private let optionDisableGC: Bool
+    /// Whether this document uses the lamport-only sync path in ``applyChanges(_:source:)``.
+    /// Starts `false` and is set authoritatively by the client on attach via
+    /// ``setDisableGC(_:)`` — mirrors the JS `disableGC` field (distinct from `opts.disableGC`).
+    private var disableGC: Bool = false
     private let enableDevtools: Bool
 
     /// Records replayable events into a ring buffer when `enableDevtools` is set.
@@ -132,7 +139,7 @@ public class Document: Attachable {
 
     public nonisolated init(key: DocKey, opts: DocumentOptions) {
         self.key = key
-        self.disableGC = opts.disableGC
+        self.optionDisableGC = opts.disableGC
         self.enableDevtools = opts.enableDevtools
         self.maxSizeLimit = 0
     }
@@ -663,12 +670,21 @@ public class Document: Attachable {
     }
 
     /**
+     * `setDisableGC` records whether this document participates in GC. The
+     * client calls this on attach so subsequent `applyChanges` runs use the
+     * lamport-only sync path and GC is skipped.
+     */
+    func setDisableGC(_ disableGC: Bool) {
+        self.disableGC = disableGC
+    }
+
+    /**
      * `garbageCollect` purges elements that were removed before the given time.
      *
      */
     @discardableResult
     func garbageCollect(minSyncedVersionVector: VersionVector) -> Int {
-        if self.disableGC {
+        if self.optionDisableGC {
             return 0
         }
 
@@ -877,7 +893,12 @@ public class Document: Attachable {
                 }
             }
 
-            self.changeID = self.changeID.syncClocks(with: change.id)
+            // Opt-out (disableGC) documents advance only the lamport clock and do
+            // not merge remote actors' version vectors, keeping each subsequent
+            // local Change's VV at O(1). See ``setDisableGC(_:)``.
+            self.changeID = self.disableGC
+                ? self.changeID.syncLamport(with: change.id)
+                : self.changeID.syncClocks(with: change.id)
 
             if change.hasOperations {
                 changeInfo = ChangeInfo(message: change.message ?? "",

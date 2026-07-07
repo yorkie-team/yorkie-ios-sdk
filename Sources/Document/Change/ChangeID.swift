@@ -101,6 +101,32 @@ struct ChangeID {
     }
 
     /**
+     * `syncLamport` advances the lamport clock against the given ID without
+     * merging its version vector into the receiver's. It is the counterpart of
+     * `syncClocks` for attachments that have opted out of GC participation: the
+     * receiver does not need other actors' entries in its VV because it never
+     * produces or consumes tombstones, and dropping them keeps each subsequent
+     * local Change's VV at O(1) instead of O(num_actors). Lamport must still
+     * advance so that TimeTickets produced locally remain ordered against
+     * remote operations.
+     */
+    @discardableResult
+    func syncLamport(with other: ChangeID) -> ChangeID {
+        if other.hasClocks() == false {
+            return self
+        }
+        let lamport = other.lamport > self.lamport ? other.lamport + 1 : self.lamport + 1
+
+        var vector = self.versionVector.deepcopy()
+        vector.set(actorID: self.actor, lamport: lamport)
+
+        return ChangeID(clientSeq: self.clientSeq,
+                        lamport: lamport,
+                        actor: self.actor,
+                        versionVector: vector)
+    }
+
+    /**
      * `setClocks` sets the given clocks to this ID. This is used when the snapshot
      * is given from the server.
      */

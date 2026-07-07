@@ -397,6 +397,11 @@ public class Client {
                 doc.setSchemaRules(Converter.fromSchemaRules(schemaRules))
             }
 
+            // Record the opt-out decision before applying the attach response so the
+            // first applyChangePack already routes remote changes through the
+            // lamport-only sync path.
+            doc.setDisableGC(disableGC)
+
             let pack = try Converter.fromChangePack(message.changePack)
             try doc.applyChangePack(pack)
 
