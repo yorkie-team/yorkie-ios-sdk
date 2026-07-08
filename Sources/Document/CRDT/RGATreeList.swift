@@ -237,6 +237,22 @@ class RGATreeList {
         self.elementMapByCreatedAt = [:]
     }
 
+    deinit {
+        // ARC cannot collect the intra-node reference cycles on its own: the
+        // doubly-linked list (`previous`/`next`) and each node's `indexNode`
+        // (which strongly holds the node back via `TreeListNode.value`) are all
+        // strong. Walk the list once at teardown and clear these so the whole
+        // node graph deallocates with the list rather than leaking.
+        var node: RGATreeListNode? = self.dummyHead
+        while let current = node {
+            let next = current.next
+            current.previous = nil
+            current.next = nil
+            current.indexNode = nil
+            node = next
+        }
+    }
+
     // MARK: Length
 
     /// The number of live (non-removed) elements in this list.

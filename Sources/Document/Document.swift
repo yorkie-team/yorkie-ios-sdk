@@ -670,9 +670,10 @@ public class Document: Attachable {
     }
 
     /**
-     * `setDisableGC` records whether this document participates in GC. The
-     * client calls this on attach so subsequent `applyChanges` runs use the
-     * lamport-only sync path and GC is skipped.
+     * `setDisableGC` records whether this document should use the lamport-only
+     * sync path in `applyChanges`. The client calls this on attach. This is
+     * distinct from `optionDisableGC`, which independently gates local
+     * `garbageCollect` — setting this flag does NOT disable garbage collection.
      */
     func setDisableGC(_ disableGC: Bool) {
         self.disableGC = disableGC
