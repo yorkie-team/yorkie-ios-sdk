@@ -113,14 +113,17 @@ struct RemoveOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
+        // Compute the sub-path (the index, for arrays) BEFORE deleting: once the
+        // element is tombstoned, `subPath` -> `TreeList.indexOf` returns -1 for the
+        // now-removed node. Mirrors yorkie-js-sdk `RemoveOperation.execute`, which
+        // reads `subPathOf` before `container.delete`.
+        let key = try object.subPath(createdAt: self.createdAt)
+        let index = Int(key)
+
         let element = try object.delete(createdAt: self.createdAt, executedAt: self.executedAt)
         root.registerRemovedElement(element)
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)
-
-        let key = try object.subPath(createdAt: self.createdAt)
-
-        let index = Int(key)
 
         return [parent is CRDTArray ? RemoveOpInfo(path: path, key: nil, index: index) : RemoveOpInfo(path: path, key: key, index: nil)]
     }

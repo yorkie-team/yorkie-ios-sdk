@@ -172,4 +172,102 @@ final class DisableGCIntegrationTests: XCTestCase {
         let msg = d2.getRoot().message as? String
         XCTAssertEqual(msg, "hello")
     }
+
+    // Ports (v0.7.11 #1270): "Opt-out clients keep per-Change VV at size 1 under multi-actor fanout"
+    //
+    // Regression for the bug where each opt-out client's Change.ID.versionVector accumulated
+    // O(num_actors) entries because applyChanges -> syncClocks merged every remote actor. After
+    // the syncLamport fix the per-Change VV must stay at size 1.
+    @MainActor
+    func test_optout_clients_keep_per_change_vv_at_size_1_under_multi_actor_fanout() async throws {
+        // given
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let c1 = Client(rpcAddress)
+        let c2 = Client(rpcAddress)
+        let c3 = Client(rpcAddress)
+        try await c1.activate()
+        try await c2.activate()
+        try await c3.activate()
+        self.addTeardownBlock {
+            try? await c1.deactivate()
+            try? await c2.deactivate()
+            try? await c3.deactivate()
+        }
+
+        let d1 = Document(key: docKey)
+        let d2 = Document(key: docKey)
+        let d3 = Document(key: docKey)
+        try await c1.attach(d1, [:], .manual, disableGC: true)
+        try await c2.attach(d2, [:], .manual, disableGC: true)
+        try await c3.attach(d3, [:], .manual, disableGC: true)
+        self.addTeardownBlock {
+            try? await c1.detach(d1)
+            try? await c2.detach(d2)
+            try? await c3.detach(d3)
+        }
+
+        try d1.update { root, _ in
+            root.counter = JSONCounter(value: Int64(0))
+        }
+        try await c1.sync()
+        try await c2.sync()
+        try await c3.sync()
+
+        // when — every client increments independently for three rounds
+        for _ in 0 ..< 3 {
+            try d1.update { root, _ in (root.counter as? JSONCounter<Int64>)?.increase(value: 1) }
+            try d2.update { root, _ in (root.counter as? JSONCounter<Int64>)?.increase(value: 1) }
+            try d3.update { root, _ in (root.counter as? JSONCounter<Int64>)?.increase(value: 1) }
+            try await c1.sync()
+            try await c2.sync()
+            try await c3.sync()
+        }
+        // Drain remaining pushed changes so every client sees them.
+        try await c1.sync()
+        try await c2.sync()
+        try await c3.sync()
+        try await c1.sync()
+
+        // then — all converge to 9 ...
+        XCTAssertEqual((d1.getRoot().counter as? JSONCounter<Int64>)?.value, 9)
+        XCTAssertEqual((d2.getRoot().counter as? JSONCounter<Int64>)?.value, 9)
+        XCTAssertEqual((d3.getRoot().counter as? JSONCounter<Int64>)?.value, 9)
+
+        // ... and every opt-out doc's per-Change VV stays at size 1.
+        for (idx, doc) in [d1, d2, d3].enumerated() {
+            XCTAssertEqual(doc.getVersionVector().size(), 1, "opt-out doc[\(idx)] versionVector must stay at size 1")
+        }
+    }
+
+    // Attaching with `disableGC: true` selects the lamport-only sync path but must NOT disable
+    // local garbage collection when the document was constructed with GC enabled — mirroring the
+    // JS split between `opts.disableGC` (gates GC) and the attach-time `disableGC` (gates sync).
+    @MainActor
+    func test_disableGC_attach_does_not_disable_local_garbage_collection() async throws {
+        // given — a normally constructed document (GC enabled) attached with disableGC = true
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let client = Client(rpcAddress)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let doc = Document(key: docKey)
+        try await client.attach(doc, [:], .manual, disableGC: true)
+        self.addTeardownBlock { try? await client.detach(doc) }
+
+        // when — create then remove an element, producing tombstones
+        try doc.update { root, _ in
+            root.point = ["x": Int64(0), "y": Int64(0)]
+        }
+        try await client.sync()
+        try doc.update { root, _ in
+            root.remove(key: "point")
+        }
+        try await client.sync()
+
+        XCTAssertEqual(doc.getGarbageLength(), 3, "point, x, y are pending purge")
+
+        // then — GC still runs (returns > 0) despite the disableGC attach option
+        let purged = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client.id]))
+        XCTAssertEqual(purged, 3, "local GC must still purge for a GC-enabled document")
+    }
 }

@@ -50,8 +50,19 @@ final class RGATreeListElementEntry {
 ///
 /// Each node represents a *position slot* in the list, not necessarily a live element.
 /// A *dead position node* has `elementEntry == nil` and its `positionRemovedAt` is set;
-/// it contributes zero to the splay-tree length and is a GC target.
-final class RGATreeListNode: SplayNode<CRDTElement> {
+/// it contributes zero to the index-tree weight and is a GC target.
+final class RGATreeListNode {
+    /// The element value carried by this position slot.
+    ///
+    /// Dead position nodes carry a `null` placeholder; callers must check
+    /// `elementEntry == nil` to detect them rather than inspecting `value`.
+    let value: CRDTElement
+
+    /// The order-statistic index node backing this position in ``RGATreeList``'s
+    /// `nodeMapByIndex`. Created once at construction and cleared when the
+    /// position is physically purged (see ``RGATreeList``).
+    var indexNode: TreeListNode<RGATreeListNode>!
+
     fileprivate var previous: RGATreeListNode?
     fileprivate var next: RGATreeListNode?
 
@@ -73,8 +84,11 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
 
     /// Creates a node wrapping a live element.
     fileprivate init(value: CRDTElement, positionCreatedAt: TimeTicket) {
+        self.value = value
         self.positionCreatedAt = positionCreatedAt
-        super.init(value)
+        // `indexNode` is implicitly nil here, so `self` is fully initialised and
+        // may be captured by its backing index node.
+        self.indexNode = TreeListNode(self)
     }
 
     /// Creates the sentinel dummy-head node.
@@ -84,17 +98,6 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
         let node = RGATreeListNode(value: dummyValue, positionCreatedAt: .initial)
         // Dummy head has no entry; it is never a GC target.
         return node
-    }
-
-    // MARK: SplayNode overrides
-
-    /// Zero for removed elements *and* for dead position nodes.
-    override var length: Int {
-        if self.elementEntry == nil {
-            // Dead position node — contributes no length.
-            return 0
-        }
-        return self.value.isRemoved ? 0 : 1
     }
 
     // MARK: Internal helpers
@@ -111,9 +114,24 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
         return self.positionCreatedAt
     }
 
-    /// Returns `true` when the underlying element has been removed.
-    fileprivate var isRemoved: Bool {
-        return self.value.isRemoved
+    /// Returns `true` for a dead position node (no element) *or* when the
+    /// underlying element has been removed.
+    ///
+    /// This is the weight predicate for ``TreeList``: such nodes contribute
+    /// zero to the live (logical) index. It mirrors the JS `RGATreeListNode.isRemoved`.
+    var isRemoved: Bool {
+        guard let entry = self.elementEntry else {
+            return true
+        }
+        return entry.element.isRemoved
+    }
+
+    /// A debug representation of the node's element, used by ``TreeList/toTestString``.
+    var toTestString: String {
+        guard let entry = self.elementEntry else {
+            return ""
+        }
+        return entry.element.toJSON()
     }
 
     /// Removes the underlying element value at the given time.
@@ -163,6 +181,10 @@ final class RGATreeListNode: SplayNode<CRDTElement> {
     }
 }
 
+// MARK: TreeListValue conformance
+
+extension RGATreeListNode: TreeListValue {}
+
 // MARK: GCChild conformance
 
 extension RGATreeListNode: GCChild {
@@ -199,7 +221,7 @@ extension RGATreeListNode: GCChild {
 class RGATreeList {
     private let dummyHead: RGATreeListNode
     private var last: RGATreeListNode
-    private let nodeMapByIndex: SplayTree<CRDTElement>
+    private let nodeMapByIndex: TreeList<RGATreeListNode>
 
     /// Maps a position node's `positionCreatedAt` to the node itself.
     private var nodeMapByPositionCreatedAt: [TimeTicket: RGATreeListNode]
@@ -210,10 +232,25 @@ class RGATreeList {
     init() {
         self.dummyHead = RGATreeListNode.createDummy()
         self.last = self.dummyHead
-        self.nodeMapByIndex = SplayTree()
-        self.nodeMapByIndex.insert(self.dummyHead)
+        self.nodeMapByIndex = TreeList(self.dummyHead.indexNode)
         self.nodeMapByPositionCreatedAt = [self.dummyHead.positionCreatedAt: self.dummyHead]
         self.elementMapByCreatedAt = [:]
+    }
+
+    deinit {
+        // ARC cannot collect the intra-node reference cycles on its own: the
+        // doubly-linked list (`previous`/`next`) and each node's `indexNode`
+        // (which strongly holds the node back via `TreeListNode.value`) are all
+        // strong. Walk the list once at teardown and clear these so the whole
+        // node graph deallocates with the list rather than leaking.
+        var node: RGATreeListNode? = self.dummyHead
+        while let current = node {
+            let next = current.next
+            current.previous = nil
+            current.next = nil
+            current.indexNode = nil
+            node = next
+        }
     }
 
     // MARK: Length
@@ -237,23 +274,25 @@ class RGATreeList {
         return current
     }
 
-    /// Removes `node` from the splay tree and position map, updating `last` if needed.
+    /// Removes `node` from the index tree and position map, updating `last` if needed.
     private func release(node: RGATreeListNode) {
         if self.last === node, let prev = node.previous {
             self.last = prev
         }
 
         node.release()
-        self.nodeMapByIndex.delete(node)
+        self.nodeMapByIndex.delete(node.indexNode)
+        // Break the node <-> index-node cycle so the purged position deallocates.
+        node.indexNode = nil
         self.nodeMapByPositionCreatedAt.removeValue(forKey: node.positionCreatedAt)
     }
 
     // MARK: Core insertion (private)
 
-    /// Inserts a node into the linked list and splay tree after the anchor.
+    /// Inserts a node into the linked list and index tree after the anchor.
     ///
     /// The `node` must have its `elementEntry` set before this call if it is a live node,
-    /// so that `SplayTree.updateWeight` sees the correct `length` during insertion.
+    /// so that ``TreeList`` sees the correct `isRemoved` weight during insertion.
     private func insertNodeIntoStructures(node: RGATreeListNode, after anchor: RGATreeListNode) {
         // Link into doubly-linked list.
         let anchorNext = anchor.next
@@ -266,7 +305,7 @@ class RGATreeList {
             self.last = node
         }
 
-        self.nodeMapByIndex.insert(previousNode: anchor, newNode: node)
+        self.nodeMapByIndex.insertAfter(anchor.indexNode, node.indexNode)
         self.nodeMapByPositionCreatedAt[node.positionCreatedAt] = node
     }
 
@@ -274,7 +313,7 @@ class RGATreeList {
     ///
     /// This is used by `moveAfter` for both the winning and losing LWW paths to create a
     /// new position slot. The node is inserted using RGA ordering (skipping concurrent nodes
-    /// with later timestamps) and added to the splay tree and position map.
+    /// with later timestamps) and added to the index tree and position map.
     ///
     /// - Parameters:
     ///   - prevPositionCreatedAt: The `positionCreatedAt` of the node to insert after.
@@ -286,7 +325,7 @@ class RGATreeList {
             throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(prevPositionCreatedAt)")
         }
         let anchor = self.findNextBeforeExecutedAt(node: prevNode, executedAt: executedAt)
-        // Use a null placeholder as the SplayNode value — callers must check `elementEntry == nil`
+        // Use a null placeholder as the node value — callers must check `elementEntry == nil`
         // to detect bare position nodes rather than accessing `.value` directly.
         let placeholder = Primitive(value: .null, createdAt: executedAt)
         let node = RGATreeListNode(value: placeholder, positionCreatedAt: executedAt)
@@ -326,8 +365,8 @@ class RGATreeList {
         let anchor = self.findNextBeforeExecutedAt(node: anchorNode, executedAt: et)
         let newNode = RGATreeListNode(value: value, positionCreatedAt: value.createdAt)
 
-        // Create and attach the entry BEFORE splay-tree insertion so that `newNode.length`
-        // returns 1 when `updateWeight` is called during `insertNodeIntoStructures`.
+        // Create and attach the entry BEFORE index-tree insertion so that `newNode.isRemoved`
+        // is false (weight 1) when the node is inserted in `insertNodeIntoStructures`.
         let entry = RGATreeListElementEntry(element: value, positionNode: newNode)
         newNode.setElementEntry(entry)
         self.elementMapByCreatedAt[value.createdAt] = entry
@@ -351,7 +390,7 @@ class RGATreeList {
     /// - **LWW winner**: Creates a new position node at `prevCreatedAt`, wires up the entry,
     ///   kills the old position node (sets `positionRemovedAt`), and returns it for GC.
     /// - **LWW loser**: Creates a bare dead position node at `prevCreatedAt` (no entry,
-    ///   `positionRemovedAt = executedAt`), splays it, and returns it for GC.
+    ///   `positionRemovedAt = executedAt`), refreshes its index weight, and returns it for GC.
     ///   Returns `nil` only when the node was already processed (idempotency check).
     ///
     /// No cascade re-linking is performed — that is not in the JS specification.
@@ -382,7 +421,7 @@ class RGATreeList {
             // Still create a bare dead position node so GC pairs are complete.
             let deadPosNode = try self.insertPositionAfter(prevPositionCreatedAt: prevCreatedAt, executedAt: executedAt)
             deadPosNode.markDead(at: executedAt)
-            self.nodeMapByIndex.splayNode(deadPosNode)
+            self.nodeMapByIndex.updateWeight(deadPosNode.indexNode)
             return deadPosNode
         }
 
@@ -396,7 +435,7 @@ class RGATreeList {
         let anchor = self.findNextBeforeExecutedAt(node: prevNode, executedAt: executedAt)
         let newPosNode = RGATreeListNode(value: entry.element, positionCreatedAt: executedAt)
 
-        // Wire the entry BEFORE splay-tree insertion so `newPosNode.length == 1`.
+        // Wire the entry BEFORE index-tree insertion so `newPosNode.isRemoved` is false (weight 1).
         newPosNode.setElementEntry(entry)
         entry.positionNode = newPosNode
         entry.posMovedAt = executedAt
@@ -404,14 +443,14 @@ class RGATreeList {
 
         self.insertNodeIntoStructures(node: newPosNode, after: anchor)
 
-        // Kill the old position node. Keep it in the splay tree with length 0
-        // (re-splay to refresh weights) rather than deleting it — JS keeps dead
-        // position nodes splayed until GC purge, and a subsequent insert/append
-        // may still use this node as its anchor (e.g. when it is `last` after a
+        // Kill the old position node. Keep it in the index tree with weight 0
+        // (refresh weights) rather than deleting it — JS keeps dead position
+        // nodes in the tree until GC purge, and a subsequent insert/append may
+        // still use this node as its anchor (e.g. when it is `last` after a
         // tail move). Deleting it here would leave that anchor unresolvable in
         // the index tree, so the appended element would never be indexed.
         oldPosNode.markDead(at: executedAt)
-        self.nodeMapByIndex.splayNode(oldPosNode)
+        self.nodeMapByIndex.updateWeight(oldPosNode.indexNode)
         // NOTE: do NOT reassign `last` here. JS leaves `last` pointing at the
         // now-dead slot when the moved element was the tail, so that subsequent
         // ops emit the same position-identity anchor as JS/Go peers. The
@@ -427,7 +466,7 @@ class RGATreeList {
     ///
     /// Called by `fromArray` when decoding a node that has `positionCreatedAt` +
     /// `positionRemovedAt` but **no** element (the JS wire format for dead nodes).
-    /// Inserts the node into the splay tree and updates `last`, exactly as JS `addDeadPosition` does.
+    /// Inserts the node into the index tree and updates `last`, exactly as JS `addDeadPosition` does.
     func addDeadPosition(
         positionCreatedAt: TimeTicket,
         positionRemovedAt: TimeTicket
@@ -442,8 +481,8 @@ class RGATreeList {
         node.previous = prevNode
         // Update last (mirrors JS: `this.last = node`).
         self.last = node
-        // Insert into splay tree (mirrors JS: `this.nodeMapByIndex.insertAfter(prevNode, node)`).
-        self.nodeMapByIndex.insert(previousNode: prevNode, newNode: node)
+        // Insert into index tree (mirrors JS: `this.nodeMapByIndex.insertAfter(prevNode.indexNode, node.indexNode)`).
+        self.nodeMapByIndex.insertAfter(prevNode.indexNode, node.indexNode)
         self.nodeMapByPositionCreatedAt[positionCreatedAt] = node
     }
 
@@ -462,7 +501,7 @@ class RGATreeList {
         let anchor = self.findNextBeforeExecutedAt(node: prevNode, executedAt: positionCreatedAt)
         let node = RGATreeListNode(value: value, positionCreatedAt: positionCreatedAt)
 
-        // Set entry BEFORE splay-tree insertion so `node.length == 1`.
+        // Set entry BEFORE index-tree insertion so `node.isRemoved` is false (weight 1).
         let entry = RGATreeListElementEntry(element: value, positionNode: node)
         entry.posMovedAt = positionMovedAt
         node.setElementEntry(entry)
@@ -498,7 +537,7 @@ class RGATreeList {
         guard let entry = self.elementMapByCreatedAt[createdAt] else {
             throw YorkieError(code: .errInvalidArgument, message: "can't find the given node: \(createdAt)")
         }
-        return String(self.nodeMapByIndex.indexOf(entry.positionNode))
+        return String(self.nodeMapByIndex.indexOf(entry.positionNode.indexNode))
     }
 
     // MARK: Deletion
@@ -512,7 +551,7 @@ class RGATreeList {
         let node = entry.positionNode
         let alreadyRemoved = node.isRemoved
         if node.remove(executedAt), !alreadyRemoved {
-            self.nodeMapByIndex.splayNode(node)
+            self.nodeMapByIndex.updateWeight(node.indexNode)
         }
         return node.value
     }
@@ -522,7 +561,7 @@ class RGATreeList {
     func deleteByIndex(index: Int, executedAt: TimeTicket) throws -> CRDTElement {
         let node = try self.getNode(index: index)
         if node.remove(executedAt) {
-            self.nodeMapByIndex.splayNode(node)
+            self.nodeMapByIndex.updateWeight(node.indexNode)
         }
         return node.value
     }
@@ -544,12 +583,13 @@ class RGATreeList {
         guard let node = self.nodeMapByPositionCreatedAt[positionCreatedAt] else {
             return
         }
-        // Dead nodes may or may not be in nodeMapByIndex; use delete which is safe either way.
         if self.last === node, let prev = node.previous {
             self.last = prev
         }
         node.release()
-        self.nodeMapByIndex.delete(node)
+        self.nodeMapByIndex.delete(node.indexNode)
+        // Break the node <-> index-node cycle so the purged position deallocates.
+        node.indexNode = nil
         self.nodeMapByPositionCreatedAt.removeValue(forKey: positionCreatedAt)
     }
 
@@ -575,16 +615,12 @@ class RGATreeList {
 
     // MARK: Node access by index
 
-    /// Returns the position node at `index` in the splay tree.
+    /// Returns the position node at `index` in the index tree.
     func getNode(index: Int) throws -> RGATreeListNode {
         guard index < self.length else {
             throw YorkieError(code: .errInvalidArgument, message: "length is smaller than or equal to: \(index)")
         }
-        let node = try self.nodeMapByIndex.findForArray(index)
-        guard let rgaNode = node as? RGATreeListNode else {
-            throw YorkieError(code: .errInvalidArgument, message: "failed to find the given index: \(index)")
-        }
-        return rgaNode
+        return try self.nodeMapByIndex.find(index).getValue()
     }
 
     // MARK: Previous / last
@@ -608,9 +644,15 @@ class RGATreeList {
         return previousNode?.positionCreatedAt ?? self.dummyHead.positionCreatedAt
     }
 
-    /// Returns the last element.
+    /// Returns the last element, skipping bare position nodes (created by
+    /// `moveAfter`/`addDeadPosition`) that have no element.
     func getLast() -> CRDTElement {
-        return self.last.value
+        var node = self.last
+        while node.elementEntry == nil, node !== self.dummyHead {
+            guard let prev = node.previous else { break }
+            node = prev
+        }
+        return node.value
     }
 
     /// Returns the POSITION `createdAt` of the last node.
