@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.12] - 2026-07-09
+
+- Add disablePresence option for presence-free Documents in https://github.com/yorkie-team/yorkie-ios-sdk/pull/266
+
 ## [v0.7.11] - 2026-07-07
 
 - Introduce treelist to optimize random access in Array in https://github.com/yorkie-team/yorkie-ios-sdk/pull/265
