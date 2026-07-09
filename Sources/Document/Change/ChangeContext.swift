@@ -109,6 +109,26 @@ class ChangeContext {
     }
 
     /**
+     * `hasPresenceChange` returns whether a presence change was registered during
+     * this context. Used by `Document.update` to detect a presence emit when the
+     * document was attached with `disablePresence: true`.
+     */
+    func hasPresenceChange() -> Bool {
+        return self.presenceChange != nil
+    }
+
+    /**
+     * `dropPresenceChange` clears any presence change registered during this
+     * context. Used by `Document.update` to silently drop presence emits on
+     * documents attached with `disablePresence: true`. After dropping, the change
+     * carries only its operations (if any); when the context was presence-only the
+     * resulting `hasChange` returns false and no `Change` is enqueued.
+     */
+    func dropPresenceChange() {
+        self.presenceChange = nil
+    }
+
+    /**
      * `isPresenceOnlyChange` returns whether this context is only for presence
      * change or not.
      */

@@ -339,7 +339,8 @@ public class Client {
                        _ schema: String = "",
                        initialRoot: [String: JSONValuable?]? = nil,
                        documentPollInterval: TimeInterval? = nil,
-                       disableGC: Bool = false) async throws -> Document
+                       disableGC: Bool = false,
+                       disablePresence: Bool? = nil) async throws -> Document
     {
         // 01. Check if the client is ready to attach documents.
         guard self.isActive else {
@@ -366,8 +367,18 @@ public class Client {
         }()
 
         doc.setActor(clientID)
-        try doc.update { _, presence in
-            presence.set(initialPresence)
+
+        // Resolve the effective presence-disabled state at attach time. The
+        // explicit option wins; absent that, the Document's seeded value (from
+        // construction or a prior attach response on this instance) is used. The
+        // server is authoritative — the attach response overwrites this with the
+        // fixated value — so this purely controls whether to push the initial
+        // presence and what to send on the request.
+        let resolvedDisablePresence = disablePresence ?? doc.isPresenceDisabled()
+        if !resolvedDisablePresence {
+            try doc.update { _, presence in
+                presence.set(initialPresence)
+            }
         }
 
         var attachRequest = AttachDocumentRequest()
@@ -375,6 +386,7 @@ public class Client {
         attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
         attachRequest.schemaKey = schema
         attachRequest.disableGc = disableGC
+        attachRequest.disablePresence = resolvedDisablePresence
         // 02. Attach the document to the client.
         do {
             let docKey = doc.getKey()
@@ -401,6 +413,9 @@ public class Client {
             // first applyChangePack already routes remote changes through the
             // lamport-only sync path.
             doc.setDisableGC(disableGC)
+            // Align the document's presence gating to the server-fixated value
+            // before applying the pack, so any subsequent update sees it settled.
+            doc.setDisablePresence(message.disablePresence)
 
             let pack = try Converter.fromChangePack(message.changePack)
             try doc.applyChangePack(pack)
@@ -417,7 +432,8 @@ public class Client {
                                                                     changeEventReceived: false,
                                                                     pollInterval: pollInterval,
                                                                     pollIntervalPinned: pollIntervalPinned,
-                                                                    disableGC: disableGC)
+                                                                    disableGC: disableGC,
+                                                                    disablePresence: message.disablePresence)
 
             // Polling mode opens no watch stream; the timer-driven sync loop drives pushpull
             // via needRealtimeSync. Skip waitForInitialization too — no stream to wait for.
