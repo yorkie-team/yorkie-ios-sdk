@@ -36,9 +36,22 @@ public struct DocumentOptions {
      */
     var enableDevtools: Bool
 
-    public init(disableGC: Bool, enableDevtools: Bool = false) {
+    /**
+     * `disablePresence` declares that this document does not use presence.
+     * When true, ``Document/update(_:_:)``'s `presence.set` calls are silently
+     * dropped and the server strips any presence that nonetheless reaches it.
+     * The option is server-fixated on first attach — once a document is created
+     * presenceless, subsequent attaches observe `true` from the attach response
+     * regardless of the local option value. Use for counter-only or other
+     * presence-free workloads where the per-client presence map would otherwise
+     * leak memory in long-lived documents.
+     */
+    var disablePresence: Bool
+
+    public init(disableGC: Bool, enableDevtools: Bool = false, disablePresence: Bool = false) {
         self.disableGC = disableGC
         self.enableDevtools = enableDevtools
+        self.disablePresence = disablePresence
     }
 }
 
@@ -94,6 +107,14 @@ public class Document: Attachable {
     /// Starts `false` and is set authoritatively by the client on attach via
     /// ``setDisableGC(_:)`` — mirrors the JS `disableGC` field (distinct from `opts.disableGC`).
     private var disableGC: Bool = false
+    /// Whether this document was attached presenceless. When true,
+    /// ``update(_:_:)``'s presence changes are silently dropped. Seeded from
+    /// ``DocumentOptions`` on construction and overwritten by the server-fixated
+    /// value in the attach response via ``setDisablePresence(_:)``.
+    private var disablePresence: Bool = false
+    /// Ensures the presence-drop warning is emitted at most once per document,
+    /// so long-lived presence-free documents do not spam the log.
+    private var presenceDropWarned: Bool = false
     private let enableDevtools: Bool
 
     /// Records replayable events into a ring buffer when `enableDevtools` is set.
@@ -140,6 +161,10 @@ public class Document: Attachable {
     public nonisolated init(key: DocKey, opts: DocumentOptions) {
         self.key = key
         self.optionDisableGC = opts.disableGC
+        // Seed from the local option so the gate already works before the first
+        // attach response lands (e.g. a document constructed with
+        // `disablePresence: true` that calls `update` before attaching).
+        self.disablePresence = opts.disablePresence
         self.enableDevtools = opts.enableDevtools
         self.maxSizeLimit = 0
     }
@@ -184,6 +209,22 @@ public class Document: Attachable {
             throw error
         }
         self.isUpdating = false
+
+        // Presence-free documents (disablePresence) silently drop any presence
+        // change recorded by the updater: the server never stores or emits
+        // presence for them, so dropping locally avoids a redundant presence-only
+        // LocalChange and history entry. The warning fires at most once per
+        // document instance. Only the context change is dropped — the clone's
+        // presence seed is still written back below (mirroring yorkie-js-sdk,
+        // which mutates the clone in place and only clears the context change),
+        // so a later `disablePresence` flip diffs against the correct seed.
+        if self.disablePresence, context.hasPresenceChange() {
+            context.dropPresenceChange()
+            if !self.presenceDropWarned {
+                self.presenceDropWarned = true
+                Logger.warning("[Document] \"\(self.key)\" was attached with disablePresence=true; presence updates from Document.update are silently dropped.")
+            }
+        }
 
         self.clone?.presences[actorID] = presence.presence
 
@@ -677,6 +718,25 @@ public class Document: Attachable {
      */
     func setDisableGC(_ disableGC: Bool) {
         self.disableGC = disableGC
+    }
+
+    /**
+     * `setDisablePresence` records the server-fixated presence-disabled state of
+     * this document. The client calls this on attach (before `applyChangePack`)
+     * so any subsequent ``update(_:_:)`` invocation sees the gating state already
+     * settled. Flipping the flag at runtime is supported: the next `update`
+     * honours the new value.
+     */
+    func setDisablePresence(_ disablePresence: Bool) {
+        self.disablePresence = disablePresence
+    }
+
+    /**
+     * `isPresenceDisabled` returns whether this document was attached
+     * presenceless (see ``DocumentOptions/disablePresence``).
+     */
+    func isPresenceDisabled() -> Bool {
+        return self.disablePresence
     }
 
     /**

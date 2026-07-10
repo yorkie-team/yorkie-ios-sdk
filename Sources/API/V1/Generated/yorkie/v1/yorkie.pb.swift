@@ -114,6 +114,11 @@ public struct Yorkie_V1_AttachDocumentRequest: Sendable {
   /// workloads; misuse leads to undefined GC behavior on this client.
   public var disableGc: Bool = false
 
+  /// disable_presence declares that this document does not produce, consume,
+  /// or store presence. Honored on first attach only; subsequent attaches
+  /// observe the value persisted in the server-side document metadata.
+  public var disablePresence: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -140,6 +145,13 @@ public struct Yorkie_V1_AttachDocumentResponse: Sendable {
   public var maxSizePerDocument: Int32 = 0
 
   public var schemaRules: [Yorkie_V1_Rule] = []
+
+  /// disable_presence carries the server-fixated value of the document's
+  /// presence option (see AttachDocumentRequest.disable_presence). Clients
+  /// align their local gating state to this value rather than the requested
+  /// value, so an attach to an already-fixated document observes the
+  /// persisted decision.
+  public var disablePresence: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -972,7 +984,7 @@ extension Yorkie_V1_DeactivateClientResponse: SwiftProtobuf.Message, SwiftProtob
 
 extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AttachDocumentRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}change_pack\0\u{3}schema_key\0\u{3}disable_gc\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}change_pack\0\u{3}schema_key\0\u{3}disable_gc\0\u{3}disable_presence\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -984,6 +996,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.schemaKey) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.disableGc) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.disablePresence) }()
       default: break
       }
     }
@@ -1006,6 +1019,9 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if self.disableGc != false {
       try visitor.visitSingularBoolField(value: self.disableGc, fieldNumber: 4)
     }
+    if self.disablePresence != false {
+      try visitor.visitSingularBoolField(value: self.disablePresence, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1014,6 +1030,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs._changePack != rhs._changePack {return false}
     if lhs.schemaKey != rhs.schemaKey {return false}
     if lhs.disableGc != rhs.disableGc {return false}
+    if lhs.disablePresence != rhs.disablePresence {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1021,7 +1038,7 @@ extension Yorkie_V1_AttachDocumentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".AttachDocumentResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{3}change_pack\0\u{3}max_size_per_document\0\u{3}schema_rules\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_id\0\u{3}change_pack\0\u{3}max_size_per_document\0\u{3}schema_rules\0\u{3}disable_presence\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1033,6 +1050,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
       case 2: try { try decoder.decodeSingularMessageField(value: &self._changePack) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxSizePerDocument) }()
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.schemaRules) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.disablePresence) }()
       default: break
       }
     }
@@ -1055,6 +1073,9 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     if !self.schemaRules.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.schemaRules, fieldNumber: 4)
     }
+    if self.disablePresence != false {
+      try visitor.visitSingularBoolField(value: self.disablePresence, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1063,6 +1084,7 @@ extension Yorkie_V1_AttachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
     if lhs._changePack != rhs._changePack {return false}
     if lhs.maxSizePerDocument != rhs.maxSizePerDocument {return false}
     if lhs.schemaRules != rhs.schemaRules {return false}
+    if lhs.disablePresence != rhs.disablePresence {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

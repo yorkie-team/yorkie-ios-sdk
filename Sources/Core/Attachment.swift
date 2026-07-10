@@ -33,6 +33,11 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     /// matching wire field on every `PushPullChanges` so the server can skip minVV
     /// tracking and omit the response version vector. Documents only.
     var disableGC: Bool
+    /// Mirrors the server-fixated value returned by the attach response.
+    /// `pushPullChanges` does not read this — the `disable_presence` wire field is
+    /// request-only (set on the first attach, ignored thereafter on the server
+    /// side). Carried here for devtools / debugging visibility. Documents only.
+    var disablePresence: Bool
     var remoteWatchStream: YorkieServerStream?
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
@@ -47,7 +52,8 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         cancelled: Bool = false,
         pollInterval: TimeInterval = 0,
         pollIntervalPinned: Bool = false,
-        disableGC: Bool = false
+        disableGC: Bool = false,
+        disablePresence: Bool = false
     ) {
         self.resource = resource
         self.resourceID = resourceID
@@ -57,6 +63,7 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         self.pollInterval = pollInterval
         self.pollIntervalPinned = pollIntervalPinned
         self.disableGC = disableGC
+        self.disablePresence = disablePresence
         self.watchLoopReconnectTimer = watchLoopReconnectTimer
         self.isDisconnected = false
         self.cancelled = cancelled
