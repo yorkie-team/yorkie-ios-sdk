@@ -363,6 +363,8 @@ final class CRDTText: CRDTElement {
             }
         }
 
+        pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
+
         return (pairs, diff, changes, prevAttributes, attributesToRemove)
     }
 
@@ -448,6 +450,8 @@ final class CRDTText: CRDTElement {
                 }
             }
         }
+
+        pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
 
         return (pairs, diff, changes, prevAttributes)
     }
@@ -554,13 +558,24 @@ extension CRDTText: CRDTGCPairContainable {
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
+        // NOTE: Only called when a root is built from a snapshot, where
+        // docSize.live counted visible nodes only. Tombstoned nodes (and the
+        // attribute tombstones inside them) were never part of live, so their
+        // pairs carry `gcOnlySize`. Attribute tombstones of visible nodes ARE
+        // counted in live (getDataSize does not skip them), so their pairs use
+        // the normal live→gc accounting.
         for node in self.rgaTreeSplit {
-            if node.removedAt != nil {
-                pairs.append(GCPair(parent: self.rgaTreeSplit, child: node))
+            let isRemoved = node.removedAt != nil
+            if isRemoved {
+                pairs.append(GCPair(parent: self.rgaTreeSplit, child: node, gcOnlySize: node.getDataSize()))
             }
 
             for pair in node.value.getGCPairs() {
-                pairs.append(pair)
+                if isRemoved {
+                    pairs.append(GCPair(parent: pair.parent, child: pair.child, gcOnlySize: pair.child?.getDataSize()))
+                } else {
+                    pairs.append(pair)
+                }
             }
         }
 

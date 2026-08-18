@@ -494,6 +494,18 @@ final class CRDTTreeNode: IndexTreeNode {
             }
             self.insNextID = split.id
             tree.registerNode(split)
+
+            // NOTE: A piece split off an already-tombstoned node inherits
+            // `removedAt` without going through `remove()`, so no GC pair is
+            // created for it in the normal deletion path. Register it here so
+            // it can be purged; otherwise it stays in the tree forever.
+            // The piece was never live, so its size goes straight to docSize.gc
+            // when the pair is registered; report a zero diff to the caller
+            // (which accounts diffs to docSize.live).
+            if split.removedAt != nil {
+                tree.registerPendingGCPair(split, diff)
+                return (split, DataSize(data: 0, meta: 0))
+            }
         }
 
         return (split, diff)
@@ -643,9 +655,12 @@ final class CRDTTreeNode: IndexTreeNode {
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
 
+        // NOTE: Only called when a root is built from a snapshot. Removed
+        // attribute nodes are skipped by `getDataSize`, so they were never
+        // counted into docSize.live — hence `gcOnlySize`.
         if let attrs = self.attrs {
             for node in attrs where node.removedAt != nil {
-                pairs.append(GCPair(parent: self, child: node))
+                pairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
             }
         }
 
@@ -724,6 +739,15 @@ class CRDTTree: CRDTElement {
 
     private(set) var indexTree: IndexTree<CRDTTreeNode>
     private var nodeMapByID: LLRBTree<CRDTTreeNodeID, CRDTTreeNode>
+
+    /**
+     * `pendingGCPairs` buffers GC pairs for nodes that were created
+     * already-tombstoned by splitting a removed node. Such pieces inherit
+     * `removedAt` without ever passing through `remove()`, so they would
+     * otherwise never be registered for GC. `edit` and `style` drain this
+     * buffer into their returned GC pairs.
+     */
+    private var pendingGCPairs: [GCPair] = []
 
     init(root: CRDTTreeNode, createdAt: TimeTicket) {
         self.createdAt = createdAt
@@ -860,6 +884,27 @@ class CRDTTree: CRDTElement {
      */
     func registerNode(_ node: CRDTTreeNode) {
         self.nodeMapByID.put(node.id, node)
+    }
+
+    /**
+     * `registerPendingGCPair` buffers a GC pair for a node that was born
+     * tombstoned (split off an already-removed node). The pair is picked up
+     * by the next `edit` or `style` call via `drainPendingGCPairs`. `size`
+     * is the net-new size created by the split; it is accounted to
+     * docSize.gc at registration since the node was never live.
+     */
+    func registerPendingGCPair(_ node: CRDTTreeNode, _ size: DataSize) {
+        self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: size))
+    }
+
+    /**
+     * `drainPendingGCPairs` returns the buffered GC pairs and clears the
+     * buffer.
+     */
+    func drainPendingGCPairs() -> [GCPair] {
+        let pairs = self.pendingGCPairs
+        self.pendingGCPairs = []
+        return pairs
     }
 
     /**
@@ -1076,6 +1121,8 @@ class CRDTTree: CRDTElement {
             }
         }
 
+        pairs.append(contentsOf: self.drainPendingGCPairs())
+
         return (pairs, changes, diff, prevAttributes, newAttrKeys)
     }
 
@@ -1200,6 +1247,8 @@ class CRDTTree: CRDTElement {
                 }
             }
         }
+
+        pairs.append(contentsOf: self.drainPendingGCPairs())
 
         return (pairs, changes, diff, prevAttributes)
     }
@@ -1473,6 +1522,8 @@ class CRDTTree: CRDTElement {
                 }
             }
         }
+        pairs.append(contentsOf: self.drainPendingGCPairs())
+
         return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned)
     }
 
@@ -2008,9 +2059,14 @@ extension CRDTTree: CRDTGCPairContainable {
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
-        self.indexTree.traverse { node, _ in
+        // NOTE: `traverse` only visits visible children, which never includes
+        // removed nodes. `traverseAll` is required to register tombstones
+        // (including pieces split off a tombstoned node) after snapshot load.
+        // These pairs carry `gcOnlySize` because `getDataSize` of the freshly
+        // built root only counted visible nodes into docSize.live.
+        self.indexTree.traverseAll { node, _ in
             if node.removedAt != nil {
-                pairs.append(GCPair(parent: self, child: node))
+                pairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
             }
 
             for pair in node.getGCPairs() {

@@ -205,6 +205,16 @@ class CRDTRoot {
 
         self.gcPairMap[childID] = pair
 
+        if let gcOnlySize = pair.gcOnlySize {
+            // NOTE: The child's size was never counted in docSize.live (it was
+            // born removed, or it was registered by the snapshot-load scan where
+            // live only counts visible nodes), so there is nothing to move out
+            // of live. Only the given size is added to gc; purge subtracts the
+            // child's size from gc as usual.
+            self.docSize.gc.addDataSizes(others: gcOnlySize)
+            return
+        }
+
         guard let size = pair.child?.getDataSize() else {
             Logger.critical("registerGCPair: missing child size for \(String(describing: pair.child))")
             return

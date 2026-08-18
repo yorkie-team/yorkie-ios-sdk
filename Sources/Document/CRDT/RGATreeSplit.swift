@@ -468,6 +468,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     private var treeByIndex: SplayTree<T>
     private var treeByID: LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>>
 
+    /**
+     * `pendingGCPairs` buffers GC pairs for nodes that were created
+     * already-tombstoned by splitting a removed node. Such pieces inherit
+     * `removedAt` without ever passing through `remove()`, so they would
+     * otherwise never be registered for GC. Callers that split nodes
+     * (`edit`, `CRDTText.setStyle`, `CRDTText.removeStyle`) drain this
+     * buffer into their returned GC pairs.
+     */
+    private var pendingGCPairs: [GCPair] = []
+
     init() {
         self.head = RGATreeSplitNode(RGATreeSplitNodeID.initial)
         self.treeByIndex = SplayTree()
@@ -503,7 +513,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         // 02. delete between from and to
         let nodesToDelete = self.findBetween(fromRight, toRight)
-        var (changes, removedNodes) = try self.deleteNodes(
+        var (changes, removedNodes, alreadyRemovedIDs) = try self.deleteNodes(
             nodesToDelete,
             editedAt,
             versionVector
@@ -536,9 +546,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var pairs = [GCPair]()
         var removedValues = [T]()
         for removedNode in removedNodes {
-            pairs.append(GCPair(parent: self, child: removedNode))
+            // NOTE: Nodes that were already tombstoned keep their existing GC
+            // pair (the pair reads `removedAt` from the node at collection
+            // time); re-registering would toggle the pair off and leak the node.
+            if !alreadyRemovedIDs.contains(removedNode.toIDString) {
+                pairs.append(GCPair(parent: self, child: removedNode))
+            }
             removedValues.append(removedNode.value)
         }
+
+        pairs.append(contentsOf: self.drainPendingGCPairs())
 
         return (caretPos, pairs, diff, changes, removedValues)
     }
@@ -816,7 +833,29 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         diff.addDataSizes(others: node.getDataSize(), splitNode.getDataSize())
         diff.subDataSize(others: prvSize)
 
+        // NOTE: A piece split off an already-tombstoned node inherits
+        // `removedAt` without going through `remove()`, so no GC pair is
+        // created for it in the normal deletion path. Buffer one here so it
+        // can be purged; otherwise it stays in the list forever. The piece
+        // was never live, so the net-new size created by the split goes
+        // straight to docSize.gc when the pair is registered; report a zero
+        // diff to the caller (which accounts diffs to docSize.live).
+        if splitNode.isRemoved {
+            self.pendingGCPairs.append(GCPair(parent: self, child: splitNode, gcOnlySize: diff))
+            return (splitNode, DataSize(data: 0, meta: 0))
+        }
+
         return (splitNode, diff)
+    }
+
+    /**
+     * `drainPendingGCPairs` returns the GC pairs buffered for born-tombstoned
+     * split pieces and clears the buffer.
+     */
+    func drainPendingGCPairs() -> [GCPair] {
+        let pairs = self.pendingGCPairs
+        self.pendingGCPairs = []
+        return pairs
     }
 
     private func deleteNodes(
@@ -824,10 +863,11 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ vector: VersionVector? = nil
     ) throws -> ([ContentChange<T>],
-                 [RGATreeSplitNode<T>])
+                 [RGATreeSplitNode<T>],
+                 Set<String>)
     {
         guard !candidates.isEmpty else {
-            return ([], [])
+            return ([], [], [])
         }
         let isLocal = vector == nil
         // 01. Collect nodes to remove and keep.
@@ -853,8 +893,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         // 03. Mark tombstones for removal. Keep `nodesToRemove` (document) order so callers can
         // reconstruct the removed content left-to-right (Swift Dictionary is unordered).
+        // Nodes that were already removed (concurrent LWW overwrite of an
+        // existing tombstone) are tracked separately: they already have a
+        // registered GC pair, and registering a second one would
+        // toggle-unregister the first.
         var removedNodes: [RGATreeSplitNode<T>] = []
+        var alreadyRemovedIDs = Set<String>()
         for node in nodesToRemove {
+            if node.isRemoved {
+                alreadyRemovedIDs.insert(node.toIDString)
+            }
             node.remove(editedAt)
             removedNodes.append(node)
         }
@@ -862,7 +910,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // 04. Clear the index tree of the given deletion boundaries.
         self.deleteIndexNodes(nodesToKeep)
 
-        return (changes, removedNodes)
+        return (changes, removedNodes, alreadyRemovedIDs)
     }
 
     /**
