@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-import XCTest
 import SwiftProtobuf
+import XCTest
 @testable import Yorkie
 
 /// Ports: `packages/sdk/test/unit/api/restore_converter_test.ts` from
@@ -186,7 +186,7 @@ final class RestoreSpanConverterTests: XCTestCase {
 
         // then — base Edit fields carry no inline content for an old peer to
         // re-insert.
-        guard case let .edit(pbEdit) = pbOp.body else {
+        guard case .edit(let pbEdit) = pbOp.body else {
             return XCTFail("expected an edit operation body")
         }
         XCTAssertEqual(pbEdit.content, "", "restore ops carry no inline content for an old peer to re-insert")
@@ -254,12 +254,34 @@ final class RestoreSpanConverterTests: XCTestCase {
         pbOp.body = Yorkie_V1_Operation.OneOf_Body.edit(pbEdit)
 
         let bytes = try pbOp.serializedData()
-        let decoded = try Converter.fromOperations([try PbOperation(serializedBytes: bytes)])
+        let decoded = try Converter.fromOperations([PbOperation(serializedBytes: bytes)])
         let stripped = try XCTUnwrap(decoded.first as? EditOperation)
         XCTAssertNil(stripped.restoreSpans, "the old peer must see no identity payload")
         XCTAssertNil(stripped.restoreMode, "no restoreMode means the op is not recognised as an undo")
 
         // then — executing the stripped op must not throw.
         XCTAssertNoThrow(try stripped.execute(root: root), "a stripped restore op must not wedge the sync loop")
+    }
+
+    /// A nonconforming peer may send a span whose `[start, end)` disagrees with
+    /// `content`. yorkie-js-sdk never rejects one, so neither may this SDK:
+    /// throwing here escapes `applyChangePack` and the change pack re-pulls and
+    /// re-fails forever. The bounds are clamped to match `content` instead, which
+    /// also keeps the NSString slicing in `restore` inside the string.
+    func test_clamps_a_restore_span_whose_bounds_disagree_with_its_content() throws {
+        // given — end overshoots the content by 40 characters, and start is negative.
+        var pbSpan = Yorkie_V1_RestoreSpan()
+        pbSpan.createdAt = Converter.toTimeTicket(self.seed)
+        pbSpan.start = -3
+        pbSpan.end = 42
+        pbSpan.content = "45"
+
+        // when
+        let span = Converter.fromRestoreSpan(pbSpan, self.executedAt)
+
+        // then — the span is self-consistent, so slicing cannot overrun.
+        XCTAssertEqual(span.start, 0, "a negative start is clamped to zero")
+        XCTAssertEqual(span.end, 2, "end is derived from the content length")
+        XCTAssertEqual(span.value.toString, "45", "content itself is preserved verbatim")
     }
 }

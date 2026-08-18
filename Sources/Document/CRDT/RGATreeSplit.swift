@@ -414,7 +414,6 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
         }
     }
 
-
     /**
      * `createRange` creates ranges of RGATreeSplitNodePos.
      */

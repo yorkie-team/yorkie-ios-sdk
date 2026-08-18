@@ -43,15 +43,15 @@ private func crossSync(_ d1: Document, _ d2: Document) throws {
     let p2 = d2.createChangePack()
 
     try d2.applyChangePack(ChangePack(key: p1.getDocumentKey(),
-                                       checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
-                                       isRemoved: false,
-                                       changes: p1.getChanges(),
-                                       versionVector: VersionVector.initial))
+                                      checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
+                                      isRemoved: false,
+                                      changes: p1.getChanges(),
+                                      versionVector: VersionVector.initial))
     try d1.applyChangePack(ChangePack(key: p2.getDocumentKey(),
-                                       checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
-                                       isRemoved: false,
-                                       changes: p2.getChanges(),
-                                       versionVector: VersionVector.initial))
+                                      checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
+                                      isRemoved: false,
+                                      changes: p2.getChanges(),
+                                      versionVector: VersionVector.initial))
 
     // Self-ack: drop exactly the delivered changes from each sender's local
     // queue so the next crossSync doesn't re-send (and re-apply) them.
@@ -59,10 +59,10 @@ private func crossSync(_ d1: Document, _ d2: Document) throws {
         let changes = pack.getChanges()
         let lastSeq = changes.last?.id.getClientSeq() ?? 0
         return ChangePack(key: pack.getDocumentKey(),
-                           checkpoint: Checkpoint(serverSeq: 0, clientSeq: lastSeq),
-                           isRemoved: false,
-                           changes: [],
-                           versionVector: VersionVector.initial)
+                          checkpoint: Checkpoint(serverSeq: 0, clientSeq: lastSeq),
+                          isRemoved: false,
+                          changes: [],
+                          versionVector: VersionVector.initial)
     }
     try d1.applyChangePack(ack(p1))
     try d2.applyChangePack(ack(p2))

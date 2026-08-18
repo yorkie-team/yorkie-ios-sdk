@@ -48,24 +48,24 @@ private func crossSync(_ d1: Document, _ d2: Document) throws {
     let p2 = d2.createChangePack()
 
     try d2.applyChangePack(ChangePack(key: p1.getDocumentKey(),
-                                       checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
-                                       isRemoved: false,
-                                       changes: p1.getChanges(),
-                                       versionVector: VersionVector.initial))
+                                      checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
+                                      isRemoved: false,
+                                      changes: p1.getChanges(),
+                                      versionVector: VersionVector.initial))
     try d1.applyChangePack(ChangePack(key: p2.getDocumentKey(),
-                                       checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
-                                       isRemoved: false,
-                                       changes: p2.getChanges(),
-                                       versionVector: VersionVector.initial))
+                                      checkpoint: Checkpoint(serverSeq: 0, clientSeq: 0),
+                                      isRemoved: false,
+                                      changes: p2.getChanges(),
+                                      versionVector: VersionVector.initial))
 
     func ack(_ pack: ChangePack) -> ChangePack {
         let changes = pack.getChanges()
         let lastSeq = changes.last?.id.getClientSeq() ?? 0
         return ChangePack(key: pack.getDocumentKey(),
-                           checkpoint: Checkpoint(serverSeq: 0, clientSeq: lastSeq),
-                           isRemoved: false,
-                           changes: [],
-                           versionVector: VersionVector.initial)
+                          checkpoint: Checkpoint(serverSeq: 0, clientSeq: lastSeq),
+                          isRemoved: false,
+                          changes: [],
+                          versionVector: VersionVector.initial)
     }
     try d1.applyChangePack(ack(p1))
     try d2.applyChangePack(ack(p2))
@@ -172,8 +172,8 @@ final class TextRestoreConvergenceTests: XCTestCase {
         XCTAssertEqual(d1.getGarbageLength(), 0)
         XCTAssertEqual(d2.getGarbageLength(), 0)
 
-        for d in [d1, d2] {
-            XCTAssertEqual(d.getDocSize().gc, DataSize(data: 0, meta: 0), "every revived node must leave docSize.gc empty")
+        for doc in [d1, d2] {
+            XCTAssertEqual(doc.getDocSize().gc, DataSize(data: 0, meta: 0), "every revived node must leave docSize.gc empty")
         }
     }
 }
