@@ -16,6 +16,13 @@
 
 import Foundation
 
+/// `RestoreMode` selects the identity-preserving path for undo/redo of pure
+/// deletions: `restore` revives spans, `retombstone` re-deletes them.
+enum RestoreMode {
+    case restore
+    case retombstone
+}
+
 /// `EditOperation` is an operation representing editing Text.
 ///
 /// It is a `class` (reference type) because undo/redo mutates its range in place — `refinePos`
@@ -39,6 +46,24 @@ final class EditOperation: Operation {
     /// Whether this operation was produced as the reverse of an edit (i.e. lives on a history stack).
     private let isUndoOp: Bool
 
+    /// `restoreSpans` returns the identity-preserving restore payload, if this
+    /// is a restore/retombstone operation.
+    private(set) var restoreSpans: [RestoreSpan<CRDTTextValue>]?
+
+    /// `restoreMode` returns the identity-preserving mode of this Edit.
+    private(set) var restoreMode: RestoreMode?
+
+    /// `retombstoneSpans` is the companion span set for an identity-preserving
+    /// reverse op. `restoreSpans` describes content the reversed edit removed;
+    /// `retombstoneSpans` describes content the reversed edit inserted (non-empty
+    /// only for the reverse of a replace). `restoreMode` picks the direction:
+    /// `restore` revives `restoreSpans` and re-removes `retombstoneSpans`; a
+    /// `retombstone` op (the redo) does the opposite. Reversing an edit that both
+    /// inserts and deletes as two identity operations — rather than
+    /// copy-reinserting the deleted text as a fresh node — keeps a later revived
+    /// neighbour in its original relative order.
+    private(set) var retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
+
     init(
         parentCreatedAt: TimeTicket,
         fromPos: RGATreeSplitPos,
@@ -46,7 +71,10 @@ final class EditOperation: Operation {
         content: String,
         attributes: [String: String]?,
         executedAt: TimeTicket,
-        isUndoOp: Bool = false
+        isUndoOp: Bool = false,
+        restoreSpans: [RestoreSpan<CRDTTextValue>]? = nil,
+        restoreMode: RestoreMode? = nil,
+        retombstoneSpans: [RestoreSpan<CRDTTextValue>]? = nil
     ) {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
@@ -55,6 +83,9 @@ final class EditOperation: Operation {
         self.attributes = attributes
         self.executedAt = executedAt
         self.isUndoOp = isUndoOp
+        self.restoreSpans = restoreSpans
+        self.restoreMode = restoreMode
+        self.retombstoneSpans = retombstoneSpans
     }
 
     /**
@@ -77,6 +108,10 @@ final class EditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
+        if self.restoreSpans != nil || self.retombstoneSpans != nil {
+            return try self.executeIdentityPreserving(root: root, text: text)
+        }
+
         // When replaying a reverse edit, the range may reference a split chain that has since
         // changed; refine it back onto the current chain before editing.
         if self.isUndoOp {
@@ -84,7 +119,7 @@ final class EditOperation: Operation {
             self.toPos = try text.refinePos(self.toPos)
         }
 
-        let (changes, pairs, diff, _, removedValues) = try text.edit(
+        let (changes, pairs, diff, _, removedValues, removedSpans) = try text.edit(
             (self.fromPos, self.toPos),
             self.content,
             self.executedAt,
@@ -92,7 +127,7 @@ final class EditOperation: Operation {
             versionVector
         )
 
-        let reverseOp = try self.toReverseOperation(removedValues, text.normalizePos(self.fromPos))
+        let reverseOp = try self.toReverseOperation(removedValues, text.normalizePos(self.fromPos), removedSpans)
 
         root.acc(diff)
 
@@ -109,9 +144,118 @@ final class EditOperation: Operation {
         return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
     }
 
+    /// Executes an identity-preserving reverse op. `restoreMode` picks the
+    /// direction: an undo (`restore`) revives `restoreSpans` and re-removes
+    /// `retombstoneSpans`; the redo (`retombstone`) does the opposite. Both sets
+    /// are revived/removed by their original identity, never re-inserted as
+    /// fresh nodes, so relative order is preserved across chained undo.
+    private func executeIdentityPreserving(root: CRDTRoot, text: CRDTText) throws -> ExecutionResult {
+        let isRetombstone = self.restoreMode == .retombstone
+        let toRestore = (isRetombstone ? self.retombstoneSpans : self.restoreSpans) ?? []
+        let toRetombstone = (isRetombstone ? self.restoreSpans : self.retombstoneSpans) ?? []
+
+        let path = try root.createPath(createdAt: self.parentCreatedAt)
+        var opInfos: [any OperationInfo] = []
+        var totalDiff = DataSize(data: 0, meta: 0)
+
+        // 1. Remove the content the reversed edit inserted (by identity).
+        if !toRetombstone.isEmpty {
+            let (pairs, changes, diff) = try text.retombstone(toRetombstone, self.executedAt)
+            totalDiff.addDataSizes(others: diff)
+            for pair in pairs {
+                root.registerGCPair(pair)
+            }
+            opInfos.append(contentsOf: changes.compactMap {
+                EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)
+            })
+        }
+
+        // 2. Revive the content the reversed edit removed (by identity).
+        if !toRestore.isEmpty {
+            let (untombstoned, _, changes, liveDiff, pendingGCPairs) = try text.restore(
+                toRestore,
+                self.executedAt,
+                self.fromPos
+            )
+            // Register first: a `pendingGCPairs` entry whose child ended up in
+            // `untombstoned` was never registered under its own id (it was born
+            // by splitting a larger tombstone), so the unregister loop below can
+            // only walk its size from gc back to live if it's registered here
+            // first.
+            for pair in pendingGCPairs {
+                root.registerGCPair(pair)
+            }
+            for node in untombstoned {
+                root.unregisterGCPair(GCPair(parent: text.rgaTreeSplit, child: node))
+            }
+            totalDiff.addDataSizes(others: liveDiff)
+            opInfos.append(contentsOf: changes.compactMap {
+                EditOpInfo(path: path, from: $0.from, to: $0.to, attributes: $0.attributes?.createdDictionary, content: $0.content)
+            })
+        }
+
+        root.acc(totalDiff)
+
+        // Reverse keeps the same span sets and flips the direction.
+        let reverseOp = EditOperation(
+            parentCreatedAt: self.parentCreatedAt,
+            fromPos: self.fromPos,
+            toPos: self.toPos,
+            content: "",
+            attributes: nil,
+            executedAt: TimeTicket.initial,
+            isUndoOp: true,
+            restoreSpans: self.restoreSpans,
+            restoreMode: isRetombstone ? .restore : .retombstone,
+            retombstoneSpans: self.retombstoneSpans
+        )
+
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
     /// Builds the reverse edit: re-inserts the removed content over the range that this edit's
     /// inserted content now occupies.
-    private func toReverseOperation(_ removedValues: [CRDTTextValue], _ fromPos: RGATreeSplitPos) -> Operation {
+    private func toReverseOperation(
+        _ removedValues: [CRDTTextValue],
+        _ fromPos: RGATreeSplitPos,
+        _ removedSpans: [RestoreSpan<CRDTTextValue>]
+    ) -> Operation {
+        if !removedSpans.isEmpty || !self.content.isEmpty {
+            // Reverse any edit by identity: revive what it removed (restoreSpans)
+            // and re-remove what it inserted (retombstoneSpans), both by original
+            // identity, rather than copy-reinserting or position-deleting. A fresh
+            // copy-reinserted node sorts ahead of an as-yet-unrevived neighbour and
+            // corrupts order across chained undo/redo; a position-based delete of
+            // the inserted range reconciles onto the wrong node under a concurrent
+            // remote edit (e.g. two clients concurrently insert and delete, then
+            // undo). Identity addressing avoids both.
+            var insertedSpans: [RestoreSpan<CRDTTextValue>]?
+            if !self.content.isEmpty {
+                let value = CRDTTextValue(self.content)
+                insertedSpans = [
+                    RestoreSpan(
+                        createdAt: self.executedAt,
+                        start: 0,
+                        end: Int32(value.count),
+                        value: value
+                    )
+                ]
+            }
+
+            return EditOperation(
+                parentCreatedAt: self.parentCreatedAt,
+                fromPos: fromPos,
+                toPos: fromPos,
+                content: "",
+                attributes: nil,
+                executedAt: TimeTicket.initial,
+                isUndoOp: true,
+                restoreSpans: removedSpans.isEmpty ? nil : removedSpans,
+                restoreMode: .restore,
+                retombstoneSpans: insertedSpans
+            )
+        }
+
         let reverseContent = removedValues.isEmpty ? "" : removedValues.map { $0.toString }.joined()
 
         var reverseAttributes: [String: String]?
@@ -149,6 +293,13 @@ final class EditOperation: Operation {
 
     /// `reconcileOperation` shifts this (undo) edit's range when a remote edit changes the text
     /// while the operation is parked on the undo/redo stack, so a later undo lands in the right spot.
+    /// NOTE: restoreSpans ops address content by identity (createdAt + offset),
+    /// so `fromPos`/`toPos` are never used to locate the restored range itself.
+    /// But `fromPos` is also passed as the fallback anchor for when every related
+    /// piece has been GC'd (see `findRestoreAnchor`), so it still needs to track
+    /// concurrent remote edits like any other undo position — only the identity
+    /// payload (`restoreSpans`) must stay untouched, which the reconciliation
+    /// below never reads.
     func reconcileOperation(_ remoteFrom: Int, _ remoteTo: Int, _ contentLen: Int) {
         guard self.isUndoOp, remoteFrom <= remoteTo else {
             return

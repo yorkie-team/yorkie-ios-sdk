@@ -40,6 +40,47 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
+/// RestoreMode selects the identity-preserving path. RESTORE_MODE_UNSPECIFIED
+/// means an ordinary edit (no restore semantics), keeping forward edits
+/// unchanged on the wire.
+public enum Yorkie_V1_RestoreMode: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case restore // = 1
+  case retombstone // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .restore
+    case 2: self = .retombstone
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .restore: return 1
+    case .retombstone: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Yorkie_V1_RestoreMode] = [
+    .unspecified,
+    .restore,
+    .retombstone,
+  ]
+
+}
+
 public enum Yorkie_V1_ValueType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case null // = 0
@@ -664,6 +705,27 @@ public struct Yorkie_V1_Operation: Sendable {
     public var attributes: Dictionary<String,String> {
       get {_storage._attributes}
       set {_uniqueStorage()._attributes = newValue}
+    }
+
+    /// identity-preserving undo/redo
+    public var restoreSpans: [Yorkie_V1_RestoreSpan] {
+      get {_storage._restoreSpans}
+      set {_uniqueStorage()._restoreSpans = newValue}
+    }
+
+    public var restoreMode: Yorkie_V1_RestoreMode {
+      get {_storage._restoreMode}
+      set {_uniqueStorage()._restoreMode = newValue}
+    }
+
+    /// retombstone_spans is the companion span set for an identity-preserving
+    /// reverse op: restore_spans is content the reversed edit removed (to
+    /// revive), retombstone_spans is content it inserted (to re-remove). Both
+    /// are addressed by original identity so a revived neighbour keeps its
+    /// relative order across chained undo/redo. restore_mode selects direction.
+    public var retombstoneSpans: [Yorkie_V1_RestoreSpan] {
+      get {_storage._retombstoneSpans}
+      set {_uniqueStorage()._retombstoneSpans = newValue}
     }
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -2336,6 +2398,39 @@ public struct Yorkie_V1_TextNodePos: Sendable {
   fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
 }
 
+/// RestoreSpan carries a run of characters from a single original text
+/// insertion, addressed by split-invariant absolute offsets [start, end),
+/// for identity-preserving undo/redo. content and attributes are a deep
+/// copy of the removed value so restore is independent of GC state.
+public struct Yorkie_V1_RestoreSpan: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var createdAt: Yorkie_V1_TimeTicket {
+    get {_createdAt ?? Yorkie_V1_TimeTicket()}
+    set {_createdAt = newValue}
+  }
+  /// Returns true if `createdAt` has been explicitly set.
+  public var hasCreatedAt: Bool {self._createdAt != nil}
+  /// Clears the value of `createdAt`. Subsequent reads from it will return its default value.
+  public mutating func clearCreatedAt() {self._createdAt = nil}
+
+  public var start: Int32 = 0
+
+  public var end: Int32 = 0
+
+  public var content: String = String()
+
+  public var attributes: Dictionary<String,String> = [:]
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
+}
+
 public struct Yorkie_V1_TimeTicket: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2593,6 +2688,10 @@ public struct Yorkie_V1_RevisionSummary: Sendable {
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "yorkie.v1"
+
+extension Yorkie_V1_RestoreMode: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0RESTORE_MODE_UNSPECIFIED\0\u{1}RESTORE_MODE_RESTORE\0\u{1}RESTORE_MODE_RETOMBSTONE\0")
+}
 
 extension Yorkie_V1_ValueType: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VALUE_TYPE_NULL\0\u{1}VALUE_TYPE_BOOLEAN\0\u{1}VALUE_TYPE_INTEGER\0\u{1}VALUE_TYPE_LONG\0\u{1}VALUE_TYPE_DOUBLE\0\u{1}VALUE_TYPE_STRING\0\u{1}VALUE_TYPE_BYTES\0\u{1}VALUE_TYPE_DATE\0\u{1}VALUE_TYPE_JSON_OBJECT\0\u{1}VALUE_TYPE_JSON_ARRAY\0\u{1}VALUE_TYPE_TEXT\0\u{1}VALUE_TYPE_INTEGER_CNT\0\u{1}VALUE_TYPE_LONG_CNT\0\u{1}VALUE_TYPE_TREE\0\u{1}VALUE_TYPE_INTEGER_DEDUP_CNT\0")
@@ -3318,7 +3417,7 @@ extension Yorkie_V1_Operation.Remove: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".Edit"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}created_at_map_by_actor\0\u{1}content\0\u{3}executed_at\0\u{1}attributes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}created_at_map_by_actor\0\u{1}content\0\u{3}executed_at\0\u{1}attributes\0\u{3}restore_spans\0\u{3}restore_mode\0\u{3}retombstone_spans\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
@@ -3328,6 +3427,9 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
     var _content: String = String()
     var _executedAt: Yorkie_V1_TimeTicket? = nil
     var _attributes: Dictionary<String,String> = [:]
+    var _restoreSpans: [Yorkie_V1_RestoreSpan] = []
+    var _restoreMode: Yorkie_V1_RestoreMode = .unspecified
+    var _retombstoneSpans: [Yorkie_V1_RestoreSpan] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3345,6 +3447,9 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
       _content = source._content
       _executedAt = source._executedAt
       _attributes = source._attributes
+      _restoreSpans = source._restoreSpans
+      _restoreMode = source._restoreMode
+      _retombstoneSpans = source._retombstoneSpans
     }
   }
 
@@ -3370,6 +3475,9 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._content) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
         case 7: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._attributes) }()
+        case 8: try { try decoder.decodeRepeatedMessageField(value: &_storage._restoreSpans) }()
+        case 9: try { try decoder.decodeSingularEnumField(value: &_storage._restoreMode) }()
+        case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._retombstoneSpans) }()
         default: break
         }
       }
@@ -3403,6 +3511,15 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
       if !_storage._attributes.isEmpty {
         try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._attributes, fieldNumber: 7)
       }
+      if !_storage._restoreSpans.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._restoreSpans, fieldNumber: 8)
+      }
+      if _storage._restoreMode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._restoreMode, fieldNumber: 9)
+      }
+      if !_storage._retombstoneSpans.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._retombstoneSpans, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3419,6 +3536,9 @@ extension Yorkie_V1_Operation.Edit: SwiftProtobuf.Message, SwiftProtobuf._Messag
         if _storage._content != rhs_storage._content {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
         if _storage._attributes != rhs_storage._attributes {return false}
+        if _storage._restoreSpans != rhs_storage._restoreSpans {return false}
+        if _storage._restoreMode != rhs_storage._restoreMode {return false}
+        if _storage._retombstoneSpans != rhs_storage._retombstoneSpans {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -5922,6 +6042,60 @@ extension Yorkie_V1_TextNodePos: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs.offset != rhs.offset {return false}
     if lhs.relativeOffset != rhs.relativeOffset {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_RestoreSpan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RestoreSpan"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}created_at\0\u{1}start\0\u{1}end\0\u{1}content\0\u{1}attributes\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.start) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.end) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.content) }()
+      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.attributes) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._createdAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.start != 0 {
+      try visitor.visitSingularInt32Field(value: self.start, fieldNumber: 2)
+    }
+    if self.end != 0 {
+      try visitor.visitSingularInt32Field(value: self.end, fieldNumber: 3)
+    }
+    if !self.content.isEmpty {
+      try visitor.visitSingularStringField(value: self.content, fieldNumber: 4)
+    }
+    if !self.attributes.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.attributes, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_RestoreSpan, rhs: Yorkie_V1_RestoreSpan) -> Bool {
+    if lhs._createdAt != rhs._createdAt {return false}
+    if lhs.start != rhs.start {return false}
+    if lhs.end != rhs.end {return false}
+    if lhs.content != rhs.content {return false}
+    if lhs.attributes != rhs.attributes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

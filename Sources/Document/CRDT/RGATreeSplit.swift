@@ -201,6 +201,19 @@ extension RGATreeSplitPos {
 typealias RGATreeSplitPosRange = (RGATreeSplitPos, RGATreeSplitPos)
 
 /**
+ * `RestoreSpan` identifies a run of characters from a single original
+ * insertion: the absolute-offset interval [start, end) of the insertion
+ * created at `createdAt`. `value` is a deep copy of the removed content,
+ * carried so that purged nodes can be recreated (GC-safe).
+ */
+struct RestoreSpan<T: RGATreeSplitValue> {
+    let createdAt: TimeTicket
+    let start: Int32
+    let end: Int32
+    let value: T
+}
+
+/**
  * `RGATreeSplitNode` is a node of RGATreeSplit.
  */
 class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
@@ -402,6 +415,15 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
+     * `setRemovedAt` overwrites the removal timestamp without the LWW check.
+     * Passing `nil` un-tombstones the node, which identity-preserving undo
+     * uses to revive a removed piece under its original identity.
+     */
+    func setRemovedAt(_ removedAt: TimeTicket?) {
+        self.removedAt = removedAt
+    }
+
+    /**
      * `createRange` creates ranges of RGATreeSplitNodePos.
      */
     var createPosRange: RGATreeSplitPosRange {
@@ -503,7 +525,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         _ editedAt: TimeTicket,
         _ value: T?,
         _ versionVector: VersionVector? = nil
-    ) throws -> (RGATreeSplitPos, [GCPair], DataSize, [ContentChange<T>], [T]) {
+    ) throws -> (RGATreeSplitPos, [GCPair], DataSize, [ContentChange<T>], [T], [RestoreSpan<T>]) {
         var diff = DataSize(data: 0, meta: 0)
 
         // 01. split nodes with from and to
@@ -545,6 +567,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         // 04. add removed node
         var pairs = [GCPair]()
         var removedValues = [T]()
+        var removedSpans = [RestoreSpan<T>]()
         for removedNode in removedNodes {
             // NOTE: Nodes that were already tombstoned keep their existing GC
             // pair (the pair reads `removedAt` from the node at collection
@@ -553,11 +576,22 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 pairs.append(GCPair(parent: self, child: removedNode))
             }
             removedValues.append(removedNode.value)
+            // Capture split-invariant character identities. `substring` over the
+            // whole value deep-copies it, so later splits of the tombstone
+            // cannot mutate the captured content.
+            removedSpans.append(
+                RestoreSpan(
+                    createdAt: removedNode.createdAt,
+                    start: removedNode.id.offset,
+                    end: removedNode.id.offset + Int32(removedNode.contentLength),
+                    value: removedNode.value.substring(from: 0, to: removedNode.value.count)
+                )
+            )
         }
 
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
-        return (caretPos, pairs, diff, changes, removedValues)
+        return (caretPos, pairs, diff, changes, removedValues, removedSpans)
     }
 
     /**
@@ -846,6 +880,316 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         }
 
         return (splitNode, diff)
+    }
+
+    /**
+     * `restore` re-establishes the characters described by `spans` under
+     * their ORIGINAL identities. For each span, per overlapping region:
+     *   - live piece exists       → skip (idempotent; another undo restored it)
+     *   - tombstoned piece exists → clear removedAt (un-tombstone)
+     *   - no piece exists (GC'd)  → recreate a node with the original ID
+     *
+     * Returns `(untombstonedNodes, recreatedNodes, changes, liveDiff,
+     * pendingGCPairs)`. `changes` describes the revived content as insertions
+     * (ascending index) so editor bindings and remote sync can be driven the
+     * same way as a normal edit.
+     *
+     * The caller must, in order: (1) register every pair in `pendingGCPairs` —
+     * these are fragments `splitNode` buffered while isolating a target range
+     * out of a larger tombstoned piece (see `drainPendingGCPairs`);
+     * (2) unregister GC pairs for `untombstonedNodes`. Registering first is
+     * required for `untombstonedNodes` entries whose node was itself one of
+     * those split-born fragments (a target isolated from the interior of a
+     * tombstone) — such a node was never registered under its own id, so
+     * step (1) creates the entry that step (2) then correctly walks from gc
+     * back to live; entries that remain tombstoned (siblings of the restored
+     * target) simply stay registered. Finally, `root.acc(liveDiff)` accounts
+     * the size of any nodes recreated from scratch (the GC'd-away case), which
+     * `splitNode`'s buffering does not cover.
+     *
+     * - Parameters:
+     *   - spans: The identity-addressed runs to revive.
+     *   - executedAt: The timestamp of the operation performing the restore.
+     *   - fallbackAnchor: Position used to anchor a recreated fragment when
+     *     every related piece has been purged.
+     * - Returns: The untombstoned nodes, recreated nodes, resulting changes,
+     *   the live-bucket size delta, and the GC pairs buffered by splits.
+     */
+    func restore(
+        _ spans: [RestoreSpan<T>],
+        _ executedAt: TimeTicket,
+        _ fallbackAnchor: RGATreeSplitPos? = nil
+    ) throws -> ([RGATreeSplitNode<T>], [RGATreeSplitNode<T>], [ContentChange<T>], DataSize, [GCPair]) {
+        var untombstoned = [RGATreeSplitNode<T>]()
+        var recreated = [RGATreeSplitNode<T>]()
+        var liveDiff = DataSize(data: 0, meta: 0)
+
+        for span in spans {
+            let pieces = self.findPiecesOverlapping(span.createdAt, span.start, span.end)
+
+            var cursor = span.start
+            var pieceIdx = 0
+            while cursor < span.end {
+                let piece = pieceIdx < pieces.count ? pieces[pieceIdx] : nil
+                let pieceStart = piece?.id.offset ?? Int32.max
+                let pieceEnd = piece.map { $0.id.offset + Int32($0.contentLength) } ?? Int32.max
+
+                if let piece, pieceStart <= cursor {
+                    // Covered by an existing piece.
+                    let overlapEnd = Swift.min(pieceEnd, span.end)
+                    if piece.isRemoved {
+                        let (target, _) = try self.isolateRange(piece, cursor, overlapEnd)
+                        target.setRemovedAt(nil)
+                        // Repair splay weights on the path to root (length 0 → len).
+                        self.treeByIndex.splayNode(target)
+                        untombstoned.append(target)
+                    }
+                    cursor = overlapEnd
+                    if overlapEnd >= pieceEnd {
+                        pieceIdx += 1
+                    }
+                } else {
+                    // Gap: recreate [cursor, gapEnd) with its original ID.
+                    let gapEnd = Swift.min(pieceStart, span.end)
+                    let value = span.value.substring(from: Int(cursor - span.start), to: Int(gapEnd - span.start))
+                    let newNode = RGATreeSplitNode(RGATreeSplitNodeID(span.createdAt, cursor), value)
+                    liveDiff.addDataSizes(others: newNode.getDataSize())
+                    let prev = try self.findRestoreAnchor(
+                        span.createdAt,
+                        cursor,
+                        gapEnd,
+                        executedAt,
+                        fallbackAnchor
+                    )
+                    _ = self.insertAfter(prev, newNode)
+                    recreated.append(newNode)
+                    cursor = gapEnd
+                }
+            }
+        }
+
+        let pendingGCPairs = self.drainPendingGCPairs()
+
+        // Revived nodes are now live; report each as an insertion at its final
+        // index. Ascending order keeps the indices valid when applied in
+        // sequence (each earlier insertion is already present).
+        var changes = [ContentChange<T>]()
+        for node in untombstoned + recreated {
+            let (from, _) = try self.findIndexesFromRange(node.createPosRange)
+            changes.append(ContentChange<T>(actor: executedAt.actorID, from: from, to: from, content: node.value))
+        }
+        changes.sort { $0.from < $1.from }
+
+        return (untombstoned, recreated, changes, liveDiff, pendingGCPairs)
+    }
+
+    /**
+     * `retombstone` re-deletes the characters described by `spans` (redo of an
+     * identity-preserving undo). Only live pieces are affected; already removed
+     * or purged regions are skipped (idempotent).
+     *
+     * Returns `(pairs, changes, diff)`: GCPairs for the newly tombstoned nodes,
+     * the removed regions as deletions so editor bindings and remote sync can
+     * be driven the same way as a normal edit, and the metadata-size overhead
+     * from splitting the (live) pieces to isolate the target range. The caller
+     * must `root.acc(diff)` before registering `pairs`, mirroring how a normal
+     * edit's boundary splits are accounted before its resulting tombstones are
+     * registered. Indices are captured before each removal, so applying them in
+     * emission order stays consistent.
+     *
+     * - Parameters:
+     *   - spans: The identity-addressed runs to re-remove.
+     *   - executedAt: The timestamp of the operation performing the removal.
+     * - Returns: The GC pairs, resulting changes, and the live-bucket size delta.
+     */
+    func retombstone(
+        _ spans: [RestoreSpan<T>],
+        _ executedAt: TimeTicket
+    ) throws -> ([GCPair], [ContentChange<T>], DataSize) {
+        var pairs = [GCPair]()
+        var changes = [ContentChange<T>]()
+        var diff = DataSize(data: 0, meta: 0)
+
+        for span in spans {
+            let pieces = self.findPiecesOverlapping(span.createdAt, span.start, span.end)
+            for piece in pieces {
+                if piece.isRemoved {
+                    continue
+                }
+                let pieceStart = piece.id.offset
+                let pieceEnd = pieceStart + Int32(piece.contentLength)
+                let (target, splitDiff) = try self.isolateRange(
+                    piece,
+                    Swift.max(pieceStart, span.start),
+                    Swift.min(pieceEnd, span.end)
+                )
+                // `piece` was live, so the split overhead belongs to the live
+                // bucket, same as a normal edit's boundary splits.
+                diff.addDataSizes(others: splitDiff)
+                // Capture the visible range while `target` is still live.
+                let (from, to) = try self.findIndexesFromRange(target.createPosRange)
+                target.remove(executedAt)
+                self.treeByIndex.splayNode(target)
+                pairs.append(GCPair(parent: self, child: target))
+                if from < to {
+                    changes.append(ContentChange<T>(actor: executedAt.actorID, from: from, to: to))
+                }
+            }
+        }
+
+        // Defensive: retombstone only ever isolates live pieces, so splitNode
+        // never buffers anything here — drain anyway to stay consistent with
+        // every other caller of isolateRange/splitNode.
+        pairs.append(contentsOf: self.drainPendingGCPairs())
+
+        return (pairs, changes, diff)
+    }
+
+    /**
+     * `findPiecesOverlapping` collects existing nodes (live or tombstoned)
+     * belonging to the insertion `createdAt` that overlap the absolute-offset
+     * interval [start, end), in ascending offset order. Works by descending
+     * floorEntry probes over `treeByID`.
+     */
+    private func findPiecesOverlapping(
+        _ createdAt: TimeTicket,
+        _ start: Int32,
+        _ end: Int32
+    ) -> [RGATreeSplitNode<T>] {
+        var pieces = [RGATreeSplitNode<T>]()
+        var probe = end - 1
+
+        while probe >= 0 {
+            let key = RGATreeSplitNodeID(createdAt, probe)
+            guard let entry = self.treeByID.floorEntry(key), entry.key.hasSameCreatedAt(key) else {
+                break
+            }
+            let node = entry.value
+            let nodeStart = node.id.offset
+            let nodeEnd = nodeStart + Int32(node.contentLength)
+            if nodeEnd <= start {
+                break
+            }
+            if nodeStart < end, nodeEnd > start {
+                pieces.append(node)
+            }
+            if nodeStart <= start {
+                break
+            }
+            probe = nodeStart - 1
+        }
+
+        return pieces.reversed()
+    }
+
+    /**
+     * `findPieceCovering` returns the node of insertion `createdAt` whose
+     * absolute-offset range covers `offset`, if present.
+     */
+    private func findPieceCovering(
+        _ createdAt: TimeTicket,
+        _ offset: Int32
+    ) -> RGATreeSplitNode<T>? {
+        let key = RGATreeSplitNodeID(createdAt, offset)
+        guard let entry = self.treeByID.floorEntry(key), entry.key.hasSameCreatedAt(key) else {
+            return nil
+        }
+        let node = entry.value
+        let nodeStart = node.id.offset
+        let nodeEnd = nodeStart + Int32(node.contentLength)
+        if nodeStart <= offset, offset < nodeEnd {
+            return node
+        }
+        return nil
+    }
+
+    /**
+     * `findRestoreAnchor` returns the physical node to insert a recreated
+     * fragment [gapStart, gapEnd) of insertion `createdAt` AFTER.
+     *
+     * Resolution ladder (all rules key on op-carried data + ID lookups only):
+     *  (a) a piece covering gapEnd exists → directly before it
+     *      (originally-adjacent successor; exact original slot)
+     *  (b) nearest surviving piece of the same insertion left of gapStart
+     *      → directly after it
+     *  (c) rightmost surviving piece of the same insertion (must be right
+     *      of the gap) → directly before it
+     *  (d) the operation's fallback anchor (refined)
+     *  (e) head (deterministic last resort)
+     */
+    private func findRestoreAnchor(
+        _ createdAt: TimeTicket,
+        _ gapStart: Int32,
+        _ gapEnd: Int32,
+        _ executedAt: TimeTicket,
+        _ fallbackAnchor: RGATreeSplitPos?
+    ) throws -> RGATreeSplitNode<T> {
+        if let succ = self.findPieceCovering(createdAt, gapEnd), let prev = succ.prev {
+            return prev
+        }
+
+        if gapStart > 0 {
+            let key = RGATreeSplitNodeID(createdAt, gapStart - 1)
+            if let entry = self.treeByID.floorEntry(key), entry.key.hasSameCreatedAt(key) {
+                return entry.value
+            }
+        }
+
+        let rightmostKey = RGATreeSplitNodeID(createdAt, Int32.max)
+        if let rightmost = self.treeByID.floorEntry(rightmostKey),
+           rightmost.key.hasSameCreatedAt(rightmostKey),
+           rightmost.value.id.offset >= gapEnd,
+           let prev = rightmost.value.prev
+        {
+            return prev
+        }
+
+        if let fallbackAnchor {
+            // The anchor may have been fully purged; fall through to the head
+            // when it can no longer be resolved.
+            if let left = try? self.findNodeWithSplit(self.refinePos(fallbackAnchor), executedAt).0 {
+                return left
+            }
+        }
+
+        return self.head
+    }
+
+    /**
+     * `isolateRange` splits `piece` so that a node exactly covering the
+     * absolute-offset interval [from, to) exists, and returns it along with the
+     * net metadata-size overhead the split(s) introduced.
+     *
+     * When `piece` is live, this overhead is a normal live-bucket cost (same as
+     * any other boundary split) and the caller should `root.acc` it. When
+     * `piece` is tombstoned, `splitNode` itself buffers the overhead of any
+     * born-removed fragment via `pendingGCPairs` (see `drainPendingGCPairs`),
+     * so the returned diff is zero in that case — the caller must still drain
+     * and register those pairs.
+     *
+     * Requires: `pieceStart <= from < to <= pieceEnd`.
+     */
+    private func isolateRange(
+        _ piece: RGATreeSplitNode<T>,
+        _ from: Int32,
+        _ to: Int32
+    ) throws -> (RGATreeSplitNode<T>, DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
+        var node = piece
+        let nodeStart = node.id.offset
+        if from > nodeStart {
+            let (right, splitDiff) = try self.splitNode(node, from - nodeStart)
+            diff.addDataSizes(others: splitDiff)
+            if let right {
+                node = right
+            }
+        }
+        let newStart = node.id.offset
+        if to < newStart + Int32(node.contentLength) {
+            let (_, splitDiff) = try self.splitNode(node, to - newStart)
+            diff.addDataSizes(others: splitDiff)
+        }
+        return (node, diff)
     }
 
     /**
