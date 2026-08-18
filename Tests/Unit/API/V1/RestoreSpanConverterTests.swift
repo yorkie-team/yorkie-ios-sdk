@@ -199,4 +199,67 @@ final class RestoreSpanConverterTests: XCTestCase {
         self.assertMode(restored.restoreMode, .restore)
         XCTAssertEqual(restored.restoreSpans?.count, 1)
     }
+
+    /// A server or peer older than v0.7.13 does not know fields 8-10 and drops
+    /// them, so the op arrives as a bare zero-width edit whose range is the
+    /// head-anchored position `normalizePos` produced. Executing that must not
+    /// throw: the error would escape the sync loop, and the change would be
+    /// re-pulled and re-fail indefinitely.
+    func test_executes_without_throwing_when_an_old_peer_strips_the_restore_fields() throws {
+        // given — a text holding "0123456789" with "45" deleted, i.e. the state
+        // in which an identity-preserving undo would arrive.
+        let actorID = ActorIDs.initial
+        let rootObject = CRDTObject(createdAt: TimeTicket.initial)
+        let root = CRDTRoot(rootObject: rootObject)
+
+        let textCreatedAt = TimeTicket(lamport: 2, delimiter: 0, actorID: actorID)
+        let text = CRDTText(rgaTreeSplit: RGATreeSplit<CRDTTextValue>(), createdAt: textCreatedAt)
+        rootObject.set(key: "text", value: text)
+        root.registerElement(text, parent: rootObject)
+
+        let head = RGATreeSplitPos(RGATreeSplitNodeID.initial, 0)
+        try text.edit((head, head), "0123456789", TimeTicket(lamport: 3, delimiter: 0, actorID: actorID))
+        let seedID = RGATreeSplitNodeID(TimeTicket(lamport: 3, delimiter: 0, actorID: actorID), 0)
+        try text.edit(
+            (RGATreeSplitPos(seedID, 4), RGATreeSplitPos(seedID, 6)),
+            "",
+            TimeTicket(lamport: 4, delimiter: 0, actorID: actorID)
+        )
+        XCTAssertEqual(text.toString, "01236789", "sanity: \"45\" is deleted, leaving a tombstone to revive")
+
+        // A reverse op shaped exactly as `toReverseOperation` emits one: the
+        // range is head-anchored (only `normalizePos` yields offset > 0 on the
+        // head sentinel) and the payload lives entirely in the restore fields.
+        let headAnchored = RGATreeSplitPos(RGATreeSplitNodeID.initial, 4)
+        let undoOp = EditOperation(
+            parentCreatedAt: textCreatedAt,
+            fromPos: headAnchored,
+            toPos: headAnchored,
+            content: "",
+            attributes: [:],
+            executedAt: self.executedAt,
+            isUndoOp: true,
+            restoreSpans: [self.span(4, 6, "45")],
+            restoreMode: .restore
+        )
+
+        // when — serialize, then strip fields 8-10 the way an old peer would.
+        var pbOp = try Converter.toOperation(undoOp)
+        guard case .edit(var pbEdit) = pbOp.body else {
+            return XCTFail("expected an edit operation body")
+        }
+        pbEdit.restoreSpans = []
+        pbEdit.retombstoneSpans = []
+        pbEdit.restoreMode = Yorkie_V1_RestoreMode.unspecified
+        pbOp.body = Yorkie_V1_Operation.OneOf_Body.edit(pbEdit)
+
+        let bytes = try pbOp.serializedData()
+        let decoded = try Converter.fromOperations([try PbOperation(serializedBytes: bytes)])
+        let stripped = try XCTUnwrap(decoded.first as? EditOperation)
+        XCTAssertNil(stripped.restoreSpans, "the old peer must see no identity payload")
+        XCTAssertNil(stripped.restoreMode, "no restoreMode means the op is not recognised as an undo")
+
+        // then — executing the stripped op must not throw.
+        XCTAssertNoThrow(try stripped.execute(root: root), "a stripped restore op must not wedge the sync loop")
+    }
 }

@@ -114,7 +114,18 @@ final class EditOperation: Operation {
 
         // When replaying a reverse edit, the range may reference a split chain that has since
         // changed; refine it back onto the current chain before editing.
-        if self.isUndoOp {
+        //
+        // `isUndoOp` normally marks that, but an identity-preserving reverse op that
+        // arrives from a peer or server older than 0.7.13 has its restore fields
+        // (proto 8-10) stripped, so `restoreMode` — and with it `isUndoOp` — is lost,
+        // leaving only the head-anchored base range that `normalizePos` produced.
+        // Detect that shape directly: only `normalizePos` yields a position on the
+        // head sentinel with a non-zero offset, because the head holds no content, so
+        // no forward edit can reference it. Without this the range reaches
+        // `splitNode` unresolved and throws, which escapes the sync loop and makes
+        // the change re-pull and re-fail indefinitely.
+        let isHeadAnchored = self.fromPos.id == RGATreeSplitNodeID.initial && self.fromPos.relativeOffset > 0
+        if self.isUndoOp || isHeadAnchored {
             self.fromPos = try text.refinePos(self.fromPos)
             self.toPos = try text.refinePos(self.toPos)
         }
