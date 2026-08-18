@@ -1229,12 +1229,16 @@ class CRDTTree: CRDTElement {
                 }
             }
 
-            let rawOffset = left !== parent ? try parent.findOffset(node: left, includeRemoved: true) + 1 : 0
-            try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
-            left = parent
+            // Stop the walk once the node to split has no parent. Splitting the
+            // root dereferences its nil parent, so the guard must precede the
+            // split rather than follow it.
             guard let nextParent = parent.parent else {
                 break
             }
+
+            let rawOffset = left !== parent ? try parent.findOffset(node: left, includeRemoved: true) + 1 : 0
+            try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            left = parent
             parent = nextParent
             splitCount += 1
         }
