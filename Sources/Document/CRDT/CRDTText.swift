@@ -302,7 +302,19 @@ final class CRDTText: CRDTElement {
      */
     private func toTextChanges(_ contentChanges: [ContentChange<CRDTTextValue>]) -> [TextChange] {
         contentChanges.compactMap {
-            TextChange(type: .content, actor: $0.actor, from: $0.from, to: $0.to, content: $0.content?.toString)
+            // Carry the revived node's attributes, not just its content: an editor
+            // binding driven by these changes must re-insert restored text with its
+            // original styling, otherwise the view diverges from the CRDT.
+            let attributes = $0.content?.getAttributes().mapValues { $0.value }
+
+            return TextChange(
+                type: .content,
+                actor: $0.actor,
+                from: $0.from,
+                to: $0.to,
+                content: $0.content?.toString,
+                attributes: (attributes?.isEmpty ?? true) ? nil : attributes
+            )
         }
     }
 

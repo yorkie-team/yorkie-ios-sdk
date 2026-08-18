@@ -414,14 +414,6 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
         }
     }
 
-    /**
-     * `setRemovedAt` overwrites the removal timestamp without the LWW check.
-     * Passing `nil` un-tombstones the node, which identity-preserving undo
-     * uses to revive a removed piece under its original identity.
-     */
-    func setRemovedAt(_ removedAt: TimeTicket?) {
-        self.removedAt = removedAt
-    }
 
     /**
      * `createRange` creates ranges of RGATreeSplitNodePos.
@@ -939,7 +931,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     let overlapEnd = Swift.min(pieceEnd, span.end)
                     if piece.isRemoved {
                         let (target, _) = try self.isolateRange(piece, cursor, overlapEnd)
-                        target.setRemovedAt(nil)
+                        target.setRemoveAt(nil)
                         // Repair splay weights on the path to root (length 0 → len).
                         self.treeByIndex.splayNode(target)
                         untombstoned.append(target)
@@ -951,7 +943,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 } else {
                     // Gap: recreate [cursor, gapEnd) with its original ID.
                     let gapEnd = Swift.min(pieceStart, span.end)
-                    let value = span.value.substring(from: Int(cursor - span.start), to: Int(gapEnd - span.start))
+                    let value = span.value.substring(from: Int(cursor - span.start), to: Swift.min(Int(gapEnd - span.start), span.value.count))
                     let newNode = RGATreeSplitNode(RGATreeSplitNodeID(span.createdAt, cursor), value)
                     liveDiff.addDataSizes(others: newNode.getDataSize())
                     let prev = try self.findRestoreAnchor(

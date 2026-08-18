@@ -1488,7 +1488,6 @@ class CRDTTree: CRDTElement {
 
                         pairs.append(GCPair(parent: self, child: node))
                     } else {
-                        print(node.getDataSize())
                         diff.addDataSizes(others: node.getDataSize())
                     }
 

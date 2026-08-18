@@ -446,7 +446,22 @@ extension Converter {
      *   - executedAt: Timestamp stamped on the span's attributes; the wire format
      *     carries attribute values only, so the operation's own time is used.
      */
-    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) -> RestoreSpan<CRDTTextValue> {
+    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) throws -> RestoreSpan<CRDTTextValue> {
+        // Validate before trusting the span: `restore` slices `content` with
+        // NSString ranges, which raise an Objective-C NSRangeException (not a
+        // Swift error, so it cannot be caught) when the range overruns the
+        // string. JS clamps instead, so a nonconforming peer would crash only
+        // this SDK. Reject inconsistent spans at the boundary.
+        guard pbSpan.start >= 0,
+              pbSpan.end >= pbSpan.start,
+              Int32((pbSpan.content as NSString).length) == pbSpan.end - pbSpan.start
+        else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "invalid RestoreSpan: start=\(pbSpan.start), end=\(pbSpan.end), content length=\((pbSpan.content as NSString).length)"
+            )
+        }
+
         let value = CRDTTextValue(pbSpan.content)
         for (key, attr) in pbSpan.attributes {
             value.setAttr(key: key, value: attr, updatedAt: executedAt)
@@ -607,8 +622,8 @@ extension Converter {
                 var retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
                 var restoreMode: RestoreMode?
                 if !pbEditOperation.restoreSpans.isEmpty || !pbEditOperation.retombstoneSpans.isEmpty {
-                    restoreSpans = pbEditOperation.restoreSpans.map { fromRestoreSpan($0, executedAt) }
-                    retombstoneSpans = pbEditOperation.retombstoneSpans.map { fromRestoreSpan($0, executedAt) }
+                    restoreSpans = try pbEditOperation.restoreSpans.map { try fromRestoreSpan($0, executedAt) }
+                    retombstoneSpans = try pbEditOperation.retombstoneSpans.map { try fromRestoreSpan($0, executedAt) }
                     restoreMode = pbEditOperation.restoreMode == .retombstone ? .retombstone : .restore
                 }
 
