@@ -38,6 +38,17 @@ enum TreeChangeType {
     case removeStyle
 }
 
+/// `PosBoundary` selects how a position inside a merged-away parent resolves in
+/// ``CRDTTree/findNodesAndSplitText(_:_:_:)``.
+enum PosBoundary {
+    /// The insertion boundary in the merge target, before the first moved child,
+    /// so RGA ordering breaks ties between concurrent inserts.
+    case insert
+    /// The position right after the merge-source tombstone, so a style range
+    /// neither grows over nor shrinks past nodes concurrently inserted there.
+    case range
+}
+
 enum TreeChangeValue {
     case nodes([CRDTTreeNode])
     case attributes([String: String])
@@ -936,10 +947,18 @@ class CRDTTree: CRDTElement {
      * The ids of the given `pos` are the ids of the node in the CRDT perspective.
      * This is different from `TreePos` which is a position of the tree in the
      * physical perspective.
+     *
+     * `boundary` selects how a position inside a merged-away parent resolves:
+     * ``PosBoundary/insert`` places it at the insertion boundary in the merge
+     * target (before the first moved child, so RGA ordering breaks ties), while
+     * ``PosBoundary/range`` places it right after the merge-source tombstone so a
+     * style range neither grows over nor shrinks past nodes concurrently inserted
+     * at that anchor.
      */
     func findNodesAndSplitText(
         _ pos: CRDTTreePos,
-        _ editedAt: TimeTicket? = nil
+        _ editedAt: TimeTicket? = nil,
+        _ boundary: PosBoundary = .insert
     ) throws -> (TreeNodePair, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
         // 01. Find the parent and left sibling node of the given position.
@@ -957,6 +976,16 @@ class CRDTTree: CRDTElement {
         // tombstoned parent (i.e. the first child moved by the merge, in target
         // child order).
         if realParent.isRemoved, isLeftMost, let mergedInto = realParent.mergedInto {
+            // §9.3 Range Boundary at Merged-Away Anchors: a range boundary
+            // resolves to the position right after the merge-source tombstone,
+            // not the insertion boundary below. The insertion boundary sits
+            // before the first moved child, so it would extend a style range over
+            // nodes concurrently inserted between the tombstone and the moved
+            // children — nodes the styling client saw outside its range (after
+            // the then-live parent).
+            if boundary == .range, let tombstoneParent = realParent.parent {
+                return ((tombstoneParent, realParent), diff)
+            }
             if let mergeTarget = self.findFloorNode(mergedInto), !mergeTarget.isRemoved {
                 let allChildren = mergeTarget.innerChildren
                 for (index, targetChild) in allChildren.enumerated() {
@@ -1013,8 +1042,8 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector?
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String], [String]) {
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
 
         // Advance past split siblings unknown to the editing client so the range
@@ -1161,8 +1190,8 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
 
         // Advance past split siblings unknown to the editing client so the range
