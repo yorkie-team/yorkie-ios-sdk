@@ -560,6 +560,17 @@ extension Converter {
             pbTreeEditOperation.contents = toTreeNodesWhenEdit(treeEditOperation.contents)
             pbTreeEditOperation.splitLevel = treeEditOperation.splitLevel
             pbTreeEditOperation.executedAt = toTimeTicket(treeEditOperation.executedAt)
+            let treeRestoreSpans = treeEditOperation.restoreSpans
+            let treeRetombstoneSpans = treeEditOperation.retombstoneSpans
+            if !(treeRestoreSpans?.isEmpty ?? true) || !(treeRetombstoneSpans?.isEmpty ?? true) {
+                pbTreeEditOperation.restoreSpans = (treeRestoreSpans ?? []).map { toTreeRestoreSpan($0) }
+                pbTreeEditOperation.retombstoneSpans = (treeRetombstoneSpans ?? []).map { toTreeRestoreSpan($0) }
+                if case .retombstone = treeEditOperation.restoreMode {
+                    pbTreeEditOperation.restoreMode = .retombstone
+                } else {
+                    pbTreeEditOperation.restoreMode = .restore
+                }
+            }
             pbOperation.treeEdit = pbTreeEditOperation
         } else if let treeStyleOperation = operation as? TreeStyleOperation {
             var pbTreeStyleOperation = PbOperation.TreeStyle()
@@ -653,12 +664,24 @@ extension Converter {
                                          executedAt: fromTimeTicket(pbIncreaseOperation.executedAt),
                                          actor: pbIncreaseOperation.actor)
             } else if case let .treeEdit(pbTreeEditOperation) = pbOperation.body {
+                var treeRestoreSpans: [TreeRestoreSpan]?
+                var treeRetombstoneSpans: [TreeRestoreSpan]?
+                var treeRestoreMode: RestoreMode?
+                if !pbTreeEditOperation.restoreSpans.isEmpty || !pbTreeEditOperation.retombstoneSpans.isEmpty {
+                    treeRestoreSpans = try pbTreeEditOperation.restoreSpans.map { try fromTreeRestoreSpan($0) }
+                    treeRetombstoneSpans = try pbTreeEditOperation.retombstoneSpans.map { try fromTreeRestoreSpan($0) }
+                    treeRestoreMode = pbTreeEditOperation.restoreMode == .retombstone ? .retombstone : .restore
+                }
                 return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                          fromPos: fromTreePos(pbTreeEditOperation.from),
                                          toPos: fromTreePos(pbTreeEditOperation.to),
                                          contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
                                          splitLevel: pbTreeEditOperation.splitLevel,
-                                         executedAt: fromTimeTicket(pbTreeEditOperation.executedAt))
+                                         executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
+                                         isUndoOp: treeRestoreMode != nil,
+                                         restoreSpans: treeRestoreSpans,
+                                         restoreMode: treeRestoreMode,
+                                         retombstoneSpans: treeRetombstoneSpans)
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
                 if !pbTreeStyleOperation.attributesToRemove.isEmpty {
                     return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
@@ -1178,6 +1201,77 @@ extension Converter {
      */
     static func fromTreeNodeID(_ pbTreeNodeID: PbTreeNodeID) -> CRDTTreeNodeID {
         CRDTTreeNodeID(createdAt: fromTimeTicket(pbTreeNodeID.createdAt), offset: pbTreeNodeID.offset)
+    }
+
+    /**
+     * `toTreeRestoreSpan` converts a ``TreeRestoreSpan`` to Protobuf format.
+     */
+    static func toTreeRestoreSpan(_ span: TreeRestoreSpan) -> PbTreeRestoreSpan {
+        var pbSpan = PbTreeRestoreSpan()
+        pbSpan.id = toTreeNodeID(span.id)
+        pbSpan.nodeType = span.nodeType
+        pbSpan.isText = span.isText
+        pbSpan.length = span.length
+        if let value = span.value {
+            pbSpan.value = value as String
+        }
+        span.attrs?.forEach { rhtNode in
+            var attr = PbNodeAttr()
+            attr.value = rhtNode.value
+            attr.updatedAt = toTimeTicket(rhtNode.updatedAt)
+            attr.isRemoved = rhtNode.isRemoved
+            pbSpan.attributes[rhtNode.key] = attr
+        }
+        if let parentID = span.parentID {
+            pbSpan.parentID = toTreeNodeID(parentID)
+        }
+        if let leftSiblingID = span.leftSiblingID {
+            pbSpan.leftSiblingID = toTreeNodeID(leftSiblingID)
+        }
+        if let rightSiblingID = span.rightSiblingID {
+            pbSpan.rightSiblingID = toTreeNodeID(rightSiblingID)
+        }
+        return pbSpan
+    }
+
+    /**
+     * `fromTreeRestoreSpan` converts the given Protobuf format to model format.
+     *
+     * A span addresses content by insertion identity, so every node ID it carries
+     * is malformed without a `createdAt`, and the attribute snapshot is malformed
+     * without an `updatedAt`. Both are rejected here because the decoders below
+     * would otherwise yield a `CRDTTreeNodeID` with a default `createdAt` and an
+     * RHT node with a default `updatedAt` — neither failing until deep inside the
+     * restore path. Mirrors the server's `fromTreeRestoreSpans`.
+     */
+    static func fromTreeRestoreSpan(_ pbSpan: PbTreeRestoreSpan) throws -> TreeRestoreSpan {
+        let anchorsValid = (!pbSpan.hasParentID || pbSpan.parentID.hasCreatedAt)
+            && (!pbSpan.hasLeftSiblingID || pbSpan.leftSiblingID.hasCreatedAt)
+            && (!pbSpan.hasRightSiblingID || pbSpan.rightSiblingID.hasCreatedAt)
+        guard pbSpan.hasID, pbSpan.id.hasCreatedAt, anchorsValid,
+              pbSpan.attributes.values.allSatisfy({ $0.hasUpdatedAt })
+        else {
+            throw YorkieError(code: .errInvalidArgument, message: "malformed tree restore span: missing timestamp")
+        }
+
+        var attrs: RHT?
+        if !pbSpan.attributes.isEmpty {
+            let rht = RHT()
+            pbSpan.attributes.forEach { key, value in
+                rht.setInternal(key: key, value: value.value, executedAt: fromTimeTicket(value.updatedAt), removed: value.isRemoved)
+            }
+            attrs = rht
+        }
+
+        return TreeRestoreSpan(id: fromTreeNodeID(pbSpan.id),
+                               nodeType: pbSpan.nodeType,
+                               isText: pbSpan.isText,
+                               length: pbSpan.length,
+                               value: pbSpan.isText ? pbSpan.value as NSString : nil,
+                               attrs: attrs,
+                               parentID: pbSpan.hasParentID ? fromTreeNodeID(pbSpan.parentID) : nil,
+                               leftSiblingID: pbSpan.hasLeftSiblingID ? fromTreeNodeID(pbSpan.leftSiblingID) : nil,
+                               rightSiblingID: pbSpan.hasRightSiblingID ? fromTreeNodeID(pbSpan.rightSiblingID) : nil)
     }
     
     /**

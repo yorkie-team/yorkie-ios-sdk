@@ -900,6 +900,22 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    /// identity-preserving undo/redo
+    public var restoreSpans: [Yorkie_V1_TreeRestoreSpan] {
+      get {_storage._restoreSpans}
+      set {_uniqueStorage()._restoreSpans = newValue}
+    }
+
+    public var restoreMode: Yorkie_V1_RestoreMode {
+      get {_storage._restoreMode}
+      set {_uniqueStorage()._restoreMode = newValue}
+    }
+
+    public var retombstoneSpans: [Yorkie_V1_TreeRestoreSpan] {
+      get {_storage._retombstoneSpans}
+      set {_uniqueStorage()._retombstoneSpans = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -2431,6 +2447,88 @@ public struct Yorkie_V1_RestoreSpan: Sendable {
   fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
 }
 
+/// TreeRestoreSpan carries a tree node run from a single deletion, addressed
+/// by TreeNodeID identity, for identity-preserving Tree undo/redo. Unlike the
+/// text RestoreSpan (flat offsets), a tree span records the node's structure
+/// (type/attrs) and its position anchors, because in a tree id-order is not
+/// sibling-order: left_sibling_id and right_sibling_id are redundant external
+/// boundary anchors of the deleted run, so restore can reconstruct the run's
+/// internal order from the op's own spans and needs only one surviving
+/// boundary to place it. value/attributes are a deep copy so a GC-purged node
+/// can be recreated.
+public struct Yorkie_V1_TreeRestoreSpan: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: Yorkie_V1_TreeNodeID {
+    get {_storage._id ?? Yorkie_V1_TreeNodeID()}
+    set {_uniqueStorage()._id = newValue}
+  }
+  /// Returns true if `id` has been explicitly set.
+  public var hasID: Bool {_storage._id != nil}
+  /// Clears the value of `id`. Subsequent reads from it will return its default value.
+  public mutating func clearID() {_uniqueStorage()._id = nil}
+
+  public var nodeType: String {
+    get {_storage._nodeType}
+    set {_uniqueStorage()._nodeType = newValue}
+  }
+
+  public var isText: Bool {
+    get {_storage._isText}
+    set {_uniqueStorage()._isText = newValue}
+  }
+
+  public var length: Int32 {
+    get {_storage._length}
+    set {_uniqueStorage()._length = newValue}
+  }
+
+  public var value: String {
+    get {_storage._value}
+    set {_uniqueStorage()._value = newValue}
+  }
+
+  public var attributes: Dictionary<String,Yorkie_V1_NodeAttr> {
+    get {_storage._attributes}
+    set {_uniqueStorage()._attributes = newValue}
+  }
+
+  public var parentID: Yorkie_V1_TreeNodeID {
+    get {_storage._parentID ?? Yorkie_V1_TreeNodeID()}
+    set {_uniqueStorage()._parentID = newValue}
+  }
+  /// Returns true if `parentID` has been explicitly set.
+  public var hasParentID: Bool {_storage._parentID != nil}
+  /// Clears the value of `parentID`. Subsequent reads from it will return its default value.
+  public mutating func clearParentID() {_uniqueStorage()._parentID = nil}
+
+  public var leftSiblingID: Yorkie_V1_TreeNodeID {
+    get {_storage._leftSiblingID ?? Yorkie_V1_TreeNodeID()}
+    set {_uniqueStorage()._leftSiblingID = newValue}
+  }
+  /// Returns true if `leftSiblingID` has been explicitly set.
+  public var hasLeftSiblingID: Bool {_storage._leftSiblingID != nil}
+  /// Clears the value of `leftSiblingID`. Subsequent reads from it will return its default value.
+  public mutating func clearLeftSiblingID() {_uniqueStorage()._leftSiblingID = nil}
+
+  public var rightSiblingID: Yorkie_V1_TreeNodeID {
+    get {_storage._rightSiblingID ?? Yorkie_V1_TreeNodeID()}
+    set {_uniqueStorage()._rightSiblingID = newValue}
+  }
+  /// Returns true if `rightSiblingID` has been explicitly set.
+  public var hasRightSiblingID: Bool {_storage._rightSiblingID != nil}
+  /// Clears the value of `rightSiblingID`. Subsequent reads from it will return its default value.
+  public mutating func clearRightSiblingID() {_uniqueStorage()._rightSiblingID = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
 public struct Yorkie_V1_TimeTicket: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -3753,7 +3851,7 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".TreeEdit"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}created_at_map_by_actor\0\u{1}contents\0\u{3}executed_at\0\u{3}split_level\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}created_at_map_by_actor\0\u{1}contents\0\u{3}executed_at\0\u{3}split_level\0\u{3}restore_spans\0\u{3}restore_mode\0\u{3}retombstone_spans\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
@@ -3763,6 +3861,9 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _contents: [Yorkie_V1_TreeNodes] = []
     var _splitLevel: Int32 = 0
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _restoreSpans: [Yorkie_V1_TreeRestoreSpan] = []
+    var _restoreMode: Yorkie_V1_RestoreMode = .unspecified
+    var _retombstoneSpans: [Yorkie_V1_TreeRestoreSpan] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3780,6 +3881,9 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       _contents = source._contents
       _splitLevel = source._splitLevel
       _executedAt = source._executedAt
+      _restoreSpans = source._restoreSpans
+      _restoreMode = source._restoreMode
+      _retombstoneSpans = source._retombstoneSpans
     }
   }
 
@@ -3805,6 +3909,9 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 5: try { try decoder.decodeRepeatedMessageField(value: &_storage._contents) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
         case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._splitLevel) }()
+        case 8: try { try decoder.decodeRepeatedMessageField(value: &_storage._restoreSpans) }()
+        case 9: try { try decoder.decodeSingularEnumField(value: &_storage._restoreMode) }()
+        case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._retombstoneSpans) }()
         default: break
         }
       }
@@ -3838,6 +3945,15 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       if _storage._splitLevel != 0 {
         try visitor.visitSingularInt32Field(value: _storage._splitLevel, fieldNumber: 7)
       }
+      if !_storage._restoreSpans.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._restoreSpans, fieldNumber: 8)
+      }
+      if _storage._restoreMode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._restoreMode, fieldNumber: 9)
+      }
+      if !_storage._retombstoneSpans.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._retombstoneSpans, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3854,6 +3970,9 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._contents != rhs_storage._contents {return false}
         if _storage._splitLevel != rhs_storage._splitLevel {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._restoreSpans != rhs_storage._restoreSpans {return false}
+        if _storage._restoreMode != rhs_storage._restoreMode {return false}
+        if _storage._retombstoneSpans != rhs_storage._retombstoneSpans {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -6096,6 +6215,132 @@ extension Yorkie_V1_RestoreSpan: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs.end != rhs.end {return false}
     if lhs.content != rhs.content {return false}
     if lhs.attributes != rhs.attributes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_TreeRestoreSpan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TreeRestoreSpan"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}node_type\0\u{3}is_text\0\u{1}length\0\u{1}value\0\u{1}attributes\0\u{3}parent_id\0\u{3}left_sibling_id\0\u{3}right_sibling_id\0")
+
+  fileprivate class _StorageClass {
+    var _id: Yorkie_V1_TreeNodeID? = nil
+    var _nodeType: String = String()
+    var _isText: Bool = false
+    var _length: Int32 = 0
+    var _value: String = String()
+    var _attributes: Dictionary<String,Yorkie_V1_NodeAttr> = [:]
+    var _parentID: Yorkie_V1_TreeNodeID? = nil
+    var _leftSiblingID: Yorkie_V1_TreeNodeID? = nil
+    var _rightSiblingID: Yorkie_V1_TreeNodeID? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _nodeType = source._nodeType
+      _isText = source._isText
+      _length = source._length
+      _value = source._value
+      _attributes = source._attributes
+      _parentID = source._parentID
+      _leftSiblingID = source._leftSiblingID
+      _rightSiblingID = source._rightSiblingID
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._nodeType) }()
+        case 3: try { try decoder.decodeSingularBoolField(value: &_storage._isText) }()
+        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._length) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._value) }()
+        case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_NodeAttr>.self, value: &_storage._attributes) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._parentID) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._leftSiblingID) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._rightSiblingID) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._id {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if !_storage._nodeType.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._nodeType, fieldNumber: 2)
+      }
+      if _storage._isText != false {
+        try visitor.visitSingularBoolField(value: _storage._isText, fieldNumber: 3)
+      }
+      if _storage._length != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._length, fieldNumber: 4)
+      }
+      if !_storage._value.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._value, fieldNumber: 5)
+      }
+      if !_storage._attributes.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_NodeAttr>.self, value: _storage._attributes, fieldNumber: 6)
+      }
+      try { if let v = _storage._parentID {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._leftSiblingID {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._rightSiblingID {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_TreeRestoreSpan, rhs: Yorkie_V1_TreeRestoreSpan) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._nodeType != rhs_storage._nodeType {return false}
+        if _storage._isText != rhs_storage._isText {return false}
+        if _storage._length != rhs_storage._length {return false}
+        if _storage._value != rhs_storage._value {return false}
+        if _storage._attributes != rhs_storage._attributes {return false}
+        if _storage._parentID != rhs_storage._parentID {return false}
+        if _storage._leftSiblingID != rhs_storage._leftSiblingID {return false}
+        if _storage._rightSiblingID != rhs_storage._rightSiblingID {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

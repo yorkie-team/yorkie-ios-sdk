@@ -101,6 +101,16 @@ final class TreeEditOperation: Operation {
     /// for redo, rather than re-inserting the tombstoned boundary nodes as content.
     fileprivate var redoSplitLevel: Int32?
 
+    // Identity-preserving Tree undo/redo (mirrors ``EditOperation``): a reverse
+    // op carries the deleted nodes' spans and a mode. `.restore` revives
+    // `restoreSpans` and re-removes `retombstoneSpans`; `.retombstone` (the redo)
+    // does the opposite. Nodes are revived/removed by original identity, never
+    // copy-reinserted, so concurrent undos converge. Empty/nil for ordinary edits
+    // and for the copy-reinsert reverse of merge/split edits.
+    private(set) var restoreSpans: [TreeRestoreSpan]?
+    private(set) var restoreMode: RestoreMode?
+    private(set) var retombstoneSpans: [TreeRestoreSpan]?
+
     init(parentCreatedAt: TimeTicket,
          fromPos: CRDTTreePos,
          toPos: CRDTTreePos,
@@ -109,7 +119,10 @@ final class TreeEditOperation: Operation {
          executedAt: TimeTicket,
          isUndoOp: Bool = false,
          fromIdx: Int? = nil,
-         toIdx: Int? = nil)
+         toIdx: Int? = nil,
+         restoreSpans: [TreeRestoreSpan]? = nil,
+         restoreMode: RestoreMode? = nil,
+         retombstoneSpans: [TreeRestoreSpan]? = nil)
     {
         self.parentCreatedAt = parentCreatedAt
         self.fromPos = fromPos
@@ -120,6 +133,9 @@ final class TreeEditOperation: Operation {
         self.isUndoOp = isUndoOp
         self.fromIdx = fromIdx
         self.toIdx = toIdx
+        self.restoreSpans = restoreSpans
+        self.restoreMode = restoreMode
+        self.retombstoneSpans = retombstoneSpans
     }
 
     /**
@@ -142,6 +158,67 @@ final class TreeEditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: "fail to execute, only Tree can execute edit")
         }
 
+        // Identity-preserving restore/retombstone path (mirrors ``EditOperation``).
+        // `restoreMode` selects direction; an undo (`.restore`) revives
+        // `restoreSpans` and re-removes `retombstoneSpans`, the redo
+        // (`.retombstone`) does the opposite. Nodes move by identity, never
+        // copy-reinsert.
+        if self.restoreSpans != nil || self.retombstoneSpans != nil {
+            var isRetombstone = false
+            if case .retombstone = self.restoreMode {
+                isRetombstone = true
+            }
+            let toRestore = (isRetombstone ? self.retombstoneSpans : self.restoreSpans) ?? []
+            let toRetombstone = (isRetombstone ? self.restoreSpans : self.retombstoneSpans) ?? []
+
+            var diff = DataSize(data: 0, meta: 0)
+            // 1. Re-remove (retombstone) by identity.
+            for pair in tree.retombstone(toRetombstone, editedAt) {
+                root.registerGCPair(pair)
+            }
+            // 2. Revive (restore) by identity: un-tombstoned nodes move gc->live
+            // via `unregisterGCPair` (must be after `removedAt` is cleared, which
+            // `restore` does); recreated nodes are brand new, so add their size to
+            // live.
+            let (untombstoned, recreated) = try tree.restore(toRestore)
+            for node in untombstoned {
+                root.unregisterGCPair(GCPair(parent: tree, child: node))
+            }
+            for node in recreated {
+                diff.addDataSizes(others: node.getDataSize())
+            }
+            root.acc(diff)
+
+            // `opInfos` must be non-empty or `Document.executeUndoRedo` drops the
+            // undo change from localChanges (it never propagates to peers). Exact
+            // from/to for editor integration is best-effort here.
+            let opInfos: [any OperationInfo] = try [
+                TreeEditOpInfo(path: root.createPath(createdAt: self.parentCreatedAt),
+                               from: self.fromIdx ?? 0,
+                               to: self.toIdx ?? self.fromIdx ?? 0,
+                               value: [],
+                               splitLevel: 0,
+                               fromPath: [],
+                               toPath: [])
+            ]
+
+            // Reverse keeps the same span sets and flips the direction.
+            let reverseOp = TreeEditOperation(parentCreatedAt: self.parentCreatedAt,
+                                              fromPos: self.fromPos,
+                                              toPos: self.toPos,
+                                              contents: nil,
+                                              splitLevel: 0,
+                                              executedAt: self.executedAt,
+                                              isUndoOp: true,
+                                              fromIdx: self.fromIdx,
+                                              toIdx: self.toIdx,
+                                              restoreSpans: self.restoreSpans,
+                                              restoreMode: isRetombstone ? .restore : .retombstone,
+                                              retombstoneSpans: self.retombstoneSpans)
+
+            return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+        }
+
         // For undo ops the stored integer indices may have been reconciled against remote edits;
         // convert them back to positions on the current tree before editing.
         if self.isUndoOp, let fromIdx = self.fromIdx, let toIdx = self.toIdx {
@@ -156,7 +233,7 @@ final class TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
@@ -183,7 +260,7 @@ final class TreeEditOperation: Operation {
             && removedNodes.isEmpty
         let reverseOp: Operation?
         if self.splitLevel == 0 {
-            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, preTombstoned: preTombstoned, mergeLevel: mergeLevel)
+            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, preTombstoned: preTombstoned, mergeLevel: mergeLevel, removedSpans: removedSpans, insertedSpans: insertedSpans)
         } else if isPureSplit {
             reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx)
         } else {
@@ -244,7 +321,30 @@ final class TreeEditOperation: Operation {
     ///   - mergeLevel: The number of element boundaries merged by this edit. When greater than
     ///     zero the reverse op is a split rather than a content reinsertion.
     /// - Returns: The reverse ``TreeEditOperation``, or `nil` when the edit was a no-op.
-    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, preTombstoned: Set<String> = [], mergeLevel: Int = 0) throws -> Operation? {
+    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, preTombstoned: Set<String> = [], mergeLevel: Int = 0, removedSpans: [TreeRestoreSpan] = [], insertedSpans: [TreeRestoreSpan] = []) throws -> Operation? {
+        // Identity-preserving reverse: reverse an edit by reviving the nodes it
+        // removed (`restoreSpans`) AND re-removing the nodes it inserted
+        // (`retombstoneSpans`), both by ORIGINAL identity instead of
+        // copy-reinsert. `edit` only fills these spans when the edit was
+        // merge/split-free (spansComplete), so this never fires for the
+        // merge/split cases below; the `redoSplitLevel` guard keeps a split's own
+        // boundary-deletion undo on the re-split path (its deletion would
+        // otherwise fill `removedSpans` here).
+        if self.redoSplitLevel == nil, !removedSpans.isEmpty || !insertedSpans.isEmpty {
+            return TreeEditOperation(parentCreatedAt: self.parentCreatedAt,
+                                     fromPos: self.fromPos,
+                                     toPos: self.toPos,
+                                     contents: nil,
+                                     splitLevel: 0,
+                                     executedAt: TimeTicket.initial, // assigned at undo time
+                                     isUndoOp: true,
+                                     fromIdx: preEditFromIdx,
+                                     toIdx: preEditFromIdx,
+                                     restoreSpans: removedSpans,
+                                     restoreMode: .restore,
+                                     retombstoneSpans: insertedSpans)
+        }
+
         // Special case: this op is a boundary-deletion that was generated to reverse a split.
         // Its redo (i.e. the reverse of this reverse) should re-split at the merged position,
         // not re-insert the tombstoned boundary nodes as raw content.
@@ -400,6 +500,12 @@ final class TreeEditOperation: Operation {
     /// tree while the operation is parked on the undo/redo stack, so a later undo lands in the right
     /// spot. Uses the same 6-case overlap logic as ``EditOperation/reconcileOperation(_:_:_:)``.
     func reconcileOperation(_ remoteFrom: Int, _ remoteTo: Int, _ contentLen: Int) {
+        // Identity-addressed restore/retombstone ops locate their nodes by
+        // `CRDTTreeNodeID`, not by index, so index reconciliation must not touch
+        // them (mirrors ``EditOperation`` for Text).
+        if self.restoreSpans != nil || self.retombstoneSpans != nil {
+            return
+        }
         guard self.isUndoOp, let localFrom = self.fromIdx, let localTo = self.toIdx, remoteFrom <= remoteTo else {
             return
         }
