@@ -806,6 +806,28 @@ class CRDTTree: CRDTElement {
     }
 
     /**
+     * `resolveMergeTarget` follows the `mergedInto` forwarding chain from the
+     * given node while the current node is a merge-away tombstone, returning the
+     * final live target. When a merge lands on a parent that a prior concurrent
+     * merge already merged away (a chained merge P->Q->R, applied Q->R before
+     * this P->Q), the children must flow to that parent's final destination so
+     * the merge chain stays flat (P->R, not P->Q) and both replicas converge.
+     * The seen set guards against cycles from a concurrent mutual merge.
+     */
+    private func resolveMergeTarget(_ node: CRDTTreeNode) -> CRDTTreeNode {
+        var target = node
+        var seen = [CRDTTreeNode]([target])
+        while target.isRemoved, let mergedInto = target.mergedInto {
+            guard let next = self.findFloorNode(mergedInto), !seen.contains(where: { $0 === next }) else {
+                break
+            }
+            seen.append(next)
+            target = next
+        }
+        return target
+    }
+
+    /**
      * `advancePastUnknownSplitSiblings` follows the `insNextID` chain of the
      * given node, advancing past element-type split siblings that the editing
      * client did not know about (not in `versionVector`).
@@ -1446,13 +1468,14 @@ class CRDTTree: CRDTElement {
         }
 
         // 03. Merge: move the nodes that are marked as moved, then set the
-        // forwarding pointer on merge-source nodes.
-        try self.applyMergeMoves(toBeMovedToFromParents, fromParent, toBeMergedNodes, editedAt)
+        // forwarding pointer on merge-source nodes. Returns the resolved
+        // destination, which differs from `fromParent` in a chained merge.
+        let mergeDest = try self.applyMergeMoves(toBeMovedToFromParents, fromParent, toBeMergedNodes, editedAt)
 
         // 03-1. Propagate deletes to children moved by prior merges. When a
         // merge-source node is fully deleted (not a merge boundary), its former
         // children in the merge target should also be deleted.
-        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, fromParent, toBeMergedNodes, editedAt))
+        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, mergeDest, toBeMergedNodes, editedAt))
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
@@ -1538,7 +1561,15 @@ class CRDTTree: CRDTElement {
      * parent. It then sets the `mergedInto` forwarding cache on the merge-source
      * nodes.
      */
-    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) throws {
+    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _: [CRDTTreeNode], _ editedAt: TimeTicket) throws -> CRDTTreeNode {
+        // §6.3 Chained-Merge Flattening: a merge chain P->Q->R is kept flat so
+        // runtime state matches what `rebuildMergeState` derives from a snapshot
+        // (which can only ever represent the compressed chain, because it records
+        // one `mergedFrom` pointer per child and reads the child's final physical
+        // parent). The destination is resolved through `resolveMergeTarget`, so
+        // children merged into an already-merged-away parent forward to the final
+        // live target instead of piling up under the removed intermediate.
+        let dest = self.resolveMergeTarget(fromParent)
         for node in toBeMovedToFromParents {
             // A moved child must have a source parent to record; skip otherwise
             // rather than append an untracked node (a node without `mergedFrom`
@@ -1552,15 +1583,40 @@ class CRDTTree: CRDTElement {
             // replica that inserted before the merge. `moveChild` keeps the size
             // accounting correct for both live and tombstoned children
             // (visible-neutral for the latter), so index positions stay correct.
-            node.mergedFrom = parent.id
-            node.mergedAt = editedAt
-            try fromParent.moveChild(child: node)
+            //
+            // `mergedFrom` and `mergedAt` are stamped together, only on the first
+            // move, so a child carried through a chained merge keeps its original
+            // source P and the original P->Q merge ticket. Stamping `mergedAt` on
+            // every move would diverge: a replica that applied P->Q then Q->R
+            // would record the Q->R ticket, while a replica where Q was already
+            // merged records the P->Q ticket on the single forwarded move.
+            if node.mergedFrom == nil {
+                node.mergedFrom = parent.id
+                node.mergedAt = editedAt
+            }
+            try dest.moveChild(child: node)
+            // Point this child's original source at the resolved destination,
+            // path-compressing a transitive source (a prior merge whose children
+            // were just relocated again) from the now-removed intermediate to the
+            // final target. This runtime cache is rebuilt from `mergedFrom` on
+            // snapshot load. Deriving `mergedInto` from a *moved* child — one that
+            // had a parent above — mirrors `rebuildMergeState`, which likewise
+            // skips parentless children, so runtime and snapshot agree. (A
+            // parentless child, detached by a concurrent split cascade, is
+            // skipped above and must not repoint its source here.)
+            //
+            // `mergedInto` is set solely from moved children (never from the
+            // merge-source list directly), so it is set only when
+            // `rebuildMergeState` can reconstruct it — a source with no moved
+            // child of its own (e.g. an intermediate that only relayed another
+            // source's children) is left unset on both paths, keeping runtime and
+            // snapshot consistent.
+            if let mergedFrom = node.mergedFrom, let src = self.findFloorNode(mergedFrom) {
+                src.mergedInto = dest.id
+            }
         }
 
-        // Forwarding pointer rebuilt from `mergedFrom` on snapshot load.
-        for src in toBeMergedNodes {
-            src.mergedInto = fromParent.id
-        }
+        return dest
     }
 
     /**
@@ -1598,12 +1654,17 @@ class CRDTTree: CRDTElement {
      * moved children are recomputed from the merge target's children filtered by
      * `mergedFrom`. Returns the GC pairs for the newly tombstoned nodes.
      */
-    private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
+    /// Skips when `mergedInto` points to the merge destination (concurrent
+    /// merge). The comparison is against the resolved `dest`, not `fromParent`:
+    /// the forwarding pointers set by ``applyMergeMoves(_:_:_:_:)`` point at the
+    /// flattened target, so a chained merge (`dest !== fromParent`) must
+    /// recognise a concurrent-merge boundary by `dest`.
+    private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ dest: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
         var pairs = [GCPair]()
         for node in nodesToBeRemoved {
             guard let mergedInto = node.mergedInto,
                   !toBeMergedNodes.contains(where: { $0 === node }),
-                  mergedInto != fromParent.id,
+                  mergedInto != dest.id,
                   let mergeTarget = self.findFloorNode(mergedInto)
             else {
                 continue
