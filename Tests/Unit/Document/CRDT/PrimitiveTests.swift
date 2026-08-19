@@ -136,4 +136,36 @@ class PrimitiveTests: XCTestCase {
         // then — date encodes as an ISO-8601 UTC string with fractional seconds
         XCTAssertEqual(dateValue.toJSON(), "\"1995-12-17T03:24:00.000Z\"")
     }
+
+    /// Parity guard for yorkie-js-sdk#1291 ("Promote out-of-int32 integers to
+    /// Long in Primitive"). JS has a single `number` type, so it classified any
+    /// integer as `Integer` and silently overflowed int32 on the wire; the fix
+    /// promotes out-of-range values to Long. Swift cannot express that bug —
+    /// `.integer` only ever takes a statically-typed `Int32` — so there is no
+    /// logic to port. This pins the property that makes it unrepresentable, so a
+    /// future widening of the integer path cannot reintroduce it.
+    func test_out_of_int32_integers_are_typed_as_long() throws {
+        // given — values beyond both ends of the int32 range
+        let aboveMax = Int64(Int32.max) + 1
+        let belowMin = Int64(Int32.min) - 1
+
+        // when / then — they classify as long, never as integer
+        for raw in [aboveMax, belowMin] {
+            guard case .long(let value) = Primitive.type(of: raw) else {
+                return XCTFail("expected .long for \(raw), got \(String(describing: Primitive.type(of: raw)))")
+            }
+            XCTAssertEqual(value, raw, "the value survives the promotion intact")
+        }
+
+        // and — a platform `Int` is always long, so it cannot overflow int32 either
+        guard case .long = Primitive.type(of: Int(aboveMax)) else {
+            return XCTFail("expected Int to classify as .long")
+        }
+
+        // and — an in-range Int32 still classifies as integer
+        guard case .integer(let small) = Primitive.type(of: Int32(42)) else {
+            return XCTFail("expected .integer for an Int32")
+        }
+        XCTAssertEqual(small, 42)
+    }
 }
