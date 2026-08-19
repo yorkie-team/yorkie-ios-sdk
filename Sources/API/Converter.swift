@@ -422,6 +422,61 @@ extension Converter {
     static func fromTextNodePos(_ pbTextNodePos: PbTextNodePos) -> RGATreeSplitPos {
         RGATreeSplitPos(RGATreeSplitNodeID(Self.fromTimeTicket(pbTextNodePos.createdAt), pbTextNodePos.offset), pbTextNodePos.relativeOffset)
     }
+
+    /**
+     * `toRestoreSpan` converts the given model to Protobuf format.
+     */
+    static func toRestoreSpan(_ span: RestoreSpan<CRDTTextValue>) -> PbRestoreSpan {
+        var pbSpan = PbRestoreSpan()
+        pbSpan.createdAt = toTimeTicket(span.createdAt)
+        pbSpan.start = span.start
+        pbSpan.end = span.end
+        pbSpan.content = span.value.toString
+        for (key, value) in span.value.getAttributes() {
+            pbSpan.attributes[key] = value.value
+        }
+        return pbSpan
+    }
+
+    /**
+     * `fromRestoreSpan` converts the given Protobuf format to model format.
+     *
+     * - Parameters:
+     *   - pbSpan: The Protobuf span to convert.
+     *   - executedAt: Timestamp stamped on the span's attributes; the wire format
+     *     carries attribute values only, so the operation's own time is used.
+     */
+    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) -> RestoreSpan<CRDTTextValue> {
+        // Derive the bounds from `content` rather than trusting the wire pair:
+        // `restore` slices `content` with NSString ranges, which raise an
+        // Objective-C NSRangeException (not a Swift error, so it cannot be
+        // caught) when the range overruns the string. yorkie-js-sdk never
+        // rejects a span here, so throwing would both diverge from it and wedge
+        // `applyChangePack` — the change pack would re-pull and re-fail
+        // indefinitely. Clamp to a self-consistent span so a nonconforming peer
+        // degrades to a harmless no-op instead.
+        // `start` is also capped at `Int32.max - length`: Swift's `+` traps on
+        // overflow, so an unbounded peer-supplied `start` would terminate the
+        // process — the opposite of degrading gracefully.
+        let length = Int32((pbSpan.content as NSString).length)
+        let start = min(max(0, pbSpan.start), Int32.max - length)
+        let end = start + length
+        if start != pbSpan.start || end != pbSpan.end {
+            Logger.warning("clamped inconsistent RestoreSpan: start=\(pbSpan.start), end=\(pbSpan.end), content length=\((pbSpan.content as NSString).length)")
+        }
+
+        let value = CRDTTextValue(pbSpan.content)
+        for (key, attr) in pbSpan.attributes {
+            value.setAttr(key: key, value: attr, updatedAt: executedAt)
+        }
+
+        return RestoreSpan(
+            createdAt: Self.fromTimeTicket(pbSpan.createdAt),
+            start: start,
+            end: end,
+            value: value
+        )
+    }
 }
 
 // MARK: Operation
@@ -469,6 +524,15 @@ extension Converter {
                 pbEditOperation.attributes[$0.key] = $0.value
             }
             pbEditOperation.executedAt = toTimeTicket(editOperation.executedAt)
+
+            let restoreSpans = editOperation.restoreSpans ?? []
+            let retombstoneSpans = editOperation.retombstoneSpans ?? []
+            if !restoreSpans.isEmpty || !retombstoneSpans.isEmpty {
+                pbEditOperation.restoreSpans = restoreSpans.map(toRestoreSpan)
+                pbEditOperation.retombstoneSpans = retombstoneSpans.map(toRestoreSpan)
+                pbEditOperation.restoreMode = editOperation.restoreMode == .retombstone ? .retombstone : .restore
+            }
+
             pbOperation.edit = pbEditOperation
         } else if let styleOperation = operation as? StyleOperation {
             var pbStyleOperation = PbOperation.Style()
@@ -555,12 +619,27 @@ extension Converter {
                                        createdAt: fromTimeTicket(pbRemoveOperation.createdAt),
                                        executedAt: fromTimeTicket(pbRemoveOperation.executedAt))
             } else if case let .edit(pbEditOperation) = pbOperation.body {
+                let executedAt = fromTimeTicket(pbEditOperation.executedAt)
+
+                var restoreSpans: [RestoreSpan<CRDTTextValue>]?
+                var retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
+                var restoreMode: RestoreMode?
+                if !pbEditOperation.restoreSpans.isEmpty || !pbEditOperation.retombstoneSpans.isEmpty {
+                    restoreSpans = pbEditOperation.restoreSpans.map { fromRestoreSpan($0, executedAt) }
+                    retombstoneSpans = pbEditOperation.retombstoneSpans.map { fromRestoreSpan($0, executedAt) }
+                    restoreMode = pbEditOperation.restoreMode == .retombstone ? .retombstone : .restore
+                }
+
                 return EditOperation(parentCreatedAt: fromTimeTicket(pbEditOperation.parentCreatedAt),
                                      fromPos: fromTextNodePos(pbEditOperation.from),
                                      toPos: fromTextNodePos(pbEditOperation.to),
                                      content: pbEditOperation.content,
                                      attributes: pbEditOperation.attributes,
-                                     executedAt: fromTimeTicket(pbEditOperation.executedAt))
+                                     executedAt: executedAt,
+                                     isUndoOp: restoreMode != nil,
+                                     restoreSpans: restoreSpans,
+                                     restoreMode: restoreMode,
+                                     retombstoneSpans: retombstoneSpans)
             } else if case let .style(pbStyleOperation) = pbOperation.body {
                 return StyleOperation(parentCreatedAt: fromTimeTicket(pbStyleOperation.parentCreatedAt),
                                       fromPos: fromTextNodePos(pbStyleOperation.from),

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.13] - 2026-08-18
+
+- Identity-preserving restore for Text undo/redo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/267
+- Register GC pairs for pieces split off tombstoned nodes in https://github.com/yorkie-team/yorkie-ios-sdk/pull/267
+- Prevent panic when splitLevel walks past the tree root in https://github.com/yorkie-team/yorkie-ios-sdk/pull/267
+
 ## [v0.7.12] - 2026-07-09
 
 - Add disablePresence option for presence-free Documents in https://github.com/yorkie-team/yorkie-ios-sdk/pull/266

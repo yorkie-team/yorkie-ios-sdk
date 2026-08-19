@@ -96,7 +96,7 @@ public class JSONText {
             attrs = StringValueTypeDictionary.stringifyAttributes(attributes)
         }
 
-        let (_, pairs, diff, rangeAfterEdit, _) = try text.edit(
+        let (_, pairs, diff, rangeAfterEdit, _, _) = try text.edit(
             range,
             content,
             ticket,

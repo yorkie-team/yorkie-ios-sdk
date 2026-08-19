@@ -205,6 +205,16 @@ class CRDTRoot {
 
         self.gcPairMap[childID] = pair
 
+        if let gcOnlySize = pair.gcOnlySize {
+            // NOTE: The child's size was never counted in docSize.live (it was
+            // born removed, or it was registered by the snapshot-load scan where
+            // live only counts visible nodes), so there is nothing to move out
+            // of live. Only the given size is added to gc; purge subtracts the
+            // child's size from gc as usual.
+            self.docSize.gc.addDataSizes(others: gcOnlySize)
+            return
+        }
+
         guard let size = pair.child?.getDataSize() else {
             Logger.critical("registerGCPair: missing child size for \(String(describing: pair.child))")
             return
@@ -220,6 +230,35 @@ class CRDTRoot {
         }
 
         self.docSize.gc.addDataSizes(others: size)
+    }
+
+    /**
+     * `unregisterGCPair` removes the given pair from the hash table. Called
+     * when a tombstoned node is revived (un-tombstoned) by an
+     * identity-preserving undo, so that a later re-registration (redo) is not
+     * swallowed by the toggle in `registerGCPair`.
+     *
+     * NOTE: must be called AFTER the node's `removedAt` has been cleared, so
+     * `getDataSize()` no longer includes the tombstone ticket.
+     */
+    func unregisterGCPair(_ pair: GCPair) {
+        guard let childID = pair.child?.toIDString, self.gcPairMap[childID] != nil else {
+            return
+        }
+
+        self.gcPairMap.removeValue(forKey: childID)
+
+        guard let size = pair.child?.getDataSize() else {
+            return
+        }
+
+        // Mirror registerGCPair's accounting: move the node's size back from
+        // gc to live, and drop the tombstone ticket counted at register time.
+        self.docSize.gc.subDataSize(others: size)
+        self.docSize.live.addDataSizes(others: size)
+        if !(pair.child is RHTNode) {
+            self.docSize.gc.meta -= timeTicketSize
+        }
     }
 
     /**
@@ -302,6 +341,15 @@ class CRDTRoot {
         }
 
         for pair in self.gcPairMap.values {
+            if let child = pair.child, child.removedAt == nil {
+                // Node was revived but its pair was not unregistered. Reverse the
+                // GC accounting (gc → live) and drop the stale entry via
+                // unregisterGCPair so the registerGCPair toggle can't be tripped
+                // later and docSize.gc/live stay consistent.
+                self.unregisterGCPair(pair)
+                continue
+            }
+
             if let child = pair.child, let removedAt = child.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
                 pair.parent?.purge(node: child)
                 if let datasize = pair.child?.getDataSize() {

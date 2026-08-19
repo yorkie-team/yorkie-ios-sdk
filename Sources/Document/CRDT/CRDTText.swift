@@ -227,7 +227,7 @@ final class CRDTText: CRDTElement {
         _ editedAt: TimeTicket,
         _ attributes: [String: String]? = nil,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TextChange], [GCPair], DataSize, RGATreeSplitPosRange, [CRDTTextValue]) {
+    ) throws -> ([TextChange], [GCPair], DataSize, RGATreeSplitPosRange, [CRDTTextValue], [RestoreSpan<CRDTTextValue>]) {
         let value = !content.isEmpty ? CRDTTextValue(content) : nil
         if !content.isEmpty, let attributes {
             for (key, jsonValue) in attributes {
@@ -235,7 +235,7 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        let (caretPos, pairs, diff, contentChanges, removedValues) = try self.rgaTreeSplit.edit(
+        let (caretPos, pairs, diff, contentChanges, removedValues, removedSpans) = try self.rgaTreeSplit.edit(
             range,
             editedAt,
             value,
@@ -250,7 +250,72 @@ final class CRDTText: CRDTElement {
             }
         }
 
-        return (changes, pairs, diff, (caretPos, caretPos), removedValues)
+        return (changes, pairs, diff, (caretPos, caretPos), removedValues, removedSpans)
+    }
+
+    /**
+     * `restore` re-establishes removed characters under their original
+     * identities (identity-preserving undo of a deletion).
+     *
+     * - Parameters:
+     *   - spans: The identity-addressed runs to revive.
+     *   - executedAt: The timestamp of the operation performing the restore.
+     *   - fallbackAnchor: Position used to anchor a recreated fragment when
+     *     every related piece has been purged.
+     * - Returns: The untombstoned nodes, recreated nodes, resulting changes,
+     *   the live-bucket size delta, and the GC pairs buffered by splits.
+     */
+    func restore(
+        _ spans: [RestoreSpan<CRDTTextValue>],
+        _ executedAt: TimeTicket,
+        _ fallbackAnchor: RGATreeSplitPos? = nil
+    ) throws -> ([RGATreeSplitNode<CRDTTextValue>], [RGATreeSplitNode<CRDTTextValue>], [TextChange], DataSize, [GCPair]) {
+        let (untombstoned, recreated, contentChanges, liveDiff, pendingGCPairs) = try self.rgaTreeSplit.restore(
+            spans,
+            executedAt,
+            fallbackAnchor
+        )
+
+        return (untombstoned, recreated, self.toTextChanges(contentChanges), liveDiff, pendingGCPairs)
+    }
+
+    /**
+     * `retombstone` re-deletes previously restored characters (redo).
+     *
+     * - Parameters:
+     *   - spans: The identity-addressed runs to re-remove.
+     *   - executedAt: The timestamp of the operation performing the removal.
+     * - Returns: The GC pairs, resulting changes, and the live-bucket size delta.
+     */
+    func retombstone(
+        _ spans: [RestoreSpan<CRDTTextValue>],
+        _ executedAt: TimeTicket
+    ) throws -> ([GCPair], [TextChange], DataSize) {
+        let (pairs, contentChanges, diff) = try self.rgaTreeSplit.retombstone(spans, executedAt)
+
+        return (pairs, self.toTextChanges(contentChanges), diff)
+    }
+
+    /**
+     * `toTextChanges` wraps raw RGATreeSplit content changes into `TextChange`s,
+     * mirroring the mapping used by `edit`.
+     */
+    private func toTextChanges(_ contentChanges: [ContentChange<CRDTTextValue>]) -> [TextChange] {
+        contentChanges.compactMap {
+            // Carry the revived node's attributes, not just its content: an editor
+            // binding driven by these changes must re-insert restored text with its
+            // original styling, otherwise the view diverges from the CRDT.
+            let attributes = $0.content?.getAttributes().mapValues { $0.value }
+
+            return TextChange(
+                type: .content,
+                actor: $0.actor,
+                from: $0.from,
+                to: $0.to,
+                content: $0.content?.toString,
+                attributes: (attributes?.isEmpty ?? true) ? nil : attributes
+            )
+        }
     }
 
     /**
@@ -363,6 +428,8 @@ final class CRDTText: CRDTElement {
             }
         }
 
+        pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
+
         return (pairs, diff, changes, prevAttributes, attributesToRemove)
     }
 
@@ -448,6 +515,8 @@ final class CRDTText: CRDTElement {
                 }
             }
         }
+
+        pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
 
         return (pairs, diff, changes, prevAttributes)
     }
@@ -554,13 +623,24 @@ extension CRDTText: CRDTGCPairContainable {
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
+        // NOTE: Only called when a root is built from a snapshot, where
+        // docSize.live counted visible nodes only. Tombstoned nodes (and the
+        // attribute tombstones inside them) were never part of live, so their
+        // pairs carry `gcOnlySize`. Attribute tombstones of visible nodes ARE
+        // counted in live (getDataSize does not skip them), so their pairs use
+        // the normal live→gc accounting.
         for node in self.rgaTreeSplit {
-            if node.removedAt != nil {
-                pairs.append(GCPair(parent: self.rgaTreeSplit, child: node))
+            let isRemoved = node.removedAt != nil
+            if isRemoved {
+                pairs.append(GCPair(parent: self.rgaTreeSplit, child: node, gcOnlySize: node.getDataSize()))
             }
 
             for pair in node.value.getGCPairs() {
-                pairs.append(pair)
+                if isRemoved {
+                    pairs.append(GCPair(parent: pair.parent, child: pair.child, gcOnlySize: pair.child?.getDataSize()))
+                } else {
+                    pairs.append(pair)
+                }
             }
         }
 
