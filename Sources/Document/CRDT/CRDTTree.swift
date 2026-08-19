@@ -871,12 +871,12 @@ class CRDTTree: CRDTElement {
      */
     private func resolveMergeTarget(_ node: CRDTTreeNode) -> CRDTTreeNode {
         var target = node
-        var seen = [CRDTTreeNode]([target])
+        var seen: Set<ObjectIdentifier> = [ObjectIdentifier(target)]
         while target.isRemoved, let mergedInto = target.mergedInto {
-            guard let next = self.findFloorNode(mergedInto), !seen.contains(where: { $0 === next }) else {
+            guard let next = self.findFloorNode(mergedInto), !seen.contains(ObjectIdentifier(next)) else {
                 break
             }
-            seen.append(next)
+            seen.insert(ObjectIdentifier(next))
             target = next
         }
         return target
@@ -1547,7 +1547,7 @@ class CRDTTree: CRDTElement {
         // 03. Merge: move the nodes that are marked as moved, then set the
         // forwarding pointer on merge-source nodes. Returns the resolved
         // destination, which differs from `fromParent` in a chained merge.
-        let mergeDest = try self.applyMergeMoves(toBeMovedToFromParents, fromParent, toBeMergedNodes, editedAt)
+        let mergeDest = try self.applyMergeMoves(toBeMovedToFromParents, fromParent, editedAt)
 
         // 03-1. Propagate deletes to children moved by prior merges. When a
         // merge-source node is fully deleted (not a merge boundary), its former
@@ -1653,7 +1653,7 @@ class CRDTTree: CRDTElement {
      * parent. It then sets the `mergedInto` forwarding cache on the merge-source
      * nodes.
      */
-    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _: [CRDTTreeNode], _ editedAt: TimeTicket) throws -> CRDTTreeNode {
+    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ editedAt: TimeTicket) throws -> CRDTTreeNode {
         // §6.3 Chained-Merge Flattening: a merge chain P->Q->R is kept flat so
         // runtime state matches what `rebuildMergeState` derives from a snapshot
         // (which can only ever represent the compressed chain, because it records
@@ -1748,7 +1748,7 @@ class CRDTTree: CRDTElement {
      */
     /// Skips when `mergedInto` points to the merge destination (concurrent
     /// merge). The comparison is against the resolved `dest`, not `fromParent`:
-    /// the forwarding pointers set by ``applyMergeMoves(_:_:_:_:)`` point at the
+    /// the forwarding pointers set by ``applyMergeMoves(_:_:_:)`` point at the
     /// flattened target, so a chained merge (`dest !== fromParent`) must
     /// recognise a concurrent-merge boundary by `dest`.
     private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ dest: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
@@ -2464,12 +2464,21 @@ extension CRDTTree {
 
         let node: CRDTTreeNode
         if span.isText {
+            // Slice in UTF-16 with an EXCLUSIVE end. Tree text offsets are UTF-16
+            // throughout (`CRDTTreeNode.value`'s setter sets `size` from
+            // `NSString.length`, and `splitText` slices with `NSString`), whereas
+            // `String.substring(from:to:)` indexes by grapheme AND treats `to` as
+            // inclusive — either would silently produce a node whose value and
+            // `size` disagree with JS, corrupting ancestor index accounting.
             let base = Int(offset - span.id.offset)
-            let source = (span.value as String?) ?? ""
-            let value = source.substring(from: base, to: base + Int(length))
+            let source: NSString = span.value ?? ""
+            guard base >= 0, length >= 0, base + Int(length) <= source.length else {
+                return nil
+            }
+            let value = source.substring(with: NSRange(location: base, length: Int(length))) as NSString
             node = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset),
                                 type: span.nodeType,
-                                value: value as NSString)
+                                value: value)
         } else {
             node = CRDTTreeNode(id: span.id,
                                 type: span.nodeType,

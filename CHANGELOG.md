@@ -13,7 +13,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 - Keep style ranges from crossing a concurrent merge anchor
 - Flatten chained merge to converge an anchored concurrent insert
 - Move tombstones with merge to preserve tree RGA anchors
-- Promote out-of-int32 integers to Long in Primitive
+- Promote out-of-int32 integers to Long in Primitive (no-op on iOS; `Int32` typing makes the JS bug unrepresentable, guarded by a parity test)
 
 ## [v0.7.13] - 2026-08-18
 

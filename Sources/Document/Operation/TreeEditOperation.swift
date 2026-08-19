@@ -208,7 +208,7 @@ final class TreeEditOperation: Operation {
                                               toPos: self.toPos,
                                               contents: nil,
                                               splitLevel: 0,
-                                              executedAt: self.executedAt,
+                                              executedAt: TimeTicket.initial, // reassigned at (re)undo time
                                               isUndoOp: true,
                                               fromIdx: self.fromIdx,
                                               toIdx: self.toIdx,
