@@ -8,12 +8,12 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ## [v0.7.14] - 2026-08-19
 
-- Add identity-preserving restore for Tree undo/redo
-- Recreate purged text runs in order on restore, not reversed
-- Keep style ranges from crossing a concurrent merge anchor
-- Flatten chained merge to converge an anchored concurrent insert
-- Move tombstones with merge to preserve tree RGA anchors
-- Promote out-of-int32 integers to Long in Primitive (no-op on iOS; `Int32` typing makes the JS bug unrepresentable, guarded by a parity test)
+- Add identity-preserving restore for Tree undo/redo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/268
+- Recreate purged text runs in order on restore, not reversed in https://github.com/yorkie-team/yorkie-ios-sdk/pull/268
+- Keep style ranges from crossing a concurrent merge anchor in https://github.com/yorkie-team/yorkie-ios-sdk/pull/268
+- Flatten chained merge to converge an anchored concurrent insert in https://github.com/yorkie-team/yorkie-ios-sdk/pull/268
+- Move tombstones with merge to preserve tree RGA anchors in https://github.com/yorkie-team/yorkie-ios-sdk/pull/268
+- Promote out-of-int32 integers to Long in Primitive (no-op on iOS; `Int32` typing makes the JS bug unrepresentable, guarded by a parity test) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/268
 
 ## [v0.7.13] - 2026-08-18
 
