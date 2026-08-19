@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.14] - 2026-08-19
+
+- Add identity-preserving restore for Tree undo/redo
+- Recreate purged text runs in order on restore, not reversed
+- Keep style ranges from crossing a concurrent merge anchor
+- Flatten chained merge to converge an anchored concurrent insert
+- Move tombstones with merge to preserve tree RGA anchors
+- Promote out-of-int32 integers to Long in Primitive
+
 ## [v0.7.13] - 2026-08-18
 
 - Identity-preserving restore for Text undo/redo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/267
