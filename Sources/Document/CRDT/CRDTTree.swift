@@ -1384,7 +1384,11 @@ class CRDTTree: CRDTElement {
                 // intentional merge.
                 if ticketKnown(versionVector, node.createdAt) {
                     toBeMergedNodes.append(node)
-                    toBeMovedToFromParents.append(contentsOf: node.children)
+                    // Include removed children (innerChildren) so tombstones move
+                    // with the merge and survive as RGA anchors; a concurrent
+                    // insert referencing one then resolves in the merge target
+                    // and orders via the RGA tie-break.
+                    toBeMovedToFromParents.append(contentsOf: node.innerChildren)
                 }
             }
 
@@ -1527,23 +1531,30 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `applyMergeMoves` moves each alive node marked for merge into `fromParent`,
+     * `applyMergeMoves` moves each node marked for merge into `fromParent`,
      * recording `mergedFrom`/`mergedAt` (both persisted in the snapshot encoding;
      * `mergedAt` is captured here because the source's `removedAt` may be
-     * overwritten by a later LWW tombstone) and detaching it from its old parent.
-     * It then sets the `mergedInto` forwarding cache on the merge-source nodes.
+     * overwritten by a later LWW tombstone) and re-parenting it from its old
+     * parent. It then sets the `mergedInto` forwarding cache on the merge-source
+     * nodes.
      */
     private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) throws {
-        for node in toBeMovedToFromParents where node.removedAt == nil {
-            if let parent = node.parent {
-                node.mergedFrom = parent.id
-                node.mergedAt = editedAt
-                // Detach from old parent to prevent ghost references. The child
-                // may already have been detached by a concurrent operation
-                // (e.g., cascade delete of split sibling), so ignore the error.
-                try? parent.detachChild(child: node)
+        for node in toBeMovedToFromParents {
+            // A moved child must have a source parent to record; skip otherwise
+            // rather than append an untracked node (a node without `mergedFrom`
+            // is invisible to the merge-delete propagation and rebuild logic).
+            guard let parent = node.parent else {
+                continue
             }
-            try fromParent.append(contentsOf: [node])
+            // Tombstoned children are moved too (kept removed): they stay as RGA
+            // anchors so a concurrent insert referencing one resolves in the
+            // merge target and orders via the RGA tie-break, converging with the
+            // replica that inserted before the merge. `moveChild` keeps the size
+            // accounting correct for both live and tombstoned children
+            // (visible-neutral for the latter), so index positions stay correct.
+            node.mergedFrom = parent.id
+            node.mergedAt = editedAt
+            try fromParent.moveChild(child: node)
         }
 
         // Forwarding pointer rebuilt from `mergedFrom` on snapshot load.
