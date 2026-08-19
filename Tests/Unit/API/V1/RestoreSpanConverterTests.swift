@@ -284,4 +284,25 @@ final class RestoreSpanConverterTests: XCTestCase {
         XCTAssertEqual(span.end, 2, "end is derived from the content length")
         XCTAssertEqual(span.value.toString, "45", "content itself is preserved verbatim")
     }
+
+    /// The clamp derives `end` by adding the content length to `start`, and
+    /// Swift's `+` traps on overflow. An unbounded `start` from the wire would
+    /// therefore terminate the process rather than degrade to a no-op, so
+    /// `start` is capped at `Int32.max - length`.
+    func test_clamps_a_restore_span_whose_start_would_overflow() throws {
+        // given — the largest representable start, with non-empty content.
+        var pbSpan = Yorkie_V1_RestoreSpan()
+        pbSpan.createdAt = Converter.toTimeTicket(self.seed)
+        pbSpan.start = Int32.max
+        pbSpan.end = Int32.max
+        pbSpan.content = "45"
+
+        // when — must not trap.
+        let span = Converter.fromRestoreSpan(pbSpan, self.executedAt)
+
+        // then — the derived span is still representable and self-consistent.
+        XCTAssertEqual(span.start, Int32.max - 2, "start is capped so start + length cannot overflow")
+        XCTAssertEqual(span.end, Int32.max, "end stays representable")
+        XCTAssertEqual(span.end - span.start, 2, "the span still matches the content length")
+    }
 }

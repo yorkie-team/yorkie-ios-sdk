@@ -455,8 +455,12 @@ extension Converter {
         // `applyChangePack` — the change pack would re-pull and re-fail
         // indefinitely. Clamp to a self-consistent span so a nonconforming peer
         // degrades to a harmless no-op instead.
-        let start = max(0, pbSpan.start)
-        let end = start + Int32((pbSpan.content as NSString).length)
+        // `start` is also capped at `Int32.max - length`: Swift's `+` traps on
+        // overflow, so an unbounded peer-supplied `start` would terminate the
+        // process — the opposite of degrading gracefully.
+        let length = Int32((pbSpan.content as NSString).length)
+        let start = min(max(0, pbSpan.start), Int32.max - length)
+        let end = start + length
         if start != pbSpan.start || end != pbSpan.end {
             Logger.warning("clamped inconsistent RestoreSpan: start=\(pbSpan.start), end=\(pbSpan.end), content length=\((pbSpan.content as NSString).length)")
         }
