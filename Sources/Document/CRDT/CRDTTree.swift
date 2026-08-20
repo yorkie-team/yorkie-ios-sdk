@@ -38,6 +38,17 @@ enum TreeChangeType {
     case removeStyle
 }
 
+/// `PosBoundary` selects how a position inside a merged-away parent resolves in
+/// ``CRDTTree/findNodesAndSplitText(_:_:_:)``.
+enum PosBoundary {
+    /// The insertion boundary in the merge target, before the first moved child,
+    /// so RGA ordering breaks ties between concurrent inserts.
+    case insert
+    /// The position right after the merge-source tombstone, so a style range
+    /// neither grows over nor shrinks past nodes concurrently inserted there.
+    case range
+}
+
 enum TreeChangeValue {
     case nodes([CRDTTreeNode])
     case attributes([String: String])
@@ -244,6 +255,35 @@ typealias TreeNodePair = (CRDTTreeNode, CRDTTreeNode)
 public typealias TreePosStructRange = (CRDTTreePosStruct, CRDTTreePosStruct)
 
 /**
+ * `TreeRestoreSpan` identifies a node an edit transitioned visible → tombstoned,
+ * for identity-preserving Tree undo/redo. For text nodes the span is the
+ * absolute-offset interval `[id.offset, id.offset + length)` of the original
+ * insertion (split-invariant); for element nodes it is the whole node.
+ * `value`/`attrs` are deep-copied so a GC-purged node can be recreated.
+ * `leftSiblingID`/`rightSiblingID` are the deleted run's external boundary
+ * anchors captured at tombstone time — redundant on purpose: since a run's spans
+ * are carried together, restore can rebuild the run's internal order from the op
+ * itself and needs only ONE surviving boundary to place it (id-order is not
+ * sibling-order in a tree).
+ */
+struct TreeRestoreSpan {
+    let id: CRDTTreeNodeID
+    let nodeType: TreeNodeType
+    let isText: Bool
+    /// Text length; 0 for elements.
+    let length: Int32
+    /// Text content copy.
+    let value: NSString?
+    /// Element attribute snapshot.
+    let attrs: RHT?
+    let parentID: CRDTTreeNodeID?
+    /// `nil` → was first child.
+    let leftSiblingID: CRDTTreeNodeID?
+    /// `nil` → was last child.
+    let rightSiblingID: CRDTTreeNodeID?
+}
+
+/**
  * `CRDTTreeNode` is a node of CRDTTree. It includes the logical clock and
  * links to other nodes to resolve conflicts.
  */
@@ -385,6 +425,21 @@ final class CRDTTreeNode: IndexTreeNode {
         }
 
         return false
+    }
+
+    /**
+     * `unremove` clears the tombstone of this node (identity-preserving
+     * restore). Mirrors ``remove(_:)``'s ancestor-size bookkeeping so the node
+     * becomes visible again in place.
+     */
+    func unremove() {
+        guard self.removedAt != nil else {
+            return
+        }
+        self.removedAt = nil
+        // `updateAncestorsSize` signs the delta by the node's own `isRemoved`,
+        // which is now false, so this adds the size back.
+        self.updateAncestorsSize()
     }
 
     /**
@@ -806,6 +861,28 @@ class CRDTTree: CRDTElement {
     }
 
     /**
+     * `resolveMergeTarget` follows the `mergedInto` forwarding chain from the
+     * given node while the current node is a merge-away tombstone, returning the
+     * final live target. When a merge lands on a parent that a prior concurrent
+     * merge already merged away (a chained merge P->Q->R, applied Q->R before
+     * this P->Q), the children must flow to that parent's final destination so
+     * the merge chain stays flat (P->R, not P->Q) and both replicas converge.
+     * The seen set guards against cycles from a concurrent mutual merge.
+     */
+    private func resolveMergeTarget(_ node: CRDTTreeNode) -> CRDTTreeNode {
+        var target = node
+        var seen: Set<ObjectIdentifier> = [ObjectIdentifier(target)]
+        while target.isRemoved, let mergedInto = target.mergedInto {
+            guard let next = self.findFloorNode(mergedInto), !seen.contains(ObjectIdentifier(next)) else {
+                break
+            }
+            seen.insert(ObjectIdentifier(next))
+            target = next
+        }
+        return target
+    }
+
+    /**
      * `advancePastUnknownSplitSiblings` follows the `insNextID` chain of the
      * given node, advancing past element-type split siblings that the editing
      * client did not know about (not in `versionVector`).
@@ -914,10 +991,18 @@ class CRDTTree: CRDTElement {
      * The ids of the given `pos` are the ids of the node in the CRDT perspective.
      * This is different from `TreePos` which is a position of the tree in the
      * physical perspective.
+     *
+     * `boundary` selects how a position inside a merged-away parent resolves:
+     * ``PosBoundary/insert`` places it at the insertion boundary in the merge
+     * target (before the first moved child, so RGA ordering breaks ties), while
+     * ``PosBoundary/range`` places it right after the merge-source tombstone so a
+     * style range neither grows over nor shrinks past nodes concurrently inserted
+     * at that anchor.
      */
     func findNodesAndSplitText(
         _ pos: CRDTTreePos,
-        _ editedAt: TimeTicket? = nil
+        _ editedAt: TimeTicket? = nil,
+        _ boundary: PosBoundary = .insert
     ) throws -> (TreeNodePair, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
         // 01. Find the parent and left sibling node of the given position.
@@ -935,6 +1020,16 @@ class CRDTTree: CRDTElement {
         // tombstoned parent (i.e. the first child moved by the merge, in target
         // child order).
         if realParent.isRemoved, isLeftMost, let mergedInto = realParent.mergedInto {
+            // §9.3 Range Boundary at Merged-Away Anchors: a range boundary
+            // resolves to the position right after the merge-source tombstone,
+            // not the insertion boundary below. The insertion boundary sits
+            // before the first moved child, so it would extend a style range over
+            // nodes concurrently inserted between the tombstone and the moved
+            // children — nodes the styling client saw outside its range (after
+            // the then-live parent).
+            if boundary == .range, let tombstoneParent = realParent.parent {
+                return ((tombstoneParent, realParent), diff)
+            }
             if let mergeTarget = self.findFloorNode(mergedInto), !mergeTarget.isRemoved {
                 let allChildren = mergeTarget.innerChildren
                 for (index, targetChild) in allChildren.enumerated() {
@@ -991,8 +1086,8 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector?
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String], [String]) {
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
 
         // Advance past split siblings unknown to the editing client so the range
@@ -1139,8 +1234,8 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
         var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
 
         // Advance past split siblings unknown to the editing client so the range
@@ -1344,7 +1439,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan]) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1384,7 +1479,11 @@ class CRDTTree: CRDTElement {
                 // intentional merge.
                 if ticketKnown(versionVector, node.createdAt) {
                     toBeMergedNodes.append(node)
-                    toBeMovedToFromParents.append(contentsOf: node.children)
+                    // Include removed children (innerChildren) so tombstones move
+                    // with the merge and survive as RGA anchors; a concurrent
+                    // insert referencing one then resolves in the merge target
+                    // and orders via the RGA tie-break.
+                    toBeMovedToFromParents.append(contentsOf: node.innerChildren)
                 }
             }
 
@@ -1433,22 +1532,27 @@ class CRDTTree: CRDTElement {
         let mergeLevel = toBeMergedNodes.count
 
         // 02. Delete: delete the nodes that are marked as removed.
-        var pairs = [GCPair]()
-        for node in nodesToBeRemoved {
-            let didRemove = node.remove(editedAt)
-            if didRemove {
-                pairs.append(GCPair(parent: self, child: node))
-            }
-        }
+        var (pairs, removedSpans) = self.applyDeletions(nodesToBeRemoved, editedAt)
+        // Captured in the insert phase: identity spans of the nodes this edit
+        // inserts, so an undo re-removes them by identity (not by index, which
+        // would clobber concurrently-restored content) and a redo revives them.
+        var insertedSpans = [TreeRestoreSpan]()
+        // Track how many GC pairs exist right after the plain-delete loop; if the
+        // merge phases (steps 03/03-1) add more, this edit involved merge-child
+        // propagation and its captured spans are NOT a complete description of
+        // the deletion — the op layer then falls back to the copy-reinsert
+        // reverse.
+        let deletePairCount = pairs.count
 
         // 03. Merge: move the nodes that are marked as moved, then set the
-        // forwarding pointer on merge-source nodes.
-        try self.applyMergeMoves(toBeMovedToFromParents, fromParent, toBeMergedNodes, editedAt)
+        // forwarding pointer on merge-source nodes. Returns the resolved
+        // destination, which differs from `fromParent` in a chained merge.
+        let mergeDest = try self.applyMergeMoves(toBeMovedToFromParents, fromParent, editedAt)
 
         // 03-1. Propagate deletes to children moved by prior merges. When a
         // merge-source node is fully deleted (not a merge boundary), its former
         // children in the merge target should also be deleted.
-        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, fromParent, toBeMergedNodes, editedAt))
+        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, mergeDest, toBeMergedNodes, editedAt))
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
@@ -1492,6 +1596,10 @@ class CRDTTree: CRDTElement {
                     }
 
                     self.nodeMapByID.put(node.id, node)
+
+                    // Capture this inserted node's identity span for
+                    // identity-preserving insert undo/redo.
+                    insertedSpans.append(self.makeRestoreSpan(node))
                 }
 
                 if !content.isRemoved {
@@ -1523,33 +1631,84 @@ class CRDTTree: CRDTElement {
         }
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned)
+        // Identity-preserving restore only covers plain deletions. If this edit
+        // merged nodes, or its merge propagation removed extra nodes, the
+        // captured spans don't fully describe the deletion → signal the op layer
+        // (empty spans) to keep the copy-reinsert reverse.
+        let spansComplete = mergeLevel == 0 && pairs.count == deletePairCount
+
+        // `traverseAll` is post-order (children before parent), so reverse to get
+        // parent-before-child — the order `restore` needs to recreate a purged
+        // subtree top-down (a child's recreate resolves its parent by identity).
+        let outRemoved = spansComplete ? removedSpans : []
+        let outInserted = spansComplete ? Array(insertedSpans.reversed()) : []
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted)
     }
 
     /**
-     * `applyMergeMoves` moves each alive node marked for merge into `fromParent`,
+     * `applyMergeMoves` moves each node marked for merge into `fromParent`,
      * recording `mergedFrom`/`mergedAt` (both persisted in the snapshot encoding;
      * `mergedAt` is captured here because the source's `removedAt` may be
-     * overwritten by a later LWW tombstone) and detaching it from its old parent.
-     * It then sets the `mergedInto` forwarding cache on the merge-source nodes.
+     * overwritten by a later LWW tombstone) and re-parenting it from its old
+     * parent. It then sets the `mergedInto` forwarding cache on the merge-source
+     * nodes.
      */
-    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) throws {
-        for node in toBeMovedToFromParents where node.removedAt == nil {
-            if let parent = node.parent {
+    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ editedAt: TimeTicket) throws -> CRDTTreeNode {
+        // §6.3 Chained-Merge Flattening: a merge chain P->Q->R is kept flat so
+        // runtime state matches what `rebuildMergeState` derives from a snapshot
+        // (which can only ever represent the compressed chain, because it records
+        // one `mergedFrom` pointer per child and reads the child's final physical
+        // parent). The destination is resolved through `resolveMergeTarget`, so
+        // children merged into an already-merged-away parent forward to the final
+        // live target instead of piling up under the removed intermediate.
+        let dest = self.resolveMergeTarget(fromParent)
+        for node in toBeMovedToFromParents {
+            // A moved child must have a source parent to record; skip otherwise
+            // rather than append an untracked node (a node without `mergedFrom`
+            // is invisible to the merge-delete propagation and rebuild logic).
+            guard let parent = node.parent else {
+                continue
+            }
+            // Tombstoned children are moved too (kept removed): they stay as RGA
+            // anchors so a concurrent insert referencing one resolves in the
+            // merge target and orders via the RGA tie-break, converging with the
+            // replica that inserted before the merge. `moveChild` keeps the size
+            // accounting correct for both live and tombstoned children
+            // (visible-neutral for the latter), so index positions stay correct.
+            //
+            // `mergedFrom` and `mergedAt` are stamped together, only on the first
+            // move, so a child carried through a chained merge keeps its original
+            // source P and the original P->Q merge ticket. Stamping `mergedAt` on
+            // every move would diverge: a replica that applied P->Q then Q->R
+            // would record the Q->R ticket, while a replica where Q was already
+            // merged records the P->Q ticket on the single forwarded move.
+            if node.mergedFrom == nil {
                 node.mergedFrom = parent.id
                 node.mergedAt = editedAt
-                // Detach from old parent to prevent ghost references. The child
-                // may already have been detached by a concurrent operation
-                // (e.g., cascade delete of split sibling), so ignore the error.
-                try? parent.detachChild(child: node)
             }
-            try fromParent.append(contentsOf: [node])
+            try dest.moveChild(child: node)
+            // Point this child's original source at the resolved destination,
+            // path-compressing a transitive source (a prior merge whose children
+            // were just relocated again) from the now-removed intermediate to the
+            // final target. This runtime cache is rebuilt from `mergedFrom` on
+            // snapshot load. Deriving `mergedInto` from a *moved* child — one that
+            // had a parent above — mirrors `rebuildMergeState`, which likewise
+            // skips parentless children, so runtime and snapshot agree. (A
+            // parentless child, detached by a concurrent split cascade, is
+            // skipped above and must not repoint its source here.)
+            //
+            // `mergedInto` is set solely from moved children (never from the
+            // merge-source list directly), so it is set only when
+            // `rebuildMergeState` can reconstruct it — a source with no moved
+            // child of its own (e.g. an intermediate that only relayed another
+            // source's children) is left unset on both paths, keeping runtime and
+            // snapshot consistent.
+            if let mergedFrom = node.mergedFrom, let src = self.findFloorNode(mergedFrom) {
+                src.mergedInto = dest.id
+            }
         }
 
-        // Forwarding pointer rebuilt from `mergedFrom` on snapshot load.
-        for src in toBeMergedNodes {
-            src.mergedInto = fromParent.id
-        }
+        return dest
     }
 
     /**
@@ -1587,12 +1746,17 @@ class CRDTTree: CRDTElement {
      * moved children are recomputed from the merge target's children filtered by
      * `mergedFrom`. Returns the GC pairs for the newly tombstoned nodes.
      */
-    private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
+    /// Skips when `mergedInto` points to the merge destination (concurrent
+    /// merge). The comparison is against the resolved `dest`, not `fromParent`:
+    /// the forwarding pointers set by ``applyMergeMoves(_:_:_:)`` point at the
+    /// flattened target, so a chained merge (`dest !== fromParent`) must
+    /// recognise a concurrent-merge boundary by `dest`.
+    private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ dest: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
         var pairs = [GCPair]()
         for node in nodesToBeRemoved {
             guard let mergedInto = node.mergedInto,
                   !toBeMergedNodes.contains(where: { $0 === node }),
-                  mergedInto != fromParent.id,
+                  mergedInto != dest.id,
                   let mergeTarget = self.findFloorNode(mergedInto)
             else {
                 continue
@@ -1627,7 +1791,7 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan]) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         return try self.edit(
@@ -2080,5 +2244,311 @@ extension CRDTTree: CRDTGCPairContainable {
 extension CRDTTreeNode {
     var toXML: String {
         return CRDTTreeNode.toXML(node: self)
+    }
+}
+
+// MARK: - Identity-preserving Tree undo/redo (yorkie-js-sdk#1297)
+
+extension CRDTTree {
+    /**
+     * `applyDeletions` tombstones each node this edit removes and captures one
+     * ``TreeRestoreSpan`` per node it actually transitioned visible → tombstoned.
+     *
+     * `remove` returning true is exactly that transition, so pre-tombstoned nodes
+     * and LWW overwrites are excluded automatically. `nodesToBeRemoved` is in
+     * traversal order → parents precede children, which ``restore(_:)`` relies on
+     * when recreating purged subtrees.
+     */
+    private func applyDeletions(_ nodesToBeRemoved: [CRDTTreeNode], _ editedAt: TimeTicket) -> ([GCPair], [TreeRestoreSpan]) {
+        var pairs = [GCPair]()
+        var removedSpans = [TreeRestoreSpan]()
+        for node in nodesToBeRemoved where node.remove(editedAt) {
+            pairs.append(GCPair(parent: self, child: node))
+            removedSpans.append(self.makeRestoreSpan(node))
+        }
+        return (pairs, removedSpans)
+    }
+
+    /**
+     * `restore` re-establishes the nodes described by `spans` under their
+     * ORIGINAL identities (identity-preserving Tree undo): live → skip
+     * (idempotent), tombstoned → unremove in place, purged → recreate. Spans
+     * must be in parent-before-child order (``edit(_:_:_:_:_:_:)`` captures them
+     * that way).
+     *
+     * - Returns: the un-tombstoned and recreated nodes; the caller unregisters
+     *   GC pairs for the un-tombstoned ones.
+     */
+    func restore(_ spans: [TreeRestoreSpan]) throws -> ([CRDTTreeNode], [CRDTTreeNode]) {
+        var untombstoned = [CRDTTreeNode]()
+        var recreated = [CRDTTreeNode]()
+
+        for span in spans {
+            if !span.isText {
+                if let node = self.findFloorNode(span.id), node.id == span.id {
+                    if node.isRemoved {
+                        node.unremove()
+                        untombstoned.append(node)
+                    }
+                    continue
+                }
+                if let created = try self.recreateFromSpan(span, span.id.offset, span.length) {
+                    recreated.append(created)
+                }
+                continue
+            }
+
+            // Text: surviving pieces may be split finer than the span.
+            let start = span.id.offset
+            let end = start + span.length
+            let pieces = self.findPiecesOverlapping(span.id.createdAt, start, end)
+
+            var cursor = start
+            var pieceIdx = 0
+            while cursor < end {
+                let piece = pieceIdx < pieces.count ? pieces[pieceIdx] : nil
+                let pieceStart = piece?.id.offset ?? Int32.max
+                let pieceEnd = piece.map { $0.id.offset + Int32($0.size) } ?? Int32.max
+
+                if let piece, pieceStart <= cursor {
+                    if pieceStart < start || pieceEnd > end {
+                        // Piece straddles a span boundary. Under causal delivery
+                        // the forward delete split at span boundaries on every
+                        // replica before its undo could arrive, so this is not
+                        // expected; skip conservatively rather than un-tombstone
+                        // beyond the span. Mirrors the guard in `retombstone`.
+                        break
+                    }
+                    if piece.isRemoved {
+                        piece.unremove()
+                        untombstoned.append(piece)
+                    }
+                    cursor = Swift.min(pieceEnd, end)
+                    if cursor >= pieceEnd {
+                        pieceIdx += 1
+                    }
+                } else {
+                    let gapEnd = Swift.min(pieceStart, end)
+                    if let created = try self.recreateFromSpan(span, cursor, gapEnd - cursor) {
+                        recreated.append(created)
+                    }
+                    cursor = gapEnd
+                }
+            }
+        }
+
+        return (untombstoned, recreated)
+    }
+
+    /**
+     * `retombstone` re-deletes the nodes described by `spans` (redo of an
+     * identity-preserving undo). Live pieces only; idempotent.
+     *
+     * - Returns: GC pairs for the newly tombstoned nodes.
+     */
+    func retombstone(_ spans: [TreeRestoreSpan], _ executedAt: TimeTicket) -> [GCPair] {
+        var pairs = [GCPair]()
+        for span in spans {
+            let start = span.id.offset
+            let end = start + Swift.max(span.length, 1)
+            let pieces: [CRDTTreeNode]
+            if span.isText {
+                pieces = self.findPiecesOverlapping(span.id.createdAt, start, end)
+            } else if let node = self.findFloorNode(span.id), node.id == span.id {
+                pieces = [node]
+            } else {
+                pieces = []
+            }
+
+            for piece in pieces {
+                if piece.isRemoved {
+                    continue
+                }
+                if piece.isText, piece.id.offset < start || piece.id.offset + Int32(piece.size) > end {
+                    // Piece straddles a span boundary (same clamped `end` as
+                    // `findPiecesOverlapping`); skip so we never re-tombstone
+                    // content outside the span. Mirrors the guard in `restore`.
+                    continue
+                }
+                if piece.remove(executedAt) {
+                    pairs.append(GCPair(parent: self, child: piece))
+                }
+            }
+        }
+        return pairs
+    }
+
+    /**
+     * `findPiecesOverlapping` collects surviving pieces (live or tombstoned) of
+     * the text insertion `createdAt` overlapping `[start, end)`, in ascending
+     * offset order, via descending floorEntry probes.
+     */
+    private func findPiecesOverlapping(_ createdAt: TimeTicket, _ start: Int32, _ end: Int32) -> [CRDTTreeNode] {
+        var pieces = [CRDTTreeNode]()
+        var probe = end - 1
+        while probe >= 0 {
+            guard let node = self.findFloorNode(CRDTTreeNodeID(createdAt: createdAt, offset: probe)), node.isText else {
+                break
+            }
+            let nodeStart = node.id.offset
+            let nodeEnd = nodeStart + Int32(node.size)
+            if nodeEnd <= start {
+                break
+            }
+            if nodeStart < end, nodeEnd > start {
+                pieces.append(node)
+            }
+            if nodeStart <= start {
+                break
+            }
+            probe = nodeStart - 1
+        }
+        return pieces.reversed()
+    }
+
+    /**
+     * `makeRestoreSpan` captures the identity span of `node` — its id, type,
+     * content/attribute copy, and the external boundary anchors of its position
+     * — so an undo can re-establish it later even if it has been GC-purged.
+     */
+    private func makeRestoreSpan(_ node: CRDTTreeNode) -> TreeRestoreSpan {
+        var leftSiblingID: CRDTTreeNodeID?
+        var rightSiblingID: CRDTTreeNodeID?
+        let parent = node.parent
+        if let parent {
+            let siblings = parent.innerChildren
+            if let idx = siblings.firstIndex(where: { $0 === node }) {
+                if idx > 0 {
+                    leftSiblingID = self.leftAnchorID(siblings[idx - 1])
+                }
+                if idx < siblings.count - 1 {
+                    rightSiblingID = siblings[idx + 1].id
+                }
+            }
+        }
+
+        return TreeRestoreSpan(id: node.id,
+                               nodeType: node.type,
+                               isText: node.isText,
+                               length: node.isText ? Int32(node.size) : 0,
+                               value: node.isText ? node.value as NSString : nil,
+                               attrs: node.attrs?.deepcopy(),
+                               parentID: parent?.id,
+                               leftSiblingID: leftSiblingID,
+                               rightSiblingID: rightSiblingID)
+    }
+
+    /**
+     * `recreateFromSpan` rebuilds a purged node (or purged text sub-range) under
+     * its original identity and attaches it. Anchor ladder, each rung doing
+     * floor-lookup + parent-identity check:
+     *   (a) same-insertion successor/predecessor piece (text) → exact slot;
+     *   (b) captured left boundary sibling still under this parent → after it;
+     *   (c) captured right boundary sibling still under this parent → before it;
+     *   (d) deterministic id-order fallback: insert among the parent's current
+     *       children at the first position whose id compares greater than the
+     *       node's id (a pure function of ids → identical on every replica).
+     *
+     * A genuinely absent parent → skip: the node stays unplaced/invisible, which
+     * is convergent because every replica resolves parent-absent identically.
+     */
+    private func recreateFromSpan(_ span: TreeRestoreSpan, _ offset: Int32, _ length: Int32) throws -> CRDTTreeNode? {
+        guard let parentID = span.parentID,
+              let parent = self.findFloorNode(parentID),
+              parent.id == parentID
+        else {
+            // Parent gone (purged, and not part of this undo's spans). Leave the
+            // node unplaced; a later parent-restore will bring it back.
+            return nil
+        }
+
+        let node: CRDTTreeNode
+        if span.isText {
+            // Slice in UTF-16 with an EXCLUSIVE end. Tree text offsets are UTF-16
+            // throughout (`CRDTTreeNode.value`'s setter sets `size` from
+            // `NSString.length`, and `splitText` slices with `NSString`), whereas
+            // `String.substring(from:to:)` indexes by grapheme AND treats `to` as
+            // inclusive — either would silently produce a node whose value and
+            // `size` disagree with JS, corrupting ancestor index accounting.
+            let base = Int(offset - span.id.offset)
+            let source: NSString = span.value ?? ""
+            guard base >= 0, length >= 0, base + Int(length) <= source.length else {
+                return nil
+            }
+            let value = source.substring(with: NSRange(location: base, length: Int(length))) as NSString
+            node = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset),
+                                type: span.nodeType,
+                                value: value)
+        } else {
+            node = CRDTTreeNode(id: span.id,
+                                type: span.nodeType,
+                                attributes: span.attrs?.deepcopy())
+        }
+
+        let siblings = parent.innerChildren
+
+        // (a) same-insertion successor / predecessor piece (text): exact slot.
+        if span.isText {
+            if let succ = self.findFloorNode(CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset + length)),
+               succ.isText, succ.parent === parent, succ.id.offset == offset + length,
+               let succIdx = siblings.firstIndex(where: { $0 === succ })
+            {
+                try parent.insertAt(node, succIdx)
+                self.nodeMapByID.put(node.id, node)
+                return node
+            }
+            if offset > span.id.offset || offset > 0 {
+                if let pred = self.findFloorNode(CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset - 1)),
+                   pred.isText, pred.parent === parent
+                {
+                    try parent.insertAfter(node, pred)
+                    self.nodeMapByID.put(node.id, node)
+                    return node
+                }
+            }
+        }
+
+        // (b) captured left boundary sibling, if it still exists under this parent.
+        if let leftSiblingID = span.leftSiblingID,
+           let left = self.findFloorNode(leftSiblingID), left.parent === parent
+        {
+            try parent.insertAfter(node, left)
+            self.nodeMapByID.put(node.id, node)
+            return node
+        }
+
+        // (c) captured right boundary sibling (redundant anchor): insert before it.
+        if let rightSiblingID = span.rightSiblingID,
+           let right = self.findFloorNode(rightSiblingID), right.parent === parent,
+           let rightIdx = siblings.firstIndex(where: { $0 === right })
+        {
+            try parent.insertAt(node, rightIdx)
+            self.nodeMapByID.put(node.id, node)
+            return node
+        }
+
+        // (d) deterministic id-order fallback: first slot whose child id > node id.
+        // `CRDTTreeNodeID` is `Comparable` on (createdAt, offset), which is the
+        // total order this rung needs.
+        let insertIdx = siblings.firstIndex { $0.id > node.id } ?? siblings.count
+        try parent.insertAt(node, insertIdx)
+        self.nodeMapByID.put(node.id, node)
+        return node
+    }
+
+    /**
+     * `leftAnchorID` returns the id to store as a restore span's left-sibling
+     * anchor. For a text node the anchor is its LAST character's offset, not its
+     * start: a concurrent delete may later split the left neighbour, and only the
+     * last-char offset floor-resolves to the rightmost fragment (the true left
+     * neighbour of the restored node). For elements (never split by offset) the
+     * node's own id is exact. Right-sibling anchors always use the start offset,
+     * which floor-resolves to the leftmost fragment — the true right neighbour.
+     */
+    private func leftAnchorID(_ sibling: CRDTTreeNode) -> CRDTTreeNodeID {
+        guard sibling.isText else {
+            return sibling.id
+        }
+        return CRDTTreeNodeID(createdAt: sibling.id.createdAt, offset: sibling.id.offset + Int32(sibling.size) - 1)
     }
 }

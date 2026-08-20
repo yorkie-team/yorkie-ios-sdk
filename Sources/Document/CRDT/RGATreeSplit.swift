@@ -915,6 +915,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         var recreated = [RGATreeSplitNode<T>]()
         var liveDiff = DataSize(data: 0, meta: 0)
 
+        // The last node placed at the current cursor (un-tombstoned or recreated),
+        // in document order. When a recreated fragment has no surviving same-
+        // insertion anchor, chaining after this keeps a multi-fragment run in
+        // left-to-right order instead of each fragment prepending at the same fixed
+        // fallback anchor — which would rebuild the run reversed. Spans arrive in
+        // document order, so this is always the recreated fragment's left neighbour.
+        var chainAnchor: RGATreeSplitNode<T>?
         for span in spans {
             let pieces = self.findPiecesOverlapping(span.createdAt, span.start, span.end)
 
@@ -934,6 +941,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                         // Repair splay weights on the path to root (length 0 → len).
                         self.treeByIndex.splayNode(target)
                         untombstoned.append(target)
+                        chainAnchor = target
+                    } else {
+                        chainAnchor = piece
                     }
                     cursor = overlapEnd
                     if overlapEnd >= pieceEnd {
@@ -950,10 +960,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                         cursor,
                         gapEnd,
                         executedAt,
-                        fallbackAnchor
+                        fallbackAnchor,
+                        chainAnchor
                     )
                     _ = self.insertAfter(prev, newNode)
                     recreated.append(newNode)
+                    chainAnchor = newNode
                     cursor = gapEnd
                 }
             }
@@ -1105,15 +1117,19 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      *      → directly after it
      *  (c) rightmost surviving piece of the same insertion (must be right
      *      of the gap) → directly before it
-     *  (d) the operation's fallback anchor (refined)
-     *  (e) head (deterministic last resort)
+     *  (d) chain anchor: the previously placed fragment of this same restore
+     *      (document order) → after it, so a purged multi-fragment run is
+     *      rebuilt left-to-right rather than reversed
+     *  (e) the operation's fallback anchor (refined)
+     *  (f) head (deterministic last resort)
      */
     private func findRestoreAnchor(
         _ createdAt: TimeTicket,
         _ gapStart: Int32,
         _ gapEnd: Int32,
         _ executedAt: TimeTicket,
-        _ fallbackAnchor: RGATreeSplitPos?
+        _ fallbackAnchor: RGATreeSplitPos?,
+        _ chainAnchor: RGATreeSplitNode<T>? = nil
     ) throws -> RGATreeSplitNode<T> {
         if let succ = self.findPieceCovering(createdAt, gapEnd), let prev = succ.prev {
             return prev
@@ -1133,6 +1149,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
            let prev = rightmost.value.prev
         {
             return prev
+        }
+
+        // (d) No surviving piece of this insertion anchors the fragment. When the
+        // whole run was purged, every fragment lands here; anchoring after the
+        // fragment placed just before it (document order) keeps the run forward.
+        if let chainAnchor {
+            return chainAnchor
         }
 
         if let fallbackAnchor {

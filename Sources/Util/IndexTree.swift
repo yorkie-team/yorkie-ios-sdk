@@ -449,6 +449,56 @@ extension IndexTreeNode {
     }
 
     /**
+     * `moveChild` detaches the given child from its current parent (if any) and
+     * appends it to this node, preserving the size accounting on both parents.
+     *
+     * Unlike ``detachChild(child:)`` followed by ``append(contentsOf:)``, it is
+     * correct for tombstoned children: a removed node contributes nothing to
+     * either parent's size (removal already excluded it from its ancestors), so
+     * moving it must not touch the size at all. It is used by merge to move
+     * tombstones as RGA anchors without corrupting index positions.
+     *
+     * iOS caches only the visible size and derives the include-removed total on
+     * demand via ``nodeLength(includeRemoved:)``, so — unlike yorkie-js-sdk,
+     * which caches both dimensions — only the visible dimension is relocated
+     * here.
+     */
+    func moveChild(child: Self) throws {
+        guard self.isText == false else {
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
+        }
+
+        let removed = child.isRemoved
+
+        if let oldParent = child.parent {
+            // The child may already have been spliced out of its parent's list by
+            // a concurrent operation (e.g. cascade delete of a split sibling),
+            // which already reconciled the old ancestors' size. In that case only
+            // re-parent; otherwise detach with size accounting.
+            if let offset = oldParent.innerChildren.firstIndex(where: { $0 === child }) {
+                oldParent.innerChildren.splice(offset, 1, with: [])
+                if !removed {
+                    var ancestor = child.parent
+                    while ancestor != nil {
+                        ancestor?.size -= child.paddedSize
+                        if ancestor!.isRemoved {
+                            break
+                        }
+                        ancestor = ancestor?.parent
+                    }
+                }
+            }
+            child.parent = nil
+        }
+
+        self.innerChildren.append(child)
+        child.parent = self
+        if !removed {
+            child.updateAncestorsSize()
+        }
+    }
+
+    /**
      * `shouldStayLeftOnSplit` returns true when `child` was moved here by a
      * concurrent merge whose source is one of `siblings`, and that merge is
      * unknown to `versionVector`. Such a child must remain in the original

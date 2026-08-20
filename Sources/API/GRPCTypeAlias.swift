@@ -97,6 +97,7 @@ typealias PbTreePos = Yorkie_V1_TreePos
 typealias PbTreeNodes = Yorkie_V1_TreeNodes
 typealias PbSnapshot = Yorkie_V1_Snapshot
 typealias PbTreeNodeID = Yorkie_V1_TreeNodeID
+typealias PbTreeRestoreSpan = Yorkie_V1_TreeRestoreSpan
 typealias PbVersionVector = Yorkie_V1_VersionVector
 
 typealias ErrorInfo = Google_Rpc_ErrorInfo
