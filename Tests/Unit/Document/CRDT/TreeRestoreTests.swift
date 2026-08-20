@@ -61,7 +61,7 @@ final class TreeRestoreTests: XCTestCase {
                                    parentID: paragraph.id,
                                    leftSiblingID: nil,
                                    rightSiblingID: nil)
-        let (untombstoned, recreated) = try tree.restore([span])
+        let (untombstoned, recreated, _, _) = try tree.restore([span])
 
         // then — exactly 3 characters, and `size` agrees with the value length
         XCTAssertTrue(untombstoned.isEmpty, "the node was purged, so nothing can be un-tombstoned")
@@ -97,9 +97,9 @@ final class TreeRestoreTests: XCTestCase {
                                    rightSiblingID: nil)
 
         // when — restore twice
-        let (first, recreatedFirst) = try tree.restore([span])
+        let (first, recreatedFirst, _, _) = try tree.restore([span])
         let sizeAfterFirst = tree.size
-        let (second, recreatedSecond) = try tree.restore([span])
+        let (second, recreatedSecond, _, _) = try tree.restore([span])
 
         // then
         XCTAssertEqual(first.count, 1, "the tombstoned node is revived in place")
@@ -132,9 +132,9 @@ final class TreeRestoreTests: XCTestCase {
                                    rightSiblingID: nil)
 
         // when
-        let firstPairs = tree.retombstone([span], timeT())
+        let (firstPairs, _) = try tree.retombstone([span], timeT())
         let xmlAfterFirst = tree.toXML()
-        let secondPairs = tree.retombstone([span], timeT())
+        let (secondPairs, _) = try tree.retombstone([span], timeT())
 
         // then
         XCTAssertEqual(firstPairs.count, 1, "the live node is tombstoned and registered for GC")
