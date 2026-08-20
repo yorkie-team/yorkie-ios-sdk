@@ -121,6 +121,10 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
 
     /// Increases the counter by the given primitive value.
     ///
+    /// The sum is computed in 64-bit and then wrapped to the counter's own width, so
+    /// an `Int32` counter increased by an out-of-int32 `Long` wraps around instead of
+    /// trapping, converging with the other SDKs.
+    ///
     /// - Throws: ``YorkieError`` when called on a dedup counter; use
     ///   ``increaseDedup(_:actor:)`` instead.
     @discardableResult
@@ -132,11 +136,15 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
             )
         }
 
+        // Add in 64-bit, then wrap the *result* down to `T`'s width. This mirrors
+        // JS `bigintToInt32(BigInt(value) + delta)` / `BigInt.asIntN(64, …)` and the
+        // Go SDK: an `Int32` counter keeps the low 32 bits of the sum instead of
+        // trapping on an out-of-int32 `Long` delta, an `Int64` counter wraps at 64.
         switch primitive.value {
         case .integer(let int32Value):
-            self.value &+= T(int32Value)
+            self.value = T(truncatingIfNeeded: Int64(self.value) &+ Int64(int32Value))
         case .long(let int64Value):
-            self.value &+= T(int64Value)
+            self.value = T(truncatingIfNeeded: Int64(self.value) &+ int64Value)
         default:
             throw YorkieError(code: .errUnimplemented, message: "Unsupported type of value: \(type(of: primitive.value))")
         }
