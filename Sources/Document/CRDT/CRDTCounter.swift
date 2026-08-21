@@ -142,9 +142,9 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
         // trapping on an out-of-int32 `Long` delta, an `Int64` counter wraps at 64.
         switch primitive.value {
         case .integer(let int32Value):
-            self.value = T(truncatingIfNeeded: Int64(self.value) &+ Int64(int32Value))
+            self.value = T(truncatingIfNeeded: Int64(truncatingIfNeeded: self.value) &+ Int64(int32Value))
         case .long(let int64Value):
-            self.value = T(truncatingIfNeeded: Int64(self.value) &+ int64Value)
+            self.value = T(truncatingIfNeeded: Int64(truncatingIfNeeded: self.value) &+ int64Value)
         default:
             throw YorkieError(code: .errUnimplemented, message: "Unsupported type of value: \(type(of: primitive.value))")
         }

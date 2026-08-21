@@ -64,17 +64,22 @@ private func initFlat(_ doc: Document) throws {
 }
 
 /// Returns the XML of the `t` field in the document root.
+///
+/// Unwraps rather than defaulting to `""`: a broken document model would
+/// otherwise let every comparison pass vacuously as `"" == ""`.
 @MainActor
-private func flatXML(_ doc: Document) -> String {
-    (doc.getRoot().t as? JSONTree)?.toXML() ?? ""
+private func flatXML(_ doc: Document) throws -> String {
+    try XCTUnwrap(doc.getRoot().t as? JSONTree, "root.t is not a JSONTree").toXML()
 }
 
 /// Asserts the two replicas converged, reporting both trees when they have not.
 @MainActor
-private func assertConverged(_ d1: Document, _ d2: Document, _ label: String) {
+private func assertConverged(_ d1: Document, _ d2: Document, _ label: String) throws {
+    let x1 = try flatXML(d1)
+    let x2 = try flatXML(d2)
     XCTAssertEqual(d1.toSortedJSON(),
                    d2.toSortedJSON(),
-                   "\(label) DIVERGED\n  d1=\(flatXML(d1))\n  d2=\(flatXML(d2))")
+                   "\(label) DIVERGED\n  d1=\(x1)\n  d2=\(x2)")
 }
 
 /// One undo range on `d1` versus one on `d2`, covering every overlap
@@ -190,7 +195,38 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
     // (non-commutative — broke GC/tombstone symmetry after redo).
     @MainActor
     func test_known_delete_whole_element_vs_edit_inside_both_undo() async throws {
-        throw XCTSkip("KNOWN: element-delete vs inner text edit diverges on segmentation after GC — mirrors JS it.skip")
+        // `XCTSkipIf(true, …)` rather than a bare `throw`: the body below stays
+        // compiled (so it cannot rot) and re-enabling is a one-line deletion,
+        // matching how upstream keeps the scenario under `it.skip`.
+        try XCTSkipIf(true, "KNOWN: element-delete vs inner text edit diverges on segmentation after GC — mirrors JS it.skip")
+
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "hello")]),
+                        JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "world")])
+                    ])
+                )
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // d1 removes the whole first <p>; d2 replaces text inside it.
+            try d1.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).edit(0, 7)
+            }
+            try d2.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).edit(3, 5, JSONTreeTextNode(value: "XY"))
+            }
+            try await settle(c1, c2)
+            try assertConverged(d1, d2, "after ops")
+
+            try d1.undo()
+            try d2.undo()
+            try await settle(c1, c2)
+            try assertConverged(d1, d2, "after undo")
+        }
     }
 
     // Ports: "KNOWN: delete two <p> vs edit inside first, both undo (segmentation)"
@@ -204,7 +240,35 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
     // Left skipped until undo-stack-aware GC lands.
     @MainActor
     func test_known_delete_two_elements_vs_edit_inside_first_both_undo() async throws {
-        throw XCTSkip("KNOWN: multi-element delete vs inner text edit diverges on segmentation after GC — mirrors JS it.skip")
+        try XCTSkipIf(true, "KNOWN: multi-element delete vs inner text edit diverges on segmentation after GC — mirrors JS it.skip")
+
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "aaaa")]),
+                        JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "bbbb")]),
+                        JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cccc")])
+                    ])
+                )
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            try d1.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).edit(0, 12)
+            }
+            try d2.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).edit(2, 4, JSONTreeTextNode(value: "XY"))
+            }
+            try await settle(c1, c2)
+            try await settle(c1, c2)
+
+            try d1.undo()
+            try d2.undo()
+            try await settle(c1, c2)
+            try assertConverged(d1, d2, "after undo")
+        }
     }
 
     // MARK: - Shared runners
@@ -222,18 +286,18 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
             try initFlat(d1)
             try await c1.sync()
             try await c2.sync()
-            let initial = flatXML(d1)
+            let initial = try flatXML(d1)
 
             // when — concurrent overlapping deletes, settled twice so GC purges
             try d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(tc.r1.0, tc.r1.1)
+                try XCTUnwrap(root.t as? JSONTree).edit(tc.r1.0, tc.r1.1)
             }
             try d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(tc.r2.0, tc.r2.1)
+                try XCTUnwrap(root.t as? JSONTree).edit(tc.r2.0, tc.r2.1)
             }
             try await settle(c1, c2)
             try await settle(c1, c2)
-            assertConverged(d1, d2, "after deletes")
+            try assertConverged(d1, d2, "after deletes")
 
             // when — both replicas undo their own delete
             try d1.undo()
@@ -241,8 +305,8 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
             try await settle(c1, c2)
 
             // then
-            assertConverged(d1, d2, "after undo")
-            XCTAssertEqual(flatXML(d1), initial, "undo restores the initial visible content")
+            try assertConverged(d1, d2, "after undo")
+            XCTAssertEqual(try flatXML(d1), initial, "undo restores the initial visible content")
         }
     }
 
@@ -257,18 +321,18 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
             try initFlat(d1)
             try await c1.sync()
             try await c2.sync()
-            let initial = flatXML(d1)
+            let initial = try flatXML(d1)
 
             // when — concurrent overlapping deletes, settled twice so GC purges
             try d1.update { root, _ in
-                try (root.t as? JSONTree)?.edit(tc.r1.0, tc.r1.1)
+                try XCTUnwrap(root.t as? JSONTree).edit(tc.r1.0, tc.r1.1)
             }
             try d2.update { root, _ in
-                try (root.t as? JSONTree)?.edit(tc.r2.0, tc.r2.1)
+                try XCTUnwrap(root.t as? JSONTree).edit(tc.r2.0, tc.r2.1)
             }
             try await settle(c1, c2)
             try await settle(c1, c2)
-            let afterDeletes = flatXML(d1)
+            let afterDeletes = try flatXML(d1)
 
             // when — both undo
             try d1.undo()
@@ -276,8 +340,8 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
             try await settle(c1, c2)
 
             // then
-            assertConverged(d1, d2, "after undo")
-            XCTAssertEqual(flatXML(d1), initial, "undo restores the initial visible content")
+            try assertConverged(d1, d2, "after undo")
+            XCTAssertEqual(try flatXML(d1), initial, "undo restores the initial visible content")
 
             // when — both redo
             try d1.redo()
@@ -285,8 +349,8 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
             try await settle(c1, c2)
 
             // then
-            assertConverged(d1, d2, "after redo")
-            XCTAssertEqual(flatXML(d1), afterDeletes, "redo restores the post-delete visible content")
+            try assertConverged(d1, d2, "after redo")
+            XCTAssertEqual(try flatXML(d1), afterDeletes, "redo restores the post-delete visible content")
         }
     }
 }

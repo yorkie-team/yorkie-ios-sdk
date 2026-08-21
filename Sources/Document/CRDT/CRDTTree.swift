@@ -2377,8 +2377,16 @@ extension CRDTTree {
         if from > node.id.offset {
             let (right, splitDiff) = try node.split(self, from - node.id.offset)
             diff.addDataSizes(others: splitDiff)
+            // The caller's invariants (``restore(_:)``'s cursor, ``retombstone(_:_:)``'s
+            // clamp) guarantee a real split here. Returning the unsplit — wider —
+            // node instead would un-tombstone or re-tombstone content OUTSIDE the
+            // span, silently diverging the replicas: precisely what isolating is
+            // meant to prevent. Fail loudly rather than corrupt the document.
             guard let right else {
-                return node
+                throw YorkieError(
+                    code: .errInvalidArgument,
+                    message: "isolateTextRange: split failed at \(from) for piece \(node.id)"
+                )
             }
             node = right
         }
