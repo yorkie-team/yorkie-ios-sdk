@@ -398,6 +398,11 @@ public class Document: Attachable {
                 let prev = add.value.createdAt
                 add.value.setCreatedAt(ticket)
                 self.internalHistory.reconcileCreatedAt(prevCreatedAt: prev, currCreatedAt: ticket)
+            } else if let treeEdit = op as? TreeEditOperation {
+                // A reverse that re-inserts a copy of removed nodes carries their original ids;
+                // inserting them again would leave two nodes under one id. Restore-mode reverses
+                // revive by identity and keep theirs.
+                try treeEdit.reissueContentIDs { context.issueTimeTicket }
             }
 
             context.push(operation: op)

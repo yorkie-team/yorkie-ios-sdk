@@ -787,8 +787,14 @@ public class JSONTree {
             crdtNodes = try contents?.compactMap { try createCRDTTreeNode(context: context, content: $0) }
         }
 
-        let (_, pairs, diff, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
-            context.issueTimeTicket
+        // Splitting an element creates nodes that need tickets. Record the ones issued so the
+        // operation can carry them: every other replica then uses them instead of reconstructing them
+        // from the operation, which it cannot do correctly once content has descendants.
+        var splitTickets = [TimeTicket]()
+        let (_, pairs, diff, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
+            let issued = context.issueTimeTicket
+            splitTickets.append(issued)
+            return issued
         }, nil)
         self.context?.acc(diff)
 
@@ -796,16 +802,16 @@ public class JSONTree {
             self.context?.registerGCPair(pair)
         }
 
-        context.push(
-            operation: TreeEditOperation(
-                parentCreatedAt: tree.createdAt,
-                fromPos: fromPos,
-                toPos: toPos,
-                contents: crdtNodes,
-                splitLevel: splitLevel,
-                executedAt: ticket
-            )
+        let edit = TreeEditOperation(
+            parentCreatedAt: tree.createdAt,
+            fromPos: fromPos,
+            toPos: toPos,
+            contents: crdtNodes,
+            splitLevel: splitLevel,
+            executedAt: ticket
         )
+        edit.setSplitTickets(splitTickets)
+        context.push(operation: edit)
 
         return true
     }

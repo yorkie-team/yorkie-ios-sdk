@@ -571,6 +571,7 @@ extension Converter {
                     pbTreeEditOperation.restoreMode = .restore
                 }
             }
+            pbTreeEditOperation.splitTickets = treeEditOperation.getSplitTickets().map { toTimeTicket($0) }
             pbOperation.treeEdit = pbTreeEditOperation
         } else if let treeStyleOperation = operation as? TreeStyleOperation {
             var pbTreeStyleOperation = PbOperation.TreeStyle()
@@ -672,16 +673,18 @@ extension Converter {
                     treeRetombstoneSpans = try pbTreeEditOperation.retombstoneSpans.map { try fromTreeRestoreSpan($0) }
                     treeRestoreMode = pbTreeEditOperation.restoreMode == .retombstone ? .retombstone : .restore
                 }
-                return TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
-                                         fromPos: fromTreePos(pbTreeEditOperation.from),
-                                         toPos: fromTreePos(pbTreeEditOperation.to),
-                                         contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
-                                         splitLevel: pbTreeEditOperation.splitLevel,
-                                         executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
-                                         isUndoOp: treeRestoreMode != nil,
-                                         restoreSpans: treeRestoreSpans,
-                                         restoreMode: treeRestoreMode,
-                                         retombstoneSpans: treeRetombstoneSpans)
+                let treeEdit = TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
+                                                 fromPos: fromTreePos(pbTreeEditOperation.from),
+                                                 toPos: fromTreePos(pbTreeEditOperation.to),
+                                                 contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
+                                                 splitLevel: pbTreeEditOperation.splitLevel,
+                                                 executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
+                                                 isUndoOp: treeRestoreMode != nil,
+                                                 restoreSpans: treeRestoreSpans,
+                                                 restoreMode: treeRestoreMode,
+                                                 retombstoneSpans: treeRetombstoneSpans)
+                treeEdit.setSplitTickets(pbTreeEditOperation.splitTickets.map { fromTimeTicket($0) })
+                return treeEdit
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
                 if !pbTreeStyleOperation.attributesToRemove.isEmpty {
                     return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
