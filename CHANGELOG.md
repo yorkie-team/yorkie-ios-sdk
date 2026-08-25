@@ -8,6 +8,8 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ## [v0.7.16] - 2026-08-25
 
+> Requires a Yorkie server v0.7.16 or later. The tree node identity rules below are a wire contract shared with the server (yorkie#1927, yorkie#1929); against an older server a tree undo/redo can abort a sync with `ErrInvalidArgument: offset out of range` instead of degrading.
+
 - Keep a tree position resolvable when two nodes claim one ID in https://github.com/yorkie-team/yorkie-ios-sdk/pull/270
 - Stamp merge-bound inserts and filter style-range interlopers in https://github.com/yorkie-team/yorkie-ios-sdk/pull/270
 - Stop undo and element splits from reusing a node's identity in https://github.com/yorkie-team/yorkie-ios-sdk/pull/270
