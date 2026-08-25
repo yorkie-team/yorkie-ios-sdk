@@ -268,9 +268,8 @@ final class CRDTTreeDuplicateIdTests: XCTestCase {
         XCTAssertEqual(op.getContentSize(), 0, "an edit whose content was dropped inserted nothing")
 
         // Redoing must not delete a neighbour that this edit never inserted.
-        if let redo = result?.reverseOp as? TreeEditOperation {
-            XCTAssertEqual(redo.fromPos, redo.toPos, "the reverse of an edit that inserted nothing spans nothing")
-        }
+        let redo = try XCTUnwrap(result?.reverseOp as? TreeEditOperation)
+        XCTAssertEqual(redo.fromPos, redo.toPos, "the reverse of an edit that inserted nothing spans nothing")
     }
 
     func test_refuses_to_split_a_text_node_past_its_end() throws {

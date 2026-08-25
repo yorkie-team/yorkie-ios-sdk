@@ -86,6 +86,30 @@ final class CRDTTreeNodeTests: XCTestCase {
         XCTAssertEqual(right?.mergedAt, mergeTicket)
     }
 
+    // Ported from yorkie-js-sdk v0.7.16: CRDTTreeNode — splitElement preserves mergedFrom and mergedAt.
+    func test_splitElement_preserves_mergedFrom_and_mergedAt() throws {
+        // given — a paragraph a merge previously moved
+        let root = CRDTTreeNode(id: posT(), type: "r", children: [])
+        let para = CRDTTreeNode(id: posT(), type: "p", children: [])
+        try root.append(contentsOf: [para])
+        try para.append(contentsOf: [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "helloworld")])
+
+        let sourceID = CRDTTreeNodeID(createdAt: timeT(), offset: 0)
+        let mergeTicket = timeT()
+        para.mergedFrom = sourceID
+        para.mergedAt = mergeTicket
+
+        // when — split the text, then split the element between the halves
+        _ = try para.children[0].splitText(5, 0)
+        let split = try para.splitElement(1, timeT()).0
+
+        // then — the split product holds the other half of the same moved node,
+        // so it carries the same merge stamp (as splitText does)
+        XCTAssertNotNil(split)
+        XCTAssertEqual(split?.mergedFrom, sourceID)
+        XCTAssertEqual(split?.mergedAt, mergeTicket)
+    }
+
     // Ported from yorkie-js-sdk v0.7.4: CRDTTreeNode — deepcopy preserves merge metadata.
     func test_deepcopy_preserves_merge_metadata() throws {
         // given
@@ -326,6 +350,44 @@ final class CRDTTreeEditTests: XCTestCase {
         XCTAssertEqual(treeNode.size, 4)
         XCTAssertEqual(treeNode.children![0].size, 2)
         XCTAssertEqual(treeNode.children![0].children![0].size, 2)
+    }
+
+    // Ported from yorkie-js-sdk v0.7.16: CRDTTree.Edit — stamps an insert declared inside a
+    // merged-away parent (yorkie-js-sdk#1317).
+    func test_stamps_an_insert_declared_inside_a_merged_away_parent() throws {
+        // given — <root><p>ab</p><p>cd</p></root>, capturing the leftmost position
+        // inside the second paragraph before the merge
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0, timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((5, 5), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0, timeT(), timeT)
+
+        let pos = try tree.findPos(5)
+        let declaredParent = try tree.findNodesAndSplitText(pos, timeT()).0.0
+
+        // when — merge the second paragraph into the first, then apply an insert that still
+        // declares the merged-away paragraph as its parent. A later delete LWW-overwrites the
+        // tombstone first, so the merge ticket is only recoverable from the moved sibling.
+        let mergeTicket = timeT()
+        try tree.editT((3, 5), nil, 0, mergeTicket, timeT)
+        _ = declaredParent.remove(timeT())
+        let content = CRDTTreeNode(id: posT(), type: "b")
+        _ = try tree.edit((pos, pos), [content], 0, timeT(), timeT, nil)
+
+        // then — the content lands in the merge target (the surviving first paragraph) but is
+        // stamped as merged-from the declared parent, like a merge-moved child.
+        //
+        // NOTE: upstream reads the merge ticket from the moved sibling rather than the parent's
+        // `removedAt` because a later delete can LWW-overwrite that tombstone. On iOS the
+        // `mergedAt` assertion below does NOT discriminate the two sources: `CRDTTreeNode.remove`
+        // keeps the EARLIEST tombstone (`removedAt <= self.removedAt`), where the JS SDK overwrites
+        // with the newer one, so `removedAt` here still equals the merge ticket. That divergence
+        // predates this sync (it has been in `remove` since the v0.7.4 port) and is tracked
+        // separately — this test is kept faithful to the upstream scenario.
+        XCTAssertTrue(content.parent === tree.root.innerChildren[0])
+        XCTAssertEqual(content.mergedFrom, declaredParent.id)
+        XCTAssertEqual(content.mergedAt, mergeTicket)
     }
 
     func test_can_find_the_closest_TreePos_when_parentNode_or_leftSiblingNode_does_not_exist() async throws {
