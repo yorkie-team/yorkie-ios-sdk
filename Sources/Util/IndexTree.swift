@@ -263,8 +263,15 @@ extension IndexTreeNode {
     func splitText(_ offset: Int32, _ absOffset: Int32) throws -> (Self?, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
 
-        guard offset > 0, offset < self.size else {
+        guard offset != 0, offset != self.size else {
             return (nil, diff)
+        }
+
+        // A position that anchors past the end of this node cannot be resolved
+        // here. Slicing would quietly hand back an empty right value and the
+        // split would look like a no-op, leaving the edit at the wrong position.
+        guard offset > 0, offset < self.size else {
+            throw YorkieError(code: .errInvalidArgument, message: "split at \(offset) of \(self.size): offset out of range")
         }
 
         let leftValue = self.value.substring(to: Int(offset)) as NSString

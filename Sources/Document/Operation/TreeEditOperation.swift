@@ -96,6 +96,11 @@ final class TreeEditOperation: Operation {
     private var lastFromIdx: Int?
     /// The pre-edit end index captured by the most recent `execute`, used to reconcile parked ops.
     private var lastToIdx: Int?
+    /// The tree-index token count the tree actually accepted from ``contents`` on the most recent
+    /// `execute`. The tree drops content whose ID it already holds, so this can be smaller than the
+    /// content this operation carries; a reverse range covering a dropped copy would delete a
+    /// neighbour on redo.
+    private var insertedContentSize: Int?
     /// Set on boundary-deletion ops that were generated to reverse a split. When this op executes
     /// (as undo), ``toReverseOperation(_:_:_:)`` uses this value to regenerate a proper split op
     /// for redo, rather than re-inserting the tombstoned boundary nodes as content.
@@ -244,7 +249,12 @@ final class TreeEditOperation: Operation {
          * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
          * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
          */
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
+        // The tree drops content that reuses an ID it already holds, and reports the size of what it
+        // accepted. The reverse operation and the undo stack both read that size rather than the
+        // content this operation carried: a range covering content the tree refused would delete a
+        // neighbour on redo. The delimiter simulation below stays on the original count, since the
+        // server simulates it the same way.
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
             var delimiter = editedAt.delimiter
             if let contents {
                 delimiter += UInt32(contents.count)
@@ -261,6 +271,7 @@ final class TreeEditOperation: Operation {
         self.lastFromIdx = preEditFromIdx
         let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
         self.lastToIdx = preEditFromIdx + removedSize
+        self.insertedContentSize = insertedContentSize
 
         // Build the reverse op for undo.
         // A pure split (splitLevel > 0, no content inserted, no nodes removed) gets a
@@ -394,8 +405,13 @@ final class TreeEditOperation: Operation {
             return splitUndoOp
         }
 
-        // Total tree-index tokens inserted by this edit.
-        let insertedContentSize = self.contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
+        // Inserted content size in tree index tokens, measured before the edit: these nodes are now
+        // in the tree, and one inserted under a concurrently removed parent is tombstoned on the way
+        // in, which shrinks the size read back here. The guard below relies on that pre-edit size to
+        // recognize an edit that had no effect. What it counts is the content the tree accepted, not
+        // the content this operation carried — a reverse range covering a dropped copy would delete a
+        // neighbour on redo.
+        let insertedContentSize = self.insertedContentSize ?? 0
 
         // Guard: if the positions exceed the post-edit tree size, the edit was a no-op (e.g. a
         // concurrent parent deletion tombstoned the inserted content). Skip the reverse op.
@@ -560,8 +576,15 @@ final class TreeEditOperation: Operation {
     }
 
     /// `getContentSize` returns the total visible size of this operation's content.
+    ///
+    /// Once the operation has run, this is the size the tree accepted: content whose ID was already
+    /// in the tree is dropped, and the undo stack shifts its stored indices by this size, so counting
+    /// the dropped copy would move every index in the stack past content that was never inserted.
     func getContentSize() -> Int {
-        self.contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
+        if let insertedContentSize = self.insertedContentSize {
+            return insertedContentSize
+        }
+        return self.contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
     }
 
     /**

@@ -809,8 +809,19 @@ class CRDTTree: CRDTElement {
         self.indexTree = IndexTree(root: root)
         self.nodeMapByID = LLRBTree()
 
+        // Registering every node is the cost of loading a document, so it runs
+        // without the duplicate check: a plain put per node, then one comparison
+        // to see whether any ID was claimed twice. Only a tree that carries
+        // duplicates pays for resolving them.
+        var nodeCount = 0
         self.indexTree.traverseAll { node, _ in
             self.nodeMapByID.put(node.id, node)
+            nodeCount += 1
+        }
+        if self.nodeMapByID.size != nodeCount {
+            self.indexTree.traverseAll { node, _ in
+                self.registerNode(node)
+            }
         }
 
         // Rebuild runtime merge state from the persisted `mergedFrom` field.
@@ -957,10 +968,83 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `registerNode` registers the given node to the tree.
+     * `registerNode` registers the given node to the tree, keeping a live node
+     * over a tombstone when both claim the same ID.
+     *
+     * Documents written by older clients can carry two nodes under one ID (an
+     * undo that re-inserted a deleted piece by copy). A plain put lets the
+     * winner depend on the order the nodes were registered — operation order on
+     * a live document, document order on one rebuilt from a snapshot — so after
+     * a reload the same position resolves to a different node and its offset can
+     * fall outside that node. Keeping the live one makes both orders agree for a
+     * live/tombstone pair, which is the shape those documents carry.
+     *
+     * Two nodes in the same state keep the last-registered-wins behavior, and
+     * stay order-dependent: element IDs issued for a split can legitimately
+     * collide with an inserted node's ID (see the delimiter note in
+     * ``TreeEditOperation``), and that resolution order is what the rest of the
+     * tree already assumes.
+     *
+     * A node this refuses stays in the index tree while another node answers for
+     * its ID, so it is reachable by traversal but not by lookup. That is the
+     * intended trade for a duplicate: the alternative is unregistering a node
+     * that positions still resolve through.
      */
     func registerNode(_ node: CRDTTreeNode) {
+        if let entry = self.nodeMapByID.floorEntry(node.id),
+           entry.value !== node,
+           entry.key == node.id,
+           node.isRemoved,
+           entry.value.isRemoved == false
+        {
+            return
+        }
+
         self.nodeMapByID.put(node.id, node)
+    }
+
+    /**
+     * `dropDuplicateContents` returns the contents that would not put a second
+     * node under an ID already in the tree.
+     *
+     * Content created by an edit carries that edit's lamport and actor, so a
+     * content node whose ID names another change is a copy of a node that
+     * already exists — what the copy-reinsert undo path sends when it reverses a
+     * deletion. Inserting it would leave two nodes under one identity, so the
+     * copy is dropped and the rest of the edit applies.
+     *
+     * Content from this edit's own change is kept even when its ID collides: the
+     * delimiters an element split consumes are simulated rather than replayed,
+     * so an ID issued here can legitimately collide, and dropping it would lose
+     * a node the client already inserted.
+     *
+     * Dropping rather than failing is deliberate: such changes are already in
+     * the history of existing documents, and a change that cannot be replayed is
+     * a document that can never be loaded again. A collision anywhere in a
+     * content node's subtree drops that whole subtree, on the grounds that a
+     * copy is copied whole.
+     *
+     * - Parameters:
+     *   - contents: The content nodes this edit is about to insert.
+     *   - editedAt: The ticket of the edit inserting them.
+     * - Returns: The subset of `contents` whose IDs are free.
+     */
+    func dropDuplicateContents(_ contents: [CRDTTreeNode], _ editedAt: TimeTicket) -> [CRDTTreeNode] {
+        contents.filter { content in
+            var reused = false
+            traverseAll(node: content) { node, _ in
+                let createdAt = node.id.createdAt
+                if createdAt.lamport == editedAt.lamport, createdAt.actorID == editedAt.actorID {
+                    return
+                }
+
+                if let entry = self.nodeMapByID.floorEntry(node.id), entry.key == node.id {
+                    reused = true
+                }
+            }
+
+            return reused == false
+        }
     }
 
     /**
@@ -1439,7 +1523,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan]) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1569,6 +1653,16 @@ class CRDTTree: CRDTElement {
         }
 
         // 05. Insert: insert the given nodes at the given position.
+        //
+        // The identity check runs here rather than on entry: resolving the range
+        // above splits text nodes, and a split can create the very ID a content
+        // node carries. Checking before that would let the copy through and leave
+        // two nodes under one ID. `insertedContentSize` is measured now, while the
+        // content is still detached — inserting under a removed parent tombstones
+        // it and shrinks what its size reads back as.
+        let contents = contents.map { self.dropDuplicateContents($0, editedAt) }
+        let insertedContentSize = contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
+
         if let contents, contents.isEmpty == false {
             var aliveContents = [CRDTTreeNode]()
             var leftInChildren = fromLeft // tree
@@ -1595,7 +1689,7 @@ class CRDTTree: CRDTElement {
                         diff.addDataSizes(others: node.getDataSize())
                     }
 
-                    self.nodeMapByID.put(node.id, node)
+                    self.registerNode(node)
 
                     // Capture this inserted node's identity span for
                     // identity-preserving insert undo/redo.
@@ -1642,7 +1736,7 @@ class CRDTTree: CRDTElement {
         // subtree top-down (a child's recreate resolves its parent by identity).
         let outRemoved = spansComplete ? removedSpans : []
         let outInserted = spansComplete ? Array(insertedSpans.reversed()) : []
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted)
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize)
     }
 
     /**
@@ -1791,7 +1885,7 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan]) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         return try self.edit(
@@ -2202,7 +2296,12 @@ extension CRDTTree: GCParent {
         } catch {
             return
         }
-        self.nodeMapByID.remove(node.id)
+        // `nodeMapByID` is keyed by ID, so an unconditional remove would also
+        // unregister a different node that shares this one's ID — see
+        // ``registerNode(_:)``. Only drop the entry this node actually holds.
+        if let entry = self.nodeMapByID.floorEntry(node.id), entry.value === node, entry.key == node.id {
+            self.nodeMapByID.remove(node.id)
+        }
 
         if let insPrevID = node.insPrevID {
             self.findFloorNode(insPrevID)?.insNextID = node.insNextID
@@ -2556,7 +2655,7 @@ extension CRDTTree {
                let succIdx = siblings.firstIndex(where: { $0 === succ })
             {
                 try parent.insertAt(node, succIdx)
-                self.nodeMapByID.put(node.id, node)
+                self.registerNode(node)
                 return node
             }
             if offset > span.id.offset || offset > 0 {
@@ -2564,7 +2663,7 @@ extension CRDTTree {
                    pred.isText, pred.parent === parent
                 {
                     try parent.insertAfter(node, pred)
-                    self.nodeMapByID.put(node.id, node)
+                    self.registerNode(node)
                     return node
                 }
             }
@@ -2575,7 +2674,7 @@ extension CRDTTree {
            let left = self.findFloorNode(leftSiblingID), left.parent === parent
         {
             try parent.insertAfter(node, left)
-            self.nodeMapByID.put(node.id, node)
+            self.registerNode(node)
             return node
         }
 
@@ -2585,7 +2684,7 @@ extension CRDTTree {
            let rightIdx = siblings.firstIndex(where: { $0 === right })
         {
             try parent.insertAt(node, rightIdx)
-            self.nodeMapByID.put(node.id, node)
+            self.registerNode(node)
             return node
         }
 
@@ -2594,7 +2693,7 @@ extension CRDTTree {
         // total order this rung needs.
         let insertIdx = siblings.firstIndex { $0.id > node.id } ?? siblings.count
         try parent.insertAt(node, insertIdx)
-        self.nodeMapByID.put(node.id, node)
+        self.registerNode(node)
         return node
     }
 
