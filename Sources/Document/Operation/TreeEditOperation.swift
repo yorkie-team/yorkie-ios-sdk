@@ -193,6 +193,39 @@ final class TreeEditOperation: Operation {
         }
     }
 
+    /// `makeSplitTicketIssuer` returns the closure ``CRDTTree/edit(_:_:_:_:_:_:)`` uses to issue
+    /// tickets for the nodes an element split creates.
+    ///
+    /// The originating replica issued them and carries them in ``splitTickets``, so this hands them
+    /// back in the same order. A change written before that field existed carries none and falls
+    /// back to reconstructing them from `editedAt` and the number of top-level contents — a
+    /// reconstruction that is wrong as soon as content has descendants, since each of those consumed
+    /// a ticket too.
+    ///
+    /// TODO(sejongk): When splitting element nodes, a new nodeID is assigned with a different
+    /// timeTicket. In the same change context, the timeTickets share the same lamport and actorID
+    /// but have different delimiters, incremented by one for each. This logic might be unclear;
+    /// consider refactoring for multi-level concurrent editing in the Tree implementation.
+    ///
+    /// - Parameter editedAt: The ticket this operation executes at.
+    /// - Returns: A closure returning the next split ticket on each call.
+    private func makeSplitTicketIssuer(_ editedAt: TimeTicket) -> () -> TimeTicket {
+        var issued = 0
+        // The base is captured once and advanced one delimiter per issued ticket, so successive
+        // tickets in a multi-level split are consecutive. Reading the base back off the last issued
+        // ticket instead would re-add the content count on every call.
+        var delimiter = editedAt.delimiter + UInt32(self.contents?.count ?? 0)
+        return {
+            if issued < self.splitTickets.count {
+                let ticket = self.splitTickets[issued]
+                issued += 1
+                return ticket
+            }
+            delimiter += 1
+            return TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
+        }
+    }
+
     /// `getSplitTickets` returns the tickets issued for the nodes an element split created, in issue
     /// order.
     ///
@@ -310,39 +343,18 @@ final class TreeEditOperation: Operation {
             self.toPos = try fromIdx == toIdx ? self.fromPos : (tree.findPos(toIdx))
         }
 
-        /**
-         * TODO(sejongk): When splitting element nodes, a new nodeID is assigned with a different timeTicket.
-         * In the same change context, the timeTickets share the same lamport and actorID but have different delimiters,
-         * incremented by one for each.
-         * Therefore, it is possible to simulate later timeTickets using `editedAt` and the length of `contents`.
-         * This logic might be unclear; consider refactoring for multi-level concurrent editing in the Tree implementation.
-         */
         // The tree drops content that reuses an ID it already holds, and reports the size of what it
         // accepted. The reverse operation and the undo stack both read that size rather than the
         // content this operation carried: a range covering content the tree refused would delete a
-        // neighbour on redo. The delimiter simulation below stays on the original count, since the
-        // server simulates it the same way.
-        // Splitting an element creates nodes that need tickets. The originating replica issued them
-        // and carries them here, so this hands them back in the same order. A change written before
-        // the field existed carries none, and falls back to reconstructing them from `editedAt` and
-        // the number of top-level contents — a reconstruction that is wrong as soon as content has
-        // descendants, since each of those consumed a ticket too.
-        var issuedSplitTickets = 0
-        // The reconstruction advances one delimiter per issued ticket from a base captured once, so
-        // successive tickets in a multi-level split are consecutive. Reading the base back off the
-        // last issued ticket instead would re-add the content count on every call.
-        var splitDelimiter = editedAt.delimiter + UInt32(self.contents?.count ?? 0)
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
-            if issuedSplitTickets < self.splitTickets.count {
-                let ticket = self.splitTickets[issuedSplitTickets]
-                issuedSplitTickets += 1
-                return ticket
-            }
-
-            splitDelimiter += 1
-
-            return TimeTicket(lamport: editedAt.lamport, delimiter: splitDelimiter, actorID: editedAt.actorID)
-        }, versionVector)
+        // neighbour on redo.
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize) = try tree.edit(
+            (self.fromPos, self.toPos),
+            self.contents?.compactMap { $0.deepcopy() },
+            self.splitLevel,
+            editedAt,
+            self.makeSplitTicketIssuer(editedAt),
+            versionVector
+        )
 
         // Capture the pre-edit range so a remote/local edit can reconcile parked undo ops. `toIdx`
         // is `fromIdx` plus the total visible tokens of the nodes this edit removed.

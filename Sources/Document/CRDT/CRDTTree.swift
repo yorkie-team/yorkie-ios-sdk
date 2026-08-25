@@ -1270,22 +1270,116 @@ class CRDTTree: CRDTElement {
      *   captured from the first styled node (for undo reverse op), and keys of attributes that
      *   did not previously exist on the first styled node (for undo reverse op).
      */
+    /// `recordInsertedContent` attaches the inserted nodes to this edit's content change.
+    ///
+    /// A removal at the same index already emitted a change there; the insert rides on it rather
+    /// than emitting a second change at the same position.
+    ///
+    /// - Parameters:
+    ///   - changes: The change list being built, mutated in place.
+    ///   - contents: The live nodes this edit inserted.
+    ///   - fromIdx: The index the edit applied at.
+    ///   - fromPath: The path the edit applied at.
+    ///   - editedAt: The ticket of the edit.
     @discardableResult
+    private func recordInsertedContent(
+        _ changes: inout [TreeChange],
+        _ contents: [CRDTTreeNode],
+        _ fromIdx: Int,
+        _ fromPath: [Int],
+        _ editedAt: TimeTicket
+    ) {
+        let value = TreeChangeValue.nodes(contents)
+
+        if let last = changes.last, last.from == fromIdx {
+            var merged = last
+            merged.value = value
+            changes.removeLast()
+            changes.append(merged)
+        } else {
+            changes.append(TreeChange(actor: editedAt.actorID,
+                                      type: .content,
+                                      from: fromIdx,
+                                      to: fromIdx,
+                                      fromPath: fromPath,
+                                      toPath: fromPath,
+                                      value: value,
+                                      splitLevel: 0))
+        }
+    }
+
+    /// `intendedMergeStamp` returns the merge stamp an insert should carry when its position was
+    /// declared inside a parent a concurrent merge removed.
+    ///
+    /// §9.4: the content physically lands in the merge target, so stamping it as merged-from the
+    /// declared parent keeps it distinguishable from nodes that were never inside that parent —
+    /// style-range resolution and merge-delete propagation key on this.
+    ///
+    /// - Parameters:
+    ///   - fromPos: The declared insert position.
+    ///   - fromParent: The parent the insert actually resolves into.
+    /// - Returns: The intended parent and the merge ticket to stamp, or `(nil, nil)` when the insert
+    ///   was not redirected by a merge.
+    /// - Throws: Rethrows from ``CRDTTreePos/toTreeNodePair(tree:)``.
+    private func intendedMergeStamp(
+        _ fromPos: CRDTTreePos,
+        _ fromParent: CRDTTreeNode
+    ) throws -> (CRDTTreeNode?, TimeTicket?) {
+        let declaredFromParent = try fromPos.toTreeNodePair(tree: self).0
+        guard declaredFromParent !== fromParent,
+              declaredFromParent.isRemoved,
+              declaredFromParent.mergedInto != nil,
+              self.resolveMergeTarget(declaredFromParent) === fromParent
+        else {
+            return (nil, nil)
+        }
+
+        // Take the merge ticket from a sibling the merge moved; the parent's own `removedAt` may
+        // have been overwritten by a later LWW tombstone.
+        for child in fromParent.innerChildren where child.mergedFrom == declaredFromParent.id {
+            if let mergedAt = child.mergedAt {
+                return (declaredFromParent, mergedAt)
+            }
+        }
+        return (declaredFromParent, declaredFromParent.removedAt)
+    }
+
+    /// `resolveStyleRange` resolves a style operation's range to its traversal endpoints.
+    ///
+    /// Shared by ``style(_:_:_:_:)`` and ``removeStyle(_:_:_:_:)``: it splits text at both ends and
+    /// advances past split siblings the editing client did not know about, so the range covers all
+    /// concurrent split products.
+    ///
+    /// - Parameters:
+    ///   - range: The style range in CRDT positions.
+    ///   - editedAt: The ticket of the styling change.
+    ///   - versionVector: The styling client's causal knowledge, or `nil` for a local edit.
+    /// - Returns: The from/to parent and left-sibling nodes, plus the data-size delta the splits produced.
+    /// - Throws: Rethrows from ``findNodesAndSplitText(_:_:_:)``.
+    private func resolveStyleRange(
+        _ range: TreePosRange,
+        _ editedAt: TimeTicket,
+        _ versionVector: VersionVector?
+    ) throws -> (CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
+        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
+        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
+        diff.addDataSizes(others: fromDiff, toDiff)
+
+        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
+
+        return (fromParent, fromLeft, toParent, toLeft, diff)
+    }
+
     func style(
         _ range: TreePosRange,
         _ attributes: [String: String]?,
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector?
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String], [String]) {
-        var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
-        diff.addDataSizes(others: fromDiff, toDiff)
-
-        // Advance past split siblings unknown to the editing client so the range
-        // covers all concurrent split products. Skip when leftNode == parent.
-        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
-        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
+        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
+        var diff = rangeDiff
 
         let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector)
 
@@ -1424,15 +1518,8 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
-        var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
-        diff.addDataSizes(others: fromDiff, toDiff)
-
-        // Advance past split siblings unknown to the editing client so the range
-        // covers all concurrent split products. Skip when leftNode == parent.
-        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
-        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
+        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
+        var diff = rangeDiff
 
         let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector)
 
@@ -1775,29 +1862,7 @@ class CRDTTree: CRDTElement {
             // target. Stamp it as merged-from the declared parent so it stays
             // distinguishable from nodes that were never inside that parent —
             // style-range resolution and merge-delete propagation key on this.
-            let declaredFromParent = try range.0.toTreeNodePair(tree: self).0
-            let intendedParent: CRDTTreeNode? = {
-                guard declaredFromParent !== fromParent,
-                      declaredFromParent.isRemoved,
-                      declaredFromParent.mergedInto != nil,
-                      self.resolveMergeTarget(declaredFromParent) === fromParent
-                else {
-                    return nil
-                }
-                return declaredFromParent
-            }()
-            var intendedMergedAt: TimeTicket?
-            if let intendedParent {
-                // Take the merge ticket from a sibling the merge moved; the parent's
-                // own `removedAt` may have been overwritten by a later LWW tombstone.
-                for child in fromParent.innerChildren where child.mergedFrom == intendedParent.id {
-                    if let mergedAt = child.mergedAt {
-                        intendedMergedAt = mergedAt
-                        break
-                    }
-                }
-                intendedMergedAt = intendedMergedAt ?? intendedParent.removedAt
-            }
+            let (intendedParent, intendedMergedAt) = try self.intendedMergeStamp(range.0, fromParent)
 
             var aliveContents = [CRDTTreeNode]()
             var leftInChildren = fromLeft // tree
@@ -1842,25 +1907,7 @@ class CRDTTree: CRDTElement {
             }
 
             if aliveContents.isEmpty == false {
-                let value = TreeChangeValue.nodes(aliveContents)
-
-                if changes.isEmpty == false, changes.last!.from == fromIdx {
-                    var last = changes.last!
-
-                    last.value = value
-
-                    changes.removeLast()
-                    changes.append(last)
-                } else {
-                    changes.append(TreeChange(actor: editedAt.actorID,
-                                              type: .content,
-                                              from: fromIdx,
-                                              to: fromIdx,
-                                              fromPath: fromPath,
-                                              toPath: fromPath,
-                                              value: value,
-                                              splitLevel: 0))
-                }
+                self.recordInsertedContent(&changes, aliveContents, fromIdx, fromPath, editedAt)
             }
         }
         pairs.append(contentsOf: self.drainPendingGCPairs())

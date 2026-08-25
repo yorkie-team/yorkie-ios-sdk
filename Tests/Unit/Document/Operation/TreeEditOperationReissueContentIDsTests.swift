@@ -42,8 +42,8 @@ final class TreeEditOperationReissueContentIDsTests: XCTestCase {
     func test_gives_copied_content_a_fresh_identity() throws {
         // given
         let pos = CRDTTreePos(parentID: posT(), leftSiblingID: posT())
-        let p = CRDTTreeNode(id: posT(), type: "p")
-        try p.append(contentsOf: [
+        let para = CRDTTreeNode(id: posT(), type: "para")
+        try para.append(contentsOf: [
             CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "a"),
             CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "b")
         ])
@@ -52,7 +52,7 @@ final class TreeEditOperationReissueContentIDsTests: XCTestCase {
             parentCreatedAt: timeT(),
             fromPos: pos,
             toPos: pos,
-            contents: [p],
+            contents: [para],
             splitLevel: 0,
             executedAt: timeT(),
             isUndoOp: true
@@ -66,7 +66,7 @@ final class TreeEditOperationReissueContentIDsTests: XCTestCase {
         let after = self.idsOf(op.contents!)
         // The count is stated rather than derived from the same traversal the
         // reissue uses, so a traversal that skipped a node would show up here.
-        XCTAssertEqual(after.count, 3, "the <p> and its two texts")
+        XCTAssertEqual(after.count, 3, "the <para> and its two texts")
         XCTAssertEqual(after.count, before.count)
         XCTAssertEqual(Set(after).count, after.count, "every node gets its own id")
         for id in after {
