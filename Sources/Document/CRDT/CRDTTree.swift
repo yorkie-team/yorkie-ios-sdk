@@ -920,13 +920,11 @@ class CRDTTree: CRDTElement {
     private func mergedAnchorInterloperGuard(
         _ pos: CRDTTreePos,
         _ versionVector: VersionVector?
-    ) -> ((CRDTTreeNode) -> Bool)? {
+    ) throws -> ((CRDTTreeNode) -> Bool)? {
         guard let versionVector else {
             return nil
         }
-        guard let (declaredParent, _) = try? pos.toTreeNodePair(tree: self) else {
-            return nil
-        }
+        let (declaredParent, _) = try pos.toTreeNodePair(tree: self)
         guard declaredParent.isRemoved,
               declaredParent.mergedInto != nil,
               let removedAt = declaredParent.removedAt,
@@ -988,8 +986,8 @@ class CRDTTree: CRDTElement {
     private func styleSkipPredicate(
         _ pos: CRDTTreePos,
         _ versionVector: VersionVector?
-    ) -> (CRDTTreeNode, TokenType) -> Bool {
-        let anchorGuard = self.mergedAnchorInterloperGuard(pos, versionVector)
+    ) throws -> (CRDTTreeNode, TokenType) -> Bool {
+        let anchorGuard = try self.mergedAnchorInterloperGuard(pos, versionVector)
         return { node, tokenType in
             // Skip styling via End token when the node has an unknown split
             // sibling. The End token is in the range only because a concurrent
@@ -1289,7 +1287,7 @@ class CRDTTree: CRDTElement {
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
-        let shouldSkipToken = self.styleSkipPredicate(range.1, versionVector)
+        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector)
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
@@ -1436,7 +1434,7 @@ class CRDTTree: CRDTElement {
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
-        let shouldSkipToken = self.styleSkipPredicate(range.1, versionVector)
+        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector)
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
@@ -1777,10 +1775,9 @@ class CRDTTree: CRDTElement {
             // target. Stamp it as merged-from the declared parent so it stays
             // distinguishable from nodes that were never inside that parent —
             // style-range resolution and merge-delete propagation key on this.
-            let declaredFromParent = (try? range.0.toTreeNodePair(tree: self))?.0
+            let declaredFromParent = try range.0.toTreeNodePair(tree: self).0
             let intendedParent: CRDTTreeNode? = {
-                guard let declaredFromParent,
-                      declaredFromParent !== fromParent,
+                guard declaredFromParent !== fromParent,
                       declaredFromParent.isRemoved,
                       declaredFromParent.mergedInto != nil,
                       self.resolveMergeTarget(declaredFromParent) === fromParent
