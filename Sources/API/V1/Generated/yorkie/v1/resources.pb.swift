@@ -916,6 +916,15 @@ public struct Yorkie_V1_Operation: Sendable {
       set {_uniqueStorage()._retombstoneSpans = newValue}
     }
 
+    /// split_tickets carries the tickets the originating replica issued for the
+    /// nodes an element split creates, in issue order. Empty for a change
+    /// written before this field existed, which replays through the simulation
+    /// that reconstructed them from executed_at and the content count.
+    public var splitTickets: [Yorkie_V1_TimeTicket] {
+      get {_storage._splitTickets}
+      set {_uniqueStorage()._splitTickets = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -3851,7 +3860,7 @@ extension Yorkie_V1_Operation.Increase: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".TreeEdit"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}created_at_map_by_actor\0\u{1}contents\0\u{3}executed_at\0\u{3}split_level\0\u{3}restore_spans\0\u{3}restore_mode\0\u{3}retombstone_spans\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}from\0\u{1}to\0\u{3}created_at_map_by_actor\0\u{1}contents\0\u{3}executed_at\0\u{3}split_level\0\u{3}restore_spans\0\u{3}restore_mode\0\u{3}retombstone_spans\0\u{3}split_tickets\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
@@ -3864,6 +3873,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
     var _restoreSpans: [Yorkie_V1_TreeRestoreSpan] = []
     var _restoreMode: Yorkie_V1_RestoreMode = .unspecified
     var _retombstoneSpans: [Yorkie_V1_TreeRestoreSpan] = []
+    var _splitTickets: [Yorkie_V1_TimeTicket] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3884,6 +3894,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       _restoreSpans = source._restoreSpans
       _restoreMode = source._restoreMode
       _retombstoneSpans = source._retombstoneSpans
+      _splitTickets = source._splitTickets
     }
   }
 
@@ -3912,6 +3923,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 8: try { try decoder.decodeRepeatedMessageField(value: &_storage._restoreSpans) }()
         case 9: try { try decoder.decodeSingularEnumField(value: &_storage._restoreMode) }()
         case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._retombstoneSpans) }()
+        case 11: try { try decoder.decodeRepeatedMessageField(value: &_storage._splitTickets) }()
         default: break
         }
       }
@@ -3954,6 +3966,9 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
       if !_storage._retombstoneSpans.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._retombstoneSpans, fieldNumber: 10)
       }
+      if !_storage._splitTickets.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._splitTickets, fieldNumber: 11)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3973,6 +3988,7 @@ extension Yorkie_V1_Operation.TreeEdit: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._restoreSpans != rhs_storage._restoreSpans {return false}
         if _storage._restoreMode != rhs_storage._restoreMode {return false}
         if _storage._retombstoneSpans != rhs_storage._retombstoneSpans {return false}
+        if _storage._splitTickets != rhs_storage._splitTickets {return false}
         return true
       }
       if !storagesAreEqual {return false}

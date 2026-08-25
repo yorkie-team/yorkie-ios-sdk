@@ -116,6 +116,12 @@ final class TreeEditOperation: Operation {
     private(set) var restoreMode: RestoreMode?
     private(set) var retombstoneSpans: [TreeRestoreSpan]?
 
+    /// The tickets the originating replica issued for the nodes an element split creates, in issue
+    /// order. A replica applying the operation consumes them instead of reconstructing them, so
+    /// neither side depends on the other's allocation staying in step. Empty for a change written
+    /// before the field existed, which falls back to the reconstruction.
+    private var splitTickets: [TimeTicket] = []
+
     init(parentCreatedAt: TimeTicket,
          fromPos: CRDTTreePos,
          toPos: CRDTTreePos,
@@ -143,6 +149,68 @@ final class TreeEditOperation: Operation {
         self.retombstoneSpans = retombstoneSpans
     }
 
+    /// `reissueContentIDs` gives every node this operation inserts a fresh identity.
+    ///
+    /// A reverse operation that reverses a deletion by re-inserting a copy of the removed nodes
+    /// carries their original ids, so executing it would put two nodes under one id — the ambiguity
+    /// that makes a position anchored there resolve differently on different replicas. Undo already
+    /// re-identifies a restored value elsewhere: ``ArraySetOperation`` and ``AddOperation`` both take
+    /// the fresh ticket in ``Document/undo()``. This is the tree's counterpart, called from the same
+    /// place so the ids come from the change the undo creates.
+    ///
+    /// A restore-mode reverse is left alone: it revives nodes under their original identity by
+    /// design, which is what makes concurrent undos of one deletion converge rather than duplicate.
+    ///
+    /// - Parameter issueTimeTicket: Issues the next ticket of the change the undo creates.
+    /// - Throws: ``YorkieError`` with code `errRefused` when this operation also splits.
+    func reissueContentIDs(_ issueTimeTicket: @escaping () -> TimeTicket) throws {
+        guard let contents = self.contents, self.restoreMode == nil else {
+            return
+        }
+
+        // The tickets taken here start at `executedAt.delimiter + 1` and run one per node, while
+        // `execute` simulates the tickets an element split consumes starting at
+        // `executedAt.delimiter + contents.count + 1`. The two ranges overlap as soon as content has
+        // descendants, so this only holds while no content-bearing reverse splits — which is every
+        // reverse `toReverseOperation` builds, all of them `splitLevel: 0`.
+        if self.splitLevel != 0 {
+            throw YorkieError(code: .errRefused, message: "cannot reissue content ids on a splitting edit")
+        }
+
+        for content in contents {
+            traverseAll(node: content) { node, _ in
+                node.id = CRDTTreeNodeID(createdAt: issueTimeTicket(), offset: 0)
+                // A fresh identity has to be fresh in every field that names a node. The copy came
+                // from `deepcopy`, which carries the split chain and the merge lineage of the node it
+                // copied: left in place they would splice this node into a chain it never belonged
+                // to, and `purge` relinking that chain would unlink the real tombstone from it.
+                node.insPrevID = nil
+                node.insNextID = nil
+                node.mergedFrom = nil
+                node.mergedAt = nil
+                node.mergedInto = nil
+            }
+        }
+    }
+
+    /// `getSplitTickets` returns the tickets issued for the nodes an element split created, in issue
+    /// order.
+    ///
+    /// - Returns: The issued tickets, empty when this edit did not split an element.
+    func getSplitTickets() -> [TimeTicket] {
+        self.splitTickets
+    }
+
+    /// `setSplitTickets` records the tickets issued for the nodes an element split created.
+    ///
+    /// The originating replica calls this after executing the edit, so every other replica can use
+    /// them instead of reconstructing them.
+    ///
+    /// - Parameter tickets: The tickets in issue order.
+    func setSplitTickets(_ tickets: [TimeTicket]) {
+        self.splitTickets = tickets
+    }
+
     /**
      * `execute` executes this operation on the given `CRDTRoot`.
      */
@@ -158,7 +226,7 @@ final class TreeEditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        var editedAt = self.executedAt
+        let editedAt = self.executedAt
         guard let tree = parentObject as? CRDTTree else {
             throw YorkieError(code: .errInvalidArgument, message: "fail to execute, only Tree can execute edit")
         }
@@ -254,16 +322,26 @@ final class TreeEditOperation: Operation {
         // content this operation carried: a range covering content the tree refused would delete a
         // neighbour on redo. The delimiter simulation below stays on the original count, since the
         // server simulates it the same way.
+        // Splitting an element creates nodes that need tickets. The originating replica issued them
+        // and carries them here, so this hands them back in the same order. A change written before
+        // the field existed carries none, and falls back to reconstructing them from `editedAt` and
+        // the number of top-level contents — a reconstruction that is wrong as soon as content has
+        // descendants, since each of those consumed a ticket too.
+        var issuedSplitTickets = 0
+        // The reconstruction advances one delimiter per issued ticket from a base captured once, so
+        // successive tickets in a multi-level split are consecutive. Reading the base back off the
+        // last issued ticket instead would re-add the content count on every call.
+        var splitDelimiter = editedAt.delimiter + UInt32(self.contents?.count ?? 0)
         let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize) = try tree.edit((self.fromPos, self.toPos), self.contents?.compactMap { $0.deepcopy() }, self.splitLevel, editedAt, {
-            var delimiter = editedAt.delimiter
-            if let contents {
-                delimiter += UInt32(contents.count)
+            if issuedSplitTickets < self.splitTickets.count {
+                let ticket = self.splitTickets[issuedSplitTickets]
+                issuedSplitTickets += 1
+                return ticket
             }
 
-            delimiter += 1
-            editedAt = TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
+            splitDelimiter += 1
 
-            return editedAt
+            return TimeTicket(lamport: editedAt.lamport, delimiter: splitDelimiter, actorID: editedAt.actorID)
         }, versionVector)
 
         // Capture the pre-edit range so a remote/local edit can reconcile parked undo ops. `toIdx`

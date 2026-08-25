@@ -315,7 +315,10 @@ final class CRDTTreeNode: IndexTreeNode {
 
     var innerChildren: [CRDTTreeNode]
 
-    let id: CRDTTreeNodeID
+    /// The node's identity. Mutable only so that a copy-reinsert reverse operation can take a fresh
+    /// identity before it executes — see ``TreeEditOperation/reissueContentIDs(_:)``. A node already
+    /// registered in a ``CRDTTree`` must never be re-identified in place.
+    var id: CRDTTreeNodeID
     var removedAt: TimeTicket?
     var attrs: RHT?
 
