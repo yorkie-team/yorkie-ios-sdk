@@ -2276,12 +2276,21 @@ extension CRDTTree {
      * must be in parent-before-child order (``edit(_:_:_:_:_:_:)`` captures them
      * that way).
      *
-     * - Returns: the un-tombstoned and recreated nodes; the caller unregisters
-     *   GC pairs for the un-tombstoned ones.
+     * - Returns: a tuple of
+     *   - `untombstoned`: nodes revived in place (the caller unregisters their GC
+     *     pairs);
+     *   - `recreated`: brand-new nodes rebuilt for purged ranges (the caller adds
+     *     their size to Live);
+     *   - `pairs`: pending GC pairs for born-removed remainders split off a removed
+     *     straddler (the caller registers them BEFORE unregistering the
+     *     un-tombstoned ones);
+     *   - `diff`: the metadata overhead of splitting live straddlers (the caller
+     *     `acc`s it to Live).
      */
-    func restore(_ spans: [TreeRestoreSpan]) throws -> ([CRDTTreeNode], [CRDTTreeNode]) {
+    func restore(_ spans: [TreeRestoreSpan]) throws -> ([CRDTTreeNode], [CRDTTreeNode], [GCPair], DataSize) {
         var untombstoned = [CRDTTreeNode]()
         var recreated = [CRDTTreeNode]()
+        var diff = DataSize(data: 0, meta: 0)
 
         for span in spans {
             if !span.isText {
@@ -2298,7 +2307,13 @@ extension CRDTTree {
                 continue
             }
 
-            // Text: surviving pieces may be split finer than the span.
+            // Text: pieces may be split finer than the span, and a concurrent op
+            // or a post-GC recreate can leave pieces whose boundaries straddle it.
+            // Isolate the exact `[start, end)` sub-range out of every overlapping
+            // piece — splitting at the span boundaries, live or removed — so all
+            // replicas converge on identical text-node segmentation (the tree
+            // analogue of ``RGATreeSplit.isolateRange``). Then revive the removed
+            // parts and recreate the purged gaps.
             let start = span.id.offset
             let end = start + span.length
             let pieces = self.findPiecesOverlapping(span.id.createdAt, start, end)
@@ -2311,20 +2326,14 @@ extension CRDTTree {
                 let pieceEnd = piece.map { $0.id.offset + Int32($0.size) } ?? Int32.max
 
                 if let piece, pieceStart <= cursor {
-                    if pieceStart < start || pieceEnd > end {
-                        // Piece straddles a span boundary. Under causal delivery
-                        // the forward delete split at span boundaries on every
-                        // replica before its undo could arrive, so this is not
-                        // expected; skip conservatively rather than un-tombstone
-                        // beyond the span. Mirrors the guard in `retombstone`.
-                        break
+                    let overlapEnd = Swift.min(pieceEnd, end)
+                    let target = try self.isolateTextRange(piece, cursor, overlapEnd, &diff)
+                    if target.isRemoved {
+                        target.unremove()
+                        untombstoned.append(target)
                     }
-                    if piece.isRemoved {
-                        piece.unremove()
-                        untombstoned.append(piece)
-                    }
-                    cursor = Swift.min(pieceEnd, end)
-                    if cursor >= pieceEnd {
+                    cursor = overlapEnd
+                    if overlapEnd >= pieceEnd {
                         pieceIdx += 1
                     }
                 } else {
@@ -2337,17 +2346,70 @@ extension CRDTTree {
             }
         }
 
-        return (untombstoned, recreated)
+        // Splitting a removed straddler buffers born-removed remainders as pending
+        // GC pairs (see ``CRDTTreeNode.split(_:_:_:_:)``). The caller registers
+        // these BEFORE unregistering the un-tombstoned targets, so a target that
+        // was itself a split-born piece is walked gc -> live correctly (mirrors the
+        // Text path).
+        let pairs = self.drainPendingGCPairs()
+        return (untombstoned, recreated, pairs, diff)
+    }
+
+    /**
+     * `isolateTextRange` splits `piece` so that a node exactly covering the
+     * absolute-offset interval `[from, to)` of its insertion exists, and returns
+     * it. Splitting at the caller's boundaries — rather than skipping a piece that
+     * straddles them — is what lets concurrent restores converge on the same
+     * text-node segmentation across replicas (the tree analogue of
+     * ``RGATreeSplit.isolateRange``). A live split's metadata overhead is added to
+     * `diff`; a removed split buffers a pending GC pair internally (contributing
+     * zero here).
+     *
+     * Requires `pieceStart <= from < to <= pieceEnd`.
+     */
+    private func isolateTextRange(
+        _ piece: CRDTTreeNode,
+        _ from: Int32,
+        _ to: Int32,
+        _ diff: inout DataSize
+    ) throws -> CRDTTreeNode {
+        var node = piece
+        if from > node.id.offset {
+            let (right, splitDiff) = try node.split(self, from - node.id.offset)
+            diff.addDataSizes(others: splitDiff)
+            // The caller's invariants (``restore(_:)``'s cursor, ``retombstone(_:_:)``'s
+            // clamp) guarantee a real split here. Returning the unsplit — wider —
+            // node instead would un-tombstone or re-tombstone content OUTSIDE the
+            // span, silently diverging the replicas: precisely what isolating is
+            // meant to prevent. Fail loudly rather than corrupt the document.
+            guard let right else {
+                throw YorkieError(
+                    code: .errInvalidArgument,
+                    message: "isolateTextRange: split failed at \(from) for piece \(node.id)"
+                )
+            }
+            node = right
+        }
+        if to < node.id.offset + Int32(node.size) {
+            let (_, splitDiff) = try node.split(self, to - node.id.offset)
+            diff.addDataSizes(others: splitDiff)
+        }
+        return node
     }
 
     /**
      * `retombstone` re-deletes the nodes described by `spans` (redo of an
-     * identity-preserving undo). Live pieces only; idempotent.
+     * identity-preserving undo). Live pieces only; idempotent. A piece that
+     * straddles a span boundary is split at that boundary so only the in-span range
+     * is re-removed (symmetric with ``restore(_:)``'s isolate, so undo/redo stay
+     * mirror images and segmentation stays convergent).
      *
-     * - Returns: GC pairs for the newly tombstoned nodes.
+     * - Returns: the GC pairs for the newly tombstoned nodes, and the live-split
+     *   metadata overhead.
      */
-    func retombstone(_ spans: [TreeRestoreSpan], _ executedAt: TimeTicket) -> [GCPair] {
+    func retombstone(_ spans: [TreeRestoreSpan], _ executedAt: TimeTicket) throws -> ([GCPair], DataSize) {
         var pairs = [GCPair]()
+        var diff = DataSize(data: 0, meta: 0)
         for span in spans {
             let start = span.id.offset
             let end = start + Swift.max(span.length, 1)
@@ -2364,18 +2426,18 @@ extension CRDTTree {
                 if piece.isRemoved {
                     continue
                 }
-                if piece.isText, piece.id.offset < start || piece.id.offset + Int32(piece.size) > end {
-                    // Piece straddles a span boundary (same clamped `end` as
-                    // `findPiecesOverlapping`); skip so we never re-tombstone
-                    // content outside the span. Mirrors the guard in `restore`.
-                    continue
+                var target = piece
+                if piece.isText {
+                    let from = Swift.max(piece.id.offset, start)
+                    let to = Swift.min(piece.id.offset + Int32(piece.size), end)
+                    target = try self.isolateTextRange(piece, from, to, &diff)
                 }
-                if piece.remove(executedAt) {
-                    pairs.append(GCPair(parent: self, child: piece))
+                if target.remove(executedAt) {
+                    pairs.append(GCPair(parent: self, child: target))
                 }
             }
         }
-        return pairs
+        return (pairs, diff)
     }
 
     /**

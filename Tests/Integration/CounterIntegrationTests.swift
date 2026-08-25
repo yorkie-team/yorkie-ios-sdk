@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 // swiftlint: disable force_cast
 final class CounterIntegrationTests: XCTestCase {
@@ -164,6 +167,34 @@ final class CounterIntegrationTests: XCTestCase {
 
         try await self.c1.deactivate()
         try await self.c2.deactivate()
+    }
+
+    /// Ports: "Can handle increase operation with out-of-int32 Long".
+    ///
+    /// An `Int32` counter increased by an out-of-int32 `Long` wraps under int32
+    /// arithmetic on every SDK, so the two replicas must agree on 705032705.
+    @MainActor
+    func test_can_handle_increase_operation_with_out_of_int32_long() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            // given — an Int32 counter at 1, shared by both replicas
+            try d1.update { root, _ in
+                root.age = JSONCounter(value: Int32(1))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // when — increased by a Long well beyond the int32 range
+            try d1.update { root, _ in
+                (root.age as! JSONCounter<Int32>).increase(value: Int64(5_000_000_000))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // then — 1 + 5_000_000_000 wraps to 705032705 under int32 arithmetic,
+            // which is what the JS and Go SDKs compute.
+            XCTAssertEqual(d1.toSortedJSON(), "{\"age\":705032705}")
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+        }
     }
 }
 

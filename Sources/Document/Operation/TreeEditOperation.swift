@@ -172,18 +172,29 @@ final class TreeEditOperation: Operation {
             let toRetombstone = (isRetombstone ? self.restoreSpans : self.retombstoneSpans) ?? []
 
             var diff = DataSize(data: 0, meta: 0)
-            // 1. Re-remove (retombstone) by identity.
-            for pair in tree.retombstone(toRetombstone, editedAt) {
+            // 1. Re-remove (retombstone) by identity. Isolating a straddling piece
+            // splits it (live-split overhead accounted to `diff`).
+            let (retombstonePairs, retombstoneDiff) = try tree.retombstone(toRetombstone, editedAt)
+            diff.addDataSizes(others: retombstoneDiff)
+            for pair in retombstonePairs {
                 root.registerGCPair(pair)
             }
-            // 2. Revive (restore) by identity: un-tombstoned nodes move gc->live
-            // via `unregisterGCPair` (must be after `removedAt` is cleared, which
-            // `restore` does); recreated nodes are brand new, so add their size to
-            // live.
-            let (untombstoned, recreated) = try tree.restore(toRestore)
+            // 2. Revive (restore) by identity. Isolating a range out of a straddling
+            // piece can split off born-removed remainders as pending GC pairs;
+            // register them FIRST so a split-born un-tombstoned target is walked
+            // gc->live correctly by the unregister below (mirrors the Text path).
+            // Un-tombstoned nodes move gc->live via `unregisterGCPair` (must be
+            // after `removedAt` is cleared, which `restore` does); recreated nodes
+            // are brand new, so add their size to live, plus any live-split
+            // overhead.
+            let (untombstoned, recreated, restorePairs, restoreDiff) = try tree.restore(toRestore)
+            for pair in restorePairs {
+                root.registerGCPair(pair)
+            }
             for node in untombstoned {
                 root.unregisterGCPair(GCPair(parent: tree, child: node))
             }
+            diff.addDataSizes(others: restoreDiff)
             for node in recreated {
                 diff.addDataSizes(others: node.getDataSize())
             }

@@ -60,4 +60,40 @@ final class CRDTCountTests: XCTestCase {
         XCTAssert(int.value == -30)
         XCTAssert(long.value == 100)
     }
+
+    /// An `Int32` counter increased by an out-of-int32 `Long` must wrap around
+    /// rather than trap, so it converges with the JS and Go SDKs.
+    func test_can_wrap_around_int_counter_when_increased_by_out_of_int32_long() throws {
+        // given
+        let counter = CRDTCounter(value: Int32(0), createdAt: TimeTicket.initial)
+        let outOfInt32 = Primitive(value: .long(2_147_483_648), createdAt: TimeTicket.initial) // 2^31
+
+        // when
+        try counter.increase(outOfInt32)
+
+        // then
+        XCTAssertEqual(counter.value, -2_147_483_648)
+
+        // given — a nonzero base: truncating the delta before adding would yield
+        // -2147483649, which is not representable in int32.
+        let nonZeroBase = CRDTCounter(value: Int32(-1), createdAt: TimeTicket.initial)
+
+        // when
+        try nonZeroBase.increase(outOfInt32)
+
+        // then
+        XCTAssertEqual(nonZeroBase.value, 2_147_483_647)
+    }
+
+    /// A `Long` counter still wraps at 64 bits (JS `BigInt.asIntN(64, …)`).
+    func test_can_wrap_around_long_counter_on_int64_overflow() throws {
+        // given
+        let counter = CRDTCounter(value: Int64.max, createdAt: TimeTicket.initial)
+
+        // when
+        try counter.increase(Primitive(value: .integer(1), createdAt: TimeTicket.initial))
+
+        // then
+        XCTAssertEqual(counter.value, Int64.min)
+    }
 }

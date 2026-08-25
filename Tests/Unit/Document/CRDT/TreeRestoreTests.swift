@@ -61,7 +61,7 @@ final class TreeRestoreTests: XCTestCase {
                                    parentID: paragraph.id,
                                    leftSiblingID: nil,
                                    rightSiblingID: nil)
-        let (untombstoned, recreated) = try tree.restore([span])
+        let (untombstoned, recreated, _, _) = try tree.restore([span])
 
         // then — exactly 3 characters, and `size` agrees with the value length
         XCTAssertTrue(untombstoned.isEmpty, "the node was purged, so nothing can be un-tombstoned")
@@ -97,9 +97,9 @@ final class TreeRestoreTests: XCTestCase {
                                    rightSiblingID: nil)
 
         // when — restore twice
-        let (first, recreatedFirst) = try tree.restore([span])
+        let (first, recreatedFirst, _, _) = try tree.restore([span])
         let sizeAfterFirst = tree.size
-        let (second, recreatedSecond) = try tree.restore([span])
+        let (second, recreatedSecond, _, _) = try tree.restore([span])
 
         // then
         XCTAssertEqual(first.count, 1, "the tombstoned node is revived in place")
@@ -132,9 +132,9 @@ final class TreeRestoreTests: XCTestCase {
                                    rightSiblingID: nil)
 
         // when
-        let firstPairs = tree.retombstone([span], timeT())
+        let (firstPairs, _) = try tree.retombstone([span], timeT())
         let xmlAfterFirst = tree.toXML()
-        let secondPairs = tree.retombstone([span], timeT())
+        let (secondPairs, _) = try tree.retombstone([span], timeT())
 
         // then
         XCTAssertEqual(firstPairs.count, 1, "the live node is tombstoned and registered for GC")
@@ -206,5 +206,93 @@ final class TreeRestoreTests: XCTestCase {
         XCTAssertEqual(first.size, 0, "the old parent gave up the child's size")
         XCTAssertEqual(second.size, live.paddedSize, "the new parent took it on")
         XCTAssertEqual(tree.toXML(), "<root><p></p><p>ab</p></root>")
+    }
+
+    /// Restoring a sub-range of a *removed* straddler must SPLIT it at the span
+    /// boundaries and revive only the isolated middle — the split-aware restore
+    /// added in yorkie-js-sdk#1315.
+    ///
+    /// This is the one path that makes `restore` return pending GC pairs: the two
+    /// remainders split off a removed node are born tombstoned, so they never go
+    /// through `remove()` and get no pair from the normal deletion path. The
+    /// caller must register those pairs BEFORE unregistering the un-tombstoned
+    /// target, because the target is itself one of the split-born pieces and has
+    /// to be walked gc -> live. Without this test the ordering in
+    /// ``TreeEditOperation`` could be reversed and every other test would stay
+    /// green.
+    func test_restore_splits_a_removed_straddler_and_revives_only_the_span() throws {
+        // given — "hello" as one run, tombstoned but NOT purged
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: "root"), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        let textID = posT()
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: textID, type: DefaultTreeNodeType.text.rawValue, value: "hello")],
+                       0, timeT(), timeT)
+        let paragraph = try XCTUnwrap(tree.root.innerChildren.first)
+        let textNode = try XCTUnwrap(paragraph.innerChildren.first)
+        textNode.remove(timeT())
+        XCTAssertEqual(tree.toXML(), "<root><p></p></root>")
+
+        // when — restore only [1, 3) of the 5-char run, i.e. "el"
+        let span = TreeRestoreSpan(id: CRDTTreeNodeID(createdAt: textID.createdAt, offset: 1),
+                                   nodeType: DefaultTreeNodeType.text.rawValue,
+                                   isText: true,
+                                   length: 2,
+                                   value: "hello",
+                                   attrs: nil,
+                                   parentID: paragraph.id,
+                                   leftSiblingID: nil,
+                                   rightSiblingID: nil)
+        let (untombstoned, recreated, pairs, _) = try tree.restore([span])
+
+        // then — only the isolated middle is live; the straddler was split, not skipped
+        XCTAssertEqual(tree.toXML(), "<root><p>el</p></root>", "only the in-span range may be revived")
+        XCTAssertEqual(untombstoned.count, 1, "exactly the isolated middle is un-tombstoned")
+        XCTAssertEqual(untombstoned.first?.value as String?, "el")
+        XCTAssertTrue(recreated.isEmpty, "a surviving (tombstoned) node is revived, never recreated")
+
+        // the two born-removed remainders are handed back as pending GC pairs
+        XCTAssertEqual(pairs.count, 2, "both split-born remainders need a GC pair")
+        XCTAssertEqual(pairs.compactMap { ($0.child as? CRDTTreeNode)?.id.offset }.sorted(), [1, 3])
+
+        // segmentation: h(removed) | el(live) | lo(removed)
+        let pieces = paragraph.innerChildren
+        XCTAssertEqual(pieces.map { $0.value as String }, ["h", "el", "lo"])
+        XCTAssertEqual(pieces.map(\.isRemoved), [true, false, true])
+        XCTAssertEqual(tree.size, 4, "only the 2 live chars count, plus the <p> padding")
+    }
+
+    /// The symmetric half: `retombstone` splits a LIVE straddler at the same
+    /// boundaries, so undo and redo stay mirror images and segmentation stays
+    /// convergent across replicas.
+    func test_retombstone_splits_a_live_straddler_and_removes_only_the_span() throws {
+        // given — a live "hello" run
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: "root"), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        let textID = posT()
+        try tree.editT((1, 1),
+                       [CRDTTreeNode(id: textID, type: DefaultTreeNodeType.text.rawValue, value: "hello")],
+                       0, timeT(), timeT)
+        let paragraph = try XCTUnwrap(tree.root.innerChildren.first)
+        XCTAssertEqual(tree.toXML(), "<root><p>hello</p></root>")
+
+        // when — re-remove only [1, 3)
+        let span = TreeRestoreSpan(id: CRDTTreeNodeID(createdAt: textID.createdAt, offset: 1),
+                                   nodeType: DefaultTreeNodeType.text.rawValue,
+                                   isText: true,
+                                   length: 2,
+                                   value: "hello",
+                                   attrs: nil,
+                                   parentID: paragraph.id,
+                                   leftSiblingID: nil,
+                                   rightSiblingID: nil)
+        let (pairs, _) = try tree.retombstone([span], timeT())
+
+        // then — content outside the span survives
+        XCTAssertEqual(tree.toXML(), "<root><p>hlo</p></root>", "only the in-span range may be re-removed")
+        XCTAssertEqual(pairs.count, 1, "one newly tombstoned node")
+        XCTAssertEqual((pairs.first?.child as? CRDTTreeNode)?.value as String?, "el")
+        XCTAssertEqual(paragraph.innerChildren.map { $0.value as String }, ["h", "el", "lo"])
+        XCTAssertEqual(paragraph.innerChildren.map(\.isRemoved), [false, true, false])
     }
 }
