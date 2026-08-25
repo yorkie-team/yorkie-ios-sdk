@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.16] - 2026-08-25
+
+- Keep a tree position resolvable when two nodes claim one ID in https://github.com/yorkie-team/yorkie-ios-sdk/pull/270
+- Stamp merge-bound inserts and filter style-range interlopers in https://github.com/yorkie-team/yorkie-ios-sdk/pull/270
+- Stop undo and element splits from reusing a node's identity in https://github.com/yorkie-team/yorkie-ios-sdk/pull/270
+
 ## [v0.7.15] - 2026-08-21
 
 - Make Tree restore split-aware for concurrent overlapping undo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/269
