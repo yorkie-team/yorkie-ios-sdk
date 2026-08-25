@@ -330,9 +330,11 @@ final class CRDTTreeNode: IndexTreeNode {
     var insNextID: CRDTTreeNodeID?
 
     /**
-     * `mergedFrom` records the source parent's ID when this node was moved by a
-     * concurrent merge. Persisted in the snapshot encoding as the witness of the
-     * merge relationship.
+     * `mergedFrom` records the parent this node logically belongs to when a merge
+     * relocated it into the merge target: the source parent it was moved out of,
+     * or the declared parent of an insert redirected by the §9.4 intended-parent
+     * stamp. Persisted in the snapshot encoding as the witness of the merge
+     * relationship.
      */
     var mergedFrom: CRDTTreeNodeID?
 
@@ -464,6 +466,10 @@ final class CRDTTreeNode: IndexTreeNode {
                                  type: self.type,
                                  removedAt: self.removedAt)
         clone.attrs = self.attrs?.deepcopy()
+        // The split product holds the other half of the same moved node, so it
+        // carries the same merge stamp (as `cloneText` does).
+        clone.mergedFrom = self.mergedFrom
+        clone.mergedAt = self.mergedAt
         return clone
     }
 
@@ -894,6 +900,107 @@ class CRDTTree: CRDTElement {
     }
 
     /**
+     * `mergedAnchorInterloperGuard` prepares the §9.4 per-node filter for a style
+     * range whose end position was declared inside a parent that a merge unknown
+     * to the styling client removed. The moved anchor child resolves in the merge
+     * target, so the traversal covers nodes sitting between the merge-source
+     * tombstone and the moved children — nodes the styling client saw outside its
+     * range, after the then-live parent. The predicate skips exactly those
+     * interlopers.
+     *
+     * - Parameters:
+     *   - pos: The range-end position of the style operation.
+     *   - versionVector: The styling client's causal knowledge, or `nil` for a local edit.
+     * - Returns: A predicate that reports whether a node is an interloper, or `nil`
+     *   when this shape does not apply.
+     */
+    private func mergedAnchorInterloperGuard(
+        _ pos: CRDTTreePos,
+        _ versionVector: VersionVector?
+    ) -> ((CRDTTreeNode) -> Bool)? {
+        guard let versionVector else {
+            return nil
+        }
+        guard let (declaredParent, _) = try? pos.toTreeNodePair(tree: self) else {
+            return nil
+        }
+        guard declaredParent.isRemoved,
+              declaredParent.mergedInto != nil,
+              let removedAt = declaredParent.removedAt,
+              ticketKnown(versionVector, removedAt) == false
+        else {
+            return nil
+        }
+        let target = self.resolveMergeTarget(declaredParent)
+        // Restricted to the shape where the tombstone sits directly under the
+        // merge target; in other shapes the resolved range already excludes the
+        // interlopers.
+        guard target !== declaredParent, declaredParent.parent === target else {
+            return nil
+        }
+        // Collect the target's children positioned after the merge-source
+        // tombstone in one pass, so the predicate is O(depth) per node.
+        var afterTombstone = Set<ObjectIdentifier>()
+        var seenTombstone = false
+        for child in target.innerChildren {
+            if child === declaredParent {
+                seenTombstone = true
+                continue
+            }
+            if seenTombstone {
+                afterTombstone.insert(ObjectIdentifier(child))
+            }
+        }
+        return { node in
+            // Judge by the node's highest ancestor directly under the merge
+            // target, so an interloper's descendants are skipped with it.
+            var top = node
+            while let parent = top.parent, parent !== target {
+                top = parent
+            }
+            guard top.parent === target else {
+                return false
+            }
+            // Fail open on any merge stamp: an earlier merge keeps the ORIGINAL
+            // source in `mergedFrom` (first-move stamp rule), so stamp equality
+            // cannot prove the node was outside the styled range. Only stamp-free
+            // nodes are positively interlopers.
+            if top.mergedFrom != nil {
+                return false
+            }
+            return afterTombstone.contains(ObjectIdentifier(top))
+        }
+    }
+
+    /**
+     * `styleSkipPredicate` builds the per-token skip checks shared by ``style(_:_:_:_:)``
+     * and ``removeStyle(_:_:_:_:)``: the End-token unknown-split-sibling exclusion and the
+     * §9.4 merged-anchor interloper filter for the range-end position.
+     *
+     * - Parameters:
+     *   - pos: The range-end position of the style operation.
+     *   - versionVector: The styling client's causal knowledge, or `nil` for a local edit.
+     * - Returns: A predicate that reports whether the given token must be skipped.
+     */
+    private func styleSkipPredicate(
+        _ pos: CRDTTreePos,
+        _ versionVector: VersionVector?
+    ) -> (CRDTTreeNode, TokenType) -> Bool {
+        let anchorGuard = self.mergedAnchorInterloperGuard(pos, versionVector)
+        return { node, tokenType in
+            // Skip styling via End token when the node has an unknown split
+            // sibling. The End token is in the range only because a concurrent
+            // split extended the range into the sibling.
+            if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
+                return true
+            }
+            // §9.4: the node is in the range only because an unknown merge pulled
+            // the range-end anchor past it.
+            return anchorGuard?(node) ?? false
+        }
+    }
+
+    /**
      * `advancePastUnknownSplitSiblings` follows the `insNextID` chain of the
      * given node, advancing past element-type split siblings that the editing
      * client did not know about (not in `versionVector`).
@@ -1179,6 +1286,8 @@ class CRDTTree: CRDTElement {
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
+        let shouldSkipToken = self.styleSkipPredicate(range.1, versionVector)
+
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         var prevAttributes = [String: String]()
@@ -1196,10 +1305,7 @@ class CRDTTree: CRDTElement {
                 editedAt,
                 clientLamportAtChange
             ), !node.isText, let attributes {
-                // Skip styling via End token when the node has an unknown split
-                // sibling. The End token is in the range only because a
-                // concurrent split extended the range into the sibling.
-                if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
+                if shouldSkipToken(node, tokenType) {
                     return
                 }
 
@@ -1327,6 +1433,8 @@ class CRDTTree: CRDTElement {
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
 
+        let shouldSkipToken = self.styleSkipPredicate(range.1, versionVector)
+
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         let value = TreeChangeValue.attributesToRemove(attributesToRemove)
@@ -1345,10 +1453,7 @@ class CRDTTree: CRDTElement {
                 editedAt,
                 clientLamportAtChange
             ), !attributesToRemove.isEmpty {
-                // Skip styling via End token when the node has an unknown split
-                // sibling. The End token is in the range only because a
-                // concurrent split extended the range into the sibling.
-                if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
+                if shouldSkipToken(node, tokenType) {
                     return
                 }
 
@@ -1664,6 +1769,36 @@ class CRDTTree: CRDTElement {
         let insertedContentSize = contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
 
         if let contents, contents.isEmpty == false {
+            // §9.4: When the insert position was declared inside a parent that a
+            // concurrent merge removed, the content physically lands in the merge
+            // target. Stamp it as merged-from the declared parent so it stays
+            // distinguishable from nodes that were never inside that parent —
+            // style-range resolution and merge-delete propagation key on this.
+            let declaredFromParent = (try? range.0.toTreeNodePair(tree: self))?.0
+            let intendedParent: CRDTTreeNode? = {
+                guard let declaredFromParent,
+                      declaredFromParent !== fromParent,
+                      declaredFromParent.isRemoved,
+                      declaredFromParent.mergedInto != nil,
+                      self.resolveMergeTarget(declaredFromParent) === fromParent
+                else {
+                    return nil
+                }
+                return declaredFromParent
+            }()
+            var intendedMergedAt: TimeTicket?
+            if let intendedParent {
+                // Take the merge ticket from a sibling the merge moved; the parent's
+                // own `removedAt` may have been overwritten by a later LWW tombstone.
+                for child in fromParent.innerChildren where child.mergedFrom == intendedParent.id {
+                    if let mergedAt = child.mergedAt {
+                        intendedMergedAt = mergedAt
+                        break
+                    }
+                }
+                intendedMergedAt = intendedMergedAt ?? intendedParent.removedAt
+            }
+
             var aliveContents = [CRDTTreeNode]()
             var leftInChildren = fromLeft // tree
 
@@ -1675,6 +1810,11 @@ class CRDTTree: CRDTElement {
                 } else {
                     // 05-1-2. insert after leftSibling
                     try fromParent.insertAfter(content, leftInChildren)
+                }
+
+                if let intendedParent {
+                    content.mergedFrom = intendedParent.id
+                    content.mergedAt = intendedMergedAt
                 }
 
                 leftInChildren = content
