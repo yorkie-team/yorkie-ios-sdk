@@ -98,8 +98,14 @@ struct SetOperation: Operation {
         let removed = parent.set(key: self.key, value: value)
         // NOTE: when resetting an element with a pre-existing createdAt during undo/redo,
         // deregister the previously tombstoned element before re-registering.
-        if source == .undoRedo, root.find(createdAt: value.createdAt) != nil {
-            root.deregisterElement(value)
+        //
+        // NOTE(hackerwins): It has to be the registered element that is
+        // deregistered, not the incoming copy: the copy's size and descendants are
+        // the ones about to be registered, so passing it would charge the wrong
+        // size against gc and leave the stale element's own descendants registered
+        // forever.
+        if source == .undoRedo, let registered = root.find(createdAt: value.createdAt) {
+            root.deregisterElement(registered)
         }
         root.registerElement(value, parent: parent)
         if let removed {
