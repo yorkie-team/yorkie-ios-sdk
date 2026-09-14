@@ -316,4 +316,40 @@ final class DocumentSizeContainerGCTests: XCTestCase {
         _ = doc.garbageCollect(minSyncedVersionVector: vector)
         XCTAssertEqual(doc.getDocSize(), built)
     }
+
+    // undoing the removal of an object container
+    //
+    // Not a port -- iOS-only cover for the `SetOperation` half of
+    // yorkie-js-sdk#1322. Upstream exercises that branch through
+    // `test_restoring_a_container_over_a_diverged_tombstone`, which is
+    // quarantined here under RTCOLLABPLATFORM-767 for an unrelated
+    // `ElementRHT` divergence, so without this test the
+    // `deregisterElement(registered)` change would ship with no active guard.
+    //
+    // Single client, no concurrency, so the LWW tie that RTCOLLABPLATFORM-767
+    // describes is not reachable. The undo re-registers the container under its
+    // original createdAt, so `SetOperation` must deregister the *registered*
+    // tombstone and its descendants, not the incoming copy: deregistering the
+    // copy strands the descendant's size in live and leaves the tombstone
+    // ticket in gc forever.
+    @MainActor
+    func test_undoing_the_removal_of_an_object_container() throws {
+        // given
+        let doc = Document(key: "test-doc")
+
+        try doc.update { root, _ in root.k = ["a": "1"] }
+        let built = doc.getDocSize()
+
+        // when
+        try doc.update { root, _ in root.remove(key: "k") }
+        try doc.undo()
+
+        // then
+        XCTAssertEqual(doc.toSortedJSON(), "{\"k\":{\"a\":\"1\"}}")
+        XCTAssertEqual(doc.getDocSize(), built)
+
+        let vector = maxVectorOf(actors: [doc.changeID.getActorID()])
+        _ = doc.garbageCollect(minSyncedVersionVector: vector)
+        XCTAssertEqual(doc.getDocSize(), built)
+    }
 }
