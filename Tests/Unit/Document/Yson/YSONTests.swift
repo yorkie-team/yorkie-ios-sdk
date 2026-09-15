@@ -414,6 +414,35 @@ final class YSONTests: XCTestCase {
         XCTAssertEqual(obj["v"], .dedupCounter(value: .int(15), registers: "a,b)c"))
     }
 
+    func test_should_throw_on_constructor_nesting_beyond_the_depth_limit() {
+        // given — a syntactically balanced but pathologically deep nest. Each level
+        // costs a stack frame in preprocessYSON, and without the bound this crashes
+        // the process with SIGSEGV somewhere below 4000 rather than throwing.
+        let deep = "{\"v\":" + String(repeating: "Int(", count: 5000) + "5"
+            + String(repeating: ")", count: 5000) + "}"
+
+        // when / then
+        XCTAssertThrowsError(try YSON.parse(deep)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected YorkieError but got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            XCTAssertEqual(yorkieError.message, "YSON constructor nesting deeper than 64")
+        }
+    }
+
+    func test_should_still_accept_nesting_at_the_depth_limit() throws {
+        // given — depth 2 is the deepest shape a real document uses
+        // (DedupCounter(Int(n),"…")); confirm the bound does not reject it
+        let parsed = try YSON.parse(#"{"v":Counter(Int(10))}"#)
+
+        // then
+        guard case .object(let obj) = parsed else {
+            return XCTFail("expected an object but got \(parsed)")
+        }
+        XCTAssertEqual(obj["v"], .counter(.int(10)))
+    }
+
     func test_should_throw_on_an_unterminated_string_literal() {
         // given / when / then
         XCTAssertThrowsError(try YSON.parse(#"{"c":Text([{"val":"a}])}"#)) { error in

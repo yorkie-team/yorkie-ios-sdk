@@ -126,6 +126,19 @@ public enum YSON {
         "DedupCounter", "Counter", "BinData", "Date", "Long", "Int", "Text", "Tree"
     ]
 
+    /// The deepest constructor nesting `preprocessYSON` will recurse through.
+    ///
+    /// Each nested constructor costs a stack frame, and a syntactically balanced but
+    /// pathologically deep input would otherwise exhaust the stack and terminate the
+    /// process rather than throwing. Upstream recurses unbounded, which is survivable
+    /// in JS because exceeding the call stack raises a catchable `RangeError`; in Swift
+    /// it is a hard crash, so the limit is deliberately stricter here.
+    ///
+    /// Real documents nest constructors shallowly — `DedupCounter(Int(n),"…")` is two,
+    /// and depth in a `Tree`/`Text` payload is JSON nesting rather than constructors —
+    /// so this leaves a wide margin.
+    private static let maxConstructorDepth = 64
+
     /// Reports whether `ch` can appear inside an identifier.
     ///
     /// Used to ensure a constructor keyword is matched at a token boundary rather than
@@ -246,7 +259,11 @@ public enum YSON {
     ///
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when a string literal is
     ///   unterminated, the parentheses are unbalanced, or `DedupCounter` has the wrong arity.
-    private static func preprocessYSON(_ yson: String) throws -> String {
+    private static func preprocessYSON(_ yson: String, depth: Int = 0) throws -> String {
+        guard depth <= self.maxConstructorDepth else {
+            throw YorkieError(code: .errInvalidArgument,
+                              message: "YSON constructor nesting deeper than \(self.maxConstructorDepth)")
+        }
         let chars = Array(yson)
         var result = ""
         var idx = 0
@@ -279,10 +296,10 @@ public enum YSON {
                     throw YorkieError(code: .errInvalidArgument,
                                       message: "DedupCounter expects a value and a registers argument")
                 }
-                let value = try self.preprocessYSON(args[0])
+                let value = try self.preprocessYSON(args[0], depth: depth + 1)
                 result += "{\"__yson_type\":\"DedupCounter\",\"__yson_data\":\(value),\"__yson_registers\":\(args[1])}"
             } else {
-                let data = try self.preprocessYSON(String(argContent))
+                let data = try self.preprocessYSON(String(argContent), depth: depth + 1)
                 result += "{\"__yson_type\":\"\(name)\",\"__yson_data\":\(data)}"
             }
 
