@@ -30,7 +30,7 @@ public enum YSON {
     /// - Returns: The parsed ``YSONValue``.
     /// - Throws: ``YorkieError`` with ``YorkieError/code`` `errInvalidArgument` when parsing fails.
     public static func parse(_ yson: String) throws -> YSONValue {
-        let processed = self.preprocessYSON(yson)
+        let processed = try self.preprocessYSON(yson)
 
         guard let data = processed.data(using: .utf8) else {
             throw YorkieError(code: .errInvalidArgument, message: "Failed to parse YSON: invalid encoding")
@@ -118,54 +118,171 @@ public enum YSON {
 
     // MARK: - Preprocessing
 
+    /// The YSON type constructor names the scanner recognizes.
+    ///
+    /// Longer names precede their suffixes (`DedupCounter` before `Counter`) so the
+    /// scanner prefers the longest match.
+    private static let ysonConstructors = [
+        "DedupCounter", "Counter", "BinData", "Date", "Long", "Int", "Text", "Tree"
+    ]
+
+    /// Reports whether `ch` can appear inside an identifier.
+    ///
+    /// Used to ensure a constructor keyword is matched at a token boundary rather than
+    /// as the tail of some longer word.
+    private static func isIdentChar(_ ch: Character?) -> Bool {
+        guard let ch else {
+            return false
+        }
+        return ch.isLetter || ch.isNumber || ch == "_"
+    }
+
+    /// Returns the index just past the JSON string literal starting at `start`.
+    ///
+    /// - Parameters:
+    ///   - chars: The scanned characters.
+    ///   - start: The index of the opening quote.
+    /// - Returns: The index just past the closing quote.
+    /// - Throws: ``YorkieError`` with `errInvalidArgument` when the literal is unterminated.
+    private static func skipString(_ chars: [Character], _ start: Int) throws -> Int {
+        var idx = start + 1
+        while idx < chars.count {
+            if chars[idx] == "\\" {
+                idx += 2
+                continue
+            }
+            if chars[idx] == "\"" {
+                return idx + 1
+            }
+            idx += 1
+        }
+        throw YorkieError(code: .errInvalidArgument, message: "unterminated string literal")
+    }
+
+    /// Returns the index of the `)` closing the `(` whose argument begins at `start`.
+    ///
+    /// Parentheses inside string literals are ignored, so the boundary is found by depth
+    /// counting rather than a fixed-arity pattern.
+    ///
+    /// - Throws: ``YorkieError`` with `errInvalidArgument` when the parentheses are unbalanced.
+    private static func findMatchingParen(_ chars: [Character], _ start: Int) throws -> Int {
+        var depth = 1
+        var idx = start
+        while idx < chars.count {
+            let ch = chars[idx]
+            if ch == "\"" {
+                idx = try self.skipString(chars, idx)
+                continue
+            }
+            if ch == "(" {
+                depth += 1
+            } else if ch == ")" {
+                depth -= 1
+                if depth == 0 {
+                    return idx
+                }
+            }
+            idx += 1
+        }
+        throw YorkieError(code: .errInvalidArgument, message: "unbalanced parentheses in YSON")
+    }
+
+    /// Splits a constructor argument list on top-level commas, ignoring commas inside
+    /// nested brackets or string literals.
+    private static func splitTopLevelArgs(_ chars: [Character]) throws -> [String] {
+        var args: [String] = []
+        var depth = 0
+        var start = 0
+        var idx = 0
+        while idx < chars.count {
+            let ch = chars[idx]
+            if ch == "\"" {
+                idx = try self.skipString(chars, idx)
+                continue
+            }
+            if ch == "(" || ch == "[" || ch == "{" {
+                depth += 1
+            } else if ch == ")" || ch == "]" || ch == "}" {
+                depth -= 1
+            } else if ch == ",", depth == 0 {
+                args.append(String(chars[start ..< idx]).trimmingCharacters(in: .whitespaces))
+                start = idx + 1
+            }
+            idx += 1
+        }
+        args.append(String(chars[start...]).trimmingCharacters(in: .whitespaces))
+        return args
+    }
+
+    /// Returns the constructor name beginning at `idx`, when it starts on a token boundary
+    /// and is immediately followed by `(`.
+    private static func matchConstructorAt(_ chars: [Character], _ idx: Int) -> String? {
+        if idx > 0, self.isIdentChar(chars[idx - 1]) {
+            return nil
+        }
+        for name in self.ysonConstructors {
+            let count = name.count
+            guard idx + count < chars.count, chars[idx + count] == "(" else {
+                continue
+            }
+            if String(chars[idx ..< (idx + count)]) == name {
+                return name
+            }
+        }
+        return nil
+    }
+
     /// Converts YSON special syntax to a JSON-compatible representation using `__yson_type` markers.
     ///
-    /// DedupCounter is handled first because its compound literal `DedupCounter(Int(n),"b64")`
-    /// would be partially matched by the Counter or Int patterns if those ran first.
-    private static func preprocessYSON(_ yson: String) -> String {
-        var result = yson
+    /// A single left-to-right pass rewrites constructor literals into their marker objects.
+    /// The scanner tracks string literals, so brackets and parentheses inside string values
+    /// are never counted as structure, and matches constructor arguments by paren depth, so
+    /// there is no nesting-depth ceiling. Nested constructors such as `Counter(Int(10))` are
+    /// handled by recursing into the argument content.
+    ///
+    /// - Throws: ``YorkieError`` with `errInvalidArgument` when a string literal is
+    ///   unterminated, the parentheses are unbalanced, or `DedupCounter` has the wrong arity.
+    private static func preprocessYSON(_ yson: String) throws -> String {
+        let chars = Array(yson)
+        var result = ""
+        var idx = 0
 
-        // DedupCounter must be replaced before Counter and Int, as its literal contains
-        // an Int(…) sub-expression and a quoted registers string.
-        // DedupCounter(Int(15),"b64") →
-        //   {"__yson_type":"DedupCounter","__yson_data":{"__yson_type":"Int","__yson_data":15},"__yson_registers":"b64"}
-        let dedupPattern = "DedupCounter\\(Int\\((-?\\d+)\\),\"([^\"]+)\"\\)"
-        if let regex = try? NSRegularExpression(pattern: dedupPattern) {
-            var output = ""
-            var lastEnd = result.startIndex
-            let matches = regex.matches(in: result, range: NSRange(result.startIndex..., in: result))
-            for match in matches {
-                let matchRange = Range(match.range, in: result)!
-                output += result[lastEnd ..< matchRange.lowerBound]
-                let valueRange = Range(match.range(at: 1), in: result)!
-                let regsRange = Range(match.range(at: 2), in: result)!
-                let value = String(result[valueRange])
-                let regs = String(result[regsRange])
-                output += "{\"__yson_type\":\"DedupCounter\",\"__yson_data\":{\"__yson_type\":\"Int\",\"__yson_data\":\(value)},\"__yson_registers\":\"\(regs)\"}"
-                lastEnd = matchRange.upperBound
+        while idx < chars.count {
+            let ch = chars[idx]
+
+            // Copy string literals verbatim so their contents are never interpreted
+            // as structure.
+            if ch == "\"" {
+                let end = try self.skipString(chars, idx)
+                result += String(chars[idx ..< end])
+                idx = end
+                continue
             }
-            output += result[lastEnd...]
-            result = output
-        }
 
-        // Counter and the remaining types are handled in order.
-        let replacements: [(pattern: String, template: String)] = [
-            ("Counter\\((Int|Long)\\((-?\\d+)\\)\\)",
-             "{\"__yson_type\":\"Counter\",\"__yson_data\":{\"__yson_type\":\"$1\",\"__yson_data\":$2}}"),
-            ("Int\\((-?\\d+)\\)", "{\"__yson_type\":\"Int\",\"__yson_data\":$1}"),
-            ("Long\\((-?\\d+)\\)", "{\"__yson_type\":\"Long\",\"__yson_data\":$1}"),
-            ("Date\\(\"([^\"]*)\"\\)", "{\"__yson_type\":\"Date\",\"__yson_data\":\"$1\"}"),
-            ("BinData\\(\"([^\"]*)\"\\)", "{\"__yson_type\":\"BinData\",\"__yson_data\":\"$1\"}"),
-            ("Text\\((\\[(?:[^\\[\\]]|\\[(?:[^\\[\\]]|\\[[^\\[\\]]*\\])*\\])*\\])\\)",
-             "{\"__yson_type\":\"Text\",\"__yson_data\":$1}"),
-            ("Tree\\((\\{[^{}]*(?:\\{[^{}]*(?:\\{[^{}]*\\})*[^{}]*\\})*[^{}]*\\})\\)",
-             "{\"__yson_type\":\"Tree\",\"__yson_data\":$1}")
-        ]
+            guard let name = self.matchConstructorAt(chars, idx) else {
+                result.append(ch)
+                idx += 1
+                continue
+            }
 
-        for (pattern, template) in replacements {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
-            let range = NSRange(result.startIndex..., in: result)
-            result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: template)
+            let argStart = idx + name.count + 1
+            let argEnd = try self.findMatchingParen(chars, argStart)
+            let argContent = Array(chars[argStart ..< argEnd])
+
+            if name == "DedupCounter" {
+                let args = try self.splitTopLevelArgs(argContent)
+                guard args.count == 2 else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "DedupCounter expects a value and a registers argument")
+                }
+                let value = try self.preprocessYSON(args[0])
+                result += "{\"__yson_type\":\"DedupCounter\",\"__yson_data\":\(value),\"__yson_registers\":\(args[1])}"
+            } else {
+                let data = try self.preprocessYSON(String(argContent))
+                result += "{\"__yson_type\":\"\(name)\",\"__yson_data\":\(data)}"
+            }
+
+            idx = argEnd + 1
         }
 
         return result
