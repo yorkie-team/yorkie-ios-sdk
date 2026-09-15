@@ -168,4 +168,40 @@ class PrimitiveTests: XCTestCase {
         }
         XCTAssertEqual(small, 42)
     }
+
+    /// Parity guard for yorkie-js-sdk#1326 ("Reject integers outside the
+    /// int64 range instead of wrapping"). JS represents `Long` as an
+    /// arbitrary-precision `number`/`bigint` at the API boundary, so a value
+    /// past 2^63-1 or below -2^63 could reach `bigintToBytesLE` and silently
+    /// wrap via `BigInt.asUintN(64, ...)`, diverging writer and remote peers.
+    ///
+    /// Swift cannot express that bug: `PrimitiveValue.long` only ever takes a
+    /// statically-typed `Int64`, whose bit width IS the int64 range enforced
+    /// by the hardware/language — there is no wider integer type upstream of
+    /// it that could hold an out-of-range value to wrap. One past either
+    /// boundary is not a value that type-checks as `Int64` at all (a literal
+    /// there is a compile error, and `Int64.max + 1` traps at runtime rather
+    /// than wrapping), so there is no `isWithinInt64Range` guard to add. This
+    /// pins the int64 boundary itself, mirroring the one portable upstream
+    /// case ("accept the int64 boundary and reject one past it").
+    func test_accepts_the_int64_boundary_losslessly() throws {
+        // given — the exact boundaries of the represented range
+        let maxInt64 = Int64.max
+        let minInt64 = Int64.min
+
+        // when
+        let maxPrimitive = Primitive(value: .long(maxInt64), createdAt: TimeTicket.initial)
+        let minPrimitive = Primitive(value: .long(minInt64), createdAt: TimeTicket.initial)
+
+        // then — both round-trip losslessly through the wire encoding
+        guard case .long(let maxValue) = try Converter.valueFrom(.long, data: maxPrimitive.toBytes()) else {
+            return XCTFail("expected .long for the int64 max boundary")
+        }
+        XCTAssertEqual(maxValue, maxInt64)
+
+        guard case .long(let minValue) = try Converter.valueFrom(.long, data: minPrimitive.toBytes()) else {
+            return XCTFail("expected .long for the int64 min boundary")
+        }
+        XCTAssertEqual(minValue, minInt64)
+    }
 }
