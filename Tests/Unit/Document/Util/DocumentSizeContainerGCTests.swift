@@ -129,8 +129,10 @@ final class DocumentSizeContainerGCTests: XCTestCase {
             // then — every descendant left live with the container, so live is back
             // to the empty document and the whole subtree now sits in gc.
             XCTAssertEqual(doc.getDocSize().live, empty.live, testCase.name)
-            XCTAssertEqual(doc.getDocSize().gc.data, testCase.built.data, testCase.name)
-            XCTAssertGreaterThan(doc.getDocSize().gc.meta, 0, testCase.name)
+            // Exactly the subtree that left live, no more: the ticket `removedAt`
+            // adds to the container is charged to gc and then refunded to live, so
+            // gc settles at precisely what the document had cost.
+            XCTAssertEqual(doc.getDocSize().gc, testCase.built, testCase.name)
 
             let vector = maxVectorOf(actors: [doc.changeID.getActorID()])
             _ = doc.garbageCollect(minSyncedVersionVector: vector)
@@ -260,8 +262,8 @@ final class DocumentSizeContainerGCTests: XCTestCase {
     // RTCOLLABPLATFORM-767.
     @MainActor
     func test_restoring_a_container_over_a_diverged_tombstone() throws {
-        throw XCTSkip("RTCOLLABPLATFORM-767: ElementRHT.set ties the LWW comparison on an undo "
-            + "restore, so the diverged tombstone's member leaks into the restored object. "
+        try XCTSkipIf(true, "RTCOLLABPLATFORM-767: ElementRHT.set ties the LWW comparison on an "
+            + "undo restore, so the diverged tombstone's member leaks into the restored object. "
             + "Remove this skip once that lands.")
 
         // given
@@ -327,11 +329,15 @@ final class DocumentSizeContainerGCTests: XCTestCase {
     // `deregisterElement(registered)` change would ship with no active guard.
     //
     // Single client, no concurrency, so the LWW tie that RTCOLLABPLATFORM-767
-    // describes is not reachable. The undo re-registers the container under its
-    // original createdAt, so `SetOperation` must deregister the *registered*
-    // tombstone and its descendants, not the incoming copy: deregistering the
-    // copy strands the descendant's size in live and leaves the tombstone
-    // ticket in gc forever.
+    // describes is not reachable.
+    //
+    // Scope note: in a single-client undo the restored copy and the registered
+    // tombstone share every `createdAt`, and `deregisterElement` keys off
+    // `createdAt`, so this does NOT distinguish deregistering the registered
+    // element from deregistering the copy -- it passes either way. What it does
+    // pin is `deregisterElement` walking descendants. The copy/registered
+    // distinction is covered by
+    // `test_undoing_the_removal_of_a_container_holding_a_tombstone` below.
     @MainActor
     func test_undoing_the_removal_of_an_object_container() throws {
         // given
@@ -351,5 +357,45 @@ final class DocumentSizeContainerGCTests: XCTestCase {
         let vector = maxVectorOf(actors: [doc.changeID.getActorID()])
         _ = doc.garbageCollect(minSyncedVersionVector: vector)
         XCTAssertEqual(doc.getDocSize(), built)
+    }
+
+    // undoing the removal of a container holding a tombstone
+    //
+    // Not a port -- iOS regression guard for a defect this PR's
+    // descendant-walking `deregisterElement` would otherwise introduce.
+    //
+    // `RemoveOperation.toReverseOperation` captures a deepcopy at remove time,
+    // and deepcopy preserves members whose `removedAt` is set. The undo's
+    // deregister drops those createdAts from the GC set, and `registerElement`
+    // books the copies into live -- so unless the restore re-registers the
+    // nested tombstone as removed, it stays in live and is never collectable.
+    // Against the merge-base this collected 1 element and settled at 3; without
+    // the re-registration it collects 0 and leaves 4.
+    @MainActor
+    func test_undoing_the_removal_of_a_container_holding_a_tombstone() throws {
+        // given
+        let doc = Document(key: "test-doc")
+        let reference = Document(key: "test-doc")
+        try reference.update { root, _ in root.k = ["a": "1"] }
+
+        try doc.update { root, _ in root.k = ["a": "1", "b": "2"] }
+        try doc.update { root, _ in (root.k as? JSONObject)?.remove(key: "b") }
+        try doc.update { root, _ in root.remove(key: "k") }
+
+        // when
+        try doc.undo()
+
+        // then -- the nested tombstone is still tracked for collection
+        XCTAssertEqual(doc.toSortedJSON(), "{\"k\":{\"a\":\"1\"}}")
+        XCTAssertEqual(doc.getGarbageLength(), 1)
+
+        let vector = maxVectorOf(actors: [doc.changeID.getActorID()])
+        XCTAssertEqual(doc.garbageCollect(minSyncedVersionVector: vector), 1)
+
+        // and the collected document costs exactly what the same content costs
+        // when built fresh, with nothing stranded in live.
+        XCTAssertEqual(doc.getStats().elements, reference.getStats().elements)
+        XCTAssertEqual(doc.getDocSize().live, reference.getDocSize().live)
+        XCTAssertEqual(doc.getDocSize().gc, DataSize(data: 0, meta: 0))
     }
 }

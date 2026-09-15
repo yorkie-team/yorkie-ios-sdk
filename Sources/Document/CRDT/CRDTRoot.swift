@@ -250,6 +250,28 @@ class CRDTRoot {
     }
 
     /**
+     * `adoptRemovedElement` registers an element that was **already tombstoned when
+     * it was registered**, so `registerElement` booked it at its post-removal size.
+     *
+     * Unlike ``registerRemovedElement(_:)`` this does not refund the tombstone
+     * ticket to live: live never held a pre-removal size to get it back from. Use
+     * it when a removed element is adopted wholesale, as when an undo restores a
+     * deepcopy whose members carry `removedAt`.
+     */
+    func adoptRemovedElement(_ element: CRDTElement) {
+        _ = self.moveSizeToGC(element)
+
+        if let element = element as? CRDTContainer {
+            element.getDescendants { [unowned self] element, _ in
+                _ = self.moveSizeToGC(element)
+                return false
+            }
+        }
+
+        self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
+    }
+
+    /**
      * `moveSizeToGC` moves the size of the given element from live to gc, and
      * reports whether it moved a size live was holding. A size already in gc --
      * because the element was removed before, or because a container above it

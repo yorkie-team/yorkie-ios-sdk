@@ -108,6 +108,21 @@ struct SetOperation: Operation {
             root.deregisterElement(registered)
         }
         root.registerElement(value, parent: parent)
+        // NOTE: `RemoveOperation.toReverseOperation` captures `value.deepcopy()` at
+        // remove time, and deepcopy preserves members whose `removedAt` is set. The
+        // deregister above has just dropped those createdAts from the GC set, and
+        // `registerElement` books the copies into live without re-registering them
+        // as removed -- so without this walk a tombstone nested inside a restored
+        // container stays in live and is never collectable again. `CRDTRoot.init`
+        // does the same for an already-tombstoned tree it adopts.
+        if let container = value as? CRDTContainer {
+            container.getDescendants { element, _ in
+                if element.removedAt != nil {
+                    root.adoptRemovedElement(element)
+                }
+                return false
+            }
+        }
         if let removed {
             root.registerRemovedElement(removed)
         }
