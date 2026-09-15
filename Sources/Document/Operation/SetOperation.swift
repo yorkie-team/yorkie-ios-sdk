@@ -98,10 +98,41 @@ struct SetOperation: Operation {
         let removed = parent.set(key: self.key, value: value)
         // NOTE: when resetting an element with a pre-existing createdAt during undo/redo,
         // deregister the previously tombstoned element before re-registering.
-        if source == .undoRedo, root.find(createdAt: value.createdAt) != nil {
-            root.deregisterElement(value)
+        //
+        // NOTE(hackerwins): It has to be the registered element that is
+        // deregistered, not the incoming copy: the copy's size and descendants are
+        // the ones about to be registered, so passing it would charge the wrong
+        // size against gc and leave the stale element's own descendants registered
+        // forever.
+        //
+        // NOTE(yorkie-js-sdk#1349): the `.undoRedo` gate means a peer applying this
+        // same operation as `.remote` never deregisters its tombstone, leaving the
+        // ledger stale and `getGarbageLength()` stuck. Kept as-is for parity with
+        // upstream `set_operation.ts`; drop the gate when upstream does.
+        if source == .undoRedo, let registered = root.find(createdAt: value.createdAt) {
+            root.deregisterElement(registered)
         }
         root.registerElement(value, parent: parent)
+        // NOTE: `RemoveOperation.toReverseOperation` captures `value.deepcopy()` at
+        // remove time, and deepcopy preserves members whose `removedAt` is set. The
+        // deregister above has just dropped those createdAts from the GC set, and
+        // `registerElement` books the copies into live without re-registering them
+        // as removed -- so without this walk a tombstone nested inside a restored
+        // container stays in live and is never collectable again.
+        //
+        // `adoptRemovedElement` rather than `registerRemovedElement`: the latter
+        // refunds a tombstone ticket to live, which over-credits here because
+        // `registerElement` has just booked these copies at their post-removal
+        // size. (`CRDTRoot.init` adopts an already-tombstoned tree through the
+        // refunding path instead, which is where its own known drift comes from.)
+        if let container = value as? CRDTContainer {
+            container.getDescendants { element, _ in
+                if element.removedAt != nil {
+                    root.adoptRemovedElement(element)
+                }
+                return false
+            }
+        }
         if let removed {
             root.registerRemovedElement(removed)
         }

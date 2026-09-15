@@ -61,6 +61,23 @@ class CRDTRoot {
      */
     private var gcElementSetByCreatedAt = Set<String>()
     /**
+     * `sizeInGC` maps the creation time of every registered element whose size
+     * counts toward `docSize.gc` rather than `docSize.live`, to the exact amount
+     * charged. Each element's size belongs to exactly one of the two, and an
+     * element reaches gc by more routes than it has removals: it can be removed
+     * itself, or be a descendant of a removed container. Recording the amount
+     * rather than a flag keeps the two sides symmetric even though `getDataSize`
+     * is not stable over an element's lifetime -- it grows by a ticket the moment
+     * `removedAt` is set, which can happen after the size has already moved.
+     *
+     * The "exactly one of the two" rule covers whole-element moves only. Content
+     * accumulated into an element that already sits in gc does not follow it:
+     * `acc` and ``registerGCPair(_:)`` book against live regardless of this
+     * ledger, so a Text or Tree edited inside an already-removed container keeps
+     * that content charged to live (yorkie-js-sdk#1349).
+     */
+    private var sizeInGC: [String: DataSize] = [:]
+    /**
      * `gcPairMap` is a hash table that maps the IDString of GCChild to the
      * element itself and its parent.
      */
@@ -168,26 +185,130 @@ class CRDTRoot {
     }
 
     /**
-     * `deregisterElement` deregister the given element from hash table.
+     * `deregisterElement` deregister the given element and its descendants from hash table.
      */
-    func deregisterElement(_ element: CRDTElement) {
-        self.docSize.gc.subDataSize(others: element.getDataSize())
-        self.elementPairMapByCreatedAt[element.createdAt.toIDString] = nil
-        self.gcElementSetByCreatedAt.remove(element.createdAt.toIDString)
+    @discardableResult
+    func deregisterElement(_ element: CRDTElement) -> Int {
+        var count = 0
+
+        let deregisterElementInternal: (CRDTElement) -> Void = { [unowned self] element in
+            let createdAt = element.createdAt.toIDString
+            // Subtract the size from wherever it is actually counted, and by the
+            // amount actually charged. A descendant created inside an
+            // already-removed container never passed through a removal, so it still
+            // sits in live; subtracting it from gc would push gc below zero and
+            // leave its cost in live forever.
+            if let charged = self.sizeInGC[createdAt] {
+                self.docSize.gc.subDataSize(others: charged)
+                self.sizeInGC[createdAt] = nil
+            } else {
+                self.docSize.live.subDataSize(others: element.getDataSize())
+            }
+
+            self.elementPairMapByCreatedAt[createdAt] = nil
+            self.gcElementSetByCreatedAt.remove(createdAt)
+            count += 1
+        }
+
+        deregisterElementInternal(element)
+        (element as? CRDTContainer)?.getDescendants { element, _ in
+            deregisterElementInternal(element)
+            return false
+        }
+
+        return count
     }
 
     /**
      * `registerRemovedElement` registers the given element to the hash set.
      */
     func registerRemovedElement(_ element: CRDTElement) {
+        let moved = self.moveSizeToGC(element)
+
+        // NOTE(hackerwins): registerElement books a container and every descendant
+        // into live, and deregisterElement subtracts both when the tombstone is
+        // collected. Removing a container therefore has to move its descendants as
+        // well: booking only the container itself would strand their size in live
+        // forever and drive gc negative once the collection subtracted them.
+        if let element = element as? CRDTContainer {
+            element.getDescendants { [unowned self] element, _ in
+                _ = self.moveSizeToGC(element)
+                return false
+            }
+        }
+
+        // NOTE(hackerwins): When an element is removed, parent sets the removedAt
+        // to mark the child as removed. That ticket is part of the size charged to
+        // gc just now, but it was not part of what live held -- registerElement ran
+        // before the removal -- so live gets it back. Only on the move that carried
+        // it: a size already in gc, or one moved as a descendant while its own
+        // removedAt is still unset, did not.
+        //
+        // This holds for the incremental path. Two known exceptions, both
+        // pre-existing and both leaving the refund inexact:
+        //
+        // - The initializer registers an already-tombstoned element at its
+        //   post-removal size, so live did hold the ticket and the refund
+        //   over-credits by one per *outermost* tombstone (nested ones take the
+        //   top-up path in `moveSizeToGC` and are not refunded).
+        // - The born-removed branch in `SetOperation` (#1226) marks the LWW-losing
+        //   value removed before `registerElement` books it, so live holds the
+        //   ticket there too and the losing replica ends one ticket high
+        //   (yorkie-js-sdk#1349).
+        //
+        // Use ``adoptRemovedElement(_:)`` for any new path that adopts an element
+        // already booked at its post-removal size.
+        if moved, element.removedAt != nil {
+            self.docSize.live.meta += timeTicketSize
+        }
+
+        self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
+    }
+
+    /**
+     * `adoptRemovedElement` registers an element that was **already tombstoned when
+     * it was registered**, so `registerElement` booked it at its post-removal size.
+     *
+     * Unlike ``registerRemovedElement(_:)`` this does not refund the tombstone
+     * ticket to live: live never held a pre-removal size to get it back from. Use
+     * it when a removed element is adopted wholesale, as when an undo restores a
+     * deepcopy whose members carry `removedAt`.
+     */
+    func adoptRemovedElement(_ element: CRDTElement) {
+        _ = self.moveSizeToGC(element)
+
+        if let element = element as? CRDTContainer {
+            element.getDescendants { [unowned self] element, _ in
+                _ = self.moveSizeToGC(element)
+                return false
+            }
+        }
+
+        self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
+    }
+
+    /**
+     * `moveSizeToGC` moves the size of the given element from live to gc, and
+     * reports whether it moved a size live was holding. A size already in gc --
+     * because the element was removed before, or because a container above it
+     * was -- only has its charge topped up: `getDataSize` grows by a ticket when
+     * `removedAt` is set, which can happen after the move.
+     */
+    private func moveSizeToGC(_ element: CRDTElement) -> Bool {
+        let createdAt = element.createdAt.toIDString
         let size = element.getDataSize()
+
+        if let charged = self.sizeInGC[createdAt] {
+            self.docSize.gc.addDataSizes(others: DataSize(data: size.data - charged.data,
+                                                          meta: size.meta - charged.meta))
+            self.sizeInGC[createdAt] = size
+            return false
+        }
 
         self.docSize.gc.addDataSizes(others: size)
         self.docSize.live.subDataSize(others: size)
-
-        self.docSize.live.meta += timeTicketSize
-
-        self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
+        self.sizeInGC[createdAt] = size
+        return true
     }
 
     /**
@@ -336,7 +457,7 @@ class CRDTRoot {
 
             if let removedAt = pair.element.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
                 try? pair.parent?.purge(element: pair.element)
-                count += self.garbageCollectInternal(element: pair.element)
+                count += self.deregisterElement(pair.element)
             }
         }
 
@@ -359,22 +480,6 @@ class CRDTRoot {
                 count += 1
             }
         }
-
-        return count
-    }
-
-    private func garbageCollectInternal(element: CRDTElement) -> Int {
-        var count = 0
-
-        let callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool = { element, _ in
-            self.deregisterElement(element)
-            count += 1
-            return false
-        }
-
-        _ = callback(element, nil)
-
-        (element as? CRDTContainer)?.getDescendants(callback: callback)
 
         return count
     }
