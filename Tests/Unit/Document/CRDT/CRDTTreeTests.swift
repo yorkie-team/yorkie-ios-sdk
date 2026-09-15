@@ -453,6 +453,41 @@ final class CRDTTreeEditTests: XCTestCase {
         XCTAssertNil(try? inserted.attrs?.get(key: "bold"))
     }
 
+    // A degenerate range (from == to) in the merged-anchor shape must style
+    // nothing.
+    //
+    // Note on what this does NOT cover: it is not a mutation guard for the
+    // `>` in `reversedFromAnchorRecovery`'s collapse test. Relaxing that to
+    // `>=` makes the recovery fire here, but the widened traversal only
+    // reaches nodes that moved with the merge, and those carry a `mergedFrom`
+    // stamp, so `isInterloper` rejects every one of them and nothing is styled
+    // either way. The threshold is defended in depth by that predicate; a
+    // shape that discriminates `>` from `>=` would need a stamp-free node
+    // between the recovered anchor and the range end.
+    @MainActor
+    func test_leaves_a_degenerate_from_anchor_range_unrecovered() throws {
+        // given — the merged-anchor shape, but an empty range (from == to)
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0, timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((5, 5), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0, timeT(), timeT)
+        let inserted = CRDTTreeNode(id: posT(), type: "p")
+        try tree.editT((8, 8), [inserted], 0, timeT(), timeT)
+
+        // when — both anchors resolve to the same point
+        let pos = try tree.findPos(6)
+        let knownTicket = timeT()
+        let stylerVV = VersionVector(vector: [knownTicket.actorID: knownTicket.lamport])
+
+        let mergeTicket = TimeTicket(lamport: knownTicket.lamport + 1, delimiter: 0, actorID: self.otherActor)
+        try tree.editT((0, 5), nil, 0, mergeTicket, timeT)
+        _ = try tree.style((pos, pos), ["bold": "\"x\""], timeT(), stylerVV)
+
+        // then — an empty range styles nothing, least of all the insert
+        XCTAssertNil(try? inserted.attrs?.get(key: "bold"))
+    }
+
     func test_can_find_the_closest_TreePos_when_parentNode_or_leftSiblingNode_does_not_exist() async throws {
         let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
 

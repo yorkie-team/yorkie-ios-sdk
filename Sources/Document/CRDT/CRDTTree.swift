@@ -1366,12 +1366,23 @@ class CRDTTree: CRDTElement {
     private func resolveStyleRange(
         _ range: TreePosRange,
         _ editedAt: TimeTicket,
-        _ versionVector: VersionVector?
+        _ versionVector: VersionVector?,
+        advanceSplitSiblings: Bool = true
     ) throws -> (CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
         let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
+
+        // NOTE: only `style` advances past unknown split siblings. `removeStyle`
+        // uses the raw anchors, matching upstream `tree.ts`, where the advance
+        // appears in `style` and `edit` but never in `removeStyle`. Sharing this
+        // helper without the switch silently extended the advance to
+        // `removeStyle` and made an iOS replica traverse a different node set
+        // than JS/Android for the same remote operation.
+        guard advanceSplitSiblings else {
+            return (fromParent, fromLeftRaw, toParent, toLeftRaw, diff)
+        }
 
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
@@ -1528,7 +1539,8 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
-        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
+        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector,
+                                                                                             advanceSplitSiblings: false)
         var diff = rangeDiff
 
         let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
