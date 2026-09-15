@@ -390,6 +390,104 @@ final class CRDTTreeEditTests: XCTestCase {
         XCTAssertEqual(content.mergedAt, mergeTicket)
     }
 
+    // An actor outside the styler's version vector, for simulating an unknown concurrent merge
+    // in a single-context unit test.
+    private let otherActor: ActorID = "111111111111111111111111"
+
+    // Ported from yorkie-js-sdk v0.7.18: CRDTTree.Edit — recovers a style range reversed by an
+    // unknown merge at the from anchor (yorkie-js-sdk#1329).
+    func test_recovers_a_style_range_reversed_by_an_unknown_merge_at_the_from_anchor() throws {
+        // given — <root><p>ab</p><p>cd</p></root>, plus the styler's own <p> inserted after the
+        // second paragraph
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0, timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((5, 5), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0, timeT(), timeT)
+        let inserted = CRDTTreeNode(id: posT(), type: "p")
+        try tree.editT((8, 8), [inserted], 0, timeT(), timeT)
+
+        // when — capture the styler-view range (from after `c`, to inside the insert) and a
+        // version vector that predates the merge
+        let fromPos = try tree.findPos(6)
+        let toPos = try tree.findPos(9)
+        let knownTicket = timeT()
+        let stylerVV = VersionVector(vector: [knownTicket.actorID: knownTicket.lamport])
+
+        // apply a merge from another actor, outside the styler's version vector: the moved `cd`
+        // now resolves after the insert, so the range collapses. The recovery must still style
+        // the insert.
+        let mergeTicket = TimeTicket(lamport: knownTicket.lamport + 1, delimiter: 0, actorID: self.otherActor)
+        try tree.editT((0, 5), nil, 0, mergeTicket, timeT)
+        _ = try tree.style((fromPos, toPos), ["bold": "\"x\""], timeT(), stylerVV)
+
+        // then
+        XCTAssertEqual(try? inserted.attrs?.get(key: "bold"), "\"x\"")
+    }
+
+    // Ported from yorkie-js-sdk v0.7.18: CRDTTree.Edit — keeps an ordered from-anchor range off
+    // the writer insert (yorkie-js-sdk#1329).
+    func test_keeps_an_ordered_from_anchor_range_off_the_writer_insert() throws {
+        // given — same shape, but both anchors sit inside the merged paragraph: the resolved
+        // range moves with the merge and stays ordered, so the recovery must not widen it onto
+        // the insert
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0, timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((5, 5), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0, timeT(), timeT)
+        let inserted = CRDTTreeNode(id: posT(), type: "p")
+        try tree.editT((8, 8), [inserted], 0, timeT(), timeT)
+
+        // when
+        let fromPos = try tree.findPos(6)
+        let toPos = try tree.findPos(7)
+        let knownTicket = timeT()
+        let stylerVV = VersionVector(vector: [knownTicket.actorID: knownTicket.lamport])
+
+        let mergeTicket = TimeTicket(lamport: knownTicket.lamport + 1, delimiter: 0, actorID: self.otherActor)
+        try tree.editT((0, 5), nil, 0, mergeTicket, timeT)
+        _ = try tree.style((fromPos, toPos), ["bold": "\"x\""], timeT(), stylerVV)
+
+        // then
+        XCTAssertNil(try? inserted.attrs?.get(key: "bold"))
+    }
+
+    // A degenerate range (from == to) in the merged-anchor shape must style
+    // nothing.
+    //
+    // Note on what this does NOT cover: it is not a mutation guard for the
+    // `>` in `reversedFromAnchorRecovery`'s collapse test. Relaxing that to
+    // `>=` makes the recovery fire here, but the widened traversal only
+    // reaches nodes that moved with the merge, and those carry a `mergedFrom`
+    // stamp, so `isInterloper` rejects every one of them and nothing is styled
+    // either way. The threshold is defended in depth by that predicate; a
+    // shape that discriminates `>` from `>=` would need a stamp-free node
+    // between the recovered anchor and the range end.
+    @MainActor
+    func test_leaves_a_degenerate_from_anchor_range_unrecovered() throws {
+        // given — the merged-anchor shape, but an empty range (from == to)
+        let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
+        try tree.editT((0, 0), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((1, 1), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "ab")], 0, timeT(), timeT)
+        try tree.editT((4, 4), [CRDTTreeNode(id: posT(), type: "p")], 0, timeT(), timeT)
+        try tree.editT((5, 5), [CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: "cd")], 0, timeT(), timeT)
+        let inserted = CRDTTreeNode(id: posT(), type: "p")
+        try tree.editT((8, 8), [inserted], 0, timeT(), timeT)
+
+        // when — both anchors resolve to the same point
+        let pos = try tree.findPos(6)
+        let knownTicket = timeT()
+        let stylerVV = VersionVector(vector: [knownTicket.actorID: knownTicket.lamport])
+
+        let mergeTicket = TimeTicket(lamport: knownTicket.lamport + 1, delimiter: 0, actorID: self.otherActor)
+        try tree.editT((0, 5), nil, 0, mergeTicket, timeT)
+        _ = try tree.style((pos, pos), ["bold": "\"x\""], timeT(), stylerVV)
+
+        // then — an empty range styles nothing, least of all the insert
+        XCTAssertNil(try? inserted.attrs?.get(key: "bold"))
+    }
+
     func test_can_find_the_closest_TreePos_when_parentNode_or_leftSiblingNode_does_not_exist() async throws {
         let tree = CRDTTree(root: CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.root.rawValue), createdAt: timeT())
 

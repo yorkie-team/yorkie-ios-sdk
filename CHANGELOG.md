@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.18] - 2026-09-15
+
+- Anchor RGATreeList.insert on the last node's position identity (no-op on iOS; `insert` already anchors on `positionCreatedAt`, guarded by a parity test) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/272
+- Recover style ranges collapsed by a merge at the from anchor in https://github.com/yorkie-team/yorkie-ios-sdk/pull/272
+- Relink insertion chain when restore recreates a purged fragment in https://github.com/yorkie-team/yorkie-ios-sdk/pull/272
+- Reject integers outside the int64 range (no-op on iOS; `PrimitiveValue` typing makes the JS bug unrepresentable, guarded by a parity test) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/272
+
 ## [v0.7.17] - 2026-09-14
 
 - Count a removed container's descendants in the GC total in https://github.com/yorkie-team/yorkie-ios-sdk/pull/271

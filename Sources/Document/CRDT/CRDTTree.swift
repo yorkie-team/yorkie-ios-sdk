@@ -920,7 +920,7 @@ class CRDTTree: CRDTElement {
     private func mergedAnchorInterloperGuard(
         _ pos: CRDTTreePos,
         _ versionVector: VersionVector?
-    ) throws -> ((CRDTTreeNode) -> Bool)? {
+    ) throws -> (isInterloper: (CRDTTreeNode) -> Bool, declaredParent: CRDTTreeNode, target: CRDTTreeNode)? {
         guard let versionVector else {
             return nil
         }
@@ -952,7 +952,7 @@ class CRDTTree: CRDTElement {
                 afterTombstone.insert(ObjectIdentifier(child))
             }
         }
-        return { node in
+        let isInterloper: (CRDTTreeNode) -> Bool = { node in
             // Judge by the node's highest ancestor directly under the merge
             // target, so an interloper's descendants are skipped with it.
             var top = node
@@ -971,6 +971,7 @@ class CRDTTree: CRDTElement {
             }
             return afterTombstone.contains(ObjectIdentifier(top))
         }
+        return (isInterloper, declaredParent, target)
     }
 
     /**
@@ -985,7 +986,8 @@ class CRDTTree: CRDTElement {
      */
     private func styleSkipPredicate(
         _ pos: CRDTTreePos,
-        _ versionVector: VersionVector?
+        _ versionVector: VersionVector?,
+        _ recoveredInterloper: ((CRDTTreeNode) -> Bool)? = nil
     ) throws -> (CRDTTreeNode, TokenType) -> Bool {
         let anchorGuard = try self.mergedAnchorInterloperGuard(pos, versionVector)
         return { node, tokenType in
@@ -995,9 +997,14 @@ class CRDTTree: CRDTElement {
             if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
                 return true
             }
+            // §9.4 from-side: a recovered traversal may only touch nodes the
+            // collapsed range lost, the positively identified interlopers.
+            if let recoveredInterloper, recoveredInterloper(node) == false {
+                return true
+            }
             // §9.4: the node is in the range only because an unknown merge pulled
             // the range-end anchor past it.
-            return anchorGuard?(node) ?? false
+            return anchorGuard?.isInterloper(node) ?? false
         }
     }
 
@@ -1359,12 +1366,23 @@ class CRDTTree: CRDTElement {
     private func resolveStyleRange(
         _ range: TreePosRange,
         _ editedAt: TimeTicket,
-        _ versionVector: VersionVector?
+        _ versionVector: VersionVector?,
+        advanceSplitSiblings: Bool = true
     ) throws -> (CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
         let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
+
+        // NOTE: only `style` advances past unknown split siblings. `removeStyle`
+        // uses the raw anchors, matching upstream `tree.ts`, where the advance
+        // appears in `style` and `edit` but never in `removeStyle`. Sharing this
+        // helper without the switch silently extended the advance to
+        // `removeStyle` and made an iOS replica traverse a different node set
+        // than JS/Android for the same remote operation.
+        guard advanceSplitSiblings else {
+            return (fromParent, fromLeftRaw, toParent, toLeftRaw, diff)
+        }
 
         let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
         let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
@@ -1381,14 +1399,17 @@ class CRDTTree: CRDTElement {
         let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
         var diff = rangeDiff
 
-        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector)
+        let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
+        let traverseFromParent = recovery?.fromParent ?? fromParent
+        let traverseFromLeft = recovery?.fromLeft ?? fromLeft
+        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector, recovery?.isInterloper)
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         var prevAttributes = [String: String]()
         var newAttrKeys = [String]()
         var capturedPrev = false
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
+        try self.traverseInPosRange(traverseFromParent, traverseFromLeft, toParent, toLeft) { token, _ in
             let (node, tokenType) = token
             let actorID = node.createdAt.actorID
             var clientLamportAtChange: Int64 = .max
@@ -1518,10 +1539,14 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
-        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
+        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector,
+                                                                                             advanceSplitSiblings: false)
         var diff = rangeDiff
 
-        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector)
+        let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
+        let traverseFromParent = recovery?.fromParent ?? fromParent
+        let traverseFromLeft = recovery?.fromLeft ?? fromLeft
+        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector, recovery?.isInterloper)
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
@@ -1529,7 +1554,7 @@ class CRDTTree: CRDTElement {
         var prevAttributes = [String: String]()
         var capturedPrev = false
 
-        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
+        try self.traverseInPosRange(traverseFromParent, traverseFromLeft, toParent, toLeft) { token, _ in
             let (node, tokenType) = token
             let actorID = node.createdAt.actorID
             var clientLamportAtChange: Int64 = .max
@@ -2898,5 +2923,56 @@ extension CRDTTree {
             return sibling.id
         }
         return CRDTTreeNodeID(createdAt: sibling.id.createdAt, offset: sibling.id.offset + Int32(sibling.size) - 1)
+    }
+}
+
+/// §9.4 from-side style-range recovery, kept in an extension so the main
+/// ``CRDTTree`` body stays within the type-length budget.
+private extension CRDTTree {
+    /**
+     * `reversedFromAnchorRecovery` prepares the §9.4 from-side counterpart of
+     * ``mergedAnchorInterloperGuard(_:_:)`` for a style range whose start position
+     * was declared inside a parent that a merge unknown to the styling client
+     * removed. The resolved range then collapses (start past end) and the
+     * traversal misses nodes the styling client covered. The recovery re-anchors
+     * the traversal start just after the last live sibling before the merge-source
+     * tombstone; the caller must style only nodes the returned predicate positively
+     * identifies as interlopers. Stamped nodes in the span stay out of reach and
+     * fail open unstyled — see the §9.4 known limitations in yorkie's
+     * concurrent-merge-split design doc.
+     *
+     * - Parameters:
+     *   - pos: The range-start position of the style operation.
+     *   - anchors: The resolved range anchors, as returned by ``resolveStyleRange(_:_:_:)``.
+     *   - versionVector: The styling client's causal knowledge, or `nil` for a local edit.
+     * - Returns: The re-anchored traversal start and the interloper predicate, or
+     *   `nil` when this shape does not apply.
+     */
+    func reversedFromAnchorRecovery(
+        _ pos: CRDTTreePos,
+        _ anchors: (fromParent: CRDTTreeNode, fromLeft: CRDTTreeNode, toParent: CRDTTreeNode, toLeft: CRDTTreeNode),
+        _ versionVector: VersionVector?
+    ) throws -> (fromParent: CRDTTreeNode, fromLeft: CRDTTreeNode, isInterloper: (CRDTTreeNode) -> Bool)? {
+        guard let guardResult = try self.mergedAnchorInterloperGuard(pos, versionVector) else {
+            return nil
+        }
+        // Only a range that actually collapsed needs recovery: when both anchors
+        // moved with the merge, the resolved range stays ordered and still covers
+        // what the styling client covered.
+        guard try self.toIndex(anchors.fromParent, anchors.fromLeft) > self.toIndex(anchors.toParent, anchors.toLeft) else {
+            return nil
+        }
+        let declaredParent = guardResult.declaredParent
+        let target = guardResult.target
+        var anchorLeft: CRDTTreeNode = target
+        for child in target.innerChildren {
+            if child === declaredParent {
+                break
+            }
+            if child.isRemoved == false {
+                anchorLeft = child
+            }
+        }
+        return (target, anchorLeft, guardResult.isInterloper)
     }
 }
