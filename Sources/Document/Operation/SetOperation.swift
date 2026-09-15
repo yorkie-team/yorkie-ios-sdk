@@ -104,6 +104,11 @@ struct SetOperation: Operation {
         // the ones about to be registered, so passing it would charge the wrong
         // size against gc and leave the stale element's own descendants registered
         // forever.
+        //
+        // NOTE(yorkie-js-sdk#1349): the `.undoRedo` gate means a peer applying this
+        // same operation as `.remote` never deregisters its tombstone, leaving the
+        // ledger stale and `getGarbageLength()` stuck. Kept as-is for parity with
+        // upstream `set_operation.ts`; drop the gate when upstream does.
         if source == .undoRedo, let registered = root.find(createdAt: value.createdAt) {
             root.deregisterElement(registered)
         }
@@ -113,8 +118,13 @@ struct SetOperation: Operation {
         // deregister above has just dropped those createdAts from the GC set, and
         // `registerElement` books the copies into live without re-registering them
         // as removed -- so without this walk a tombstone nested inside a restored
-        // container stays in live and is never collectable again. `CRDTRoot.init`
-        // does the same for an already-tombstoned tree it adopts.
+        // container stays in live and is never collectable again.
+        //
+        // `adoptRemovedElement` rather than `registerRemovedElement`: the latter
+        // refunds a tombstone ticket to live, which over-credits here because
+        // `registerElement` has just booked these copies at their post-removal
+        // size. (`CRDTRoot.init` adopts an already-tombstoned tree through the
+        // refunding path instead, which is where its own known drift comes from.)
         if let container = value as? CRDTContainer {
             container.getDescendants { element, _ in
                 if element.removedAt != nil {

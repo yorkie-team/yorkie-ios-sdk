@@ -69,6 +69,12 @@ class CRDTRoot {
      * rather than a flag keeps the two sides symmetric even though `getDataSize`
      * is not stable over an element's lifetime -- it grows by a ticket the moment
      * `removedAt` is set, which can happen after the size has already moved.
+     *
+     * The "exactly one of the two" rule covers whole-element moves only. Content
+     * accumulated into an element that already sits in gc does not follow it:
+     * `acc` and ``registerGCPair(_:)`` book against live regardless of this
+     * ledger, so a Text or Tree edited inside an already-removed container keeps
+     * that content charged to live (yorkie-js-sdk#1349).
      */
     private var sizeInGC: [String: DataSize] = [:]
     /**
@@ -238,10 +244,20 @@ class CRDTRoot {
         // it: a size already in gc, or one moved as a descendant while its own
         // removedAt is still unset, did not.
         //
-        // This holds for the incremental path. The initializer instead registers an
-        // already-tombstoned element at its post-removal size, so live did hold the
-        // ticket and the refund over-credits it by one per tombstone. That drift is
-        // pre-existing and unchanged here.
+        // This holds for the incremental path. Two known exceptions, both
+        // pre-existing and both leaving the refund inexact:
+        //
+        // - The initializer registers an already-tombstoned element at its
+        //   post-removal size, so live did hold the ticket and the refund
+        //   over-credits by one per *outermost* tombstone (nested ones take the
+        //   top-up path in `moveSizeToGC` and are not refunded).
+        // - The born-removed branch in `SetOperation` (#1226) marks the LWW-losing
+        //   value removed before `registerElement` books it, so live holds the
+        //   ticket there too and the losing replica ends one ticket high
+        //   (yorkie-js-sdk#1349).
+        //
+        // Use ``adoptRemovedElement(_:)`` for any new path that adopts an element
+        // already booked at its post-removal size.
         if moved, element.removedAt != nil {
             self.docSize.live.meta += timeTicketSize
         }

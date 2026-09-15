@@ -321,12 +321,11 @@ final class DocumentSizeContainerGCTests: XCTestCase {
 
     // undoing the removal of an object container
     //
-    // Not a port -- iOS-only cover for the `SetOperation` half of
-    // yorkie-js-sdk#1322. Upstream exercises that branch through
-    // `test_restoring_a_container_over_a_diverged_tombstone`, which is
-    // quarantined here under RTCOLLABPLATFORM-767 for an unrelated
-    // `ElementRHT` divergence, so without this test the
-    // `deregisterElement(registered)` change would ship with no active guard.
+    // Not a port -- iOS-only cover for `deregisterElement` walking descendants on
+    // the undo/redo path of yorkie-js-sdk#1322. Upstream exercises that path
+    // through `test_restoring_a_container_over_a_diverged_tombstone`, which is
+    // quarantined here under RTCOLLABPLATFORM-767 for an unrelated `ElementRHT`
+    // divergence.
     //
     // Single client, no concurrency, so the LWW tie that RTCOLLABPLATFORM-767
     // describes is not reachable.
@@ -334,10 +333,10 @@ final class DocumentSizeContainerGCTests: XCTestCase {
     // Scope note: in a single-client undo the restored copy and the registered
     // tombstone share every `createdAt`, and `deregisterElement` keys off
     // `createdAt`, so this does NOT distinguish deregistering the registered
-    // element from deregistering the copy -- it passes either way. What it does
-    // pin is `deregisterElement` walking descendants. The copy/registered
-    // distinction is covered by
-    // `test_undoing_the_removal_of_a_container_holding_a_tombstone` below.
+    // element from deregistering the copy -- it passes either way. That
+    // distinction is guarded by
+    // `test_undoing_the_removal_of_a_container_holding_a_tombstone` below, which
+    // is the test that fails if the restore stops handling nested tombstones.
     @MainActor
     func test_undoing_the_removal_of_an_object_container() throws {
         // given
