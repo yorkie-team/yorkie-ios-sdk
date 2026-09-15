@@ -402,6 +402,18 @@ final class YSONTests: XCTestCase {
 
     // MARK: - Error handling (string-aware scanner)
 
+    func test_should_parse_a_dedupcounter_whose_registers_contain_a_comma_and_paren() throws {
+        // given / when — the registers string holds both a comma and a closing paren, so a
+        // naive split on "," or a paren scan that ignored strings would mis-split the args
+        let parsed = try YSON.parse(#"{"v":DedupCounter(Int(15),"a,b)c")}"#)
+
+        // then
+        guard case .object(let obj) = parsed else {
+            return XCTFail("expected an object but got \(parsed)")
+        }
+        XCTAssertEqual(obj["v"], .dedupCounter(value: .int(15), registers: "a,b)c"))
+    }
+
     func test_should_throw_on_an_unterminated_string_literal() {
         // given / when / then
         XCTAssertThrowsError(try YSON.parse(#"{"c":Text([{"val":"a}])}"#)) { error in
@@ -409,6 +421,10 @@ final class YSONTests: XCTestCase {
                 return XCTFail("expected YorkieError but got \(error)")
             }
             XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // The message matters: asserting only the code would also pass against
+            // the old regex implementation, where JSONSerialization rejected the
+            // untransformed literal with the same code from a different origin.
+            XCTAssertEqual(yorkieError.message, "unterminated string literal")
         }
     }
 
@@ -419,6 +435,10 @@ final class YSONTests: XCTestCase {
                 return XCTFail("expected YorkieError but got \(error)")
             }
             XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // The message matters: asserting only the code would also pass against
+            // the old regex implementation, where JSONSerialization rejected the
+            // untransformed literal with the same code from a different origin.
+            XCTAssertEqual(yorkieError.message, "unbalanced parentheses in YSON")
         }
     }
 
@@ -429,6 +449,10 @@ final class YSONTests: XCTestCase {
                 return XCTFail("expected YorkieError but got \(error)")
             }
             XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // The message matters: asserting only the code would also pass against
+            // the old regex implementation, where JSONSerialization rejected the
+            // untransformed literal with the same code from a different origin.
+            XCTAssertEqual(yorkieError.message, "DedupCounter expects a value and a registers argument")
         }
     }
 }

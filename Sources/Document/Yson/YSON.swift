@@ -131,10 +131,14 @@ public enum YSON {
     /// Used to ensure a constructor keyword is matched at a token boundary rather than
     /// as the tail of some longer word.
     private static func isIdentChar(_ ch: Character?) -> Bool {
-        guard let ch else {
+        // ASCII-only, matching upstream's /[A-Za-z0-9_]/. Swift's `isLetter`/`isNumber`
+        // are Unicode-aware and would treat `é` or `١` as identifier characters, which
+        // would suppress a constructor expansion that the JS scanner performs.
+        guard let ch, let ascii = ch.asciiValue else {
             return false
         }
-        return ch.isLetter || ch.isNumber || ch == "_"
+        return (ascii >= 65 && ascii <= 90) || (ascii >= 97 && ascii <= 122)
+            || (ascii >= 48 && ascii <= 57) || ascii == 95
     }
 
     /// Returns the index just past the JSON string literal starting at `start`.
@@ -205,12 +209,12 @@ public enum YSON {
             } else if ch == ")" || ch == "]" || ch == "}" {
                 depth -= 1
             } else if ch == ",", depth == 0 {
-                args.append(String(chars[start ..< idx]).trimmingCharacters(in: .whitespaces))
+                args.append(String(chars[start ..< idx]).trimmingCharacters(in: .whitespacesAndNewlines))
                 start = idx + 1
             }
             idx += 1
         }
-        args.append(String(chars[start...]).trimmingCharacters(in: .whitespaces))
+        args.append(String(chars[start...]).trimmingCharacters(in: .whitespacesAndNewlines))
         return args
     }
 
