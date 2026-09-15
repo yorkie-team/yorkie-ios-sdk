@@ -964,6 +964,19 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                         chainAnchor
                     )
                     _ = self.insertAfter(prev, newNode)
+                    // `insertAfter` only maintains the physical prev/next chain. Relink
+                    // the separate insertion chain (`insPrev`/`insNext`) too, the same
+                    // way `splitNode` does, so a recreated interior fragment is not
+                    // skipped by the surviving same-insertion neighbours. Otherwise a
+                    // later edit whose boundary lands on this fragment resolves through
+                    // a stale insertion pointer in `findFloorNodePreferToLeft` and
+                    // miscomputes its offset (yorkie-js-sdk#1327).
+                    if cursor > 0, let insPrev = self.findPieceCovering(span.createdAt, cursor - 1) {
+                        newNode.setInsPrev(insPrev)
+                    }
+                    if let insNext = self.findPieceCovering(span.createdAt, gapEnd) {
+                        newNode.setInsNext(insNext)
+                    }
                     recreated.append(newNode)
                     chainAnchor = newNode
                     cursor = gapEnd
