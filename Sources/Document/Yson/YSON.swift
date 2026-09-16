@@ -30,11 +30,8 @@ public enum YSON {
     /// - Returns: The parsed ``YSONValue``.
     /// - Throws: ``YorkieError`` with ``YorkieError/code`` `errInvalidArgument` when parsing fails.
     public static func parse(_ yson: String) throws -> YSONValue {
-        let processed = try self.preprocessYSON(yson)
-
-        guard let data = processed.data(using: .utf8) else {
-            throw YorkieError(code: .errInvalidArgument, message: "Failed to parse YSON: invalid encoding")
-        }
+        let processed = try self.preprocessYSON(Array(yson.utf8))
+        let data = Data(processed)
 
         do {
             let parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
@@ -118,13 +115,13 @@ public enum YSON {
 
     // MARK: - Preprocessing
 
-    /// The YSON type constructor names the scanner recognizes.
+    /// The YSON type constructor names the scanner recognizes, as UTF-8 bytes.
     ///
     /// Longer names precede their suffixes (`DedupCounter` before `Counter`) so the
     /// scanner prefers the longest match.
-    private static let ysonConstructors = [
+    private static let ysonConstructors: [(name: String, bytes: [UInt8])] = [
         "DedupCounter", "Counter", "BinData", "Date", "Long", "Int", "Text", "Tree"
-    ]
+    ].map { ($0, Array($0.utf8)) }
 
     /// The deepest constructor nesting `preprocessYSON` will recurse through.
     ///
@@ -139,36 +136,52 @@ public enum YSON {
     /// so this leaves a wide margin.
     private static let maxConstructorDepth = 64
 
-    /// Reports whether `ch` can appear inside an identifier.
+    private enum Byte {
+        static let quote: UInt8 = 0x22
+        static let backslash: UInt8 = 0x5C
+        static let lparen: UInt8 = 0x28
+        static let rparen: UInt8 = 0x29
+        static let lbracket: UInt8 = 0x5B
+        static let rbracket: UInt8 = 0x5D
+        static let lbrace: UInt8 = 0x7B
+        static let rbrace: UInt8 = 0x7D
+        static let comma: UInt8 = 0x2C
+        static let underscore: UInt8 = 0x5F
+    }
+
+    /// Reports whether `byte` can appear inside an identifier.
     ///
-    /// Used to ensure a constructor keyword is matched at a token boundary rather than
-    /// as the tail of some longer word.
-    private static func isIdentChar(_ ch: Character?) -> Bool {
-        // ASCII-only, matching upstream's /[A-Za-z0-9_]/. Swift's `isLetter`/`isNumber`
-        // are Unicode-aware and would treat `é` or `١` as identifier characters, which
-        // would suppress a constructor expansion that the JS scanner performs.
-        guard let ch, let ascii = ch.asciiValue else {
+    /// ASCII-only, matching upstream's `/[A-Za-z0-9_]/`, so a constructor keyword is
+    /// matched at a token boundary rather than as the tail of a longer word.
+    private static func isIdentByte(_ byte: UInt8?) -> Bool {
+        guard let byte else {
             return false
         }
-        return (ascii >= 65 && ascii <= 90) || (ascii >= 97 && ascii <= 122)
-            || (ascii >= 48 && ascii <= 57) || ascii == 95
+        return (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A)
+            || (byte >= 0x30 && byte <= 0x39) || byte == Byte.underscore
+    }
+
+    /// Reports whether `byte` is JSON-legal whitespace, matching what JS `trim()` strips
+    /// between tokens.
+    private static func isSpaceByte(_ byte: UInt8) -> Bool {
+        byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D || byte == 0x0B || byte == 0x0C
     }
 
     /// Returns the index just past the JSON string literal starting at `start`.
     ///
     /// - Parameters:
-    ///   - chars: The scanned characters.
+    ///   - bytes: The scanned UTF-8 bytes.
     ///   - start: The index of the opening quote.
     /// - Returns: The index just past the closing quote.
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when the literal is unterminated.
-    private static func skipString(_ chars: [Character], _ start: Int) throws -> Int {
+    private static func skipString(_ bytes: [UInt8], _ start: Int) throws -> Int {
         var idx = start + 1
-        while idx < chars.count {
-            if chars[idx] == "\\" {
+        while idx < bytes.count {
+            if bytes[idx] == Byte.backslash {
                 idx += 2
                 continue
             }
-            if chars[idx] == "\"" {
+            if bytes[idx] == Byte.quote {
                 return idx + 1
             }
             idx += 1
@@ -182,18 +195,18 @@ public enum YSON {
     /// counting rather than a fixed-arity pattern.
     ///
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when the parentheses are unbalanced.
-    private static func findMatchingParen(_ chars: [Character], _ start: Int) throws -> Int {
+    private static func findMatchingParen(_ bytes: [UInt8], _ start: Int) throws -> Int {
         var depth = 1
         var idx = start
-        while idx < chars.count {
-            let ch = chars[idx]
-            if ch == "\"" {
-                idx = try self.skipString(chars, idx)
+        while idx < bytes.count {
+            let byte = bytes[idx]
+            if byte == Byte.quote {
+                idx = try self.skipString(bytes, idx)
                 continue
             }
-            if ch == "(" {
+            if byte == Byte.lparen {
                 depth += 1
-            } else if ch == ")" {
+            } else if byte == Byte.rparen {
                 depth -= 1
                 if depth == 0 {
                     return idx
@@ -206,44 +219,61 @@ public enum YSON {
 
     /// Splits a constructor argument list on top-level commas, ignoring commas inside
     /// nested brackets or string literals.
-    private static func splitTopLevelArgs(_ chars: [Character]) throws -> [String] {
-        var args: [String] = []
+    private static func splitTopLevelArgs(_ bytes: [UInt8]) throws -> [[UInt8]] {
+        func trimmed(_ slice: ArraySlice<UInt8>) -> [UInt8] {
+            var lower = slice.startIndex
+            var upper = slice.endIndex
+            while lower < upper, self.isSpaceByte(slice[lower]) {
+                lower += 1
+            }
+            while upper > lower, self.isSpaceByte(slice[upper - 1]) {
+                upper -= 1
+            }
+            return Array(slice[lower ..< upper])
+        }
+
+        var args: [[UInt8]] = []
         var depth = 0
         var start = 0
         var idx = 0
-        while idx < chars.count {
-            let ch = chars[idx]
-            if ch == "\"" {
-                idx = try self.skipString(chars, idx)
+        while idx < bytes.count {
+            let byte = bytes[idx]
+            if byte == Byte.quote {
+                idx = try self.skipString(bytes, idx)
                 continue
             }
-            if ch == "(" || ch == "[" || ch == "{" {
+            if byte == Byte.lparen || byte == Byte.lbracket || byte == Byte.lbrace {
                 depth += 1
-            } else if ch == ")" || ch == "]" || ch == "}" {
+            } else if byte == Byte.rparen || byte == Byte.rbracket || byte == Byte.rbrace {
                 depth -= 1
-            } else if ch == ",", depth == 0 {
-                args.append(String(chars[start ..< idx]).trimmingCharacters(in: .whitespacesAndNewlines))
+            } else if byte == Byte.comma, depth == 0 {
+                args.append(trimmed(bytes[start ..< idx]))
                 start = idx + 1
             }
             idx += 1
         }
-        args.append(String(chars[start...]).trimmingCharacters(in: .whitespacesAndNewlines))
+        args.append(trimmed(bytes[start...]))
         return args
     }
 
     /// Returns the constructor name beginning at `idx`, when it starts on a token boundary
     /// and is immediately followed by `(`.
-    private static func matchConstructorAt(_ chars: [Character], _ idx: Int) -> String? {
-        if idx > 0, self.isIdentChar(chars[idx - 1]) {
+    private static func matchConstructorAt(_ bytes: [UInt8], _ idx: Int) -> (name: String, count: Int)? {
+        if idx > 0, self.isIdentByte(bytes[idx - 1]) {
             return nil
         }
-        for name in self.ysonConstructors {
-            let count = name.count
-            guard idx + count < chars.count, chars[idx + count] == "(" else {
+        for (name, nameBytes) in self.ysonConstructors {
+            let count = nameBytes.count
+            guard idx + count < bytes.count, bytes[idx + count] == Byte.lparen else {
                 continue
             }
-            if String(chars[idx ..< (idx + count)]) == name {
-                return name
+            var matched = true
+            for offset in 0 ..< count where bytes[idx + offset] != nameBytes[offset] {
+                matched = false
+                break
+            }
+            if matched {
+                return (name, count)
             }
         }
         return nil
@@ -252,55 +282,73 @@ public enum YSON {
     /// Converts YSON special syntax to a JSON-compatible representation using `__yson_type` markers.
     ///
     /// A single left-to-right pass rewrites constructor literals into their marker objects.
-    /// The scanner tracks string literals, so brackets and parentheses inside string values
-    /// are never counted as structure, and matches constructor arguments by paren depth, so
-    /// there is no nesting-depth ceiling. Nested constructors such as `Counter(Int(10))` are
-    /// handled by recursing into the argument content.
+    /// The scanner copies string literals verbatim, so brackets and parentheses inside string
+    /// values are never counted as structure, and matches constructor arguments by paren
+    /// depth, so there is no nesting-depth ceiling. Nested constructors such as
+    /// `Counter(Int(10))` are handled by recursing into the argument content.
+    ///
+    /// Scanning is done over UTF-8 **bytes** rather than `Character`s. Swift `Character`s are
+    /// extended grapheme clusters, so a quote immediately followed by a combining mark —
+    /// which is exactly what per-keystroke Thai, Hindi or decomposed Vietnamese text produces
+    /// at the start of a value — fuses into one cluster that never compares equal to `"`, and
+    /// the scanner would report an unterminated literal on perfectly valid input. Every
+    /// structural token and constructor name is ASCII and UTF-8 continuation bytes are all
+    /// `>= 0x80`, so byte comparison cannot collide with multi-byte content.
     ///
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when a string literal is
-    ///   unterminated, the parentheses are unbalanced, or `DedupCounter` has the wrong arity.
-    private static func preprocessYSON(_ yson: String, depth: Int = 0) throws -> String {
+    ///   unterminated, the parentheses are unbalanced, the nesting exceeds
+    ///   ``maxConstructorDepth``, or `DedupCounter` has the wrong arity.
+    private static func preprocessYSON(_ bytes: [UInt8], depth: Int = 0) throws -> [UInt8] {
         guard depth <= self.maxConstructorDepth else {
             throw YorkieError(code: .errInvalidArgument,
                               message: "YSON constructor nesting deeper than \(self.maxConstructorDepth)")
         }
-        let chars = Array(yson)
-        var result = ""
+
+        var result: [UInt8] = []
+        result.reserveCapacity(bytes.count)
         var idx = 0
 
-        while idx < chars.count {
-            let ch = chars[idx]
+        while idx < bytes.count {
+            let byte = bytes[idx]
 
             // Copy string literals verbatim so their contents are never interpreted
             // as structure.
-            if ch == "\"" {
-                let end = try self.skipString(chars, idx)
-                result += String(chars[idx ..< end])
+            if byte == Byte.quote {
+                let end = try self.skipString(bytes, idx)
+                result.append(contentsOf: bytes[idx ..< end])
                 idx = end
                 continue
             }
 
-            guard let name = self.matchConstructorAt(chars, idx) else {
-                result.append(ch)
+            guard let match = self.matchConstructorAt(bytes, idx) else {
+                result.append(byte)
                 idx += 1
                 continue
             }
 
-            let argStart = idx + name.count + 1
-            let argEnd = try self.findMatchingParen(chars, argStart)
-            let argContent = Array(chars[argStart ..< argEnd])
+            let argStart = idx + match.count + 1
+            let argEnd = try self.findMatchingParen(bytes, argStart)
+            let argContent = Array(bytes[argStart ..< argEnd])
 
-            if name == "DedupCounter" {
+            if match.name == "DedupCounter" {
                 let args = try self.splitTopLevelArgs(argContent)
                 guard args.count == 2 else {
                     throw YorkieError(code: .errInvalidArgument,
                                       message: "DedupCounter expects a value and a registers argument")
                 }
                 let value = try self.preprocessYSON(args[0], depth: depth + 1)
-                result += "{\"__yson_type\":\"DedupCounter\",\"__yson_data\":\(value),\"__yson_registers\":\(args[1])}"
+                result.append(contentsOf: Array(#"{"__yson_type":"DedupCounter","__yson_data":"#.utf8))
+                result.append(contentsOf: value)
+                result.append(contentsOf: Array(#","__yson_registers":"#.utf8))
+                result.append(contentsOf: args[1])
+                result.append(Byte.rbrace)
             } else {
-                let data = try self.preprocessYSON(String(argContent), depth: depth + 1)
-                result += "{\"__yson_type\":\"\(name)\",\"__yson_data\":\(data)}"
+                let data = try self.preprocessYSON(argContent, depth: depth + 1)
+                result.append(contentsOf: Array(#"{"__yson_type":""#.utf8))
+                result.append(contentsOf: Array(match.name.utf8))
+                result.append(contentsOf: Array(#"","__yson_data":"#.utf8))
+                result.append(contentsOf: data)
+                result.append(Byte.rbrace)
             }
 
             idx = argEnd + 1
@@ -354,14 +402,33 @@ public enum YSON {
         throw YorkieError(code: .errInvalidArgument, message: "invalid YSON value")
     }
 
+    /// Reports whether `number` is a whole number that is not a boolean.
+    ///
+    /// The constructor regexes this parser replaced were the only integer-literal guard:
+    /// they matched `-?\d+` and nothing else. `as? NSNumber` alone is far looser — it also
+    /// matches `__NSCFBoolean`, so `Int(true)` would read as `1`, and it happily truncates
+    /// `Int(1.5)` to `1` or wraps `Int(1e10)` to its low 32 bits. Reject both here so the
+    /// existing `invalid YSON Int format` throw is reached instead.
+    private static func isIntegral(_ number: NSNumber) -> Bool {
+        if CFGetTypeID(number) == CFBooleanGetTypeID() {
+            return false
+        }
+        let value = number.doubleValue
+        return value.isFinite && value == value.rounded()
+    }
+
     /// Restores a value tagged with a `__yson_type` marker.
     private static func postprocessMarked(_ marker: String, data: Any) throws -> YSONValue {
         switch marker {
         case "Int":
-            guard let number = data as? NSNumber else { break }
+            guard let number = data as? NSNumber, self.isIntegral(number),
+                  number.doubleValue >= Double(Int32.min), number.doubleValue <= Double(Int32.max)
+            else { break }
             return .int(number.int32Value)
         case "Long":
-            guard let number = data as? NSNumber else { break }
+            guard let number = data as? NSNumber, self.isIntegral(number),
+                  number.doubleValue >= -9.223372036854776e18, number.doubleValue < 9.223372036854776e18
+            else { break }
             return .long(number.int64Value)
         case "Date":
             guard let string = data as? String else { break }

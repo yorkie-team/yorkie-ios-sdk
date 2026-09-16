@@ -443,6 +443,45 @@ final class YSONTests: XCTestCase {
         XCTAssertEqual(obj["v"], .counter(.int(10)))
     }
 
+    func test_should_parse_a_string_value_starting_with_a_combining_mark() throws {
+        // given — the mark is the FIRST scalar in the literal, so with grapheme-cluster
+        // scanning it fuses with the opening quote and the literal is never recognised.
+        // Per-keystroke Thai, Hindi and decomposed Vietnamese editing produce exactly this,
+        // and the server emits such values raw, so these are real snapshots.
+        let cases: [(String, String)] = [
+            ("Thai SARA AM", "{\"c\":Text([{\"val\":\"\u{0E33}\"}])}"),
+            ("combining acute", "{\"a\":\"\u{0301}x\"}"),
+            ("variation selector", "{\"c\":Text([{\"val\":\"\u{FE0F}\"}])}"),
+            ("emoji skin tone", "{\"c\":Text([{\"val\":\"\u{1F3FB}\"}])}"),
+            ("prepend before the closing quote", "{\"a\":\"x\u{0600}\",\"c\":Int(1)}")
+        ]
+
+        // when / then
+        for (name, input) in cases {
+            XCTAssertNoThrow(try YSON.parse(input), name)
+        }
+    }
+
+    func test_should_reject_a_boolean_constructor_argument() {
+        // given / when / then — `as? NSNumber` also matches __NSCFBoolean, so without an
+        // explicit check Int(true) would read as 1
+        for input in ["{\"v\":Int(true)}", "{\"v\":Long(false)}", "{\"v\":Counter(Int(true))}"] {
+            XCTAssertThrowsError(try YSON.parse(input), input) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, input)
+            }
+        }
+    }
+
+    func test_should_reject_a_non_integral_constructor_argument() {
+        // given / when / then — these would otherwise truncate (1.5 -> 1) or wrap
+        // (1e10 -> 1410065408) rather than being refused
+        for input in ["{\"v\":Int(1.5)}", "{\"v\":Long(2.9)}", "{\"v\":Int(1e10)}"] {
+            XCTAssertThrowsError(try YSON.parse(input), input) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, input)
+            }
+        }
+    }
+
     func test_should_throw_on_an_unterminated_string_literal() {
         // given / when / then
         XCTAssertThrowsError(try YSON.parse(#"{"c":Text([{"val":"a}])}"#)) { error in
