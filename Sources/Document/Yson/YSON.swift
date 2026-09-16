@@ -30,14 +30,15 @@ public enum YSON {
     /// - Returns: The parsed ``YSONValue``.
     /// - Throws: ``YorkieError`` with ``YorkieError/code`` `errInvalidArgument` when parsing fails.
     public static func parse(_ yson: String) throws -> YSONValue {
-        let processed = try self.preprocessYSON(Array(yson.utf8))
-        let data = Data(processed)
-
         do {
-            let parsed = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
+            // Inside the do so the scanner's own errors carry the same
+            // "Failed to parse YSON: " prefix as a JSONSerialization failure, matching
+            // upstream, which wraps every stage in one try.
+            let processed = try self.preprocessYSON(Array(yson.utf8))
+            let parsed = try JSONSerialization.jsonObject(with: Data(processed), options: [.fragmentsAllowed])
             return try self.postprocessValue(parsed)
         } catch let error as YorkieError {
-            throw error
+            throw YorkieError(code: error.code, message: "Failed to parse YSON: \(error.message)")
         } catch {
             throw YorkieError(code: .errInvalidArgument, message: "Failed to parse YSON: \(error.localizedDescription)")
         }
@@ -117,8 +118,9 @@ public enum YSON {
 
     /// The YSON type constructor names the scanner recognizes, as UTF-8 bytes.
     ///
-    /// Longer names precede their suffixes (`DedupCounter` before `Counter`) so the
-    /// scanner prefers the longest match.
+    /// Order is irrelevant: the token-boundary check and the required `(` mean at most
+    /// one name can match at any index, so a maintainer adding a constructor need not
+    /// place it anywhere in particular.
     private static let ysonConstructors: [(name: String, bytes: [UInt8])] = [
         "DedupCounter", "Counter", "BinData", "Date", "Long", "Int", "Text", "Tree"
     ].map { ($0, Array($0.utf8)) }
@@ -337,16 +339,16 @@ public enum YSON {
                                       message: "DedupCounter expects a value and a registers argument")
                 }
                 let value = try self.preprocessYSON(args[0], depth: depth + 1)
-                result.append(contentsOf: Array(#"{"__yson_type":"DedupCounter","__yson_data":"#.utf8))
+                result.append(contentsOf: Array("{\"\(self.typeKey)\":\"DedupCounter\",\"\(self.dataKey)\":".utf8))
                 result.append(contentsOf: value)
-                result.append(contentsOf: Array(#","__yson_registers":"#.utf8))
+                result.append(contentsOf: Array(",\"\(self.registersKey)\":".utf8))
                 result.append(contentsOf: args[1])
                 result.append(Byte.rbrace)
             } else {
                 let data = try self.preprocessYSON(argContent, depth: depth + 1)
-                result.append(contentsOf: Array(#"{"__yson_type":""#.utf8))
+                result.append(contentsOf: Array("{\"\(self.typeKey)\":\"".utf8))
                 result.append(contentsOf: Array(match.name.utf8))
-                result.append(contentsOf: Array(#"","__yson_data":"#.utf8))
+                result.append(contentsOf: Array("\",\"\(self.dataKey)\":".utf8))
                 result.append(contentsOf: data)
                 result.append(Byte.rbrace)
             }
@@ -361,6 +363,7 @@ public enum YSON {
 
     private static let typeKey = "__yson_type"
     private static let dataKey = "__yson_data"
+    private static let registersKey = "__yson_registers"
 
     /// Recursively restores YSON types from the parsed JSON object graph.
     private static func postprocessValue(_ value: Any) throws -> YSONValue {
@@ -458,7 +461,7 @@ public enum YSON {
     ///
     /// - Throws: ``YorkieError`` with code `errInvalidArgument` when the inner value is not an Int.
     private static func postprocessDedupCounter(_ dict: [String: Any]) throws -> YSONValue {
-        guard let registers = dict["__yson_registers"] as? String else {
+        guard let registers = dict[self.registersKey] as? String else {
             throw YorkieError(code: .errInvalidArgument, message: "invalid YSON DedupCounter format")
         }
         let innerValue = try postprocessValue(dict[dataKey] as Any)

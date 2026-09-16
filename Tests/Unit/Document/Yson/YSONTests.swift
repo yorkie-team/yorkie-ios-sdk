@@ -427,7 +427,7 @@ final class YSONTests: XCTestCase {
                 return XCTFail("expected YorkieError but got \(error)")
             }
             XCTAssertEqual(yorkieError.code, .errInvalidArgument)
-            XCTAssertEqual(yorkieError.message, "YSON constructor nesting deeper than 64")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: YSON constructor nesting deeper than 64")
         }
     }
 
@@ -492,7 +492,7 @@ final class YSONTests: XCTestCase {
             // The message matters: asserting only the code would also pass against
             // the old regex implementation, where JSONSerialization rejected the
             // untransformed literal with the same code from a different origin.
-            XCTAssertEqual(yorkieError.message, "unterminated string literal")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: unterminated string literal")
         }
     }
 
@@ -506,7 +506,7 @@ final class YSONTests: XCTestCase {
             // The message matters: asserting only the code would also pass against
             // the old regex implementation, where JSONSerialization rejected the
             // untransformed literal with the same code from a different origin.
-            XCTAssertEqual(yorkieError.message, "unbalanced parentheses in YSON")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: unbalanced parentheses in YSON")
         }
     }
 
@@ -520,7 +520,7 @@ final class YSONTests: XCTestCase {
             // The message matters: asserting only the code would also pass against
             // the old regex implementation, where JSONSerialization rejected the
             // untransformed literal with the same code from a different origin.
-            XCTAssertEqual(yorkieError.message, "DedupCounter expects a value and a registers argument")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: DedupCounter expects a value and a registers argument")
         }
     }
 }
