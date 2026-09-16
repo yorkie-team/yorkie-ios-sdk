@@ -286,8 +286,10 @@ public enum YSON {
     /// A single left-to-right pass rewrites constructor literals into their marker objects.
     /// The scanner copies string literals verbatim, so brackets and parentheses inside string
     /// values are never counted as structure, and matches constructor arguments by paren
-    /// depth, so there is no nesting-depth ceiling. Nested constructors such as
-    /// `Counter(Int(10))` are handled by recursing into the argument content.
+    /// depth rather than by a fixed-arity pattern, so there is no ceiling on the nesting a
+    /// single constructor argument may contain. Nested constructors such as `Counter(Int(10))`
+    /// are handled by recursing into the argument content, and that recursion is capped at
+    /// ``maxConstructorDepth`` levels.
     ///
     /// Scanning is done over UTF-8 **bytes** rather than `Character`s. Swift `Character`s are
     /// extended grapheme clusters, so a quote immediately followed by a combining mark —
@@ -425,12 +427,15 @@ public enum YSON {
         switch marker {
         case "Int":
             guard let number = data as? NSNumber, self.isIntegral(number),
-                  number.doubleValue >= Double(Int32.min), number.doubleValue <= Double(Int32.max)
+                  number.decimalValue >= Decimal(Int32.min), number.decimalValue <= Decimal(Int32.max)
             else { break }
             return .int(number.int32Value)
         case "Long":
+            // `decimalValue`, not `doubleValue`: a Double cannot represent `Int64.max`,
+            // it rounds up to 2^63, so a double-based bound rejects the legitimate
+            // maximum and compares equal to the first out-of-range value.
             guard let number = data as? NSNumber, self.isIntegral(number),
-                  number.doubleValue >= -9.223372036854776e18, number.doubleValue < 9.223372036854776e18
+                  number.decimalValue >= Decimal(Int64.min), number.decimalValue <= Decimal(Int64.max)
             else { break }
             return .long(number.int64Value)
         case "Date":

@@ -462,6 +462,30 @@ final class YSONTests: XCTestCase {
         }
     }
 
+    func test_should_accept_the_integer_boundaries_and_reject_one_past_them() throws {
+        // given / when / then — a Double cannot represent Int64.max (it rounds up to
+        // 2^63), so a double-based range check rejects the legitimate maximum and
+        // compares equal to the first out-of-range value. The bounds use Decimal.
+        let accepted: [(String, YSONValue)] = [
+            ("{\"v\":Long(9223372036854775807)}", .long(Int64.max)),
+            ("{\"v\":Long(-9223372036854775808)}", .long(Int64.min)),
+            ("{\"v\":Int(2147483647)}", .int(Int32.max)),
+            ("{\"v\":Int(-2147483648)}", .int(Int32.min))
+        ]
+        for (input, expected) in accepted {
+            guard case .object(let obj) = try YSON.parse(input) else {
+                return XCTFail("expected an object for \(input)")
+            }
+            XCTAssertEqual(obj["v"], expected, input)
+        }
+
+        for input in ["{\"v\":Long(9223372036854775808)}", "{\"v\":Int(2147483648)}"] {
+            XCTAssertThrowsError(try YSON.parse(input), input) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, input)
+            }
+        }
+    }
+
     func test_should_reject_a_boolean_constructor_argument() {
         // given / when / then — `as? NSNumber` also matches __NSCFBoolean, so without an
         // explicit check Int(true) would read as 1
