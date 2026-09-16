@@ -380,6 +380,18 @@ final class YSONTests: XCTestCase {
         XCTAssertEqual(text.nodes[0].val, "Int(42) and Tree(x)")
     }
 
+    func test_should_parse_a_dedupcounter_whose_registers_contain_a_comma_and_paren() throws {
+        // given / when — the registers string holds both a comma and a closing paren, so a
+        // naive split on "," or a paren scan that ignored strings would mis-split the args
+        let parsed = try YSON.parse(#"{"v":DedupCounter(Int(15),"a,b)c")}"#)
+
+        // then
+        guard case .object(let obj) = parsed else {
+            return XCTFail("expected an object but got \(parsed)")
+        }
+        XCTAssertEqual(obj["v"], .dedupCounter(value: .int(15), registers: "a,b)c"))
+    }
+
     // MARK: - Text and Tree in the same root
 
     func test_should_parse_a_document_holding_both_text_and_tree_each_with_bracket_content() throws {
@@ -401,18 +413,6 @@ final class YSONTests: XCTestCase {
     }
 
     // MARK: - Error handling (string-aware scanner)
-
-    func test_should_parse_a_dedupcounter_whose_registers_contain_a_comma_and_paren() throws {
-        // given / when — the registers string holds both a comma and a closing paren, so a
-        // naive split on "," or a paren scan that ignored strings would mis-split the args
-        let parsed = try YSON.parse(#"{"v":DedupCounter(Int(15),"a,b)c")}"#)
-
-        // then
-        guard case .object(let obj) = parsed else {
-            return XCTFail("expected an object but got \(parsed)")
-        }
-        XCTAssertEqual(obj["v"], .dedupCounter(value: .int(15), registers: "a,b)c"))
-    }
 
     func test_should_throw_on_constructor_nesting_beyond_the_depth_limit() {
         // given — a syntactically balanced but pathologically deep nest. Each level
