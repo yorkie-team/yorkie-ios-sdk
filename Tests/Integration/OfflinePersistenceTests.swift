@@ -141,6 +141,51 @@ final class OfflinePersistenceTests: XCTestCase {
                       "an acknowledged change must not stay pending in the stored envelope")
     }
 
+    // A stored copy that cannot be restored must not take the caller's own work with it.
+    // `restoreFromBytes` is all-or-nothing and throws before touching the document, so a reset
+    // on that path destroys edits the app made before attaching — on the very code path that
+    // exists to prevent data loss.
+    @MainActor
+    func test_an_unusable_stored_copy_does_not_discard_the_callers_own_edits() async throws {
+        // given: a store holding bytes that cannot be decoded, under the key this client reads.
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let store = MemoryDocStore()
+        let clientKey = UUID().uuidString
+        try await store.save(docKey: "/\(clientKey)/\(docKey)", bytes: Data([0xDE, 0xAD, 0xBE, 0xEF]))
+
+        let client = Client(self.rpcAddress, ClientOptions(key: clientKey, store: store))
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        // and: a document the app has already edited, before it is ever attached.
+        let doc = Document(key: docKey)
+        var droppedReasons = [LocalChangesDroppedValue.Reason]()
+        await doc.subscribe { event, _ in
+            if let dropped = event as? LocalChangesDroppedEvent {
+                droppedReasons.append(dropped.value.reason)
+            }
+        }
+        try await doc.update { root, _ in
+            root.title = "written before attach"
+        }
+
+        // when: the attach finds the unusable stored copy.
+        try await client.attach(doc, [:], .manual)
+        try await client.sync()
+
+        // then: the app's edit survived and reached the server, and the unusable copy was
+        // reported as undecodable rather than as another identity's store.
+        XCTAssertEqual((doc.getRoot().title as? String), "written before attach")
+        XCTAssertEqual(droppedReasons, [.restoreFailed])
+
+        let observer = Client(self.rpcAddress)
+        try await observer.activate()
+        self.addTeardownBlock { try? await observer.deactivate() }
+        let observerDoc = Document(key: docKey)
+        try await observer.attach(observerDoc, [:], .manual)
+        XCTAssertEqual((observerDoc.getRoot().title as? String), "written before attach")
+    }
+
     // MARK: Lease lifetime
 
     // A lease held past the end of an attachment locks the document key out of every later
