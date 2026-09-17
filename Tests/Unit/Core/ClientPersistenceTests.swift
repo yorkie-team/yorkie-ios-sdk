@@ -359,15 +359,12 @@ final class ClientPersistenceTests: XCTestCase {
 
     // MARK: Persist ordering
 
-    // `Client.enqueuePersist(_:)` chains writes for one document through `persistTasks` so
-    // they cannot land out of order. That method, and the `installOfflinePersistence` wiring
-    // that hangs it off `Document.onLocalChange`, are both `private` and unreachable from this
-    // target (see the class doc) — reaching them needs a real `attach()`, which needs a
-    // server. So this drives the same seam `Client` itself uses, `Document.onLocalChange`
-    // (`internal`, reachable via `@testable`), through a hand-rolled queue that mirrors
-    // `enqueuePersist`'s chaining exactly: each persist awaits whatever persist for that key is
-    // already in flight before it runs. This pins the ordering *property* the fix guarantees;
-    // it does not execute `Client`'s own chaining code, which is the gap noted in the report.
+    // `Client.enqueuePersist(_:)` chains writes for one document through `persistTasks` so they
+    // cannot land out of order. The test drives that method directly — the offline-persistence
+    // helpers are internal rather than private precisely so it can — wired onto the same
+    // `Document.onLocalChange` seam `installOfflinePersistence` uses. Removing the chaining
+    // from `enqueuePersist` makes this fail, which is what a mirror of the algorithm could
+    // never have shown.
 
     @MainActor
     func test_chained_persists_land_in_order_even_when_the_first_write_is_slower() async throws {

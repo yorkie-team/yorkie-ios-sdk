@@ -160,7 +160,7 @@ public extension Document {
     ///   ``fromBytes(key:bytes:opts:)``), or with `errActorMismatch` when the persisted actor
     ///   does not match this document's current actor. The two are distinguished so a caller
     ///   can tell a store reused under another identity from bytes it simply cannot decode.
-    func restoreFromBytes(_ bytes: Data) throws {
+    internal func restoreFromBytes(_ bytes: Data) throws {
         let currentActor = self.changeID.getActorID()
         let decoded = try Self.decodePersistedBytes(bytes)
         let restoredActor = decoded.changeID.getActorID()
@@ -195,7 +195,7 @@ public extension Document {
     /// can read their operations directly off the returned values.
     ///
     /// - Returns: The document's pending local changes, in application order.
-    func getPendingChangeStructs() -> [Change] {
+    internal func getPendingChangeStructs() -> [Change] {
         self.persistenceSnapshot().localChanges
     }
 
@@ -208,7 +208,7 @@ public extension Document {
     /// relative to the compacted document, so presenting them again would just be rejected.
     /// This mirrors constructing a brand-new ``Document`` instance without forcing the caller
     /// to swap the object reference it already holds.
-    func resetForReanchor() {
+    internal func resetForReanchor() {
         self.applyPersistedState(PersistedDocumentState(
             root: CRDTRoot(),
             presences: [:],

@@ -338,7 +338,20 @@ public class Client {
             self.id = message.clientID
             // The server's stable actor, derived from the project and client key. An older
             // server leaves it empty, in which case the session id remains the actor.
-            self.actorID = message.actorID.isEmpty ? message.clientID : message.actorID
+            // Adopted only when it is a usable ActorID. Every ticket and change id encodes the
+            // actor through `String.toData`, which yields nil for anything that is not an
+            // even-length hex string and is then written as an empty actor with no error --
+            // collapsing tie-breaks and keying the version vector on "". Falling back to the
+            // session id keeps a server that sends something unexpected from silently
+            // corrupting every change this client makes.
+            if message.actorID.isEmpty || message.actorID.toData == nil {
+                if message.actorID.isEmpty == false {
+                    Logger.warning("[AC] c:\"\(self.key)\" server sent an unusable actor id; using the session id")
+                }
+                self.actorID = message.clientID
+            } else {
+                self.actorID = message.actorID
+            }
 
             self.status = .activated
             await self.runSyncLoop()
@@ -1453,7 +1466,9 @@ public class Client {
             // the stored envelope would keep an already-pushed change under a stale
             // checkpoint until the next edit. A resume from that envelope re-pushes a change
             // the server has already applied. This is a full overwrite, so it does not grow.
-            if self.store != nil {
+            // Gated on the attachment still being live: a deactivate can interleave here, and
+            // a write queued after its drain would land once the lease is already free.
+            if self.store != nil, self.attachmentMap[docKey] != nil {
                 self.enqueuePersist(doc)
             }
 
@@ -1539,6 +1554,12 @@ public class Client {
         if yorkieErrorCode == YorkieError.Code.errClientNotActivated ||
             yorkieErrorCode == YorkieError.Code.errClientNotFound
         {
+            // Held leases must not survive this teardown. `deactivateInternal` drops the
+            // attachments, and with them the only reference to each lease, so a lease not
+            // released here is never released at all -- locking the document key out of every
+            // later session under a cross-process lock, with `deactivate()` early-returning
+            // because the status is already deactivated.
+            await self.releaseAllSessions()
             do {
                 try self.deactivateInternal()
             } catch {
@@ -2091,8 +2112,15 @@ extension Client {
         // never see it in `others` and its cursor is invisible until the app happens to set
         // presence again.
         if !disablePresence {
-            try? doc.update { _, presence in
-                presence.set(initialPresence)
+            do {
+                try doc.update { _, presence in
+                    presence.set(initialPresence)
+                }
+            } catch {
+                // Not fatal to the retry, but never silent: the same input fails loudly on a
+                // normal attach, and a client that attaches with no presence entry is
+                // invisible to its peers.
+                Logger.warning("[AD] c:\"\(self.key)\" d:\"\(docKey)\" could not seed presence on re-anchor: \(error)")
             }
         }
 
@@ -2208,10 +2236,15 @@ extension Client {
     ///   - doc: The document leaving this client.
     ///   - attachment: Its attachment, holding the session lease.
     func releasePersistence(for doc: Document, attachment: Attachment<Document>?) async {
+        // Order matters in both directions. Quiescing first stops new writes and lets the
+        // in-flight one finish, so the removal below cannot be undone by a save landing after
+        // it -- detach queues one itself, by clearing presence. Releasing the lease last means
+        // no other session can start resuming a copy that is about to be deleted.
+        await self.quiescePersistence(for: doc)
         if self.store != nil {
             try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
         }
-        await self.releaseSession(for: doc, attachment: attachment)
+        await self.releaseLease(of: attachment)
     }
 
     /// Resolves the polling interval for an attachment.
@@ -2272,14 +2305,25 @@ extension Client {
     ///   - doc: The document this client stops persisting.
     ///   - attachment: Its attachment, holding the session lease.
     func releaseSession(for doc: Document, attachment: Attachment<Document>?) async {
+        await self.quiescePersistence(for: doc)
+        await self.releaseLease(of: attachment)
+    }
+
+    /// Stops persisting `doc` and waits for any write already queued for it to finish.
+    ///
+    /// - Parameter doc: The document to stop persisting.
+    func quiescePersistence(for doc: Document) async {
         doc.onLocalChange = nil
-        // Drain any queued write first, so the lease is not released while a persist for this
-        // document is still in flight and a second session could start resuming a half-written
-        // envelope.
         let key = self.storeKey(doc.getKey())
         if let pending = self.persistTasks.removeValue(forKey: key) {
             await pending.value
         }
+    }
+
+    /// Releases an attachment's session lease, if it holds one.
+    ///
+    /// - Parameter attachment: The attachment giving up its lease.
+    func releaseLease(of attachment: Attachment<Document>?) async {
         await attachment?.sessionLockHandle?.release()
         attachment?.sessionLockHandle = nil
     }

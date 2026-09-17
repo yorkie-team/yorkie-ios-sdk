@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import Connect
+import SwiftProtobuf
 import XCTest
 @testable import Yorkie
 
@@ -29,6 +31,19 @@ import XCTest
 // Requires a yorkie server at localhost:8080.
 /// A ``SessionLock`` that grants a name once and refuses it until released, standing in for
 /// the cross-process lock an App Group deployment would supply.
+/// Builds the `ErrClientNotFound` the server sends when it no longer knows a client, shaped so
+/// `errorCodeOf` reads the code out of the error details exactly as it does for a real one.
+private func clientNotFoundError() -> ConnectError {
+    var info = Google_Rpc_ErrorInfo()
+    info.metadata = ["code": YorkieError.Code.errClientNotFound.rawValue]
+    let payload = (try? info.serializedData()) ?? Data()
+    return ConnectError(
+        code: .failedPrecondition,
+        message: "client not found",
+        details: [ConnectError.Detail(type: "google.rpc.ErrorInfo", payload: payload)]
+    )
+}
+
 private actor CountingSessionLock: SessionLock {
     private var held = Set<String>()
     private(set) var releaseCount = 0
@@ -280,6 +295,42 @@ final class OfflinePersistenceTests: XCTestCase {
         } catch let error as YorkieError {
             XCTAssertEqual(error.code, .errInvalidArgument)
         }
+    }
+
+    // The server evicting the client record tears the client down through
+    // `handleConnectError`, not through `deactivate()`. That path drops the attachments — and
+    // with them the only reference to each lease — so a lease not released there is never
+    // released at all, and `deactivate()` will not do it either, because it early-returns once
+    // the status is already deactivated.
+    @MainActor
+    func test_an_internal_teardown_releases_the_session_lease() async throws {
+        // given: an attached document whose lease is held.
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let store = MemoryDocStore()
+        let lock = CountingSessionLock()
+        let clientKey = UUID().uuidString
+
+        let client = Client(self.rpcAddress,
+                            ClientOptions(key: clientKey, store: store, sessionLock: lock),
+                            isMockingEnabled: true)
+        try await client.activate()
+        let doc = Document(key: docKey)
+        try await client.attach(doc, [:], .manual)
+
+        let leaseName = "yorkie-session:/\(clientKey)/\(docKey)"
+        let heldWhileAttached = await lock.isHeld(leaseName)
+        XCTAssertTrue(heldWhileAttached)
+
+        // when: the next sync reports that the server no longer knows this client, which is
+        // what drives the internal teardown rather than an app-initiated deactivate.
+        client.setMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges,
+                            error: clientNotFoundError())
+        try? await client.sync()
+
+        // then: the teardown ran, and it did not strand the lease.
+        XCTAssertFalse(client.isActive, "ErrClientNotFound should deactivate the client")
+        let heldAfter = await lock.isHeld(leaseName)
+        XCTAssertFalse(heldAfter, "an internal teardown must not leak the session lease")
     }
 
     // MARK: Duplicate attach (yorkie-js-sdk#1337)

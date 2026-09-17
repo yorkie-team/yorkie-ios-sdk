@@ -364,6 +364,16 @@ public struct LocalChangesDroppedValue {
     public let reason: Reason
     /// The changes that were discarded, in the order they were made.
     public let changes: [DroppedChange]
+
+    /// Creates the value, so an app can construct one in its own tests.
+    ///
+    /// - Parameters:
+    ///   - reason: Why the changes were dropped.
+    ///   - changes: The discarded changes.
+    public init(reason: Reason, changes: [DroppedChange]) {
+        self.reason = reason
+        self.changes = changes
+    }
 }
 
 /// One un-pushed local change that offline persistence could not reconcile with the server.
