@@ -176,6 +176,11 @@ enum DefaultBroadcastOptions {
 @MainActor
 public class Client {
     private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
+    /// Keys with an in-flight attach.
+    ///
+    /// `attachmentMap` is only populated once the attach round trip resolves, so this
+    /// set is what rejects a concurrent duplicate attach of the same key.
+    private var attachingDocs = Set<String>()
     private var conditions: [ClientCondition: Bool] = [
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
@@ -355,6 +360,15 @@ public class Client {
             throw YorkieError(code: .errNotDetached, message: "\(self.key) is not detached.")
         }
 
+        // Reject a duplicate attach of the same key on this client. Without this guard
+        // the request reaches the server, which reports the already-attached key as a
+        // misleading `ErrClientNotFound`; `handleConnectError` then escalates that into
+        // deactivating the whole client. `attachmentMap` covers the resolved case and
+        // `attachingDocs` covers a concurrent in-flight attach.
+        guard self.attachmentMap[doc.getKey()] == nil, self.attachingDocs.contains(doc.getKey()) == false else {
+            throw YorkieError(code: .errAlreadyAttached, message: "\(doc.getKey()) is already attached.")
+        }
+
         if let interval = documentPollInterval, interval <= 0 {
             throw YorkieError(code: .errInvalidArgument, message: "documentPollInterval must be greater than 0")
         }
@@ -388,6 +402,11 @@ public class Client {
         attachRequest.disableGc = disableGC
         attachRequest.disablePresence = resolvedDisablePresence
         // 02. Attach the document to the client.
+        // Marked before the request so a concurrent duplicate attach of the same key is
+        // rejected by the guard above. Cleared however this attach ends.
+        self.attachingDocs.insert(doc.getKey())
+        defer { self.attachingDocs.remove(doc.getKey()) }
+
         do {
             let docKey = doc.getKey()
             let semaphore = DispatchSemaphore(value: 0)

@@ -53,6 +53,10 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrNotDetached is returned when the resource is not detached.
         case errNotDetached = "ErrNotDetached"
 
+        /// ErrAlreadyAttached is returned when a document with the same key is
+        /// already attached, or is being attached, to this client.
+        case errAlreadyAttached = "ErrAlreadyAttached"
+
         /// ErrDocumentRemoved is returned when the document is removed.
         case errDocumentRemoved = "ErrDocumentRemoved"
 
