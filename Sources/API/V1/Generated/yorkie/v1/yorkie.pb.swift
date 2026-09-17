@@ -61,6 +61,11 @@ public struct Yorkie_V1_ActivateClientResponse: Sendable {
 
   public var clientID: String = String()
 
+  /// actor_id is the stable actor derived from the project and client key.
+  /// Opted-in SDKs stamp it into changes; old SDKs ignore it and keep using
+  /// client_id as their actor.
+  public var actorID: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -216,6 +221,12 @@ public struct Yorkie_V1_WatchRequest: Sendable {
   public var clientID: String = String()
 
   public var resources: [Yorkie_V1_ResourceDescriptor] = []
+
+  /// actor_id is the stable actor the client stamps into its changes. When set,
+  /// the server subscribes the client under it so watch peer ids and
+  /// watched/unwatched events match the presence CRDT keying. Old SDKs omit it
+  /// and the server falls back to client_id (the session id).
+  public var actorID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -900,7 +911,7 @@ extension Yorkie_V1_ActivateClientRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ActivateClientResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{3}actor_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -909,6 +920,7 @@ extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.actorID) }()
       default: break
       }
     }
@@ -918,11 +930,15 @@ extension Yorkie_V1_ActivateClientResponse: SwiftProtobuf.Message, SwiftProtobuf
     if !self.clientID.isEmpty {
       try visitor.visitSingularStringField(value: self.clientID, fieldNumber: 1)
     }
+    if !self.actorID.isEmpty {
+      try visitor.visitSingularStringField(value: self.actorID, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_ActivateClientResponse, rhs: Yorkie_V1_ActivateClientResponse) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
+    if lhs.actorID != rhs.actorID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1175,7 +1191,7 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0\u{3}actor_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1185,6 +1201,7 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.resources) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.actorID) }()
       default: break
       }
     }
@@ -1197,12 +1214,16 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.resources.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.resources, fieldNumber: 2)
     }
+    if !self.actorID.isEmpty {
+      try visitor.visitSingularStringField(value: self.actorID, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_WatchRequest, rhs: Yorkie_V1_WatchRequest) -> Bool {
     if lhs.clientID != rhs.clientID {return false}
     if lhs.resources != rhs.resources {return false}
+    if lhs.actorID != rhs.actorID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
