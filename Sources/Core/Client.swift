@@ -140,13 +140,29 @@ public struct ClientOptions {
 
     private(set) var metadata: [String: String]
 
+    /// The store that persists attached documents between sessions.
+    ///
+    /// When set, the client writes ``Document/toBytes()`` after every local change and
+    /// restores from the store on the next attach, so changes made offline are re-pushed.
+    /// Leaving it `nil` keeps the previous behaviour: nothing is persisted.
+    public var store: DocStore?
+
+    /// The guard that keeps two sessions from resuming the same persisted document.
+    ///
+    /// Consulted only when ``store`` is set. Defaults to ``NoopSessionLock``, which grants
+    /// every lease — correct for a single process. Supply your own when a persistent store
+    /// is shared across processes, such as an app and its extensions.
+    public var sessionLock: SessionLock
+
     public init(key: String? = nil,
                 apiKey: String? = nil,
                 authTokenInjector: AuthTokenInjector? = nil,
                 syncLoopDuration: Int? = nil,
                 retrySyncLoopDelay: Int? = nil,
                 reconnectStreamDelay: Int? = nil,
-                attachTimeout: Int? = nil)
+                attachTimeout: Int? = nil,
+                store: DocStore? = nil,
+                sessionLock: SessionLock? = nil)
     {
         self.key = key
         self.apiKey = apiKey
@@ -156,6 +172,8 @@ public struct ClientOptions {
         self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
         self.maximumAttachmentTimeout = attachTimeout ?? DefaultClientOptions.maximumAttachmentTimeout
         self.metadata = [:]
+        self.store = store
+        self.sessionLock = sessionLock ?? NoopSessionLock()
     }
 }
 
@@ -176,6 +194,19 @@ enum DefaultBroadcastOptions {
 @MainActor
 public class Client {
     private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
+    /// The stable actor stamped into this client's document changes.
+    ///
+    /// Supplied by the server on activate and derived from the project and client key, so it
+    /// survives across sessions where the session id does not. Falls back to the session id
+    /// when the server does not send one, which is how an older server behaves.
+    private var actorID: ActorID?
+    /// The project API key, used to scope the session lease name.
+    private let apiKey: String
+    /// The store that persists attached documents, when offline persistence is enabled.
+    private let store: DocStore?
+    /// The guard that keeps two sessions from resuming the same persisted document.
+    private let sessionLock: SessionLock
+
     /// Keys with an in-flight attach.
     ///
     /// `attachmentMap` is only populated once the attach round trip resolves, so this
@@ -218,6 +249,17 @@ public class Client {
         return self.attachmentMap[key] as? Attachment<Channel>
     }
 
+    /// Returns the stable actor this client stamps into document changes.
+    ///
+    /// Supplied by the server on activate and derived from the project and client key, so it
+    /// is stable across sessions where ``id`` is not. Returns `nil` before activation, and the
+    /// session id when the server does not supply one.
+    ///
+    /// - Returns: The stable actor, or `nil` when the client is not activated.
+    public func getActorID() -> ActorID? {
+        self.actorID
+    }
+
     /**
      * `has` checks whether the given resource is attached to this client or not.
      */
@@ -249,6 +291,9 @@ public class Client {
         self.authTokenInjector = options.authTokenInjector
         self.authHeader = AuthHeader(apiKey: options.apiKey, token: "")
         self.metadata = options.metadata
+        self.store = options.store
+        self.sessionLock = options.sessionLock
+        self.apiKey = options.apiKey ?? ""
     }
 
     /**
@@ -289,6 +334,9 @@ public class Client {
             }
 
             self.id = message.clientID
+            // The server's stable actor, derived from the project and client key. An older
+            // server leaves it empty, in which case the session id remains the actor.
+            self.actorID = message.actorID.isEmpty ? message.clientID : message.actorID
 
             self.status = .activated
             await self.runSyncLoop()
@@ -380,7 +428,7 @@ public class Client {
             return syncMode == .polling ? self.defaultPollingInterval : 0
         }()
 
-        doc.setActor(clientID)
+        doc.setActor(self.actorID ?? clientID)
 
         // Resolve the effective presence-disabled state at attach time. The
         // explicit option wins; absent that, the Document's seeded value (from
@@ -389,14 +437,28 @@ public class Client {
         // fixated value — so this purely controls whether to push the initial
         // presence and what to send on the request.
         let resolvedDisablePresence = disablePresence ?? doc.isPresenceDisabled()
-        if !resolvedDisablePresence {
+
+        var attachRequest = AttachDocumentRequest()
+        attachRequest.clientID = clientID
+        // Offline persistence preamble: take the session lease and restore any stored copy,
+        // both before the change pack is built below.
+        let resume = try await self.prepareOfflineResume(for: doc)
+        var pendingSessionLockHandle = resume.handle
+        let didRestore = resume.didRestore
+
+        // Seeded after the restore, and skipped when one happened: a restore brings the
+        // presence map back with it, so setting the initial presence here would append a
+        // spurious local change on every resume. Seeding it before the restore would be
+        // worse still — the restore overwrites the map and the change is silently lost.
+        if !resolvedDisablePresence, !didRestore {
             try doc.update { _, presence in
                 presence.set(initialPresence)
             }
         }
 
-        var attachRequest = AttachDocumentRequest()
-        attachRequest.clientID = clientID
+        // Built AFTER any restore, so the change pack carries the un-acknowledged local
+        // changes the restore brought back. Building it first would push an empty pack and
+        // silently strand everything the previous session left unsynced.
         attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
         attachRequest.schemaKey = schema
         attachRequest.disableGc = disableGC
@@ -413,7 +475,19 @@ public class Client {
 
             self.semaphoresForInitialzation[docKey] = semaphore
 
-            let attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
+            var attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
+
+            // A restored document whose epoch the server has since compacted past cannot be
+            // resumed: the un-acknowledged changes it carries are anchored to a state the
+            // server no longer has. Re-anchor from scratch and retry once as a fresh attach,
+            // surfacing the discarded changes so the app can decide what to do about them.
+            var resumed = didRestore
+            if didRestore, self.isEpochMismatch(attachResponse.error) {
+                attachResponse = await self.retryAttachAfterReanchor(doc: doc, request: &attachRequest)
+                // The retry is a fresh attach, so the purge guard below has nothing persisted
+                // left to compare against.
+                resumed = false
+            }
 
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach error")
@@ -437,7 +511,19 @@ public class Client {
             doc.setDisablePresence(message.disablePresence)
 
             let pack = try Converter.fromChangePack(message.changePack)
+
+            if resumed {
+                await self.dropPurgedOfflineState(doc: doc,
+                                                  pack: pack,
+                                                  documentID: message.documentID,
+                                                  disableGC: disableGC,
+                                                  disablePresence: message.disablePresence)
+            }
+
             try doc.applyChangePack(pack)
+            // Record the server-assigned document id so the next persisted envelope carries it
+            // for the purge guard on a later restore.
+            doc.setDocID(message.documentID)
 
             if doc.status == .removed {
                 throw YorkieError(code: .errDocumentRemoved, message: "\(doc) is removed.")
@@ -453,6 +539,12 @@ public class Client {
                                                                     pollIntervalPinned: pollIntervalPinned,
                                                                     disableGC: disableGC,
                                                                     disablePresence: message.disablePresence)
+            if let attachment = self.getDocumentAttachment(doc.getKey()) {
+                self.installOfflinePersistence(on: attachment, doc: doc, lease: pendingSessionLockHandle)
+                // Ownership of the lease has moved to the attachment, which releases it on
+                // detach. Cleared so the failure path below cannot release it a second time.
+                pendingSessionLockHandle = nil
+            }
 
             // Polling mode opens no watch stream; the timer-driven sync loop drives pushpull
             // via needRealtimeSync. Skip waitForInitialization too — no stream to wait for.
@@ -480,6 +572,9 @@ public class Client {
 
             return doc
         } catch {
+            // No attachment took ownership of the lease, so release it here rather than
+            // holding it for the process lifetime and locking the key out of every retry.
+            await pendingSessionLockHandle?.release()
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
             await self.handleConnectError(error)
             throw error
@@ -533,7 +628,9 @@ public class Client {
                 doc.applyStatus(.detached)
             }
 
+            let releasedAttachment = self.getDocumentAttachment(doc.getKey())
             try self.detachInternal(doc.getKey())
+            await self.releasePersistence(for: doc, attachment: releasedAttachment)
 
             Logger.info("[DD] c:\"\(self.key)\" detaches d:\"\(doc.getKey())\"")
 
@@ -579,7 +676,9 @@ public class Client {
 
             try self.detachInternal(doc.getKey())
 
+            let releasedAttachment = self.getDocumentAttachment(doc.getKey())
             self.attachmentMap.removeValue(forKey: doc.getKey())
+            await self.releasePersistence(for: doc, attachment: releasedAttachment)
 
             Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
 
@@ -1045,6 +1144,9 @@ public class Client {
 
             let request = WatchRequest.with {
                 $0.clientID = id
+                // Declaring the stable actor subscribes this client under it, so watch peer
+                // ids and watched/unwatched events match the presence CRDT keying.
+                $0.actorID = self.actorID ?? id
                 $0.resources = [
                     ResourceDescriptor.with {
                         $0.document = DocumentDescriptor.with {
@@ -1093,6 +1195,7 @@ public class Client {
 
             let request = WatchRequest.with {
                 $0.clientID = id
+                $0.actorID = self.actorID ?? id
                 $0.resources = [
                     ResourceDescriptor.with {
                         $0.channel = ChannelDescriptor.with {
@@ -1545,6 +1648,14 @@ public extension Client {
         attachment.resource.publishAuthErrorEvent(reason: reason, method: method)
     }
 
+    /// Reports whether a response error is the server's stale-epoch signal.
+    private func isEpochMismatch(_ error: ConnectError?) -> Bool {
+        guard let error else {
+            return false
+        }
+        return YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errEpochMismatch
+    }
+
     private func publishEpochMismatchIfNeeded(error: ConnectError?, attachment: Attachment<Document>?) {
         guard let connectError = error, let attachment else { return }
         let rawValue = errorCodeOf(error: connectError)
@@ -1863,5 +1974,211 @@ extension Client {
 
         try await self.refreshChannel(attachment.resource)
         return attachment.resource.getSessionCount()
+    }
+}
+
+/// Offline persistence: the store, the single-active-session lease, and the resume paths
+/// that reconcile a restored document with what the server still has.
+private extension Client {
+    /// Returns the store key under which `docKey` is persisted.
+    func storeKey(_ docKey: String) -> String {
+        "\(self.apiKey)/\(self.key)/\(docKey)"
+    }
+
+    /// Returns the session lease name guarding `docKey` for this client.
+    func sessionLockName(_ docKey: String) -> String {
+        "yorkie-session:\(self.apiKey)/\(self.key)/\(docKey)"
+    }
+
+    /// Drops a document's stale persisted state and re-stamps it with this client's actor.
+    ///
+    /// ``Document/resetForReanchor()`` resets the change id along with everything else, which
+    /// clears the actor the attach already assigned. Re-stamping here keeps every reset site
+    /// from having to remember that.
+    ///
+    /// - Parameter doc: The document to re-anchor.
+    func reanchor(_ doc: Document) {
+        doc.resetForReanchor()
+        if let actor = self.actorID ?? self.id {
+            doc.setActor(actor)
+        }
+    }
+
+    /// Hands the session lease to the attachment and starts persisting the document.
+    ///
+    /// The lease then lives exactly as long as the attachment does. Persistence is driven off
+    /// every local change rather than the sync round trip, because what offline persistence
+    /// has to survive is precisely the case where no sync ever runs to completion.
+    ///
+    /// - Parameters:
+    ///   - attachment: The attachment taking ownership of the lease.
+    ///   - doc: The attached document.
+    ///   - lease: The held session lease, if one was taken.
+    func installOfflinePersistence(on attachment: Attachment<Document>,
+                                   doc: Document,
+                                   lease: SessionLockHandle?)
+    {
+        attachment.sessionLockHandle = lease
+        guard self.store != nil else {
+            return
+        }
+        doc.onLocalChange = { [weak self, weak doc] in
+            guard let self, let doc else {
+                return
+            }
+            Task { await self.persistToStore(doc) }
+        }
+    }
+
+    /// Re-anchors a document whose resume the server rejected for a stale epoch, and retries
+    /// the attach once.
+    ///
+    /// A restored document whose epoch the server has since compacted past cannot be resumed:
+    /// the un-acknowledged changes it carries are anchored to a state the server no longer
+    /// has. The persisted state is dropped — surfaced as a data-loss event first, so the app
+    /// can decide what to do about the discarded edits — and the retry goes out as a fresh
+    /// attach the server can re-anchor from its current snapshot.
+    ///
+    /// - Parameters:
+    ///   - doc: The resumed document the server rejected.
+    ///   - request: The attach request, re-packed here with the re-anchored change pack.
+    /// - Returns: The response to the retried attach.
+    func retryAttachAfterReanchor(doc: Document,
+                                  request: inout Yorkie_V1_AttachDocumentRequest) async
+        -> ResponseMessage<Yorkie_V1_AttachDocumentResponse>
+    {
+        let docKey = doc.getKey()
+        Logger.warning("[AD] c:\"\(self.key)\" stale epoch on resume of d:\"\(docKey)\"; re-anchoring")
+        doc.publishLocalChangesDroppedEvent(reason: .epochReanchor, changes: doc.getPendingChangeStructs())
+        self.reanchor(doc)
+        try? await self.store?.remove(docKey: self.storeKey(docKey))
+
+        request.changePack = Converter.toChangePack(pack: doc.createChangePack())
+        return await self.yorkieService.attachDocument(request: request,
+                                                       headers: self.authHeader.makeHeader(docKey))
+    }
+
+    /// Discards a resumed document's persisted state when the server purged the document
+    /// it was anchored to.
+    ///
+    /// If the server collected or deleted the document while this client was offline, attach
+    /// mints a fresh empty one under a new document id with the server sequence back at 0.
+    /// Restoring the persisted snapshot on top of that would present un-pushed edits against
+    /// an unrelated document, so the purge is detected — by a changed document id, or by a
+    /// server sequence that regressed to 0 while the local snapshot was non-empty — and the
+    /// persisted state is dropped instead, surfaced as a data-loss event rather than left to
+    /// corrupt the attach.
+    ///
+    /// Call before ``Document/applyChangePack(_:)``, while the document still carries the
+    /// restored checkpoint and document id this compares against.
+    ///
+    /// - Parameters:
+    ///   - doc: The resumed document.
+    ///   - pack: The change pack from the attach response, not yet applied.
+    ///   - documentID: The document id the server returned for this attach.
+    ///   - disableGC: The attach's garbage-collection opt-out, restated after a reset.
+    ///   - disablePresence: The server-fixated presence gating, restated after a reset.
+    func dropPurgedOfflineState(doc: Document,
+                                pack: ChangePack,
+                                documentID: String,
+                                disableGC: Bool,
+                                disablePresence: Bool) async
+    {
+        let persistedDocID = doc.getDocID()
+        let idChanged = persistedDocID.isEmpty == false && documentID != persistedDocID
+        let seqRegressed = doc.checkpoint.getServerSeq() > 0 && pack.getCheckpoint().getServerSeq() == 0
+        guard idChanged || seqRegressed else {
+            return
+        }
+
+        Logger.warning("[AD] c:\"\(self.key)\" server purged d:\"\(doc.getKey())\" " +
+            "(document id or server seq reset); dropping persisted offline state")
+        doc.publishLocalChangesDroppedEvent(reason: .documentPurged, changes: doc.getPendingChangeStructs())
+        try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
+        self.reanchor(doc)
+        // Restated because the reset cleared them along with the rest of the local state.
+        doc.setDisableGC(disableGC)
+        doc.setDisablePresence(disablePresence)
+    }
+
+    /// Takes the session lease and restores any stored copy of `doc`, before its change pack
+    /// is built.
+    ///
+    /// The lease is acquired before any restore or RPC, so a second session fails fast rather
+    /// than driving sync against a shared checkpoint. A client without a store does none of
+    /// this and keeps the previous behaviour entirely.
+    ///
+    /// - Parameter doc: The document being attached.
+    /// - Returns: The held lease, and whether a stored copy was restored.
+    /// - Throws: ``YorkieError`` with `errInvalidArgument` when another session holds the lease.
+    func prepareOfflineResume(for doc: Document) async throws -> (handle: SessionLockHandle?, didRestore: Bool) {
+        var acquired: SessionLockHandle?
+        var restored = false
+        if let store = self.store {
+            guard let handle = await self.sessionLock.acquire(name: self.sessionLockName(doc.getKey())) else {
+                throw YorkieError(
+                    code: .errInvalidArgument,
+                    message: "document \"\(doc.getKey())\" is already open in another session under offline "
+                        + "persistence; only one active session per document is allowed to avoid silent edit loss"
+                )
+            }
+            acquired = handle
+
+            // Restore the persisted document so its un-acknowledged local changes are
+            // re-pushed by the attach below. A stored copy belonging to a different actor is
+            // discarded rather than adopted, since its changes are not ours to re-push.
+            if let bytes = try? await store.load(docKey: self.storeKey(doc.getKey())) {
+                do {
+                    try doc.restoreFromBytes(bytes)
+                    restored = true
+                } catch {
+                    // An envelope that cannot be restored is unusable, but it must never abort
+                    // this attach or poison every later one: drop it and fall through to a fresh
+                    // attach. A ``YorkieError`` is the actor guard rejecting a store reused under
+                    // a different identity; anything else means the bytes could not be decoded.
+                    let reason: LocalChangesDroppedValue.Reason = error is YorkieError ? .actorMismatch : .restoreFailed
+                    Logger.warning("[Store] persisted state for \(doc.getKey()) unusable (\(reason.rawValue)): \(error)")
+                    // Recovered from the stored bytes, not from `doc`: the restore failed, so
+                    // `doc` never took on the persisted changes and would report none.
+                    let dropped = (try? Document.fromBytes(key: doc.getKey(), bytes: bytes).getPendingChangeStructs()) ?? []
+                    doc.publishLocalChangesDroppedEvent(reason: reason, changes: dropped)
+                    self.reanchor(doc)
+                    try? await store.remove(docKey: self.storeKey(doc.getKey()))
+                }
+            }
+        }
+
+        return (acquired, restored)
+    }
+
+    /// Drops everything offline persistence held for a document that is no longer attached.
+    ///
+    /// The stored copy is removed before the lease is released, so no other session can
+    /// resume a copy that is about to be deleted.
+    ///
+    /// - Parameters:
+    ///   - doc: The document leaving this client.
+    ///   - attachment: Its attachment, holding the session lease.
+    func releasePersistence(for doc: Document, attachment: Attachment<Document>?) async {
+        doc.onLocalChange = nil
+        if self.store != nil {
+            try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
+        }
+        await attachment?.sessionLockHandle?.release()
+    }
+
+    /// Persists the document's restorable envelope, when a store is configured.
+    ///
+    /// Failures are logged rather than thrown: losing a persisted copy must not fail the edit
+    /// that triggered it, and the next local change will try again.
+    func persistToStore(_ doc: Document) async {
+        guard let store = self.store else {
+            return
+        }
+        do {
+            try await store.save(docKey: self.storeKey(doc.getKey()), bytes: doc.toBytes())
+        } catch {
+            Logger.warning("[Store] failed to persist \(doc.getKey()): \(error)")
+        }
     }
 }

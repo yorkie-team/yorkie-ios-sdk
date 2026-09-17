@@ -290,6 +290,7 @@ public class Document: Attachable {
             }
 
             self.localChanges.append(change)
+            self.onLocalChange?()
             if let reverseOps = executionResult?.reverseOps, !reverseOps.isEmpty {
                 self.internalHistory.pushUndo(reverseOps)
             }
@@ -444,6 +445,7 @@ public class Document: Attachable {
         }
 
         self.localChanges.append(change)
+        self.onLocalChange?()
         self.changeID = context.getNextID()
 
         if !opInfos.isEmpty {
@@ -1140,8 +1142,23 @@ public class Document: Attachable {
         self.publish(authErrorEvent)
     }
 
+    /// Invoked after a local change is appended, when offline persistence is enabled.
+    ///
+    /// Separate from ``subscribe(_:_:)`` deliberately: that is a single-slot, app-facing
+    /// callback, and the client registering there would displace the app's own subscription.
+    var onLocalChange: (() -> Void)?
+
     func publishEpochMismatchEvent(method: String) {
         self.publish(EpochMismatchEvent(value: EpochMismatchValue(method: method)))
+    }
+
+    /// Publishes the changes an offline resume had to discard.
+    ///
+    /// - Parameters:
+    ///   - reason: Why the changes could not be reconciled with the server.
+    ///   - changes: The discarded changes, in the order they were made.
+    func publishLocalChangesDroppedEvent(reason: LocalChangesDroppedValue.Reason, changes: [Change]) {
+        self.publish(LocalChangesDroppedEvent(value: LocalChangesDroppedValue(reason: reason, changes: changes)))
     }
 
     /**
