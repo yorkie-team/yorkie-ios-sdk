@@ -17,6 +17,13 @@
 import XCTest
 @testable import Yorkie
 
+/// Ports: `packages/sdk/test/unit/document/yson_test.ts` from yorkie-js-sdk v0.7.19
+/// (yorkie-js-sdk#1335 "Replace YSON regex preprocessor with a string-aware scanner").
+///
+/// The old `preprocessYSON` rewrote `Tree(...)`/`Text([...])` literals with a chain of
+/// fixed-depth regular expressions: nesting past three levels was left untransformed, and
+/// brackets inside string values were counted as structure. `preprocessYSON` is now a
+/// string-aware scanner without either limitation.
 final class YSONTests: XCTestCase {
     // MARK: - parse
 
@@ -266,5 +273,278 @@ final class YSONTests: XCTestCase {
         // Manually crafted JSON that bypasses preprocessing — __yson_registers is absent.
         let malformed = "{\"v\":{\"__yson_type\":\"DedupCounter\",\"__yson_data\":{\"__yson_type\":\"Int\",\"__yson_data\":5}}}"
         XCTAssertThrowsError(try YSON.parse(malformed))
+    }
+
+    // MARK: - Deep nesting (regression: regex depth ceiling)
+
+    func test_should_parse_a_tree_nested_deeper_than_three_levels() throws {
+        // given: doc > block > inline > text is already depth four.
+        let yson = #"{"c":Tree({"type":"doc","children":[{"type":"block","children":[{"type":"inline","children":[{"type":"text","value":"a"}]}]}]})}"#
+
+        // when
+        let result = try YSON.parse(yson)
+
+        // then
+        guard case .object(let obj) = result, case .tree(let tree)? = obj["c"] else {
+            return XCTFail("expected tree content")
+        }
+        XCTAssertEqual(YSON.treeToXML(tree), "<doc><block><inline><text>a</text></inline></block></doc>")
+    }
+
+    func test_should_parse_a_tree_nested_far_past_four_levels() throws {
+        // given: doc > l0 > l1 > ... > l7 > text.
+        var node = #"{"type":"text","value":"deep"}"#
+        for level in stride(from: 7, through: 0, by: -1) {
+            node = "{\"type\":\"l\(level)\",\"children\":[\(node)]}"
+        }
+        let yson = "{\"c\":Tree({\"type\":\"doc\",\"children\":[\(node)]})}"
+
+        // when
+        let result = try YSON.parse(yson)
+
+        // then
+        guard case .object(let obj) = result, case .tree(let tree)? = obj["c"] else {
+            return XCTFail("expected tree content")
+        }
+        let xml = YSON.treeToXML(tree)
+        XCTAssertTrue(xml.contains("<l0>"))
+        XCTAssertTrue(xml.contains("<l7>"))
+        XCTAssertTrue(xml.contains("<text>deep</text>"))
+    }
+
+    // MARK: - Bracket characters in string values (regression: not string-aware)
+
+    func test_should_parse_a_text_value_with_an_unmatched_closing_bracket() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Text([{"val":"a]b"}])}"#)
+
+        // then
+        guard case .object(let obj) = result, case .text(let text)? = obj["c"] else {
+            return XCTFail("expected text content")
+        }
+        XCTAssertEqual(text.nodes[0].val, "a]b")
+    }
+
+    func test_should_parse_a_text_value_with_an_unmatched_opening_bracket() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Text([{"val":"a[b"}])}"#)
+
+        // then
+        guard case .object(let obj) = result, case .text(let text)? = obj["c"] else {
+            return XCTFail("expected text content")
+        }
+        XCTAssertEqual(text.nodes[0].val, "a[b")
+    }
+
+    func test_should_parse_a_tree_value_with_an_unmatched_closing_brace() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Tree({"type":"doc","children":[{"type":"text","value":"a}b"}]})}"#)
+
+        // then
+        guard case .object(let obj) = result, case .tree(let tree)? = obj["c"] else {
+            return XCTFail("expected tree content")
+        }
+        XCTAssertTrue(YSON.treeToXML(tree).contains("a}b"))
+    }
+
+    func test_should_parse_a_text_value_containing_a_closing_paren() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Text([{"val":"see f(x))"}])}"#)
+
+        // then
+        guard case .object(let obj) = result, case .text(let text)? = obj["c"] else {
+            return XCTFail("expected text content")
+        }
+        XCTAssertEqual(text.nodes[0].val, "see f(x))")
+    }
+
+    func test_should_parse_a_value_with_an_escaped_quote_adjacent_to_a_bracket() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Text([{"val":"a\"]b"}])}"#)
+
+        // then
+        guard case .object(let obj) = result, case .text(let text)? = obj["c"] else {
+            return XCTFail("expected text content")
+        }
+        XCTAssertEqual(text.nodes[0].val, "a\"]b")
+    }
+
+    func test_should_not_treat_a_constructor_like_substring_inside_a_string_as_a_type() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Text([{"val":"Int(42) and Tree(x)"}])}"#)
+
+        // then
+        guard case .object(let obj) = result, case .text(let text)? = obj["c"] else {
+            return XCTFail("expected text content")
+        }
+        XCTAssertEqual(text.nodes[0].val, "Int(42) and Tree(x)")
+    }
+
+    func test_should_parse_a_dedupcounter_whose_registers_contain_a_comma_and_paren() throws {
+        // given / when — the registers string holds both a comma and a closing paren, so a
+        // naive split on "," or a paren scan that ignored strings would mis-split the args
+        let parsed = try YSON.parse(#"{"v":DedupCounter(Int(15),"a,b)c")}"#)
+
+        // then
+        guard case .object(let obj) = parsed else {
+            return XCTFail("expected an object but got \(parsed)")
+        }
+        XCTAssertEqual(obj["v"], .dedupCounter(value: .int(15), registers: "a,b)c"))
+    }
+
+    // MARK: - Text and Tree in the same root
+
+    func test_should_parse_a_document_holding_both_text_and_tree_each_with_bracket_content() throws {
+        // given
+        let yson = #"{"t":Text([{"val":"x]y"}]),"tr":Tree({"type":"doc","children":[{"type":"text","value":"p}q"}]})}"#
+
+        // when
+        let result = try YSON.parse(yson)
+
+        // then
+        guard case .object(let obj) = result,
+              case .text(let text)? = obj["t"],
+              case .tree(let tree)? = obj["tr"]
+        else {
+            return XCTFail("expected text and tree content")
+        }
+        XCTAssertEqual(text.nodes[0].val, "x]y")
+        XCTAssertTrue(YSON.treeToXML(tree).contains("p}q"))
+    }
+
+    // MARK: - Error handling (string-aware scanner)
+
+    func test_should_throw_on_constructor_nesting_beyond_the_depth_limit() {
+        // given — a syntactically balanced but pathologically deep nest. Each level
+        // costs a stack frame in preprocessYSON, and without the bound this crashes
+        // the process with SIGSEGV somewhere below 4000 rather than throwing.
+        let deep = "{\"v\":" + String(repeating: "Int(", count: 5000) + "5"
+            + String(repeating: ")", count: 5000) + "}"
+
+        // when / then
+        XCTAssertThrowsError(try YSON.parse(deep)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected YorkieError but got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: YSON constructor nesting deeper than 64")
+        }
+    }
+
+    func test_should_still_accept_nesting_at_the_depth_limit() throws {
+        // given — depth 2 is the deepest shape a real document uses
+        // (DedupCounter(Int(n),"…")); confirm the bound does not reject it
+        let parsed = try YSON.parse(#"{"v":Counter(Int(10))}"#)
+
+        // then
+        guard case .object(let obj) = parsed else {
+            return XCTFail("expected an object but got \(parsed)")
+        }
+        XCTAssertEqual(obj["v"], .counter(.int(10)))
+    }
+
+    func test_should_parse_a_string_value_starting_with_a_combining_mark() throws {
+        // given — the mark is the FIRST scalar in the literal, so with grapheme-cluster
+        // scanning it fuses with the opening quote and the literal is never recognised.
+        // Per-keystroke Thai, Hindi and decomposed Vietnamese editing produce exactly this,
+        // and the server emits such values raw, so these are real snapshots.
+        let cases: [(String, String)] = [
+            ("Thai SARA AM", "{\"c\":Text([{\"val\":\"\u{0E33}\"}])}"),
+            ("combining acute", "{\"a\":\"\u{0301}x\"}"),
+            ("variation selector", "{\"c\":Text([{\"val\":\"\u{FE0F}\"}])}"),
+            ("emoji skin tone", "{\"c\":Text([{\"val\":\"\u{1F3FB}\"}])}"),
+            ("prepend before the closing quote", "{\"a\":\"x\u{0600}\",\"c\":Int(1)}")
+        ]
+
+        // when / then
+        for (name, input) in cases {
+            XCTAssertNoThrow(try YSON.parse(input), name)
+        }
+    }
+
+    func test_should_accept_the_integer_boundaries_and_reject_one_past_them() throws {
+        // given / when / then — a Double cannot represent Int64.max (it rounds up to
+        // 2^63), so a double-based range check rejects the legitimate maximum and
+        // compares equal to the first out-of-range value. The bounds use Decimal.
+        let accepted: [(String, YSONValue)] = [
+            ("{\"v\":Long(9223372036854775807)}", .long(Int64.max)),
+            ("{\"v\":Long(-9223372036854775808)}", .long(Int64.min)),
+            ("{\"v\":Int(2147483647)}", .int(Int32.max)),
+            ("{\"v\":Int(-2147483648)}", .int(Int32.min))
+        ]
+        for (input, expected) in accepted {
+            guard case .object(let obj) = try YSON.parse(input) else {
+                return XCTFail("expected an object for \(input)")
+            }
+            XCTAssertEqual(obj["v"], expected, input)
+        }
+
+        for input in ["{\"v\":Long(9223372036854775808)}", "{\"v\":Int(2147483648)}"] {
+            XCTAssertThrowsError(try YSON.parse(input), input) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, input)
+            }
+        }
+    }
+
+    func test_should_reject_a_boolean_constructor_argument() {
+        // given / when / then — `as? NSNumber` also matches __NSCFBoolean, so without an
+        // explicit check Int(true) would read as 1
+        for input in ["{\"v\":Int(true)}", "{\"v\":Long(false)}", "{\"v\":Counter(Int(true))}"] {
+            XCTAssertThrowsError(try YSON.parse(input), input) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, input)
+            }
+        }
+    }
+
+    func test_should_reject_a_non_integral_constructor_argument() {
+        // given / when / then — these would otherwise truncate (1.5 -> 1) or wrap
+        // (1e10 -> 1410065408) rather than being refused
+        for input in ["{\"v\":Int(1.5)}", "{\"v\":Long(2.9)}", "{\"v\":Int(1e10)}"] {
+            XCTAssertThrowsError(try YSON.parse(input), input) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, input)
+            }
+        }
+    }
+
+    func test_should_throw_on_an_unterminated_string_literal() {
+        // given / when / then
+        XCTAssertThrowsError(try YSON.parse(#"{"c":Text([{"val":"a}])}"#)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected YorkieError but got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // The message matters: asserting only the code would also pass against
+            // the old regex implementation, where JSONSerialization rejected the
+            // untransformed literal with the same code from a different origin.
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: unterminated string literal")
+        }
+    }
+
+    func test_should_throw_on_unbalanced_parentheses() {
+        // given / when / then
+        XCTAssertThrowsError(try YSON.parse(#"{"c":Tree({"type":"doc"}"#)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected YorkieError but got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // The message matters: asserting only the code would also pass against
+            // the old regex implementation, where JSONSerialization rejected the
+            // untransformed literal with the same code from a different origin.
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: unbalanced parentheses in YSON")
+        }
+    }
+
+    func test_should_throw_on_a_dedupcounter_with_the_wrong_argument_count() {
+        // given / when / then
+        XCTAssertThrowsError(try YSON.parse(#"{"c":DedupCounter(Int(15))}"#)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected YorkieError but got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // The message matters: asserting only the code would also pass against
+            // the old regex implementation, where JSONSerialization rejected the
+            // untransformed literal with the same code from a different origin.
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: DedupCounter expects a value and a registers argument")
+        }
     }
 }
