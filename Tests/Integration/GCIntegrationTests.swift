@@ -75,8 +75,8 @@ class GCIntegrationTests: XCTestCase {
         XCTAssertEqual(doc2Len, gcNodeLen)
 
         // Actual garbage-collected nodes
-        doc1Len = doc1.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.id, client2.id]))
-        doc2Len = doc2.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.id, client2.id]))
+        doc1Len = doc1.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.getActorID(), client2.getActorID()]))
+        doc2Len = doc2.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client1.getActorID(), client2.getActorID()]))
 
         XCTAssertEqual(doc1Len, gcNodeLen)
         XCTAssertEqual(doc2Len, gcNodeLen)
