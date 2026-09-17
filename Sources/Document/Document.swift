@@ -1158,7 +1158,8 @@ public class Document: Attachable {
     ///   - reason: Why the changes could not be reconciled with the server.
     ///   - changes: The discarded changes, in the order they were made.
     func publishLocalChangesDroppedEvent(reason: LocalChangesDroppedValue.Reason, changes: [Change]) {
-        self.publish(LocalChangesDroppedEvent(value: LocalChangesDroppedValue(reason: reason, changes: changes)))
+        let dropped = changes.map { DroppedChange($0) }
+        self.publish(LocalChangesDroppedEvent(value: LocalChangesDroppedValue(reason: reason, changes: dropped)))
     }
 
     /**

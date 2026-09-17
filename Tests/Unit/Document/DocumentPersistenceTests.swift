@@ -109,7 +109,10 @@ final class DocumentPersistenceTests: XCTestCase {
             guard let yorkieError = error as? YorkieError else {
                 return XCTFail("expected a YorkieError, got \(error)")
             }
-            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            // Distinct from the `errInvalidArgument` every malformed-envelope guard throws,
+            // so the client can tell a store reused under another identity from bytes it
+            // simply cannot decode, and report the right reason for the dropped changes.
+            XCTAssertEqual(yorkieError.code, .errActorMismatch)
         }
     }
 

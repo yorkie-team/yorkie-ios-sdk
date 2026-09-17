@@ -363,7 +363,36 @@ public struct LocalChangesDroppedValue {
     /// Why the changes were dropped.
     public let reason: Reason
     /// The changes that were discarded, in the order they were made.
-    public let changes: [Change]
+    public let changes: [DroppedChange]
+}
+
+/// One un-pushed local change that offline persistence could not reconcile with the server.
+///
+/// A readable projection of the document's internal change representation, so an app handling
+/// a ``LocalChangesDroppedEvent`` can report what was lost — who made it, in what order, and
+/// how much of it there was — rather than only how many changes there were.
+public struct DroppedChange {
+    /// The actor that made the change.
+    public let actorID: String?
+    /// The change's sequence number for that actor, giving the order they were made in.
+    public let clientSeq: UInt32
+    /// The lamport timestamp of the change.
+    public let lamport: Int64
+    /// The description recorded with the change, when the app supplied one.
+    public let message: String?
+    /// How many operations the change carries.
+    public let operationCount: Int
+    /// Whether the change carries a presence update.
+    public let hasPresenceChange: Bool
+
+    init(_ change: Change) {
+        self.actorID = change.id.getActorID()
+        self.clientSeq = change.id.getClientSeq()
+        self.lamport = change.id.getLamport()
+        self.message = change.message
+        self.operationCount = change.operations.count
+        self.hasPresenceChange = change.presenceChange != nil
+    }
 }
 
 /// `LocalChangesDroppedEvent` is published when offline persistence discards un-pushed local

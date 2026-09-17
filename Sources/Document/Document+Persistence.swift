@@ -156,9 +156,10 @@ public extension Document {
     /// rather than corrupt state.
     ///
     /// - Parameter bytes: The envelope produced by a prior ``toBytes()``.
-    /// - Throws: ``YorkieError`` with ``ErrorCode/errInvalidArgument`` when `bytes` is
-    ///   malformed (see ``fromBytes(key:bytes:opts:)``) or the persisted actor does not
-    ///   match this document's current actor.
+    /// - Throws: ``YorkieError`` with `errInvalidArgument` when `bytes` is malformed (see
+    ///   ``fromBytes(key:bytes:opts:)``), or with `errActorMismatch` when the persisted actor
+    ///   does not match this document's current actor. The two are distinguished so a caller
+    ///   can tell a store reused under another identity from bytes it simply cannot decode.
     func restoreFromBytes(_ bytes: Data) throws {
         let currentActor = self.changeID.getActorID()
         let decoded = try Self.decodePersistedBytes(bytes)
@@ -166,7 +167,7 @@ public extension Document {
 
         if let currentActor, let restoredActor, currentActor != restoredActor {
             throw YorkieError(
-                code: .errInvalidArgument,
+                code: .errActorMismatch,
                 message: "persisted actor \"\(restoredActor)\" does not match the current actor " +
                     "\"\(currentActor)\"; the store was reused under a different client identity, " +
                     "restoring would diverge the CRDT"
@@ -237,10 +238,17 @@ private extension Document {
     /// ``restoreFromBytes(_:)``.
     static func decodePersistedBytes(_ bytes: Data) throws -> PersistedState {
         let blobs = try Self.unpackBlobs(bytes)
-        guard blobs.count == 6 else {
+        // Envelope invariant: the first four blobs are required; trailing blobs are optional.
+        // An envelope written before a later field existed carries fewer (four before epoch,
+        // five before docID) and each is defaulted below, while one written by a newer SDK
+        // carries more and the extras are ignored. Tolerating both directions is deliberate:
+        // a strict count would mean an app downgrade, or a share extension running an older
+        // SDK than its host, discards the user's un-pushed offline edits. Any future field
+        // MUST be appended as a new trailing blob and stay optional here.
+        guard blobs.count >= 4 else {
             throw YorkieError(
                 code: .errInvalidArgument,
-                message: "corrupt envelope: expected 6 blobs, got \(blobs.count)"
+                message: "corrupt envelope: expected at least 4 blobs, got \(blobs.count)"
             )
         }
 
@@ -265,12 +273,28 @@ private extension Document {
         let pbPendingChanges = try PbChangePack(serializedBytes: blobs[3])
         let localChanges = try Converter.fromChanges(pbPendingChanges.changes)
 
-        guard let epochString = String(data: blobs[4], encoding: .utf8), let epoch = Int64(epochString) else {
-            throw YorkieError(code: .errInvalidArgument, message: "corrupt envelope: invalid epoch blob")
+        // Absent in a pre-epoch envelope, in which case the document re-learns the epoch from
+        // the next server response.
+        let epoch: Int64
+        if blobs.count > 4 {
+            guard let epochString = String(data: blobs[4], encoding: .utf8), let parsed = Int64(epochString) else {
+                throw YorkieError(code: .errInvalidArgument, message: "corrupt envelope: invalid epoch blob")
+            }
+            epoch = parsed
+        } else {
+            epoch = 0
         }
 
-        guard let docID = String(data: blobs[5], encoding: .utf8) else {
-            throw YorkieError(code: .errInvalidArgument, message: "corrupt envelope: invalid docID blob")
+        // Absent in a pre-docID envelope. An empty id disables the purge guard for this
+        // resume rather than failing it, and the next attach records the server's id.
+        let docID: DocumentID
+        if blobs.count > 5 {
+            guard let parsed = String(data: blobs[5], encoding: .utf8) else {
+                throw YorkieError(code: .errInvalidArgument, message: "corrupt envelope: invalid docID blob")
+            }
+            docID = parsed
+        } else {
+            docID = ""
         }
 
         return (root, presences, checkpoint, changeID, localChanges, epoch, docID)
