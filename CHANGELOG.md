@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.20] - 2026-09-17
+
+> Requires a Yorkie server v0.7.20 or later. Offline resume depends on the server accepting a re-pushed change pack against a persisted checkpoint and epoch, and on stable-actor watch (yorkie#1969, yorkie#1970).
+
+### Added
+
+- Add offline local persistence (serialize, store, resume, multi-tab) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/274
+
+### Fixed
+
+- Reject duplicate attach of the same key on one client in https://github.com/yorkie-team/yorkie-ios-sdk/pull/274
+
 ## [v0.7.19] - 2026-09-15
 
 - Replace YSON regex preprocessor with a string-aware scanner in https://github.com/yorkie-team/yorkie-ios-sdk/pull/273
