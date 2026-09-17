@@ -10,6 +10,8 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 > Requires a Yorkie server v0.7.20 or later. Offline resume depends on the server accepting a re-pushed change pack against a persisted checkpoint and epoch, and on stable-actor watch (yorkie#1969, yorkie#1970).
 
+> **Behavioural change.** A document's actor is now the server-supplied stable actor rather than the client's session id, so peers in `Document.getPresences()` and the client ids in watched/unwatched events are keyed by it. An app that used `Client.id` to identify itself among peers must use `Client.getActorID()`. Because the actor also breaks ties between concurrent edits, and a stable actor is derived from the client key rather than being time-ordered, the winner of a tie no longer follows client creation order.
+
 ### Added
 
 - Add offline local persistence (serialize, store, resume, multi-tab) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/274
