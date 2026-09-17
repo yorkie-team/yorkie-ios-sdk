@@ -44,13 +44,13 @@ final class PresenceTests: XCTestCase {
             }
         }
 
-        var presence = doc1.getPresenceForTest(c1.id!)?["key"] as? Int
+        var presence = doc1.getPresenceForTest(c1.getActorID()!)?["key"] as? Int
         XCTAssertEqual(presence, defaultSnapshotThreshold - 1)
 
         try await c1.sync()
         try await c2.sync()
 
-        presence = doc2.getPresenceForTest(c1.id!)?["key"] as? Int
+        presence = doc2.getPresenceForTest(c1.getActorID()!)?["key"] as? Int
         XCTAssertEqual(presence, defaultSnapshotThreshold - 1)
     }
 
@@ -69,23 +69,23 @@ final class PresenceTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, ["key": "key2"], .manual)
 
-        var presence = doc1.getPresenceForTest(c1.id!)?["key"] as? String
+        var presence = doc1.getPresenceForTest(c1.getActorID()!)?["key"] as? String
         XCTAssertEqual(presence, "key1")
-        presence = doc1.getPresenceForTest(c2.id!)?["key"] as? String
+        presence = doc1.getPresenceForTest(c2.getActorID()!)?["key"] as? String
         XCTAssertEqual(presence, nil)
-        presence = doc2.getPresenceForTest(c2.id!)?["key"] as? String
+        presence = doc2.getPresenceForTest(c2.getActorID()!)?["key"] as? String
         XCTAssertEqual(presence, "key2")
-        presence = doc2.getPresenceForTest(c1.id!)?["key"] as? String
+        presence = doc2.getPresenceForTest(c1.getActorID()!)?["key"] as? String
         XCTAssertEqual(presence, "key1")
 
         try await c1.sync()
-        presence = doc1.getPresenceForTest(c2.id!)?["key"] as? String
+        presence = doc1.getPresenceForTest(c2.getActorID()!)?["key"] as? String
         XCTAssertEqual(presence, "key2")
 
         try await c2.detach(doc2)
         try await c1.sync()
 
-        let hasPresence = doc1.hasPresence(c2.id!)
+        let hasPresence = doc1.hasPresence(c2.getActorID()!)
         XCTAssertFalse(hasPresence)
     }
 
@@ -104,18 +104,18 @@ final class PresenceTests: XCTestCase {
         let doc2 = Document(key: docKey)
         try await c2.attach(doc2, [:], .manual)
 
-        var presence = doc1.getPresenceForTest(c1.id!)
+        var presence = doc1.getPresenceForTest(c1.getActorID()!)
         XCTAssertTrue(presence!.isEmpty)
-        presence = doc1.getPresenceForTest(c2.id!)
+        presence = doc1.getPresenceForTest(c2.getActorID()!)
         XCTAssertTrue(presence == nil)
-        presence = doc2.getPresenceForTest(c2.id!)
+        presence = doc2.getPresenceForTest(c2.getActorID()!)
         XCTAssertTrue(presence!.isEmpty)
-        presence = doc2.getPresenceForTest(c1.id!)
+        presence = doc2.getPresenceForTest(c1.getActorID()!)
         XCTAssertTrue(presence!.isEmpty)
 
         try await c1.sync()
 
-        presence = doc2.getPresenceForTest(c1.id!)
+        presence = doc2.getPresenceForTest(c1.getActorID()!)
         XCTAssertTrue(presence!.isEmpty)
     }
 
@@ -138,14 +138,14 @@ final class PresenceTests: XCTestCase {
             presence.set(["cursor": ["x": 1, "y": 1]])
         }
 
-        var presence = doc1.getPresenceForTest(c1.id!)
+        var presence = doc1.getPresenceForTest(c1.getActorID()!)
         XCTAssertEqual(presence?["key"] as? String, "key1")
         XCTAssertEqual(presence?["cursor"] as? [String: Int], ["x": 1, "y": 1])
 
         try await c1.sync()
         try await c2.sync()
 
-        presence = doc2.getPresenceForTest(c1.id!)
+        presence = doc2.getPresenceForTest(c1.getActorID()!)
         XCTAssertEqual(presence?["key"] as? String, "key1")
         XCTAssertEqual(presence?["cursor"] as? [String: Int], ["x": 1, "y": 1])
     }
@@ -158,9 +158,9 @@ final class PresenceTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
         try await c3.activate()
-        let c1ID = c1.id!
-        let c2ID = c2.id!
-        let c3ID = c3.id!
+        let c1ID = c1.getActorID()!
+        let c2ID = c2.getActorID()!
+        let c3ID = c3.getActorID()!
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -227,7 +227,7 @@ final class PresenceTests: XCTestCase {
         let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
-        let c1ID = c1.id!
+        let c1ID = c1.getActorID()!
 
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
@@ -331,8 +331,8 @@ final class PresenceSubscribeTests: XCTestCase {
         let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
-        let c1ID = c1.id!
-        let c2ID = c2.id!
+        let c1ID = c1.getActorID()!
+        let c2ID = c2.getActorID()!
 
         let doc1 = Document(key: docKey)
         try await c1.attach(doc1, ["name": "a"])
@@ -418,7 +418,7 @@ final class PresenceSubscribeTests: XCTestCase {
         let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
-        let c2ID = c2.id!
+        let c2ID = c2.getActorID()!
 
         let doc1 = Document(key: docKey)
 
@@ -475,8 +475,8 @@ final class PresenceSubscribeTests: XCTestCase {
         let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
-        let c1ID = c1.id!
-        let c2ID = c2.id!
+        let c1ID = c1.getActorID()!
+        let c2ID = c2.getActorID()!
         var eventCount1 = 0
         var eventCount2 = 0
 
@@ -547,8 +547,8 @@ final class PresenceSubscribeTests: XCTestCase {
         let c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
-        let c1ID = c1.id!
-        let c2ID = c2.id!
+        let c1ID = c1.getActorID()!
+        let c2ID = c2.getActorID()!
 
         var eventCount1 = 0
 
@@ -613,8 +613,8 @@ final class PresenceSubscribeTests: XCTestCase {
         try await c1.activate()
         try await c2.activate()
         try await c3.activate()
-        let c2ID = c2.id!
-        let c3ID = c3.id!
+        let c2ID = c2.getActorID()!
+        let c3ID = c3.getActorID()!
 
         let docKey = "\(Date().description)-\(self.description)".toDocKey
 
@@ -744,7 +744,7 @@ final class PresenceSubscribeTests: XCTestCase {
 
         let client1 = Client(rpcAddr)
         try await client1.activate()
-        let c1ID = client1.id!
+        let c1ID = client1.getActorID()!
 
         let doc1 = Document(key: docKey)
         let expectPresence = expectation(description: "initial presence-changed")

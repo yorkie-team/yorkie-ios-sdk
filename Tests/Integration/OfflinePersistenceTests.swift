@@ -27,44 +27,44 @@ import XCTest
 // behaviour those seams exist for.
 //
 // Requires a yorkie server at localhost:8080.
-final class OfflinePersistenceTests: XCTestCase {
-    let rpcAddress = "http://localhost:8080"
+/// A ``SessionLock`` that grants a name once and refuses it until released, standing in for
+/// the cross-process lock an App Group deployment would supply.
+private actor CountingSessionLock: SessionLock {
+    private var held = Set<String>()
+    private(set) var releaseCount = 0
 
-    /// A ``SessionLock`` that grants a name once and refuses it until released, standing in for
-    /// the cross-process lock an App Group deployment would supply.
-    private actor CountingSessionLock: SessionLock {
-        private var held = Set<String>()
-        private(set) var releaseCount = 0
+    private struct Handle: SessionLockHandle {
+        let name: String
+        let owner: CountingSessionLock
 
-        private struct Handle: SessionLockHandle {
-            let name: String
-            let owner: CountingSessionLock
-
-            func release() async {
-                await self.owner.free(self.name)
-            }
-        }
-
-        func acquire(name: String) async -> SessionLockHandle? {
-            guard self.held.contains(name) == false else {
-                return nil
-            }
-            self.held.insert(name)
-            return Handle(name: name, owner: self)
-        }
-
-        fileprivate func free(_ name: String) {
-            guard self.held.contains(name) else {
-                return
-            }
-            self.held.remove(name)
-            self.releaseCount += 1
-        }
-
-        func isHeld(_ name: String) -> Bool {
-            self.held.contains(name)
+        func release() async {
+            await self.owner.free(self.name)
         }
     }
+
+    func acquire(name: String) async -> SessionLockHandle? {
+        guard self.held.contains(name) == false else {
+            return nil
+        }
+        self.held.insert(name)
+        return Handle(name: name, owner: self)
+    }
+
+    fileprivate func free(_ name: String) {
+        guard self.held.contains(name) else {
+            return
+        }
+        self.held.remove(name)
+        self.releaseCount += 1
+    }
+
+    func isHeld(_ name: String) -> Bool {
+        self.held.contains(name)
+    }
+}
+
+final class OfflinePersistenceTests: XCTestCase {
+    let rpcAddress = "http://localhost:8080"
 
     // MARK: Resume
 

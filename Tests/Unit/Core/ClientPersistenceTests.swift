@@ -164,6 +164,12 @@ final class ClientPersistenceTests: XCTestCase {
         XCTAssertNotNil(other)
     }
 
+    // Pins the session-lease lifetime `Client.releaseSession(for:attachment:)` (private,
+    // unreachable from this target) relies on: a lease it releases must be re-acquirable for
+    // the same name, or a released document would lock its key out for the rest of the
+    // process. `Client`'s own release paths (`detach`, `deactivate`, the removed-mid-sync
+    // branch) need a server to reach and belong in `Tests/Integration`; the guarantee itself is
+    // the lock's own contract, pinned here directly.
     func test_contended_sessionlock_releasing_frees_the_name_for_reacquisition() async throws {
         let lock = FakeContendedSessionLock()
         let firstAcquired = await lock.acquire(name: "doc-1")
@@ -225,13 +231,18 @@ final class ClientPersistenceTests: XCTestCase {
 
     @MainActor
     func test_localchangesdroppedevent_is_published_with_the_reason_and_dropped_changes() throws {
+        // Two distinguishable local changes: the first is a single-op change with a message
+        // and no presence update, the second bundles two ops with a presence update — so the
+        // per-field projection below cannot pass by coincidence.
         let doc = Document(key: "dropped-event")
         doc.setActor(self.actor)
-        try doc.update { root, _ in
+        try doc.update({ root, _ in
             root.a = "1"
-        }
-        try doc.update { root, _ in
+        }, "first edit")
+        try doc.update { root, presence in
             root.b = "2"
+            root.c = "3"
+            presence.set(["cursor": 1])
         }
         let pending = doc.getPendingChangeStructs()
         XCTAssertEqual(pending.count, 2)
@@ -248,7 +259,28 @@ final class ClientPersistenceTests: XCTestCase {
         let event = try XCTUnwrap(received)
         XCTAssertEqual(event.type, .localChangesDropped)
         XCTAssertEqual(event.value.reason, .epochReanchor)
-        XCTAssertEqual(event.value.changes.count, 2)
+
+        // `DroppedChange` is a readable projection of `Change` (whose own fields are internal),
+        // so an app can read who made a dropped change, in what order, and how much of it there
+        // was. Assert the projection field-by-field against the `Change`s it was built from.
+        let changes = event.value.changes
+        XCTAssertEqual(changes.count, 2)
+
+        XCTAssertLessThan(changes[0].clientSeq, changes[1].clientSeq, "clientSeq must increase in the order the changes were made")
+
+        XCTAssertEqual(changes[0].actorID, pending[0].id.getActorID())
+        XCTAssertEqual(changes[0].clientSeq, pending[0].id.getClientSeq())
+        XCTAssertEqual(changes[0].lamport, pending[0].id.getLamport())
+        XCTAssertEqual(changes[0].message, "first edit")
+        XCTAssertEqual(changes[0].operationCount, 1)
+        XCTAssertFalse(changes[0].hasPresenceChange)
+
+        XCTAssertEqual(changes[1].actorID, pending[1].id.getActorID())
+        XCTAssertEqual(changes[1].clientSeq, pending[1].id.getClientSeq())
+        XCTAssertEqual(changes[1].lamport, pending[1].id.getLamport())
+        XCTAssertNil(changes[1].message)
+        XCTAssertEqual(changes[1].operationCount, 2)
+        XCTAssertTrue(changes[1].hasPresenceChange)
     }
 
     @MainActor
@@ -325,6 +357,72 @@ final class ClientPersistenceTests: XCTestCase {
         )
     }
 
+    // MARK: Persist ordering
+
+    // `Client.enqueuePersist(_:)` chains writes for one document through `persistTasks` so
+    // they cannot land out of order. That method, and the `installOfflinePersistence` wiring
+    // that hangs it off `Document.onLocalChange`, are both `private` and unreachable from this
+    // target (see the class doc) — reaching them needs a real `attach()`, which needs a
+    // server. So this drives the same seam `Client` itself uses, `Document.onLocalChange`
+    // (`internal`, reachable via `@testable`), through a hand-rolled queue that mirrors
+    // `enqueuePersist`'s chaining exactly: each persist awaits whatever persist for that key is
+    // already in flight before it runs. This pins the ordering *property* the fix guarantees;
+    // it does not execute `Client`'s own chaining code, which is the gap noted in the report.
+
+    @MainActor
+    func test_chained_persists_land_in_order_even_when_the_first_write_is_slower() async throws {
+        // given: the first save is deliberately slower than the second, so completion order
+        // would invert without chaining — the exact race `enqueuePersist` closes.
+        let store = RecordingSlowDocStore(delaysNanoseconds: [100_000_000, 5_000_000])
+        let clientKey = "persist-ordering-client"
+        let docKey = "persist-ordering"
+        // A real Client, driving its own chaining code. Not activated: `enqueuePersist` only
+        // needs the store and the key it derives the store key from, so the ordering guarantee
+        // is exercised without any RPC.
+        let client = Client("http://localhost:8080", ClientOptions(key: clientKey, store: store))
+        let storeKey = "/\(clientKey)/\(docKey)"
+        let doc = Document(key: docKey)
+        doc.setActor(self.actor)
+        doc.onLocalChange = { [weak client, weak doc] in
+            guard let client, let doc else {
+                return
+            }
+            client.enqueuePersist(doc)
+        }
+
+        // when
+        try doc.update { root, _ in
+            root.value = "first"
+        }
+        // Yields the MainActor so the first persist actually starts and captures "first" from
+        // `doc` before the second edit lands — both `onLocalChange` firings happen
+        // synchronously back-to-back otherwise, and the first persist would not get scheduled
+        // until after both edits, capturing "second" too. This mirrors a real app: edits are
+        // rarely two synchronous calls with no suspension between them.
+        try await Task.sleep(nanoseconds: 20_000_000)
+        try doc.update { root, _ in
+            root.value = "second"
+        }
+        await client.drainPersists()
+
+        // then: the last write to land carries the newest bytes, not whichever save happened
+        // to finish its I/O first.
+        let loaded = try await store.load(docKey: storeKey)
+        let lastBytes = try XCTUnwrap(loaded)
+        let lastDoc = try Document.fromBytes(key: docKey, bytes: lastBytes)
+        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"second\"}")
+
+        let completionOrder = await store.completionOrder
+        XCTAssertEqual(completionOrder.count, 2)
+        let firstCompletedDoc = try Document.fromBytes(key: docKey, bytes: completionOrder[0])
+        let secondCompletedDoc = try Document.fromBytes(key: docKey, bytes: completionOrder[1])
+        XCTAssertEqual(
+            firstCompletedDoc.toSortedJSON(), "{\"value\":\"first\"}",
+            "chained: the slower first write still completes before the second one starts"
+        )
+        XCTAssertEqual(secondCompletedDoc.toSortedJSON(), "{\"value\":\"second\"}")
+    }
+
     // MARK: Client.getActorID()
 
     @MainActor
@@ -374,5 +472,39 @@ private actor FakeContendedSessionLock: SessionLock {
 
     func release(name: String) async {
         self.heldNames.remove(name)
+    }
+}
+
+/// A ``DocStore`` double whose `save` can be told to sleep before it writes, so a test can
+/// force two overlapping saves to *complete* in an order different from the one they were
+/// *called* in — the exact race chaining in `Client.enqueuePersist(_:)` closes. Records the
+/// bytes of every save in the order it completed, plus the last one to land, so a test can
+/// assert on both.
+private actor RecordingSlowDocStore: DocStore {
+    /// Sleep durations to consume, one per call to `save`, in call order. Falls back to no
+    /// delay once exhausted.
+    private var delaysNanoseconds: [UInt64]
+    private(set) var completionOrder = [Data]()
+    private var stored: Data?
+
+    init(delaysNanoseconds: [UInt64]) {
+        self.delaysNanoseconds = delaysNanoseconds
+    }
+
+    func save(docKey: String, bytes: Data) async throws {
+        let delay = self.delaysNanoseconds.isEmpty ? 0 : self.delaysNanoseconds.removeFirst()
+        if delay > 0 {
+            try? await Task.sleep(nanoseconds: delay)
+        }
+        self.completionOrder.append(bytes)
+        self.stored = bytes
+    }
+
+    func load(docKey: String) async throws -> Data? {
+        self.stored
+    }
+
+    func remove(docKey: String) async throws {
+        self.stored = nil
     }
 }

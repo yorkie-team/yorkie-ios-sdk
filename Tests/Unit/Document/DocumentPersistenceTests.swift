@@ -116,6 +116,30 @@ final class DocumentPersistenceTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func test_restorefrombytes_throws_invalidargument_on_a_corrupt_envelope() throws {
+        // Pinned beside `test_restorefrombytes_throws_on_actor_mismatch` above: the actor
+        // guard throws `errActorMismatch`, but every other `restoreFromBytes` failure — a
+        // truncated or otherwise undecodable envelope — must still throw `errInvalidArgument`,
+        // classified by error code rather than by catching a `YorkieError` and assuming it
+        // means the actor guard fired.
+        let doc = Document(key: "persist-restore-corrupt")
+        doc.setActor(self.actor)
+        try doc.update { root, _ in
+            root.value = "hello"
+        }
+
+        // Truncated length prefix: not even one full 4-byte prefix.
+        let corrupt = Data([0x01, 0x02, 0x03])
+
+        XCTAssertThrowsError(try doc.restoreFromBytes(corrupt)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected a YorkieError, got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+        }
+    }
+
     // MARK: Empty document
 
     @MainActor
@@ -247,5 +271,181 @@ final class DocumentPersistenceTests: XCTestCase {
             }
             XCTAssertEqual(yorkieError.code, .errInvalidArgument)
         }
+    }
+
+    // MARK: Envelope blob-count tolerance
+
+    // `decodePersistedBytes` requires only the first four blobs (snapshot, checkpoint,
+    // changeID, pending changes); the trailing epoch and docID blobs are optional and default
+    // (epoch -> 0, docID -> "") when absent, and any blob beyond the sixth is ignored. This is
+    // the back/forward-compat guarantee for an envelope written by an older or newer SDK.
+    // Envelopes below are built directly with the same 4-byte little-endian length-prefix
+    // framing `packBlobs` uses (see `Document+Persistence.swift`), by slicing apart a real
+    // `toBytes()` envelope rather than re-deriving individual blob contents by hand.
+
+    @MainActor
+    func test_frombytes_defaults_epoch_and_docid_on_a_four_blob_legacy_envelope() throws {
+        let doc = Document(key: "persist-legacy-four-blobs")
+        doc.setActor(self.actor)
+        try doc.update { root, _ in
+            root.value = "hello"
+        }
+        doc.setDocID("server-doc-id")
+        let ackPack = ChangePack(key: doc.getKey(),
+                                 checkpoint: Checkpoint(serverSeq: 3, clientSeq: 0),
+                                 isRemoved: false,
+                                 changes: [],
+                                 versionVector: nil,
+                                 epoch: 9)
+        try doc.applyChangePack(ackPack)
+        XCTAssertEqual(doc.getEpoch(), 9)
+
+        let blobs = try Self.unpackEnvelopeBlobs(doc.toBytes())
+        XCTAssertEqual(blobs.count, 6, "toBytes() should still write all six blobs")
+
+        // Pre-epoch legacy envelope: only the four required blobs.
+        let legacyEnvelope = Self.packEnvelopeBlobs(Array(blobs.prefix(4)))
+
+        let restored = try Document.fromBytes(key: doc.getKey(), bytes: legacyEnvelope)
+
+        XCTAssertEqual(restored.toSortedJSON(), doc.toSortedJSON())
+        XCTAssertEqual(restored.getEpoch(), 0, "the epoch blob is absent, so it must default rather than throw")
+        XCTAssertEqual(restored.getDocID(), "", "the docID blob is absent, so it must default rather than throw")
+    }
+
+    @MainActor
+    func test_frombytes_defaults_docid_and_preserves_epoch_on_a_five_blob_envelope() throws {
+        let doc = Document(key: "persist-legacy-five-blobs")
+        doc.setActor(self.actor)
+        try doc.update { root, _ in
+            root.value = "hello"
+        }
+        doc.setDocID("server-doc-id")
+        let ackPack = ChangePack(key: doc.getKey(),
+                                 checkpoint: Checkpoint(serverSeq: 3, clientSeq: 0),
+                                 isRemoved: false,
+                                 changes: [],
+                                 versionVector: nil,
+                                 epoch: 9)
+        try doc.applyChangePack(ackPack)
+
+        let blobs = try Self.unpackEnvelopeBlobs(doc.toBytes())
+
+        // Pre-docID envelope: the five blobs up to and including epoch, but not docID.
+        let preDocIDEnvelope = Self.packEnvelopeBlobs(Array(blobs.prefix(5)))
+
+        let restored = try Document.fromBytes(key: doc.getKey(), bytes: preDocIDEnvelope)
+
+        XCTAssertEqual(restored.toSortedJSON(), doc.toSortedJSON())
+        XCTAssertEqual(restored.getEpoch(), 9, "the epoch blob is present, so it must be preserved, not defaulted")
+        XCTAssertEqual(restored.getDocID(), "", "the docID blob is absent, so it must default rather than throw")
+    }
+
+    @MainActor
+    func test_frombytes_ignores_extra_trailing_blobs_from_a_newer_sdk() throws {
+        let doc = Document(key: "persist-forward-compat")
+        doc.setActor(self.actor)
+        try doc.update { root, _ in
+            root.value = "hello"
+        }
+        doc.setDocID("server-doc-id")
+        let ackPack = ChangePack(key: doc.getKey(),
+                                 checkpoint: Checkpoint(serverSeq: 3, clientSeq: 0),
+                                 isRemoved: false,
+                                 changes: [],
+                                 versionVector: nil,
+                                 epoch: 9)
+        try doc.applyChangePack(ackPack)
+
+        let blobs = try Self.unpackEnvelopeBlobs(doc.toBytes())
+
+        // A hypothetical newer SDK's envelope: the current six blobs plus two more this SDK
+        // does not know about yet.
+        let forwardEnvelope = Self.packEnvelopeBlobs(blobs + [Data("future-field-a".utf8), Data("future-field-b".utf8)])
+
+        let restored = try Document.fromBytes(key: doc.getKey(), bytes: forwardEnvelope)
+
+        XCTAssertEqual(restored.toSortedJSON(), doc.toSortedJSON())
+        XCTAssertEqual(restored.getEpoch(), 9, "the extra trailing blobs must be ignored, not mistaken for epoch/docID")
+        XCTAssertEqual(restored.getDocID(), "server-doc-id")
+    }
+
+    @MainActor
+    func test_frombytes_still_throws_on_a_three_blob_envelope() throws {
+        let doc = Document(key: "persist-too-few-blobs")
+        doc.setActor(self.actor)
+        try doc.update { root, _ in
+            root.value = "hello"
+        }
+
+        let blobs = try Self.unpackEnvelopeBlobs(doc.toBytes())
+        let tooFewEnvelope = Self.packEnvelopeBlobs(Array(blobs.prefix(3)))
+
+        XCTAssertThrowsError(try Document.fromBytes(key: doc.getKey(), bytes: tooFewEnvelope)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected a YorkieError, got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+        }
+    }
+
+    @MainActor
+    func test_frombytes_round_trip_through_real_tobytes_still_carries_epoch_and_docid() throws {
+        // The tolerance above is only useful if the real `toBytes()` output is unaffected: a
+        // document that has both an epoch and a docID must still carry both through an
+        // ordinary round trip, not just when an envelope is truncated by hand.
+        let doc = Document(key: "persist-forward-compat-real-roundtrip")
+        doc.setActor(self.actor)
+        try doc.update { root, _ in
+            root.value = "hello"
+        }
+        doc.setDocID("server-doc-id-real")
+        let ackPack = ChangePack(key: doc.getKey(),
+                                 checkpoint: Checkpoint(serverSeq: 3, clientSeq: 0),
+                                 isRemoved: false,
+                                 changes: [],
+                                 versionVector: nil,
+                                 epoch: 11)
+        try doc.applyChangePack(ackPack)
+
+        let restored = try Document.fromBytes(key: doc.getKey(), bytes: doc.toBytes())
+
+        XCTAssertEqual(restored.getEpoch(), 11)
+        XCTAssertEqual(restored.getDocID(), "server-doc-id-real")
+    }
+
+    /// Splits an envelope produced by `toBytes()` back into its ordered blobs, mirroring the
+    /// private `unpackBlobs` in `Document+Persistence.swift`: each blob is prefixed with its
+    /// length as a 4-byte little-endian `UInt32`. Reimplemented here (rather than reached via
+    /// `@testable`) because it is `private` to that file, not merely `internal`.
+    private static func unpackEnvelopeBlobs(_ bytes: Data) -> [Data] {
+        let bytes = [UInt8](bytes)
+        var blobs = [Data]()
+        var offset = 0
+        while offset < bytes.count {
+            let length = UInt32(bytes[offset])
+                | (UInt32(bytes[offset + 1]) << 8)
+                | (UInt32(bytes[offset + 2]) << 16)
+                | (UInt32(bytes[offset + 3]) << 24)
+            offset += 4
+            blobs.append(Data(bytes[offset ..< (offset + Int(length))]))
+            offset += Int(length)
+        }
+        return blobs
+    }
+
+    /// Mirrors the private `packBlobs` in `Document+Persistence.swift`: concatenates the given
+    /// blobs, each prefixed with its length as a 4-byte little-endian `UInt32`.
+    private static func packEnvelopeBlobs(_ blobs: [Data]) -> Data {
+        var out = Data()
+        for blob in blobs {
+            let length = UInt32(blob.count)
+            out.append(UInt8(length & 0xFF))
+            out.append(UInt8((length >> 8) & 0xFF))
+            out.append(UInt8((length >> 16) & 0xFF))
+            out.append(UInt8((length >> 24) & 0xFF))
+            out.append(blob)
+        }
+        return out
     }
 }

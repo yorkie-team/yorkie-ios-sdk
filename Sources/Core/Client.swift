@@ -487,7 +487,12 @@ public class Client {
             // server no longer has. Re-anchor from scratch and retry once as a fresh attach,
             // surfacing the discarded changes so the app can decide what to do about them.
             var resumed = didRestore
-            if didRestore, self.isEpochMismatch(attachResponse.error) {
+            // Gated on the store, not on whether a restore happened, matching upstream. A
+            // Document instance reused across attaches keeps the epoch it learned last time,
+            // so it can present a stale one with nothing restored; a store-backed client
+            // should re-anchor from that too rather than surfacing the rejection. Clients
+            // without a store keep today's app-driven epoch-mismatch behaviour.
+            if self.store != nil, self.isEpochMismatch(attachResponse.error) {
                 attachResponse = await self.retryAttachAfterReanchor(doc: doc,
                                                                      request: &attachRequest,
                                                                      initialPresence: initialPresence,
@@ -2000,7 +2005,10 @@ extension Client {
 
 /// Offline persistence: the store, the single-active-session lease, and the resume paths
 /// that reconcile a restored document with what the server still has.
-private extension Client {
+///
+/// Internal rather than private so the tests can drive the persistence chain directly. These
+/// are not part of the public API.
+extension Client {
     /// Returns the store key under which `docKey` is persisted.
     func storeKey(_ docKey: String) -> String {
         "\(self.apiKey)/\(self.key)/\(docKey)"
@@ -2288,6 +2296,16 @@ private extension Client {
             try await store.save(docKey: self.storeKey(doc.getKey()), bytes: doc.toBytes())
         } catch {
             Logger.warning("[Store] failed to persist \(doc.getKey()): \(error)")
+        }
+    }
+
+    /// Waits for every queued persist to finish.
+    ///
+    /// Exists for tests, which otherwise have no way to observe the end of a chain that is
+    /// deliberately fire-and-forget on the editing path.
+    func drainPersists() async {
+        for task in self.persistTasks.values {
+            await task.value
         }
     }
 
