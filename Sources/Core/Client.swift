@@ -471,6 +471,7 @@ public class Client {
         let resume = try await self.prepareOfflineResume(for: doc)
         var pendingSessionLockHandle = resume.handle
         let didRestore = resume.didRestore
+        let canPersist = resume.canPersist
 
         // Seeded after the restore, and skipped when one happened: a restore brings the
         // presence map back with it, so setting the initial presence here would append a
@@ -566,7 +567,7 @@ public class Client {
                                                                     disableGC: disableGC,
                                                                     disablePresence: message.disablePresence)
             if let attachment = self.getDocumentAttachment(doc.getKey()) {
-                self.installOfflinePersistence(on: attachment, doc: doc, lease: pendingSessionLockHandle)
+                self.installOfflinePersistence(on: attachment, doc: doc, lease: pendingSessionLockHandle, persist: canPersist)
                 // Ownership of the lease has moved to the attachment, which releases it on
                 // detach. Cleared so the failure path below cannot release it a second time.
                 pendingSessionLockHandle = nil
@@ -598,8 +599,14 @@ public class Client {
 
             return doc
         } catch {
-            // No attachment took ownership of the lease, so release it here rather than
-            // holding it for the process lifetime and locking the key out of every retry.
+            // Roll back whatever this attach had already set up. The setup after the RPC can
+            // still throw -- the watch loop, the initialization wait timing out, the
+            // initialRoot update -- and by then the attachment owns the lease and the document
+            // is persisting. Leaving that in place behind a thrown attach would hold the lease
+            // for the process lifetime and keep writing for a document the caller believes is
+            // not attached.
+            await self.rollBackFailedAttach(doc)
+            // Only reached when no attachment took ownership of it.
             await pendingSessionLockHandle?.release()
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
             await self.handleConnectError(error)
@@ -2066,10 +2073,11 @@ extension Client {
     ///   - lease: The held session lease, if one was taken.
     func installOfflinePersistence(on attachment: Attachment<Document>,
                                    doc: Document,
-                                   lease: SessionLockHandle?)
+                                   lease: SessionLockHandle?,
+                                   persist: Bool)
     {
         attachment.sessionLockHandle = lease
-        guard self.store != nil else {
+        guard self.store != nil, persist else {
             return
         }
         doc.onLocalChange = { [weak self, weak doc] in
@@ -2182,9 +2190,12 @@ extension Client {
     /// - Parameter doc: The document being attached.
     /// - Returns: The held lease, and whether a stored copy was restored.
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when another session holds the lease.
-    func prepareOfflineResume(for doc: Document) async throws -> (handle: SessionLockHandle?, didRestore: Bool) {
+    func prepareOfflineResume(for doc: Document) async throws
+        -> (handle: SessionLockHandle?, didRestore: Bool, canPersist: Bool)
+    {
         var acquired: SessionLockHandle?
         var restored = false
+        var canPersist = true
         if let store = self.store {
             guard let handle = await self.sessionLock.acquire(name: self.sessionLockName(doc.getKey())) else {
                 throw YorkieError(
@@ -2198,7 +2209,23 @@ extension Client {
             // Restore the persisted document so its un-acknowledged local changes are
             // re-pushed by the attach below. A stored copy belonging to a different actor is
             // discarded rather than adopted, since its changes are not ours to re-push.
-            if let bytes = try? await store.load(docKey: self.storeKey(doc.getKey())) {
+            // A read that fails is not the same as a key that is absent. Treating it as absent
+            // would attach fresh and then let the first local change overwrite the very
+            // envelope that could not be read -- destroying un-pushed edits because of a
+            // transient storage error. The attach still proceeds, since failing it outright
+            // would make a document unusable over a read glitch, but this session does not
+            // persist, so whatever is stored survives for a session that can read it.
+            var loaded: Data?
+            do {
+                loaded = try await store.load(docKey: self.storeKey(doc.getKey()))
+            } catch {
+                Logger.warning("[Store] could not read \(doc.getKey()) (\(error)); attaching fresh and not " +
+                    "persisting this session, so the unreadable copy is left intact")
+                canPersist = false
+                loaded = nil
+            }
+
+            if let bytes = loaded {
                 do {
                     try doc.restoreFromBytes(bytes)
                     restored = true
@@ -2224,7 +2251,7 @@ extension Client {
             }
         }
 
-        return (acquired, restored)
+        return (acquired, restored, canPersist)
     }
 
     /// Drops everything offline persistence held for a document that is no longer attached.
@@ -2241,8 +2268,20 @@ extension Client {
         // it -- detach queues one itself, by clearing presence. Releasing the lease last means
         // no other session can start resuming a copy that is about to be deleted.
         await self.quiescePersistence(for: doc)
-        if self.store != nil {
-            try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
+        if let store = self.store {
+            do {
+                try await store.remove(docKey: self.storeKey(doc.getKey()))
+            } catch {
+                // Logged rather than swallowed, but the lease is still released below. Holding
+                // it until the removal succeeds would strand it -- ``SessionLock`` has no
+                // recovery API, so a lease never released locks the document key out of every
+                // later session for the lifetime of the process, which is strictly worse than
+                // the envelope outliving the detach. A stale envelope is not silently trusted
+                // either: the actor guard, the epoch check and the purge guard all screen it on
+                // the next resume.
+                Logger.warning("[Store] could not remove \(doc.getKey()) on release (\(error)); " +
+                    "a later session may find a stale copy and will re-validate it")
+            }
         }
         await self.releaseLease(of: attachment)
     }
@@ -2341,6 +2380,22 @@ extension Client {
         } catch {
             Logger.warning("[Store] failed to persist \(doc.getKey()): \(error)")
         }
+    }
+
+    /// Undoes the attachment state an attach had set up before it failed.
+    ///
+    /// The setup after the RPC can still throw — the watch loop, the initialization wait timing
+    /// out, the `initialRoot` update — and by then the attachment owns the session lease and the
+    /// document is persisting. Left in place behind a thrown attach, that holds the lease for the
+    /// process lifetime and keeps writing for a document the caller believes is not attached.
+    ///
+    /// - Parameter doc: The document whose attach failed.
+    func rollBackFailedAttach(_ doc: Document) async {
+        guard let attachment = self.getDocumentAttachment(doc.getKey()) else {
+            return
+        }
+        await self.releaseSession(for: doc, attachment: attachment)
+        try? self.detachInternal(doc.getKey())
     }
 
     /// Waits for every queued persist to finish.

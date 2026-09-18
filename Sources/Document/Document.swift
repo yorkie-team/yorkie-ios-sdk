@@ -445,8 +445,12 @@ public class Document: Attachable {
         }
 
         self.localChanges.append(change)
-        self.onLocalChange?()
         self.changeID = context.getNextID()
+        // After the change id advances, so a persist driven off this hook cannot serialize a
+        // document whose pending change is present but whose id has not moved. Ordering rather
+        // than a fix: `Document` is main-actor isolated and this method is synchronous, so the
+        // task the hook starts cannot run until it returns. Not worth depending on.
+        self.onLocalChange?()
 
         if !opInfos.isEmpty {
             let changeInfo = ChangeInfo(message: change.message ?? "",

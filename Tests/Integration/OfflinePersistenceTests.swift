@@ -333,6 +333,47 @@ final class OfflinePersistenceTests: XCTestCase {
         XCTAssertFalse(heldAfter, "an internal teardown must not leak the session lease")
     }
 
+    // Attach can still fail after the RPC succeeds and the attachment has taken ownership of
+    // the lease — the watch loop, the initialization wait timing out, the `initialRoot` update.
+    // Left in place behind a thrown attach, that holds the lease for the process lifetime and
+    // keeps writing for a document the caller believes is not attached.
+    //
+    // This drives `rollBackFailedAttach` directly, on a genuinely attached document, and
+    // asserts it undoes all three: the attachment, the lease, and the persist hook. The catch
+    // block that calls it could not be reached from here — a mocked watch failure still signals
+    // initialization, so the attach succeeds rather than throwing — so the wiring itself is
+    // covered by reading, not by this test.
+    @MainActor
+    func test_rolling_back_a_failed_attach_releases_everything_it_took() async throws {
+        // given: an attached document, persisting, holding its lease.
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let store = MemoryDocStore()
+        let lock = CountingSessionLock()
+        let clientKey = UUID().uuidString
+
+        let client = Client(self.rpcAddress, ClientOptions(key: clientKey, store: store, sessionLock: lock))
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+
+        let doc = Document(key: docKey)
+        try await client.attach(doc, [:], .manual)
+
+        let leaseName = "yorkie-session:/\(clientKey)/\(docKey)"
+        let heldWhileAttached = await lock.isHeld(leaseName)
+        XCTAssertTrue(heldWhileAttached)
+        XCTAssertNotNil(doc.onLocalChange)
+        XCTAssertTrue(client.has(docKey))
+
+        // when
+        await client.rollBackFailedAttach(doc)
+
+        // then: nothing the attach took is still held.
+        XCTAssertFalse(client.has(docKey), "the attachment must not survive the rollback")
+        let stillHeld = await lock.isHeld(leaseName)
+        XCTAssertFalse(stillHeld, "the session lease must not survive the rollback")
+        XCTAssertNil(doc.onLocalChange, "the document must stop persisting")
+    }
+
     // MARK: Duplicate attach (yorkie-js-sdk#1337)
 
     // Both calls run against a store, so each suspends in the offline-resume preamble before
