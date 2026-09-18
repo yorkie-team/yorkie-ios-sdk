@@ -53,6 +53,10 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrNotDetached is returned when the resource is not detached.
         case errNotDetached = "ErrNotDetached"
 
+        /// ErrAlreadyAttached is returned when a document with the same key is
+        /// already attached, or is being attached, to this client.
+        case errAlreadyAttached = "ErrAlreadyAttached"
+
         /// ErrDocumentRemoved is returned when the document is removed.
         case errDocumentRemoved = "ErrDocumentRemoved"
 
@@ -97,6 +101,11 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrTooManySubscribers is returned when the number of subscribers exceeds the limit.
         case errTooManySubscribers = "ErrTooManySubscribers"
+
+        // ErrActorMismatch is returned when a persisted document is restored under a
+        // different actor than the one that wrote it. Client-side only: the server never
+        // sends this code.
+        case errActorMismatch = "ErrActorMismatch"
 
         // ErrSessionNotFound is returned when the channel session is not found on the
         // server (e.g. reclaimed via TTL). The client clears its local session id and

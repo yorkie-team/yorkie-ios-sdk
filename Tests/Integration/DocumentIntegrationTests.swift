@@ -630,10 +630,19 @@ final class DocumentIntegrationTests: XCTestCase {
 
     @MainActor
     func test_can_handle_concurrent_attach_with_initialRoot() async throws {
-        let c1 = Client(rpcAddress)
-        let c2 = Client(rpcAddress)
+        var c1 = Client(rpcAddress)
+        var c2 = Client(rpcAddress)
         try await c1.activate()
         try await c2.activate()
+
+        // The concurrent-root conflict is decided by the actor tie-break. A stable actor is
+        // derived from the client key, so it does not follow creation order the way the old
+        // time-ordered session id did. Pin c2 as the higher actor to keep it the deterministic
+        // winner this scenario expects.
+        if let a1 = c1.getActorID(), let a2 = c2.getActorID(), a1 > a2 {
+            swap(&c1, &c2)
+        }
+
         let docKey = "\(self.description)-\(Date().description)".toDocKey
 
         // 01. user1 attach with initialRoot and client doesn't sync
@@ -664,7 +673,7 @@ final class DocumentIntegrationTests: XCTestCase {
 
         // 05. user1's local document's writer is overwritten by user2
         try await c1.sync()
-        doc1JSON = doc2.toSortedJSON()
+        doc1JSON = doc1.toSortedJSON()
         XCTAssertEqual(doc1JSON, "{\"writer\":\"user2\"}")
 
         try await c1.deactivate()

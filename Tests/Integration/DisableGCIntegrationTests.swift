@@ -267,7 +267,7 @@ final class DisableGCIntegrationTests: XCTestCase {
         XCTAssertEqual(doc.getGarbageLength(), 3, "point, x, y are pending purge")
 
         // then — GC still runs (returns > 0) despite the disableGC attach option
-        let purged = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client.id]))
+        let purged = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [client.getActorID()]))
         XCTAssertEqual(purged, 3, "local GC must still purge for a GC-enabled document")
     }
 }

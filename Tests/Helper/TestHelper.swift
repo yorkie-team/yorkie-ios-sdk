@@ -274,11 +274,20 @@ func withTwoClientsAndDocuments(_ title: String,
 
     let docKey = "\(Date().description)-\(title)".toDocKey
 
-    let c1 = Client(rpcAddress, isMockingEnabled: mockingEnabled)
-    let c2 = Client(rpcAddress, isMockingEnabled: mockingEnabled)
+    var c1 = Client(rpcAddress, isMockingEnabled: mockingEnabled)
+    var c2 = Client(rpcAddress, isMockingEnabled: mockingEnabled)
 
     try await c1.activate()
     try await c2.activate()
+
+    // Concurrent-edit conflicts are resolved by the actor tie-break. The actor used to be the
+    // session id, a time-ordered ObjectID, so the second-created client always held the higher
+    // actor and won ties — an outcome many tests below encode. A stable actor is derived from
+    // the client key, so creation order no longer implies actor order. Pin c1 to the lower
+    // actor and c2 to the higher, keeping the tie-break deterministic.
+    if let a1 = c1.getActorID(), let a2 = c2.getActorID(), a1 > a2 {
+        swap(&c1, &c2)
+    }
 
     let d1 = Document(key: docKey)
     let d2 = Document(key: docKey)

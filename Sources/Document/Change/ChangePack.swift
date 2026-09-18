@@ -43,6 +43,14 @@ struct ChangePack {
     private let versionVector: VersionVector?
 
     /**
+     * `epoch` is the document's compaction epoch. It is a bidirectional carrier: server
+     * responses set it to the document's current epoch, and an attach/sync request
+     * presents the client's last-known epoch so the server can detect a stale-epoch
+     * mismatch after a force compaction.
+     */
+    private let epoch: Int64
+
+    /**
      * `IsRemoved` is a flag that indicates whether the document is removed.
      */
     let isRemoved: Bool
@@ -52,13 +60,15 @@ struct ChangePack {
          isRemoved: Bool,
          changes: [Change],
          snapshot: Data? = nil,
-         versionVector: VersionVector?)
+         versionVector: VersionVector?,
+         epoch: Int64 = 0)
     {
         self.documentKey = key
         self.checkpoint = checkpoint
         self.changes = changes
         self.snapshot = snapshot
         self.versionVector = versionVector
+        self.epoch = epoch
         self.isRemoved = isRemoved
     }
 
@@ -116,5 +126,12 @@ struct ChangePack {
      */
     func getVersionVector() -> VersionVector? {
         return self.versionVector
+    }
+
+    /**
+     * `getEpoch` returns the document's compaction epoch of this pack.
+     */
+    func getEpoch() -> Int64 {
+        return self.epoch
     }
 }

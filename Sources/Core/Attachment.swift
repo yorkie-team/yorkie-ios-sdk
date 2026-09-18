@@ -39,6 +39,16 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     /// side). Carried here for devtools / debugging visibility. Documents only.
     var disablePresence: Bool
     var remoteWatchStream: YorkieServerStream?
+    /// The single-active-session lease held for this document while it is attached.
+    ///
+    /// Set by attach on the offline-persistence path and released by detach, so the lease
+    /// lifetime is exactly the attachment's and a later session can take over. Documents only.
+    var sessionLockHandle: SessionLockHandle?
+    /// Whether this attachment persists its document to the store.
+    ///
+    /// False when the store could not be read at attach time: the envelope that failed to load
+    /// may hold un-pushed edits, so nothing this session writes may replace it. Documents only.
+    var persistsToStore: Bool = false
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
     private var isDisconnected: Bool

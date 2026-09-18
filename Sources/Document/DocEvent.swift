@@ -81,6 +81,12 @@ public enum DocEventType: String {
      * this client must detach and reattach to recover.
      */
     case epochMismatch = "epoch-mismatch"
+
+    /**
+     * `localChangesDropped` indicates the offline-persistence layer discarded
+     * un-pushed local changes it could not reconcile with the server.
+     */
+    case localChangesDropped = "local-changes-dropped"
 }
 
 /**
@@ -338,4 +344,74 @@ public struct EpochMismatchValue: Equatable {
 public struct EpochMismatchEvent: DocEvent {
     public let type: DocEventType = .epochMismatch
     public let value: EpochMismatchValue
+}
+
+/// The changes an offline resume had to discard, and why.
+public struct LocalChangesDroppedValue {
+    /// Why the changes could not be reconciled with the server.
+    public enum Reason: String, Equatable {
+        /// The document was compacted server-side, so the resume re-anchored from a snapshot.
+        case epochReanchor = "epoch-reanchor"
+        /// The server no longer has the document the changes were made against.
+        case documentPurged = "document-purged"
+        /// The stored document belongs to a different actor than the one resuming it.
+        case actorMismatch = "actor-mismatch"
+        /// The stored bytes could not be decoded at all, so nothing could be restored.
+        case restoreFailed = "restore-failed"
+    }
+
+    /// Why the changes were dropped.
+    public let reason: Reason
+    /// The changes that were discarded, in the order they were made.
+    public let changes: [DroppedChange]
+
+    /// Creates the value, so an app can construct one in its own tests.
+    ///
+    /// - Parameters:
+    ///   - reason: Why the changes were dropped.
+    ///   - changes: The discarded changes.
+    public init(reason: Reason, changes: [DroppedChange]) {
+        self.reason = reason
+        self.changes = changes
+    }
+}
+
+/// One un-pushed local change that offline persistence could not reconcile with the server.
+///
+/// A readable projection of the document's internal change representation, so an app handling
+/// a ``LocalChangesDroppedEvent`` can report what was lost — who made it, in what order, and
+/// how much of it there was — rather than only how many changes there were.
+public struct DroppedChange {
+    /// The actor that made the change.
+    public let actorID: String?
+    /// The change's sequence number for that actor, giving the order they were made in.
+    public let clientSeq: UInt32
+    /// The lamport timestamp of the change.
+    public let lamport: Int64
+    /// The description recorded with the change, when the app supplied one.
+    public let message: String?
+    /// How many operations the change carries.
+    public let operationCount: Int
+    /// Whether the change carries a presence update.
+    public let hasPresenceChange: Bool
+
+    init(_ change: Change) {
+        self.actorID = change.id.getActorID()
+        self.clientSeq = change.id.getClientSeq()
+        self.lamport = change.id.getLamport()
+        self.message = change.message
+        self.operationCount = change.operations.count
+        self.hasPresenceChange = change.presenceChange != nil
+    }
+}
+
+/// `LocalChangesDroppedEvent` is published when offline persistence discards un-pushed local
+/// changes it could not reconcile with the server — a stale-epoch re-anchor, a server-side purge
+/// of the document, a store resumed under a different actor, or an undecodable envelope.
+///
+/// The event carries the dropped changes so an app can surface the data loss and, if it chooses,
+/// re-apply them on top of the re-anchored state.
+public struct LocalChangesDroppedEvent: DocEvent {
+    public let type: DocEventType = .localChangesDropped
+    public let value: LocalChangesDroppedValue
 }

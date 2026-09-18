@@ -278,6 +278,8 @@ public struct Yorkie_V1_ChangePack: Sendable {
   /// Clears the value of `versionVector`. Subsequent reads from it will return its default value.
   public mutating func clearVersionVector() {self._versionVector = nil}
 
+  public var epoch: Int64 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2849,7 +2851,7 @@ extension Yorkie_V1_Snapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChangePack"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_key\0\u{1}checkpoint\0\u{1}snapshot\0\u{1}changes\0\u{3}min_synced_ticket\0\u{3}is_removed\0\u{3}version_vector\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_key\0\u{1}checkpoint\0\u{1}snapshot\0\u{1}changes\0\u{3}min_synced_ticket\0\u{3}is_removed\0\u{3}version_vector\0\u{1}epoch\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2864,6 +2866,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 5: try { try decoder.decodeSingularMessageField(value: &self._minSyncedTicket) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.isRemoved) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._versionVector) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self.epoch) }()
       default: break
       }
     }
@@ -2895,6 +2898,9 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     try { if let v = self._versionVector {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     } }()
+    if self.epoch != 0 {
+      try visitor.visitSingularInt64Field(value: self.epoch, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2906,6 +2912,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs._minSyncedTicket != rhs._minSyncedTicket {return false}
     if lhs.isRemoved != rhs.isRemoved {return false}
     if lhs._versionVector != rhs._versionVector {return false}
+    if lhs.epoch != rhs.epoch {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

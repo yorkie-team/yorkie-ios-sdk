@@ -127,6 +127,21 @@ public class Document: Attachable {
     private var maxSizeLimit: Int
     private var schemaRules: [Rule] = []
 
+    /// The document's last-known compaction epoch. Learned from every server response
+    /// pack in ``applyChangePack(_:)`` and presented back on the next attach/sync via
+    /// ``createChangePack(_:)``. Persisted by ``toBytes()`` so a resumed offline session
+    /// presents the epoch the document was last synced under; if the document was
+    /// force-compacted while offline the server sees a stale epoch and rejects the
+    /// resume, which should drive a store-backed re-anchor via ``resetForReanchor()``.
+    private var epoch: Int64 = 0
+
+    /// The server-assigned document id recorded after a successful attach via
+    /// ``setDocID(_:)``. Persisted by ``toBytes()`` so a restored offline session can
+    /// compare it against the id the server returns on re-attach: a mismatch means the
+    /// server GC'd/deleted the document and minted a fresh one. Empty until the first
+    /// attach records it.
+    private var docID: DocumentID = ""
+
     /// Stores the undo/redo history of this document.
     private let internalHistory = History()
     /// Whether an `update` is in progress. Undo/redo is not allowed during an update.
@@ -275,6 +290,7 @@ public class Document: Attachable {
             }
 
             self.localChanges.append(change)
+            self.onLocalChange?()
             if let reverseOps = executionResult?.reverseOps, !reverseOps.isEmpty {
                 self.internalHistory.pushUndo(reverseOps)
             }
@@ -430,6 +446,11 @@ public class Document: Attachable {
 
         self.localChanges.append(change)
         self.changeID = context.getNextID()
+        // After the change id advances, so a persist driven off this hook cannot serialize a
+        // document whose pending change is present but whose id has not moved. Ordering rather
+        // than a fix: `Document` is main-actor isolated and this method is synchronous, so the
+        // task the hook starts cannot run until it returns. Not worth depending on.
+        self.onLocalChange?()
 
         if !opInfos.isEmpty {
             let changeInfo = ChangeInfo(message: change.message ?? "",
@@ -573,6 +594,10 @@ public class Document: Attachable {
         // 02. Update the checkpoint.
         self.checkpoint.forward(other: pack.getCheckpoint())
 
+        // 02-1. Learn the document's current compaction epoch from the server so a
+        // subsequent attach/sync (and any persisted envelope) presents it back.
+        self.epoch = pack.getEpoch()
+
         // 03. Do Garbage collection.
         if !hasSnapshot, let versionVector = pack.getVersionVector() {
             self.garbageCollect(minSyncedVersionVector: versionVector)
@@ -619,7 +644,8 @@ public class Document: Attachable {
                           checkpoint: checkpoint,
                           isRemoved: forceToRemoved ? true : self.status == .removed,
                           changes: changes,
-                          versionVector: self.getVersionVector())
+                          versionVector: self.getVersionVector(),
+                          epoch: self.epoch)
     }
 
     /**
@@ -651,6 +677,29 @@ public class Document: Attachable {
      */
     public nonisolated func getKey() -> String {
         return self.key
+    }
+
+    /// Returns the document's last-known compaction epoch.
+    ///
+    /// - Returns: The compaction epoch this document was last synced under.
+    public func getEpoch() -> Int64 {
+        return self.epoch
+    }
+
+    /// Returns the server-assigned document id recorded on attach.
+    ///
+    /// - Returns: The document id, or an empty string before the first attach (or for a
+    ///   restored envelope that predates docID persistence).
+    public func getDocID() -> DocumentID {
+        return self.docID
+    }
+
+    /// Records the server-assigned document id so the next ``toBytes()`` envelope
+    /// carries it for the silent-purge guard in ``restoreFromBytes(_:)``.
+    ///
+    /// - Parameter docID: The document id returned by the server on attach.
+    public func setDocID(_ docID: DocumentID) {
+        self.docID = docID
     }
 
     /**
@@ -1097,8 +1146,24 @@ public class Document: Attachable {
         self.publish(authErrorEvent)
     }
 
+    /// Invoked after a local change is appended, when offline persistence is enabled.
+    ///
+    /// Separate from ``subscribe(_:_:)`` deliberately: that is a single-slot, app-facing
+    /// callback, and the client registering there would displace the app's own subscription.
+    var onLocalChange: (() -> Void)?
+
     func publishEpochMismatchEvent(method: String) {
         self.publish(EpochMismatchEvent(value: EpochMismatchValue(method: method)))
+    }
+
+    /// Publishes the changes an offline resume had to discard.
+    ///
+    /// - Parameters:
+    ///   - reason: Why the changes could not be reconciled with the server.
+    ///   - changes: The discarded changes, in the order they were made.
+    func publishLocalChangesDroppedEvent(reason: LocalChangesDroppedValue.Reason, changes: [Change]) {
+        let dropped = changes.map { DroppedChange($0) }
+        self.publish(LocalChangesDroppedEvent(value: LocalChangesDroppedValue(reason: reason, changes: dropped)))
     }
 
     /**
@@ -1414,5 +1479,46 @@ public class Document: Attachable {
      */
     public func getVersionVector() -> VersionVector {
         return self.changeID.getVersionVector()
+    }
+
+    /// Reads the private state ``toBytes()`` needs to serialize, in one pass.
+    ///
+    /// A bridge for ``Document/Document+Persistence.swift``: `root`, `presences`,
+    /// `localChanges` and the `changeID` setter are `private` to this file, so the
+    /// persistence extension — kept in its own file to avoid growing this type's body —
+    /// reads them through this internal accessor instead of widening their access level.
+    ///
+    /// - Returns: The root object, presences, checkpoint, change id and pending local
+    ///   changes of this document.
+    func persistenceSnapshot() -> (
+        root: CRDTObject,
+        presences: [ActorID: StringValueTypeDictionary],
+        checkpoint: Checkpoint,
+        changeID: ChangeID,
+        localChanges: [Change]
+    ) {
+        (self.root.object, self.presences, self.checkpoint, self.changeID, self.localChanges)
+    }
+
+    /// Overwrites this document's restorable state in place.
+    ///
+    /// The counterpart write-side of ``persistenceSnapshot()``, used by
+    /// ``restoreFromBytes(_:)`` and ``resetForReanchor()``. Drops the stale clone so the
+    /// next `update` re-clones from the new root/presences, and clears the undo/redo
+    /// history, whose reverse-ops reference the state that was just replaced. Takes a single
+    /// ``PersistedDocumentState`` rather than one parameter per field, to stay within this
+    /// project's `function_parameter_count` lint budget.
+    ///
+    /// - Parameter state: The restorable state to install.
+    func applyPersistedState(_ state: PersistedDocumentState) {
+        self.root = state.root
+        self.presences = state.presences
+        self.checkpoint = state.checkpoint
+        self.changeID = state.changeID
+        self.localChanges = state.localChanges
+        self.epoch = state.epoch
+        self.docID = state.docID
+        self.clone = nil
+        self.clearHistory()
     }
 }

@@ -1402,6 +1402,7 @@ extension Converter {
             pbChangePack.versionVector = toVersionVector(versionVector)
         }
         pbChangePack.isRemoved = pack.isRemoved
+        pbChangePack.epoch = pack.getEpoch()
         return pbChangePack
     }
 
@@ -1414,7 +1415,8 @@ extension Converter {
                    isRemoved: pbPack.isRemoved,
                    changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
-                   versionVector: fromVersionVector(pbPack.versionVector)
+                   versionVector: fromVersionVector(pbPack.versionVector),
+                   epoch: pbPack.epoch
         )
     }
 
@@ -1493,7 +1495,25 @@ extension Converter {
         let snapshot = try PbSnapshot(serializedBytes: bytes)
         return (try fromObject(snapshot.root.jsonObject), fromPresences(snapshot.presences))
     }
-    
+
+    /**
+     * `snapshotToBytes` converts the given root and presences into a byte array. It is
+     * the reverse of `bytesToSnapshot`: the produced bytes decode back into the same
+     * `(root, presences)` pair via the shared `Snapshot` message.
+     */
+    static func snapshotToBytes(root: CRDTObject, presences: [ActorID: StringValueTypeDictionary]) throws -> Data {
+        var pbPresences = [String: PbPresence]()
+        for (actorID, presence) in presences {
+            pbPresences[actorID] = toPresence(presence: presence)
+        }
+
+        var snapshot = PbSnapshot()
+        snapshot.root = try toElement(root)
+        snapshot.presences = pbPresences
+
+        return try snapshot.serializedData()
+    }
+
     /**
      * `versionVectorToHex` converts the given VersionVector to bytes.
      */
