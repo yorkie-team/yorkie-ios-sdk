@@ -673,7 +673,7 @@ final class DocumentIntegrationTests: XCTestCase {
 
         // 05. user1's local document's writer is overwritten by user2
         try await c1.sync()
-        doc1JSON = doc2.toSortedJSON()
+        doc1JSON = doc1.toSortedJSON()
         XCTAssertEqual(doc1JSON, "{\"writer\":\"user2\"}")
 
         try await c1.deactivate()

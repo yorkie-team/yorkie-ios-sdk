@@ -374,6 +374,37 @@ final class OfflinePersistenceTests: XCTestCase {
         XCTAssertNil(doc.onLocalChange, "the document must stop persisting")
     }
 
+    // `remove` gives the document up entirely, so it must release the lease as `detach` does.
+    // `detachInternal` clears `attachmentMap` itself, so an attachment looked up after it is
+    // nil and the lease it held would never be released.
+    @MainActor
+    func test_remove_releases_the_session_lease() async throws {
+        // given
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let store = MemoryDocStore()
+        let lock = CountingSessionLock()
+        let clientKey = UUID().uuidString
+
+        let client = Client(self.rpcAddress, ClientOptions(key: clientKey, store: store, sessionLock: lock))
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+        let doc = Document(key: docKey)
+        try await client.attach(doc, [:], .manual)
+
+        let leaseName = "yorkie-session:/\(clientKey)/\(docKey)"
+        let heldWhileAttached = await lock.isHeld(leaseName)
+        XCTAssertTrue(heldWhileAttached)
+
+        // when
+        try await client.remove(doc)
+
+        // then
+        let stillHeld = await lock.isHeld(leaseName)
+        XCTAssertFalse(stillHeld, "remove must release the session lease")
+        let remaining = try await store.load(docKey: "/\(clientKey)/\(docKey)")
+        XCTAssertNil(remaining, "remove must not leave a stored copy behind")
+    }
+
     // MARK: Duplicate attach (yorkie-js-sdk#1337)
 
     // Both calls run against a store, so each suspends in the offline-resume preamble before

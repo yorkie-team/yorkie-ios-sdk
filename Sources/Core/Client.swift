@@ -707,10 +707,10 @@ public class Client {
             let pack = try Converter.fromChangePack(message.changePack)
             try doc.applyChangePack(pack)
 
-            try self.detachInternal(doc.getKey())
-
+            // Captured before `detachInternal`, which clears `attachmentMap` itself — looking
+            // it up afterwards yields nil and the session lease is never released.
             let releasedAttachment = self.getDocumentAttachment(doc.getKey())
-            self.attachmentMap.removeValue(forKey: doc.getKey())
+            try self.detachInternal(doc.getKey())
             await self.releasePersistence(for: doc, attachment: releasedAttachment)
 
             Logger.info("[DD] c:\"\(self.key)\" removed d:\"\(doc.getKey())\"")
@@ -1473,9 +1473,11 @@ public class Client {
             // the stored envelope would keep an already-pushed change under a stale
             // checkpoint until the next edit. A resume from that envelope re-pushes a change
             // the server has already applied. This is a full overwrite, so it does not grow.
-            // Gated on the attachment still being live: a deactivate can interleave here, and
-            // a write queued after its drain would land once the lease is already free.
-            if self.store != nil, self.attachmentMap[docKey] != nil {
+            // Gated on the attachment still being live, since a deactivate can interleave
+            // here and a write queued after its drain would land once the lease is already
+            // free — and on the attachment persisting at all, so a sync cannot write over an
+            // envelope this session failed to read and deliberately left alone.
+            if self.store != nil, self.getDocumentAttachment(docKey)?.persistsToStore == true {
                 self.enqueuePersist(doc)
             }
 
@@ -2080,6 +2082,7 @@ extension Client {
         guard self.store != nil, persist else {
             return
         }
+        attachment.persistsToStore = true
         doc.onLocalChange = { [weak self, weak doc] in
             guard let self, let doc else {
                 return
