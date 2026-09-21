@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.21] - 2026-09-21
+
+> Pairs with [yorkie v0.7.21](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.21), which fixes the server half of the same element-identity problem (yorkie#1978, yorkie#1980). A document already carrying an unresolvable collection entry keeps its size charged to `gc` until it is deregistered: the guard skips such a member rather than dropping it.
+
+### Fixed
+
+- Keep a client syncing when a restore duplicates an element identity, and stop `arr[i] = x` from growing the document without bound in https://github.com/yorkie-team/yorkie-ios-sdk/pull/275
+
 ## [v0.7.20] - 2026-09-18
 
 > Requires a Yorkie server v0.7.20 or later. Offline resume depends on the server accepting a re-pushed change pack against a persisted checkpoint and epoch, and on stable-actor watch (yorkie#1969, yorkie#1970).
