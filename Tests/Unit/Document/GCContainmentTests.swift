@@ -182,8 +182,79 @@ final class GCContainmentTests: XCTestCase {
         // when
         try doc.update { root, _ in try (root.arr as? JSONArray)?.setValue(index: 1, value: 99) }
 
-        // then
+        // then -- ordering only. The accounting is deliberately not asserted
+        // here: `moveAfterByIndex` already leaves the clone and the root with
+        // different `docSize` before any assignment happens, because the dead
+        // position node the move leaves behind is registered as a GC pair on
+        // the root and not on the clone. That is a separate pre-existing gap --
+        // it reproduces on `main` with create+move and no set at all -- so
+        // asserting it here would pin an unrelated defect to this test.
         XCTAssertEqual(doc.getCloneRoot()?.toSortedJSON(), doc.toSortedJSON())
+    }
+
+    /// An updater that mutates and then throws leaves the clone holding changes
+    /// whose context was dropped, so it would stay permanently ahead of the
+    /// root. `document.ts` discards the clone in that catch; iOS did not.
+    ///
+    /// This matters more now that the clone is authoritative for index-based
+    /// array edits and for the `maxSizeLimit` measurement.
+    @MainActor
+    func test_a_throwing_updater_does_not_leave_the_clone_ahead_of_the_root() throws {
+        // given
+        struct Boom: Error {}
+        let doc = Document(key: "throwing-updater")
+        try doc.update { root, _ in root.arr = [0, 1, 2] }
+
+        // when -- the updater mutates, then throws.
+        XCTAssertThrowsError(try doc.update { root, _ in
+            try (root.arr as? JSONArray)?.setValue(index: 0, value: 99)
+            throw Boom()
+        })
+
+        // then -- the clone is discarded outright, so the dropped mutation
+        // cannot survive in it, and the next access re-clones from the root.
+        XCTAssertNil(doc.getCloneRoot(), "a clone carrying the dropped mutation was kept")
+        XCTAssertEqual(doc.toSortedJSON(), "{\"arr\":[0,1,2]}")
+        XCTAssertEqual(doc.cloned.root.toSortedJSON(), doc.toSortedJSON())
+        XCTAssertEqual(doc.cloned.root.getDocSize(), doc.getDocSize())
+    }
+
+    /// `garbageCollect` skips a member whose `purge` throws instead of
+    /// deregistering it anyway. Deregistering an element the purge left linked
+    /// in the tree would drop its registration and release its `docSize.gc`
+    /// charge -- a charge with nothing left reporting it as garbage, which is
+    /// what the surrounding guard exists to prevent.
+    func test_survives_a_gc_set_member_whose_parent_cannot_purge_it() throws {
+        // given -- {"items": [{"a": 1}], "other": {}}
+        let actorId = "000000000000000000000009"
+        let rootObject = CRDTObject(createdAt: TimeTicket.initial)
+        let items = CRDTArray(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
+        let itemObject = CRDTObject(createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
+        let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
+        itemObject.set(key: "a", value: a1)
+        try items.insert(value: itemObject, prevCreatedAt: items.getHead().createdAt)
+        rootObject.set(key: "items", value: items)
+        let other = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
+        rootObject.set(key: "other", value: other)
+
+        let root = CRDTRoot(rootObject: rootObject)
+
+        // Register the tombstone against a parent that does not contain it, so
+        // the pair resolves, the parent is non-nil, and `purge` throws.
+        let removedAt = TimeTicket(lamport: 5, delimiter: 0, actorID: actorId)
+        let tombstone = try items.delete(createdAt: itemObject.createdAt, executedAt: removedAt)
+        root.registerRemovedElement(tombstone)
+        root.registerElement(tombstone, parent: other)
+
+        let before = root.getDocSize()
+
+        // when
+        let collected = root.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [actorId]))
+
+        // then -- skipped, not collected, and still reported as garbage.
+        XCTAssertEqual(collected, 0)
+        XCTAssertEqual(root.getDocSize(), before)
+        XCTAssertGreaterThan(root.garbageLength, 0)
     }
 
     @MainActor
