@@ -89,6 +89,22 @@ final class GCContainmentIntegrationTests: XCTestCase {
     /// peers, walking their undo stacks without syncing in between --
     /// exercising the restore-duplicates-identity path this release fixes
     /// under sustained pressure.
+    ///
+    /// **Scope note -- convergence is deliberately not asserted here, unlike
+    /// upstream.** Upstream reorders with `r.items.splice(0, 0, plain)`,
+    /// inserting a fully-formed object literal as ONE `Add`. iOS cannot
+    /// express that: `JSONArray.insertAfterInternal` has no `[String: Any]`
+    /// branch, so a dictionary throws `errUnimplemented` and the port has to
+    /// insert an empty `JSONObject` and then fill it with separate `Set`
+    /// operations. Two peers reordering concurrently therefore interleave a
+    /// different operation sequence than upstream's, and the documents end up
+    /// disagreeing about the re-inserted entry.
+    ///
+    /// That disagreement reproduces byte-for-byte on the commit before this
+    /// release's fix (`160aa95dc2^`), so it is not caused by, and not fixed
+    /// by, yorkie-js-sdk#1341. What this test pins is what #1341 is actually
+    /// about: the clients keep syncing. Tracked separately as the array
+    /// object-literal insert gap.
     @MainActor
     func test_keeps_syncing_while_two_peers_reorder_edit_and_undo_one_element() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
@@ -160,9 +176,6 @@ final class GCContainmentIntegrationTests: XCTestCase {
                 try await sync()
             }
 
-            // A poisoned client stops applying change packs, so an ordinary
-            // edit followed by a sync is what tells a healthy one from a
-            // dead one.
             try d1.update({ root, _ in
                 guard let items = root.items as? JSONArray else { return }
                 let idx = indexOf(items, id: "x")
@@ -170,9 +183,21 @@ final class GCContainmentIntegrationTests: XCTestCase {
                     (items[idx] as? JSONObject)?.box = ["w": Int64(1), "h": Int64(1)]
                 }
             }, "final edit")
+
+            // A poisoned client stops applying change packs entirely, so what
+            // separates a healthy client from a dead one is whether an
+            // ordinary edit still round-trips -- in BOTH directions, since a
+            // client that has stopped applying keeps producing changes of its
+            // own. Top-level scalars are used as the probe rather than the
+            // array, for the reason in the note above.
+            try d1.update({ root, _ in root.pingD1 = Int64(1) }, "ping d1")
+            try d2.update({ root, _ in root.pingD2 = Int64(2) }, "ping d2")
             try await sync()
 
-            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON(), "the two documents disagree after the final edit")
+            for (name, json) in [("d1", d1.toSortedJSON()), ("d2", d2.toSortedJSON())] {
+                XCTAssertTrue(json.contains("\"pingD1\":1"), "\(name) never received d1's edit -- it stopped applying change packs")
+                XCTAssertTrue(json.contains("\"pingD2\":2"), "\(name) never received d2's edit -- it stopped applying change packs")
+            }
         }
     }
 }
