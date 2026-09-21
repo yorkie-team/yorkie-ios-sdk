@@ -573,6 +573,14 @@ class RGATreeList {
         guard let entry = self.elementMapByCreatedAt[value.createdAt] else {
             throw YorkieError(code: .errInvalidArgument, message: "failed to find the given createdAt: \(value.createdAt)")
         }
+
+        // Same guard as ``ElementRHT/purge(element:)``: releasing the position node
+        // of an entry that now holds a different element would unlink a live one on
+        // a tombstone's behalf. A genuinely missing entry still throws above.
+        guard entry.element === value else {
+            return
+        }
+
         let node = entry.positionNode
         self.release(node: node)
         self.elementMapByCreatedAt.removeValue(forKey: value.createdAt)
@@ -602,14 +610,23 @@ class RGATreeList {
         element: CRDTElement,
         executedAt: TimeTicket
     ) throws -> CRDTElement {
-        guard let existingEntry = self.elementMapByCreatedAt[createdAt] else {
+        guard self.elementMapByCreatedAt[createdAt] != nil else {
             throw YorkieError(
                 code: .errInvalidArgument,
                 message: "cant find the given node: \(createdAt.toIDString)"
             )
         }
-        let prevPosCreatedAt = existingEntry.positionNode.positionCreatedAt
-        try self.insert(element, prevCreatedAt: prevPosCreatedAt, executedAt: executedAt)
+
+        // Anchor on the element's own `createdAt`, the anchor `rga_tree_list.ts`
+        // `set()` uses and the one ``ArraySetOperation`` replays against the
+        // root. Anchoring on the element's *current* position node instead
+        // diverges for an element that has been moved -- the operation resolves
+        // the original position, this resolved the winning one -- and the clone
+        // and the root then order the array differently, so every later
+        // index-based local edit on this client addresses the wrong element.
+        // ``insert(_:prevCreatedAt:executedAt:)`` already mirrors `insertAfter`'s
+        // two-step resolution (position map first, then element map).
+        try self.insert(element, prevCreatedAt: createdAt, executedAt: executedAt)
         return try self.delete(createdAt: createdAt, executedAt: executedAt)
     }
 

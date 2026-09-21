@@ -220,6 +220,15 @@ public class Document: Attachable {
         do {
             try updater(proxy, &presence)
         } catch {
+            // NOTE(hackerwins): If the updater fails, the cloneRoot and clone
+            // presences have to go: the updater may already have mutated them
+            // before throwing, and the change context carrying those mutations
+            // is dropped here, so the clone would stay permanently ahead of the
+            // root. That matters beyond "an invalid state to read" -- the clone
+            // is what index-based local array edits resolve against and what
+            // `maxSizeLimit` is measured on, so a stale one silently mistargets
+            // later edits. `document.ts` clears it in the same place.
+            self.clone = nil
             self.isUpdating = false
             throw error
         }

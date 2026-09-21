@@ -90,6 +90,19 @@ public class JSONArray: CustomDebugStringConvertible {
                 )
             )
 
+            // NOTE(hackerwins): The set has to be applied to the clone as well, not
+            // only in ``ArraySetOperation/execute(root:versionVector:source:)``. This
+            // path runs against the clone the updater is given, so leaving it out
+            // makes the clone's accounting drift from the document the operation is
+            // replayed on -- and it is the clone's `docSize` that
+            // ``Document/update(_:message:)`` measures against `maxSizeLimit`.
+            //
+            // The displaced element has to be registered here too, the same way
+            // ``JSONObject`` registers the value it replaces.
+            let removed = try self.target.set(createdAt: prev.createdAt, value: element, executedAt: ticket)
+            self.context.registerElement(element, parent: self.target)
+            self.context.registerRemovedElement(removed)
+
             return toWrappedElement(from: self.target)
         } else {
             throw YorkieError(
