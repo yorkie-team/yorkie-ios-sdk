@@ -96,29 +96,43 @@ struct SetOperation: Operation {
 
         let value = self.value.deepcopy()
         let removed = parent.set(key: self.key, value: value)
-        // NOTE: when resetting an element with a pre-existing createdAt during undo/redo,
-        // deregister the previously tombstoned element before re-registering.
+        // NOTE(hackerwins): A set can restore an element under a createdAt that a
+        // tombstone already answers to -- undoing a remove re-inserts the removed
+        // element under its original identity, and `parent.set` above has just
+        // handed that identity to the restored copy in the object's
+        // `nodeMapByCreatedAt`.
         //
-        // NOTE(hackerwins): It has to be the registered element that is
-        // deregistered, not the incoming copy: the copy's size and descendants are
-        // the ones about to be registered, so passing it would charge the wrong
-        // size against gc and leave the stale element's own descendants registered
-        // forever.
+        // The entry that has to follow is the one in `gcElementSetByCreatedAt`.
+        // Collection resolves it through the index that was just re-pointed, so
+        // leaving it makes the next pass reach live data.
         //
-        // NOTE(yorkie-js-sdk#1349): the `.undoRedo` gate means a peer applying this
-        // same operation as `.remote` never deregisters its tombstone, leaving the
-        // ledger stale and `getGarbageLength()` stuck. Kept as-is for parity with
-        // upstream `set_operation.ts`; drop the gate when upstream does.
-        if source == .undoRedo, let registered = root.find(createdAt: value.createdAt) {
-            root.deregisterElement(registered)
-        }
+        // Retiring that entry is the whole job, so retire only that entry. The
+        // tombstone's other registrations are deliberately left alone: its
+        // descendant set can be a strict superset of the restored copy's, since a
+        // peer may have added a child into the container after the undoing replica
+        // took its copy, and tearing the subtree out of `elementPairMapByCreatedAt`
+        // would take those extra descendants with it, with nothing to put them back
+        // -- so a later change addressed at one of them throws inside
+        // `applyChangePack`. See ``CRDTRoot/unregisterRemovedElementPair(_:)``.
+        //
+        // This is a condition on the state of the tree, not on who is applying:
+        // peers apply the undo with `OpSource.remote`, and the Go server replays it
+        // to build a snapshot, and every one of them has the same stale entry.
+        // Gating it on `.undoRedo` spared only the replica that performed the undo;
+        // the Go SDK gates the same call and loses the member outright there, which
+        // is the data loss yorkie#1978 fixes alongside this.
+        //
+        // An ordinary set carries a freshly issued createdAt, so the lookup
+        // normally misses and costs one map read.
+        root.unregisterRemovedElementPair(value.createdAt)
         root.registerElement(value, parent: parent)
         // NOTE: `RemoveOperation.toReverseOperation` captures `value.deepcopy()` at
-        // remove time, and deepcopy preserves members whose `removedAt` is set. The
-        // deregister above has just dropped those createdAts from the GC set, and
-        // `registerElement` books the copies into live without re-registering them
-        // as removed -- so without this walk a tombstone nested inside a restored
-        // container stays in live and is never collectable again.
+        // remove time, and deepcopy preserves members whose `removedAt` is set.
+        // `unregisterRemovedElementPair` has just released the tombstone's subtree
+        // and dropped those createdAts from the GC set, and `registerElement` books
+        // the copies into live without re-registering them as removed -- so without
+        // this walk a tombstone nested inside a restored container stays in live and
+        // is never collectable again.
         //
         // `adoptRemovedElement` rather than `registerRemovedElement`: the latter
         // refunds a tombstone ticket to live, which over-credits here because

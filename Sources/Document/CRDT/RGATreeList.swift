@@ -573,6 +573,14 @@ class RGATreeList {
         guard let entry = self.elementMapByCreatedAt[value.createdAt] else {
             throw YorkieError(code: .errInvalidArgument, message: "failed to find the given createdAt: \(value.createdAt)")
         }
+
+        // Same guard as ``ElementRHT/purge(element:)``: releasing the position node
+        // of an entry that now holds a different element would unlink a live one on
+        // a tombstone's behalf. A genuinely missing entry still throws above.
+        guard entry.element === value else {
+            return
+        }
+
         let node = entry.positionNode
         self.release(node: node)
         self.elementMapByCreatedAt.removeValue(forKey: value.createdAt)

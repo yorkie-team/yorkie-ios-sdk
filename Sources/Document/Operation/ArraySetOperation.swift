@@ -123,11 +123,27 @@ class ArraySetOperation: Operation {
             prevCreatedAt: self.createdAt,
             executedAt: self.executedAt
         )
-        try arrayParent.delete(createdAt: self.createdAt, executedAt: self.executedAt)
+        let removed = try arrayParent.delete(createdAt: self.createdAt, executedAt: self.executedAt)
 
-        // TODO(junseo): GC logic is not implemented here
-        // because there is no way to distinguish between old and new element with same `createdAt`.
-        root.registerElement(value, parent: nil)
+        // NOTE(hackerwins): The parent has to be passed. `garbageCollect` reaches
+        // an element through the pair registered here and calls `purge` on its
+        // parent, so a value registered without one cannot be collected -- it
+        // throws there instead, inside `applyChangePack`, and that client stops
+        // syncing for good. No undo is involved: setting an array element, then
+        // removing it, then collecting is enough.
+        root.registerElement(value, parent: arrayParent)
+
+        // NOTE(hackerwins): The element this assignment displaced has to be
+        // registered for collection. Discarding it left it charged to
+        // `docSize.live` with nothing able to reach it, so an ordinary
+        // `arr[i] = x` in a loop grew the document without bound and collection
+        // reported nothing to do.
+        //
+        // The old TODO here said the two could not be told apart because they
+        // share a createdAt. They do not: `self.createdAt` names the element being
+        // displaced and `value` carries its own identity. That stopped being true
+        // when `set` became insert-then-remove rather than an in-place swap.
+        root.registerRemovedElement(removed)
 
         // TODO(emplam27): The reverse operation is not implemented yet.
         // let reverseOp: Operation? = nil
