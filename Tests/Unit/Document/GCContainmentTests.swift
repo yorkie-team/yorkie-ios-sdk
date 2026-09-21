@@ -212,11 +212,11 @@ final class GCContainmentTests: XCTestCase {
         })
 
         // then -- the clone is discarded outright, so the dropped mutation
-        // cannot survive in it, and the next access re-clones from the root.
+        // cannot survive in it. Re-cloning is not asserted: `cloned` rebuilds
+        // from `self.root` by deepcopy once the clone is nil, so comparing the
+        // two would compare a copy against its own source.
         XCTAssertNil(doc.getCloneRoot(), "a clone carrying the dropped mutation was kept")
         XCTAssertEqual(doc.toSortedJSON(), "{\"arr\":[0,1,2]}")
-        XCTAssertEqual(doc.cloned.root.toSortedJSON(), doc.toSortedJSON())
-        XCTAssertEqual(doc.cloned.root.getDocSize(), doc.getDocSize())
     }
 
     /// `garbageCollect` skips a member whose `purge` throws instead of

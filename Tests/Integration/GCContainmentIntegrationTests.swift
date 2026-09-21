@@ -196,18 +196,21 @@ final class GCContainmentIntegrationTests: XCTestCase {
 
             // Upstream asserts the two documents agree here. On iOS they do
             // not, so the assertion is kept and marked expected-to-fail rather
-            // than deleted: it is the only thing that will report when this
-            // starts (or stops) happening. Not strict, so a run that happens to
-            // converge does not turn CI red.
+            // than deleted.
+            //
+            // STRICT deliberately: if the two documents ever start converging,
+            // the expected failure does not fire and this test FAILS, which is
+            // the report we want -- a non-strict block would pass silently and
+            // the gap would close unnoticed. The divergence is deterministic
+            // (verified over repeated standalone runs and a full-suite run), so
+            // strict does not make this flaky.
             //
             // The divergence is real and pre-existing -- it reproduces
             // byte-for-byte on `160aa95dc2^` and with `Sources/Document`
             // reverted to `main` -- but it is not small: d1 ends holding an
             // empty `{}` where an item should be, and the other item loses its
             // `id`, while d2 keeps both. See the scope note above.
-            XCTExpectFailure("iOS array reorder/undo convergence gap -- pre-existing, not yorkie-js-sdk#1341; upstream asserts convergence here",
-                             options: .nonStrict())
-            {
+            XCTExpectFailure("iOS array reorder/undo convergence gap -- pre-existing, not yorkie-js-sdk#1341; upstream asserts convergence here") {
                 XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON(), "the two documents disagree after the final edit")
             }
 
