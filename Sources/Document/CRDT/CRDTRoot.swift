@@ -603,7 +603,20 @@ class CRDTRoot {
             }
 
             if let removedAt = pair.element.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
-                try? parent.purge(element: pair.element)
+                do {
+                    try parent.purge(element: pair.element)
+                } catch {
+                    // A throw here now means a genuine mis-registration: both
+                    // purge paths return quietly when the slot has merely been
+                    // taken over by a restored copy. Skip rather than
+                    // deregister -- deregistering an element the purge left
+                    // linked in the tree drops its registration and releases
+                    // its `docSize.gc` charge, which is exactly the charge with
+                    // nothing reporting it as garbage that the guard above
+                    // exists to prevent. Letting it throw is #1340.
+                    Logger.error("garbageCollect: failed to purge \(createdAt)", error: error)
+                    continue
+                }
                 count += self.deregisterElement(pair.element)
             }
         }

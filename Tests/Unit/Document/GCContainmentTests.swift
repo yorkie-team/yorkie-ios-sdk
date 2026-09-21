@@ -143,6 +143,49 @@ final class GCContainmentTests: XCTestCase {
         XCTAssertEqual(doc.getDocSize(), steady)
     }
 
+    /// ``JSONArray/setValue(index:value:)`` applies the set to the clone while
+    /// ``ArraySetOperation`` applies it to the root, so the two have to agree.
+    /// The clone is not a convenience copy: ``Document/update(_:_:)`` measures
+    /// *its* `docSize` against `maxSizeLimit`, and every later index-based
+    /// local edit is resolved against its ordering.
+    @MainActor
+    func test_an_array_assignment_keeps_the_clone_in_step_with_the_root() throws {
+        // given
+        let doc = Document(key: "array-set-clone-parity")
+        try doc.update { root, _ in root.arr = [0] }
+
+        // when -- ten assignments, each followed by a collection.
+        for value in 1 ... 10 {
+            try doc.update { root, _ in try (root.arr as? JSONArray)?.setValue(index: 0, value: value) }
+            doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [doc.changeID.getActorID()]))
+        }
+
+        // then
+        XCTAssertEqual(doc.getCloneRoot()?.toSortedJSON(), doc.toSortedJSON())
+        XCTAssertEqual(doc.cloned.root.getDocSize(), doc.getDocSize())
+    }
+
+    /// `RGATreeList.set` used to anchor its insert on the element's *current*
+    /// position node, while ``ArraySetOperation`` anchors on the element's
+    /// `createdAt` -- the anchor `rga_tree_list.ts` `set()` uses. For an
+    /// element that had been moved the two resolve to different nodes, so the
+    /// clone and the root ended up ordering the array differently and every
+    /// later index-based local edit on this client addressed the wrong
+    /// element.
+    @MainActor
+    func test_an_array_assignment_after_a_move_keeps_the_clone_in_step_with_the_root() throws {
+        // given -- an array whose middle element has been moved.
+        let doc = Document(key: "array-set-after-move")
+        try doc.update { root, _ in root.arr = [0, 1, 2] }
+        try doc.update { root, _ in try (root.arr as? JSONArray)?.moveAfterByIndex(prevIndex: 0, targetIndex: 2) }
+
+        // when
+        try doc.update { root, _ in try (root.arr as? JSONArray)?.setValue(index: 1, value: 99) }
+
+        // then
+        XCTAssertEqual(doc.getCloneRoot()?.toSortedJSON(), doc.toSortedJSON())
+    }
+
     @MainActor
     func test_collects_the_tombstone_an_undone_object_remove_leaves_on_a_peer() throws {
         // given -- `SetOperation` restores the member under its original
