@@ -321,7 +321,7 @@ public class JSONArray: CustomDebugStringConvertible {
     private func moveBeforeInternal(nextCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
         let previousCreatedAt = try target.getPreviousCreatedAt(createdAt: nextCreatedAt)
-        try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: previousCreatedAt, executedAt: ticket)
         let operation = MoveOperation(
             parentCreatedAt: target.createdAt,
             previousCreatedAt: previousCreatedAt,
@@ -351,15 +351,20 @@ public class JSONArray: CustomDebugStringConvertible {
         )
         self.context.push(operation: operation)
 
-        // Registered the same way `MoveOperation` registers it against the root. The move
-        // abandons the element's old position node, which is charged to gc and collected once
-        // every peer has applied the winning move; leaving it unregistered here made the
-        // clone's `docSize` disagree with the root's after any array move -- and the clone's
-        // is what `Document.update` measures against `maxSizeLimit`.
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: prevPosCreatedAt, executedAt: ticket)
+    }
+
+    /// Moves an element on the clone and registers the position node the move abandons.
+    ///
+    /// `MoveOperation` registers that node against the root; leaving it unregistered here
+    /// made the clone's `docSize` disagree with the root's after any array move -- and the
+    /// clone's is what ``Document/update(_:_:)`` measures against `maxSizeLimit`. Every move
+    /// entry point goes through this, so the four public move APIs cannot drift apart again.
+    private func registerMove(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
         if let deadNode = try self.target.moveAfter(
             createdAt: createdAt,
-            prevCreatedAt: prevPosCreatedAt,
-            executedAt: ticket
+            prevCreatedAt: prevCreatedAt,
+            executedAt: executedAt
         ) {
             self.context.registerGCPair(GCPair(parent: self.target.getRGATreeList(), child: deadNode))
         }
@@ -372,7 +377,7 @@ public class JSONArray: CustomDebugStringConvertible {
     private func moveFrontInternal(createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
         let head = self.target.getHead()
-        try self.target.move(createdAt: createdAt, afterCreatedAt: head.createdAt, executedAt: ticket)
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: head.createdAt, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: head.createdAt, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
@@ -384,7 +389,7 @@ public class JSONArray: CustomDebugStringConvertible {
     private func moveLastInternal(createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
         let last = self.target.getLastCreatedAt()
-        try self.target.move(createdAt: createdAt, afterCreatedAt: last, executedAt: ticket)
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: last, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: last, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }

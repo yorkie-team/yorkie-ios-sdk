@@ -119,8 +119,16 @@ public class JSONObject {
         }
     }
 
-    private func setToCRDTObject(key: String, value: CRDTElement) {
-        let removed = self.target.set(key: key, value: value, executedAt: value.createdAt)
+    /// - Parameter executedAt: The ticket the pushed ``SetOperation`` carries.
+    ///
+    ///   It has to be that ticket and not `value.createdAt`. ``SetOperation/execute(root:versionVector:source:)``
+    ///   anchors on `executedAt`, so every remote replica -- and the server -- stamps the
+    ///   member's `movedAt` from it. `setPrimitive` mints a *second* ticket for the
+    ///   `Primitive`'s own `createdAt`, so deriving the anchor here would have the
+    ///   originating replica stamp a different `movedAt` than everyone else, on the value
+    ///   `getPositionedAt()` now resolves conflicts by.
+    private func setToCRDTObject(key: String, value: CRDTElement, executedAt: TimeTicket) {
+        let removed = self.target.set(key: key, value: value, executedAt: executedAt)
         self.context.registerElement(value, parent: self.target)
         if let removed {
             self.context.registerRemovedElement(removed)
@@ -129,7 +137,7 @@ public class JSONObject {
 
     private func setPrimitive(key: String, value: PrimitiveValue, ticket: TimeTicket) {
         let primitive = Primitive(value: value, createdAt: context.issueTimeTicket)
-        self.setToCRDTObject(key: key, value: primitive)
+        self.setToCRDTObject(key: key, value: primitive, executedAt: ticket)
 
         let operation = SetOperation(key: key,
                                      value: primitive.deepcopy(),
@@ -171,7 +179,7 @@ public class JSONObject {
     }
 
     private func setValue(key: String, value: CRDTElement, ticket: TimeTicket) {
-        self.setToCRDTObject(key: key, value: value)
+        self.setToCRDTObject(key: key, value: value, executedAt: ticket)
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
