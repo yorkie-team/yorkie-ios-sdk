@@ -28,6 +28,8 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 - Accept an object literal when inserting into an array, which previously threw `errUnimplemented` in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
 - Register the position node an array move abandons on the clone as well as the root, so their `docSize` agree in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
 - Restore correctly when an object is removed and undone after a garbage collection has run in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Stop `CRDTText` counting the sentinel head node, which made an empty Text measure 24 bytes larger than in the JS SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Drop changes the restored header says the server already has, so a resume cannot re-push an acknowledged `clientSeq` in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
 
 ## [v0.7.21] - 2026-09-21
 
