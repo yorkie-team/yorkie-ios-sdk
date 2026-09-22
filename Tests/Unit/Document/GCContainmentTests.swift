@@ -231,11 +231,11 @@ final class GCContainmentTests: XCTestCase {
         let items = CRDTArray(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let itemObject = CRDTObject(createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        itemObject.set(key: "a", value: a1)
+        itemObject.set(key: "a", value: a1, executedAt: a1.createdAt)
         try items.insert(value: itemObject, prevCreatedAt: items.getHead().createdAt)
-        rootObject.set(key: "items", value: items)
+        rootObject.set(key: "items", value: items, executedAt: items.createdAt)
         let other = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "other", value: other)
+        rootObject.set(key: "other", value: other, executedAt: other.createdAt)
 
         let root = CRDTRoot(rootObject: rootObject)
 
@@ -303,9 +303,9 @@ final class GCContainmentTests: XCTestCase {
         let items = CRDTArray(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let itemObject = CRDTObject(createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        itemObject.set(key: "a", value: a1)
+        itemObject.set(key: "a", value: a1, executedAt: a1.createdAt)
         try items.insert(value: itemObject, prevCreatedAt: items.getHead().createdAt)
-        rootObject.set(key: "items", value: items)
+        rootObject.set(key: "items", value: items, executedAt: items.createdAt)
 
         let root = CRDTRoot(rootObject: rootObject)
 
@@ -343,9 +343,9 @@ final class GCContainmentTests: XCTestCase {
         let items = CRDTArray(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let itemObject = CRDTObject(createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        itemObject.set(key: "a", value: a1)
+        itemObject.set(key: "a", value: a1, executedAt: a1.createdAt)
         try items.insert(value: itemObject, prevCreatedAt: items.getHead().createdAt)
-        rootObject.set(key: "items", value: items)
+        rootObject.set(key: "items", value: items, executedAt: items.createdAt)
 
         let root = CRDTRoot(rootObject: rootObject)
 

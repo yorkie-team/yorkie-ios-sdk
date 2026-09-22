@@ -24,20 +24,20 @@ class MoveOperationTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("a1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "k-a1", value: a1)
+        rootObject.set(key: "k-a1", value: a1, executedAt: a1.createdAt)
 
         let object2 = CRDTArray(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("b1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
         try object2.insert(value: b1, prevCreatedAt: TimeTicket.initial)
 
-        rootObject.set(key: "k-a3", value: object2)
+        rootObject.set(key: "k-a3", value: object2, executedAt: object2.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "k-c1", value: c1)
+        object3.set(key: "k-c1", value: c1, executedAt: c1.createdAt)
 
         let c2 = Primitive(value: .string("c2"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "k-c2", value: c2)
+        object3.set(key: "k-c2", value: c2, executedAt: c2.createdAt)
 
         try object2.insert(value: object3, prevCreatedAt: b1.createdAt)
 
@@ -63,17 +63,17 @@ class MoveOperationTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("a1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "k-a1", value: a1)
+        rootObject.set(key: "k-a1", value: a1, executedAt: a1.createdAt)
 
         let object2 = CRDTArray(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("b1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
         try object2.insert(value: b1, prevCreatedAt: TimeTicket.initial)
 
-        rootObject.set(key: "k-a3", value: object2)
+        rootObject.set(key: "k-a3", value: object2, executedAt: object2.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "k-c1", value: c1)
+        object3.set(key: "k-c1", value: c1, executedAt: c1.createdAt)
 
         try object2.insert(value: object3, prevCreatedAt: b1.createdAt)
 

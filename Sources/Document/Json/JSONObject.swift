@@ -120,7 +120,7 @@ public class JSONObject {
     }
 
     private func setToCRDTObject(key: String, value: CRDTElement) {
-        let removed = self.target.set(key: key, value: value)
+        let removed = self.target.set(key: key, value: value, executedAt: value.createdAt)
         self.context.registerElement(value, parent: self.target)
         if let removed {
             self.context.registerRemovedElement(removed)

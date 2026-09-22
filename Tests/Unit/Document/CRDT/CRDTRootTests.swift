@@ -25,13 +25,13 @@ class CRDTRootTests: XCTestCase {
         let crdtObject = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        crdtObject.set(key: "K1", value: a1)
+        crdtObject.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        crdtObject.set(key: "K2", value: a2)
+        crdtObject.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        crdtObject.set(key: "K3", value: a3)
+        crdtObject.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         // when
         let target = CRDTRoot(rootObject: crdtObject)
@@ -44,21 +44,21 @@ class CRDTRootTests: XCTestCase {
     func test_can_create_sub_paths() throws {
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a2", value: a2)
+        rootObject.set(key: "K-a2", value: a2, executedAt: a2.createdAt)
 
         let object2 = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2.set(key: "K-B1", value: b1)
+        object2.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "K-c1", value: c1)
+        object3.set(key: "K-c1", value: c1, executedAt: c1.createdAt)
 
-        rootObject.set(key: "K-$a3", value: object2)
+        rootObject.set(key: "K-$a3", value: object2, executedAt: object2.createdAt)
 
-        object2.set(key: "K-.B2", value: object3)
+        object2.set(key: "K-.B2", value: object3, executedAt: object3.createdAt)
 
         let target = CRDTRoot(rootObject: rootObject)
 
@@ -78,13 +78,13 @@ class CRDTRootTests: XCTestCase {
     func test_can_resturn_elements_count() throws {
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a2", value: a2)
+        rootObject.set(key: "K-a2", value: a2, executedAt: a2.createdAt)
 
         let object2 = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2.set(key: "K-B1", value: b1)
+        object2.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let target = CRDTRoot(rootObject: rootObject)
 
@@ -95,13 +95,13 @@ class CRDTRootTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a2", value: a2)
+        rootObject.set(key: "K-a2", value: a2, executedAt: a2.createdAt)
 
         let object2 = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2.set(key: "K-B1", value: b1)
+        object2.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let target = CRDTRoot(rootObject: rootObject)
 
@@ -122,19 +122,19 @@ class CRDTRootTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
 
         let object2ToRemove = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2ToRemove.set(key: "K-B1", value: b1)
+        object2ToRemove.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "K-c1", value: c1)
+        object3.set(key: "K-c1", value: c1, executedAt: c1.createdAt)
 
-        rootObject.set(key: "K-a3", value: object2ToRemove)
+        rootObject.set(key: "K-a3", value: object2ToRemove, executedAt: object2ToRemove.createdAt)
 
-        object2ToRemove.set(key: "K-B2", value: object3)
+        object2ToRemove.set(key: "K-B2", value: object3, executedAt: object3.createdAt)
 
         // when
         let target = CRDTRoot(rootObject: rootObject)
@@ -151,19 +151,19 @@ class CRDTRootTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
 
         let object2ToGarbage = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2ToGarbage.set(key: "K-B1", value: b1)
+        object2ToGarbage.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "K-c1", value: c1)
+        object3.set(key: "K-c1", value: c1, executedAt: c1.createdAt)
 
-        rootObject.set(key: "K-a3", value: object2ToGarbage)
+        rootObject.set(key: "K-a3", value: object2ToGarbage, executedAt: object2ToGarbage.createdAt)
 
-        object2ToGarbage.set(key: "K-B2", value: object3)
+        object2ToGarbage.set(key: "K-B2", value: object3, executedAt: object3.createdAt)
 
         // when
         let target = CRDTRoot(rootObject: rootObject)
@@ -192,19 +192,19 @@ class CRDTRootTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
 
         let object2ToGarbage = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2ToGarbage.set(key: "K-B1", value: b1)
+        object2ToGarbage.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "K-c1", value: c1)
+        object3.set(key: "K-c1", value: c1, executedAt: c1.createdAt)
 
-        rootObject.set(key: "K-a3", value: object2ToGarbage)
+        rootObject.set(key: "K-a3", value: object2ToGarbage, executedAt: object2ToGarbage.createdAt)
 
-        object2ToGarbage.set(key: "K-B2", value: object3)
+        object2ToGarbage.set(key: "K-B2", value: object3, executedAt: object3.createdAt)
 
         // when
         let target = CRDTRoot(rootObject: rootObject)
@@ -218,19 +218,19 @@ class CRDTRootTests: XCTestCase {
         // given
         let rootObject = CRDTObject(createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        rootObject.set(key: "K-a1", value: a1)
+        rootObject.set(key: "K-a1", value: a1, executedAt: a1.createdAt)
 
         let object2 = CRDTObject(createdAt: TimeTicket(lamport: 4, delimiter: 0, actorID: actorId))
         let b1 = Primitive(value: .string("B1"), createdAt: TimeTicket(lamport: 5, delimiter: 0, actorID: actorId))
-        object2.set(key: "K-B1", value: b1)
+        object2.set(key: "K-B1", value: b1, executedAt: b1.createdAt)
 
         let object3 = CRDTObject(createdAt: TimeTicket(lamport: 6, delimiter: 0, actorID: actorId))
         let c1 = Primitive(value: .string("c1"), createdAt: TimeTicket(lamport: 7, delimiter: 0, actorID: actorId))
-        object3.set(key: "K-c1", value: c1)
+        object3.set(key: "K-c1", value: c1, executedAt: c1.createdAt)
 
-        rootObject.set(key: "K-a3", value: object2)
+        rootObject.set(key: "K-a3", value: object2, executedAt: object2.createdAt)
 
-        object2.set(key: "K-B2", value: object3)
+        object2.set(key: "K-B2", value: object3, executedAt: object3.createdAt)
 
         let target = CRDTRoot(rootObject: rootObject)
 

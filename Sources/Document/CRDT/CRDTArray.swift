@@ -244,6 +244,10 @@ extension CRDTArray {
             }
         }
         result.remove(self.removedAt)
+        // `movedAt` has to survive the copy: it is what `getPositionedAt` reports,
+        // and it is charged to the element's meta size, so dropping it makes a
+        // deepcopy measure smaller than its source (mirrors `array.ts` deepcopy).
+        result.setMovedAt(self.movedAt)
         return result
     }
 

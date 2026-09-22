@@ -95,7 +95,7 @@ struct SetOperation: Operation {
         }
 
         let value = self.value.deepcopy()
-        let removed = parent.set(key: self.key, value: value)
+        let removed = parent.set(key: self.key, value: value, executedAt: self.executedAt)
         // NOTE(hackerwins): A set can restore an element under a createdAt that a
         // tombstone already answers to -- undoing a remove re-inserts the removed
         // element under its original identity, and `parent.set` above has just
