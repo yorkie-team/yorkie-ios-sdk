@@ -1542,6 +1542,19 @@ public class Document: Attachable {
         if let docID {
             self.docID = docID
         }
+
+        // Drop what the header says the server already has.
+        //
+        // A sync records the header without rewriting the snapshot, so the snapshot keeps
+        // carrying a change the sync went on to acknowledge. `createChangePack` pushes
+        // `localChanges` wholesale and derives the pushed checkpoint from their count, so
+        // leaving an acked change queued re-presents a `clientSeq` the server has already
+        // taken while claiming a checkpoint beyond it.
+        //
+        // Stricter than `document.ts`, which filters only the appended log against this same
+        // watermark and leaves the snapshot's own queue alone. Applying the one rule to both
+        // is what keeps the two consistent.
+        self.localChanges.removeAll { $0.id.getClientSeq() <= checkpoint.getClientSeq() }
     }
 
     /// Replays a run of persisted changes onto this document and re-queues the un-acked

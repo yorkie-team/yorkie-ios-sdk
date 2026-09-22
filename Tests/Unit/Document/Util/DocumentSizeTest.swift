@@ -166,35 +166,35 @@ extension DocumentSizeTest {
         try await self.doc.update { root, _ in
             root.text = JSONText()
         }
-        await self.expectLive(with: .init(data: 0, meta: 96))
+        await self.expectLive(with: .init(data: 0, meta: 72))
         await self.expectGC(with: .init(data: 0, meta: 0))
 
         try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(0, 0, "helloworld")
         }
 
-        await self.expectLive(with: .init(data: 20, meta: 120))
+        await self.expectLive(with: .init(data: 20, meta: 96))
         await self.expectGC(with: .init(data: 0, meta: 0))
 
         try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(5, 5, " ")
         }
 
-        await self.expectLive(with: .init(data: 22, meta: 168))
+        await self.expectLive(with: .init(data: 22, meta: 144))
         await self.expectGC(with: .init(data: 0, meta: 0))
 
         try await self.doc.update { root, _ in
             (root.text as? JSONText)?.edit(6, 11, "")
         }
 
-        await self.expectLive(with: .init(data: 12, meta: 144))
+        await self.expectLive(with: .init(data: 12, meta: 120))
         await self.expectGC(with: .init(data: 10, meta: 48))
 
         try await self.doc.update { root, _ in
             (root.text as? JSONText)?.setStyle(0, 5, ["bold": true])
         }
 
-        await self.expectLive(with: .init(data: 28, meta: 168))
+        await self.expectLive(with: .init(data: 28, meta: 144))
         await self.expectGC(with: .init(data: 10, meta: 48))
 
         try await self.doc.update { root, _ in
@@ -205,7 +205,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, text)
         }
 
-        await self.expectLive(with: .init(data: 44, meta: 216))
+        await self.expectLive(with: .init(data: 44, meta: 192))
         await self.expectGC(with: .init(data: 10, meta: 48))
     }
 

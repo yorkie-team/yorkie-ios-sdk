@@ -147,13 +147,21 @@ final class OfflinePersistenceTests: XCTestCase {
         try await client.sync()
         try await client.deactivate()
 
-        // then: the stored envelope reflects the post-sync state — nothing left pending.
+        // then: the stored state reflects the post-sync position — nothing left pending.
+        //
+        // A sync records the HEADER, not a new snapshot: re-snapshotting per sync is the cost
+        // the incremental store exists to avoid. So the snapshot still carries the change as
+        // pending, and it is the header that says the server has taken it. Restoring the way
+        // an attach does -- snapshot, then header -- is what has to show nothing pending.
         let storeKey = "/\(clientKey)/\(docKey)"
-        let stored = try await store.load(docKey: storeKey)
-        let persisted = try XCTUnwrap(stored).snapshot
-        let restored = try Document.fromBytes(key: docKey, bytes: persisted)
+        let entry = try await store.load(docKey: storeKey)
+        let stored = try XCTUnwrap(entry)
+        let restored = try Document.fromBytes(key: docKey, bytes: stored.snapshot)
+        let meta = try XCTUnwrap(stored.meta, "a sync must record the header")
+        try restored.restoreMetaFromBytes(meta)
+        try restored.restoreAppendedChanges(stored.changes, ackedClientSeq: restored.checkpoint.getClientSeq())
         XCTAssertTrue(restored.getPendingChangeStructs().isEmpty,
-                      "an acknowledged change must not stay pending in the stored envelope")
+                      "an acknowledged change must not stay pending once the header is applied")
     }
 
     // A stored copy that cannot be restored must not take the caller's own work with it.
@@ -293,7 +301,9 @@ final class OfflinePersistenceTests: XCTestCase {
             try await second.attach(Document(key: docKey), [:], .manual)
             XCTFail("the second session should be refused while the first holds the lease")
         } catch let error as YorkieError {
-            XCTAssertEqual(error.code, .errInvalidArgument)
+            XCTAssertEqual(error.code, .errDocumentOpenElsewhere,
+                           "its own code, so a consumer can fall back to a non-persisting client "
+                               + "without matching on message text")
         }
     }
 

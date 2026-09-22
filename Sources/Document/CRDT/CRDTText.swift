@@ -187,7 +187,12 @@ final class CRDTText: CRDTElement {
         var data = 0
         var meta = self.getMetaUsage()
 
-        for node in self.rgaTreeSplit where node.isRemoved == false {
+        // The sentinel head is skipped. `rga_tree_split.ts` starts its iterator at
+        // `head.getNext()`, so the JS SDK never counts it; iOS's iterator yields it, and
+        // counting its `createdAt` made an empty Text measure one `timeTicketSize` larger
+        // here than in the JS SDK. The iterator itself is left alone -- the edit paths read
+        // the head through it.
+        for node in self.rgaTreeSplit where node !== self.rgaTreeSplit.head && node.isRemoved == false {
             let size = node.getDataSize()
             data += size.data
             meta += size.meta
