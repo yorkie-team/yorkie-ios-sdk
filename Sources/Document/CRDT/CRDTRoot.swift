@@ -17,12 +17,24 @@
 typealias CRDTElementPair = (element: CRDTElement, parent: CRDTContainer?)
 
 /**
- * `GCCharge` is what `docSize.gc` is holding on behalf of one element, and
- * which element that is. See ``CRDTRoot/sizeInGC`` for why the identity matters.
+ * `GCChargeKey` keys ``CRDTRoot/sizeInGC`` by element identity.
+ *
+ * `CRDTElement` is a class-bound protocol, so `ObjectIdentifier` is the
+ * identity. The element is held alongside it because `ObjectIdentifier` does
+ * not retain: without this the element could deallocate and a later allocation
+ * could reuse its address, silently inheriting its charge. `Map<CRDTElement,
+ * DataSize>` in `root.ts` retains for the same reason.
  */
-private struct GCCharge {
+private struct GCChargeKey: Hashable {
     let element: CRDTElement
-    let size: DataSize
+
+    static func == (lhs: GCChargeKey, rhs: GCChargeKey) -> Bool {
+        lhs.element === rhs.element
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(self.element))
+    }
 }
 
 /**
@@ -80,13 +92,16 @@ class CRDTRoot {
      * lifetime -- it grows by a ticket the moment `removedAt` is set, which can
      * happen after the size has already moved.
      *
-     * The identity is load-bearing. A createdAt is meant to name one element, but
-     * it does not for the whole of a document's life: undo restores a `deepcopy`
-     * of a removed element, and the copy keeps the original's createdAt while the
-     * original is still a tombstone. Charging or releasing by key alone then
-     * bills whichever of the two occupies the slot, and a size can be taken out
-     * of `docSize.live` that live was never holding -- which is how docSize goes
-     * negative.
+     * It is keyed by the element, not by its createdAt. A createdAt is meant to
+     * name one element, but it does not for the whole of a document's life: undo
+     * restores a `deepcopy` of a removed element, and the copy keeps the
+     * original's createdAt while the original is still a tombstone. Undoing an
+     * array removal reissues a ticket for the restored container alone, so its
+     * members come back aliasing the tombstoned ones outright. One slot per
+     * createdAt cannot describe both: whichever is charged last displaces the
+     * other, and collecting the displaced one then takes a size out of
+     * `docSize.live` that live was never holding -- which is how docSize goes
+     * negative. One slot per element has room for both.
      *
      * A zero size is not the same as no record. It says this element has been
      * released: charged to neither side, because its subtree was orphaned by a
@@ -99,7 +114,7 @@ class CRDTRoot {
      * ledger, so a Text or Tree edited inside an already-removed container keeps
      * that content charged to live (yorkie-js-sdk#1349).
      */
-    private var sizeInGC: [String: GCCharge] = [:]
+    private var sizeInGC: [GCChargeKey: DataSize] = [:]
     /**
      * `gcPairMap` is a hash table that maps the IDString of GCChild to the
      * element itself and its parent.
@@ -117,10 +132,9 @@ class CRDTRoot {
         self.docSize = .init(live: .init(data: 0, meta: 0), gc: .init(data: 0, meta: 0))
 
         self.registerElement(self.rootObject, parent: nil)
+        // NOTE(hackerwins): tombstoned elements are not re-registered here:
+        // `registerElement` above already booked every one of them into gc.
         self.rootObject.getDescendants(callback: { element, _ in
-            if element.removedAt != nil {
-                self.registerRemovedElement(element)
-            }
             if let element = element as? CRDTGCPairContainable {
                 for pair in element.getGCPairs() {
                     self.registerGCPair(pair)
@@ -195,6 +209,29 @@ class CRDTRoot {
      * `registerElement` registers the given element to hash table.
      */
     func registerElement(_ element: CRDTElement, parent: CRDTContainer?) {
+        self.registerLive(element, parent: parent)
+
+        // NOTE(hackerwins): An element can be registered while it already carries a
+        // `removedAt`. An undo re-sets the `deepcopy` its reverse captured, and that
+        // copy keeps the members that were tombstoned before the container was; a
+        // snapshot loads a document that still holds tombstones; and the losing side
+        // of an LWW set is marked removed by `ElementRHT.set` before it is booked.
+        // The size registered above is the post-removal one in every such case, so
+        // it belongs to gc rather than live, and the tombstone has to be
+        // collectable. Booking it here is what makes both true whichever route
+        // brought it in, and it is the one place all of them pass through.
+        //
+        // This is a second pass on purpose. Adopting a tombstone moves its whole
+        // subtree, so doing it while the first pass is still walking would move
+        // descendants live has not been charged for yet, and drive live negative.
+        self.adoptTombstones(element)
+    }
+
+    /**
+     * `registerLive` registers the given element and its descendants to the pair
+     * map, and charges `docSize.live` for each.
+     */
+    private func registerLive(_ element: CRDTElement, parent: CRDTContainer?) {
         self.elementPairMapByCreatedAt[element.createdAt.toIDString] = (element, parent)
         self.docSize.live.addDataSizes(others: element.getDataSize())
 
@@ -204,6 +241,23 @@ class CRDTRoot {
                 self.docSize.live.addDataSizes(others: element.getDataSize())
                 return false
             }
+        }
+    }
+
+    /**
+     * `adoptTombstones` books every element of the given subtree that already
+     * carries a `removedAt` into gc.
+     */
+    private func adoptTombstones(_ element: CRDTElement) {
+        if element.removedAt != nil {
+            self.adoptRemovedElement(element)
+        }
+
+        (element as? CRDTContainer)?.getDescendants { [unowned self] element, _ in
+            if element.removedAt != nil {
+                self.adoptRemovedElement(element)
+            }
+            return false
         }
     }
 
@@ -221,11 +275,9 @@ class CRDTRoot {
             // already-removed container never passed through a removal, so it still
             // sits in live; subtracting it from gc would push gc below zero and
             // leave its cost in live forever.
-            // A charge recorded against some other element that shares this
-            // createdAt says nothing about this one, which is still in live.
-            if let charged = self.sizeInGC[createdAt], charged.element === element {
-                self.docSize.gc.subDataSize(others: charged.size)
-                self.sizeInGC[createdAt] = nil
+            if let charged = self.sizeInGC[GCChargeKey(element: element)] {
+                self.docSize.gc.subDataSize(others: charged)
+                self.sizeInGC[GCChargeKey(element: element)] = nil
             } else {
                 self.docSize.live.subDataSize(others: element.getDataSize())
             }
@@ -267,17 +319,7 @@ class CRDTRoot {
     func registerRemovedElement(_ element: CRDTElement) {
         let moved = self.moveSizeToGC(element)
 
-        // NOTE(hackerwins): registerElement books a container and every descendant
-        // into live, and deregisterElement subtracts both when the tombstone is
-        // collected. Removing a container therefore has to move its descendants as
-        // well: booking only the container itself would strand their size in live
-        // forever and drive gc negative once the collection subtracted them.
-        if let element = element as? CRDTContainer {
-            element.getDescendants { [unowned self] element, _ in
-                _ = self.moveSizeToGC(element)
-                return false
-            }
-        }
+        self.moveDescendantsToGC(element)
 
         // NOTE(hackerwins): When an element is removed, parent sets the removedAt
         // to mark the child as removed. That ticket is part of the size charged to
@@ -286,20 +328,12 @@ class CRDTRoot {
         // it: a size already in gc, or one moved as a descendant while its own
         // removedAt is still unset, did not.
         //
-        // This holds for the incremental path. Two known exceptions, both
-        // pre-existing and both leaving the refund inexact:
-        //
-        // - The initializer registers an already-tombstoned element at its
-        //   post-removal size, so live did hold the ticket and the refund
-        //   over-credits by one per *outermost* tombstone (nested ones take the
-        //   top-up path in `moveSizeToGC` and are not refunded).
-        // - The born-removed branch in `SetOperation` (#1226) marks the LWW-losing
-        //   value removed before `registerElement` books it, so live holds the
-        //   ticket there too and the losing replica ends one ticket high
-        //   (yorkie-js-sdk#1349).
-        //
-        // Use ``adoptRemovedElement(_:)`` for any new path that adopts an element
-        // already booked at its post-removal size.
+        // An element that already carried its `removedAt` when it was registered
+        // does not get the refund. ``registerElement(_:parent:)`` books it with
+        // ``adoptRemovedElement(_:)`` and the top-up branch of ``moveSizeToGC(_:)``
+        // then reports that nothing moved, so a later removal of it lands here with
+        // `moved` false. Live did hold that ticket, and there is nothing to give
+        // back.
         if moved, element.removedAt != nil {
             self.docSize.live.meta += timeTicketSize
         }
@@ -308,24 +342,15 @@ class CRDTRoot {
     }
 
     /**
-     * `adoptRemovedElement` registers an element that was **already tombstoned when
-     * it was registered**, so `registerElement` booked it at its post-removal size.
-     *
-     * Unlike ``registerRemovedElement(_:)`` this does not refund the tombstone
-     * ticket to live: live never held a pre-removal size to get it back from. Use
-     * it when a removed element is adopted wholesale, as when an undo restores a
-     * deepcopy whose members carry `removedAt`.
+     * `adoptRemovedElement` books an element that was already tombstoned when it
+     * was registered, and its descendants, into gc. It is
+     * ``registerRemovedElement(_:)`` without the ticket refund: the size just
+     * charged to live already included the `removedAt` ticket, so live has
+     * nothing to get back.
      */
-    func adoptRemovedElement(_ element: CRDTElement) {
-        _ = self.moveSizeToGC(element)
-
-        if let element = element as? CRDTContainer {
-            element.getDescendants { [unowned self] element, _ in
-                _ = self.moveSizeToGC(element)
-                return false
-            }
-        }
-
+    private func adoptRemovedElement(_ element: CRDTElement) {
+        self.moveSizeToGC(element)
+        self.moveDescendantsToGC(element)
         self.gcElementSetByCreatedAt.insert(element.createdAt.toIDString)
     }
 
@@ -337,25 +362,42 @@ class CRDTRoot {
      * charge topped up: `getDataSize` grows by a ticket when `removedAt` is set,
      * which can happen after the move.
      *
-     * A charge recorded against a different element that shares this createdAt is
-     * not this element's: this one is still in live and moves in full. The record
-     * it displaces is a released one (zero), so nothing charged is lost.
+     * Another element sharing this createdAt has a charge of its own, and it is
+     * not this one's: this element is still in live and moves in full.
      */
+    @discardableResult
     private func moveSizeToGC(_ element: CRDTElement) -> Bool {
-        let createdAt = element.createdAt.toIDString
+        let key = GCChargeKey(element: element)
         let size = element.getDataSize()
 
-        if let charged = self.sizeInGC[createdAt], charged.element === element {
-            self.docSize.gc.addDataSizes(others: DataSize(data: size.data - charged.size.data,
-                                                          meta: size.meta - charged.size.meta))
-            self.sizeInGC[createdAt] = GCCharge(element: element, size: size)
+        if let charged = self.sizeInGC[key] {
+            self.docSize.gc.addDataSizes(others: DataSize(data: size.data - charged.data,
+                                                          meta: size.meta - charged.meta))
+            self.sizeInGC[key] = size
             return false
         }
 
         self.docSize.gc.addDataSizes(others: size)
         self.docSize.live.subDataSize(others: size)
-        self.sizeInGC[createdAt] = GCCharge(element: element, size: size)
+        self.sizeInGC[key] = size
         return true
+    }
+
+    /**
+     * `moveDescendantsToGC` moves the size of every descendant of the given
+     * element from live to gc.
+     *
+     * NOTE(hackerwins): `registerElement` books a container and every descendant
+     * into live, and `deregisterElement` subtracts both when the tombstone is
+     * collected. Removing a container therefore has to move its descendants as
+     * well: booking only the container itself would strand their size in live
+     * forever and drive gc negative once the collection subtracted them.
+     */
+    private func moveDescendantsToGC(_ element: CRDTElement) {
+        (element as? CRDTContainer)?.getDescendants { [unowned self] element, _ in
+            self.moveSizeToGC(element)
+            return false
+        }
     }
 
     /**
@@ -428,8 +470,8 @@ class CRDTRoot {
         // actually charged -- the same split `deregisterElement` makes. A member
         // added into an already-removed container never passed through a removal,
         // so it still sits in live.
-        if let charged = self.sizeInGC[createdAt], charged.element === element {
-            self.docSize.gc.subDataSize(others: charged.size)
+        if let charged = self.sizeInGC[GCChargeKey(element: element)] {
+            self.docSize.gc.subDataSize(others: charged)
         } else {
             self.docSize.live.subDataSize(others: element.getDataSize())
         }
@@ -439,9 +481,9 @@ class CRDTRoot {
         // peer that has not seen the restore can still remove something inside this
         // subtree, and `moveSizeToGC` would then take its size out of live for a
         // second time and drive docSize negative. A zero charge says live is not
-        // holding it, and the identity says which element that is about, so a copy
-        // restored under the same createdAt is still charged normally.
-        self.sizeInGC[createdAt] = GCCharge(element: element, size: DataSize(data: 0, meta: 0))
+        // holding it. A copy restored under the same createdAt has a slot of its
+        // own and is still charged normally.
+        self.sizeInGC[GCChargeKey(element: element)] = DataSize(data: 0, meta: 0)
 
         if self.elementPairMapByCreatedAt[createdAt]?.element === element {
             self.gcElementSetByCreatedAt.remove(createdAt)

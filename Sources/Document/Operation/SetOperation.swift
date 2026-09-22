@@ -125,37 +125,19 @@ struct SetOperation: Operation {
         // An ordinary set carries a freshly issued createdAt, so the lookup
         // normally misses and costs one map read.
         root.unregisterRemovedElementPair(value.createdAt)
+        // `registerElement` adopts every tombstone in the subtree it books, so the
+        // members `RemoveOperation.toReverseOperation` captured as already-removed
+        // inside `value.deepcopy()` are charged to gc and made collectable without
+        // a walk here.
         root.registerElement(value, parent: parent)
-        // NOTE: `RemoveOperation.toReverseOperation` captures `value.deepcopy()` at
-        // remove time, and deepcopy preserves members whose `removedAt` is set.
-        // `unregisterRemovedElementPair` has just released the tombstone's subtree
-        // and dropped those createdAts from the GC set, and `registerElement` books
-        // the copies into live without re-registering them as removed -- so without
-        // this walk a tombstone nested inside a restored container stays in live and
-        // is never collectable again.
-        //
-        // `adoptRemovedElement` rather than `registerRemovedElement`: the latter
-        // refunds a tombstone ticket to live, which over-credits here because
-        // `registerElement` has just booked these copies at their post-removal
-        // size. (`CRDTRoot.init` adopts an already-tombstoned tree through the
-        // refunding path instead, which is where its own known drift comes from.)
-        if let container = value as? CRDTContainer {
-            container.getDescendants { element, _ in
-                if element.removedAt != nil {
-                    root.adoptRemovedElement(element)
-                }
-                return false
-            }
-        }
         if let removed {
             root.registerRemovedElement(removed)
         }
-        // NOTE(#1226): When the new value already has a removedAt (e.g. it was the
-        // LWW-losing side of a concurrent set), register it as removed so GC can
-        // collect it once all peers have seen the winning value.
-        if value.removedAt != nil {
-            root.registerRemovedElement(value)
-        }
+        // NOTE(hackerwins): A value that lost the set is marked removed by
+        // `parent.set` above, before it was registered. `registerElement` is what
+        // books it into gc, and registering it as removed a second time here would
+        // refund a ticket live is holding on the one path where `registerElement`
+        // leaves it in live.
 
         guard let path = try? root.createPath(createdAt: parentCreatedAt) else {
             throw YorkieError(code: .errUnexpected, message: "fail to get path")
