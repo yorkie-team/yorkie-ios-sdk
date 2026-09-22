@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.22] - 2026-09-22
+
+> Requires a Yorkie server v0.7.22 or later: three of these are the client halves of fixes shipping with [yorkie v0.7.22](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.22).
+
+> **Behavioural change — documents measure larger.** `ElementRHT.set` now stamps `movedAt` on the member it stores, as the JS SDK has always done. `getMetaUsage` counts `movedAt`, so every object member had been costing one `timeTicketSize` (24 bytes) less than in the JS SDK. `docSize` is what `Document.update` measures against `maxSizeLimit`, so iOS was accepting documents the JS SDK rejects; an app sitting close to the limit may begin to hit it.
+
+> **Breaking — `DocStore` changed shape.** Offline persistence is now a snapshot plus an append-only change log rather than one opaque blob. `load` returns `StoredDoc?` instead of `Data?`, `save` becomes `saveSnapshot`, and `appendChange` and `saveMeta` are new. Apps using the default `MemoryDocStore` are unaffected; an app with its own `DocStore` must be updated.
+
+### Changed
+
+- Persist offline changes incrementally instead of re-snapshotting in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Bump dependencies to fix 79 Dependabot security alerts (JS-only; npm packages have no iOS counterpart) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+
+### Fixed
+
+- Validate the restore log against meta's counter, not its checkpoint in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Reject malformed YSON constructor argument lists in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Fix docSize accounting for elements removed before registration in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Anchor ElementRHT.set eviction on the occupant's positionedAt in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Accept an object literal when inserting into an array, which previously threw `errUnimplemented` in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Register the position node an array move abandons on the clone as well as the root, so their `docSize` agree in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+- Restore correctly when an object is removed and undone after a garbage collection has run in https://github.com/yorkie-team/yorkie-ios-sdk/pull/276
+
 ## [v0.7.21] - 2026-09-21
 
 > Pairs with [yorkie v0.7.21](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.21), which fixes the server half of the same element-identity problem (yorkie#1978, yorkie#1980). A document already carrying an unresolvable collection entry keeps its size charged to `gc` until it is deregistered: the guard skips such a member rather than dropping it.
