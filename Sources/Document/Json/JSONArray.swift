@@ -428,7 +428,12 @@ public class JSONArray: CustomDebugStringConvertible {
             for element in array {
                 child.pushInternal(element)
             }
-            return crdtArray
+            // `clone`, not `crdtArray`: the clone is what was inserted and what the members
+            // were pushed into. `insertAfter` wraps this return in a proxy and hands it to
+            // the caller, so returning the detached original gives them a proxy whose writes
+            // land nowhere the clone can see -- the root still takes them, because operations
+            // address by `createdAt`, so the two silently disagree.
+            return clone
         } else if let dictionary = value as? [String: Any] {
             // An object literal, accepted the way `[Any]` above is. Without this branch a
             // dictionary fell through to the `errUnimplemented` throw, so an app could not
@@ -453,7 +458,9 @@ public class JSONArray: CustomDebugStringConvertible {
 
             let child = JSONObject(target: clone, context: self.context)
             child.set(dictionary)
-            return crdtObject
+            // See the note in the `[Any]` branch above: the inserted clone is what the
+            // caller's proxy has to target.
+            return clone
         } else if value is JSONArray {
             let crdtArray = CRDTArray(createdAt: ticket)
             guard let clone = crdtArray.deepcopy() as? CRDTArray else {

@@ -2361,7 +2361,11 @@ extension Client {
             } catch {
                 Logger.warning("[Store] persisted header for \(doc.getKey()) is unreadable (\(error)); " +
                     "keeping the snapshot")
-                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: [])
+                // The log is discarded with the header, so report what it held: an
+                // unreadable header says nothing about whether the entries decode, and an
+                // empty event would tell the app nothing was lost when something was.
+                let lost = (try? Converter.fromChanges(stored.changes.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
+                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost)
                 return
             }
         }
@@ -2739,7 +2743,26 @@ extension Client {
             // and a header landing over a holed log costs the un-pushed edits their pending
             // status until the server resends them.
             let key = client.storeKey(doc.getKey())
-            if client.persistStates[key]?.poisoned == true, let store = client.store {
+            let state = client.persistStates[key]
+
+            // A header write is only safe while the log actually holds everything the
+            // checkpoint covers. Two ways it does not:
+            //
+            // - the log has a hole, so the change that failed to append lives only in memory;
+            // - an append was still queued when the sync drained the change it was going to
+            //   read. `persistToStore` reads the pending queue when its chained task runs,
+            //   not when the edit happened, so a sync completing first leaves the change in
+            //   neither the snapshot nor the log while `lastAppendedClientSeq` stays behind.
+            //
+            // Writing the header either way records a `serverSeq` past content the store does
+            // not hold, and the server will not resend a change it has already taken. The
+            // restore guard does catch it and falls back to the snapshot, but that costs the
+            // un-pushed edits their pending status -- a snapshot here avoids it entirely.
+            //
+            // In healthy operation `lastAppendedClientSeq` is never below the checkpoint, so
+            // this is an invariant check rather than a live branch.
+            let logIsBehind = (state?.lastAppendedClientSeq ?? 0) < doc.checkpoint.getClientSeq()
+            if state?.poisoned == true || logIsBehind, let store = client.store {
                 await client.writeBaseSnapshot(doc, key: key, store: store)
             } else {
                 await client.saveMetaToStore(doc)

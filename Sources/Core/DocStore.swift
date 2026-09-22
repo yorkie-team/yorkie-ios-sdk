@@ -96,6 +96,12 @@ public protocol DocStore: Sendable {
     /// It is an **upsert keyed by `clientSeq`**: re-appending a change already stored
     /// replaces it rather than duplicating it, so a retried write is safe.
     ///
+    /// It is a **no-op when nothing is stored for the key**, like ``saveMeta(docKey:bytes:)``.
+    /// An implementation must not create an entry here: the entry would hold a log with no
+    /// snapshot under it, which is not restorable, and the client discards an unrestorable
+    /// entry -- taking the un-pushed changes in that log with it. The client always writes a
+    /// base snapshot before it appends.
+    ///
     /// - Parameters:
     ///   - docKey: The key of the document the change belongs to.
     ///   - change: The change to append.
