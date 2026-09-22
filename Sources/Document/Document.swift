@@ -1519,6 +1519,66 @@ public class Document: Attachable {
     /// project's `function_parameter_count` lint budget.
     ///
     /// - Parameter state: The restorable state to install.
+    /// Overwrites the clocks a sync advances, leaving the root and pending changes alone.
+    ///
+    /// The write-side counterpart of ``metaToBytes()``. The snapshot stays put while a sync
+    /// advances the header constantly, which is why the two are stored apart.
+    ///
+    /// - Parameters:
+    ///   - checkpoint: The checkpoint as of the last sync.
+    ///   - changeID: The change id as of the last sync.
+    ///   - epoch: The epoch, when the header carried one.
+    ///   - docID: The document id, when the header carried one.
+    func applyRestoredMeta(checkpoint: Checkpoint, changeID: ChangeID?, epoch: Int64?, docID: DocumentID?) {
+        self.checkpoint = checkpoint
+        if let changeID {
+            self.changeID = changeID
+        }
+        // Trailing fields stay optional, the same rule the `toBytes` envelope follows, so
+        // meta written before they existed still decodes.
+        if let epoch {
+            self.epoch = epoch
+        }
+        if let docID {
+            self.docID = docID
+        }
+    }
+
+    /// Replays a run of persisted changes onto this document and re-queues the un-acked
+    /// ones.
+    ///
+    /// - Parameters:
+    ///   - changes: The appended changes, ascending by `clientSeq`.
+    ///   - ackedClientSeq: The `clientSeq` the server has already acknowledged.
+    /// - Throws: Whatever ``applyChanges(_:source:)`` throws.
+    func appendRestoredChanges(_ changes: [Change], ackedClientSeq: UInt32) throws {
+        // Every entry is applied -- the log is the delta between the snapshot and current
+        // content, so skipping an acked one would leave the root behind. Only the un-acked
+        // ones are queued: re-pushing what the server has already taken presents a
+        // `clientSeq` it will skip.
+        try self.applyChanges(changes, source: .local)
+        self.localChanges.append(contentsOf: changes.filter { $0.id.getClientSeq() > ackedClientSeq })
+
+        // Adopt the last replayed change's ID as the document's own counter.
+        //
+        // `applyChanges` only syncs clocks, which leaves `clientSeq` behind and over-advances
+        // `lamport` (it bumps per change, on top of a snapshot that predates them). Both
+        // matter. `createChangePack` derives the pushed checkpoint from `clientSeq`, so a
+        // counter left behind mints a sequence the server has already seen and silently drops
+        // the next edit; and a lamport that ran ahead mis-stamps every later ticket.
+        //
+        // Guarded: an all-acked replay must not pull the clock back below what the meta
+        // header already established.
+        if let lastID = changes.last?.id, lastID.getClientSeq() >= self.changeID.getClientSeq() {
+            self.changeID = lastID
+        }
+
+        // The clone predates the replay, and the history's reverse-ops reference the
+        // pre-replay state -- the same reasoning ``restoreFromBytes(_:)`` applies.
+        self.clone = nil
+        self.clearHistory()
+    }
+
     func applyPersistedState(_ state: PersistedDocumentState) {
         self.root = state.root
         self.presences = state.presences

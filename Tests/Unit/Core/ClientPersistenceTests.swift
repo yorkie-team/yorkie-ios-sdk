@@ -402,22 +402,28 @@ final class ClientPersistenceTests: XCTestCase {
         }
         await client.drainPersists()
 
-        // then: the last write to land carries the newest bytes, not whichever save happened
-        // to finish its I/O first.
-        let loaded = try await store.load(docKey: storeKey)
-        let lastBytes = try XCTUnwrap(loaded).snapshot
-        let lastDoc = try Document.fromBytes(key: docKey, bytes: lastBytes)
-        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"second\"}")
-
+        // then: the first edit writes the base snapshot and the second APPENDS to it -- the
+        // whole point of the incremental store, so only one snapshot is written.
         let completionOrder = await store.completionOrder
-        XCTAssertEqual(completionOrder.count, 2)
+        XCTAssertEqual(completionOrder.count, 1, "the second edit must append, not re-snapshot")
+        let appended = await store.appendOrder
+        XCTAssertEqual(appended.count, 1, "the second edit must be appended to the log")
+
+        // Restoring means snapshot then log: the snapshot alone is deliberately behind.
+        let entry = try await store.load(docKey: storeKey)
+        let loaded = try XCTUnwrap(entry)
+        let lastDoc = try Document.fromBytes(key: docKey, bytes: loaded.snapshot)
+        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"first\"}",
+                       "the snapshot is the base the log is appended to, so it holds the first edit")
+        try lastDoc.restoreAppendedChanges(loaded.changes)
+        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"second\"}",
+                       "snapshot plus log has to reconstruct the newest content")
+
         let firstCompletedDoc = try Document.fromBytes(key: docKey, bytes: completionOrder[0])
-        let secondCompletedDoc = try Document.fromBytes(key: docKey, bytes: completionOrder[1])
         XCTAssertEqual(
             firstCompletedDoc.toSortedJSON(), "{\"value\":\"first\"}",
             "chained: the slower first write still completes before the second one starts"
         )
-        XCTAssertEqual(secondCompletedDoc.toSortedJSON(), "{\"value\":\"second\"}")
     }
 
     // MARK: Client.getActorID()
@@ -482,6 +488,8 @@ private actor RecordingSlowDocStore: DocStore {
     /// to no delay once exhausted.
     private var delaysNanoseconds: [UInt64]
     private(set) var completionOrder = [Data]()
+    /// Appended changes in completion order, so a test can tell an append from a snapshot.
+    private(set) var appendOrder = [StoredChange]()
     private var stored: StoredDoc?
 
     init(delaysNanoseconds: [UInt64]) {
@@ -501,6 +509,7 @@ private actor RecordingSlowDocStore: DocStore {
         guard let entry = self.stored else {
             return
         }
+        self.appendOrder.append(change)
         var changes = entry.changes
         if let existing = changes.firstIndex(where: { $0.clientSeq == change.clientSeq }) {
             changes[existing] = change

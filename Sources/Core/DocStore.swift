@@ -22,11 +22,11 @@ import Foundation
 /// what lets a restore detect a hole rather than replaying a discontinuous run.
 public struct StoredChange: Sendable, Equatable {
     /// The `clientSeq` this change carries.
-    public let clientSeq: Int64
+    public let clientSeq: UInt32
     /// The serialized change.
     public let bytes: Data
 
-    public init(clientSeq: Int64, bytes: Data) {
+    public init(clientSeq: UInt32, bytes: Data) {
         self.clientSeq = clientSeq
         self.bytes = bytes
     }
