@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
     
     env:
-      # yorkie server v0.7.21
-      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/0559f1bf4d2e456adc94b9b414c74fbe9d0d7d08/Formula/y/yorkie.rb"
+      # yorkie server v0.7.22
+      YORKIE_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/d1a1ec1782ea9a5ae3b5b07333097f4a9a15c82b/Formula/y/yorkie.rb"
       # swiftlint v0.58.2
       SWIFTLINT_RB_URL: "https://raw.githubusercontent.com/Homebrew/homebrew-core/ae3894d1d8d343733160e1c57903187228628d9d/Formula/s/swiftlint.rb"
       # swiftformat v0.55.6
