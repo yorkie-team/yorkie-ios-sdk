@@ -98,8 +98,10 @@ struct YorkieError: Error, CustomStringConvertible {
         /// Returned when an offline-persistence attach cannot take the single-active-session
         /// lock because another session already holds it for this document.
         ///
-        /// It is its own code so a consumer can fall back to a non-persisting client on
-        /// exactly this condition without matching on message text.
+        /// Its own code rather than a generic argument error, so the condition is
+        /// distinguishable without matching on message text. Note that ``YorkieError`` is
+        /// internal today, so an app cannot yet read this off a caught error -- upstream
+        /// exposes it and iOS should, but widening the error surface is its own change.
         case errDocumentOpenElsewhere = "ErrDocumentOpenElsewhere"
 
         // ErrTooManyAttachments is returned when the number of attachments exceeds the limit.

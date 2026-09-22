@@ -279,18 +279,6 @@ public enum YSON {
     /// parent: `Int(1},"y":{"a":2)` would parse to an object carrying a `y` key that was
     /// never in the document.
     private static func splitConstructorArgs(_ name: String, _ bytes: [UInt8]) throws -> [[UInt8]] {
-        func trimmed(_ slice: ArraySlice<UInt8>) -> [UInt8] {
-            var lower = slice.startIndex
-            var upper = slice.endIndex
-            while lower < upper, self.isSpaceByte(slice[lower]) {
-                lower += 1
-            }
-            while upper > lower, self.isSpaceByte(slice[upper - 1]) {
-                upper -= 1
-            }
-            return Array(slice[lower ..< upper])
-        }
-
         var args: [[UInt8]] = []
         var stack: [UInt8] = []
         var start = 0
@@ -316,7 +304,7 @@ public enum YSON {
                     throw YorkieError(code: .errInvalidArgument, message: "\(name) has unbalanced brackets")
                 }
             } else if byte == Byte.comma, stack.isEmpty {
-                args.append(trimmed(bytes[start ..< idx]))
+                args.append(self.trimmedBytes(bytes[start ..< idx]))
                 start = idx + 1
             }
             idx += 1
@@ -326,7 +314,7 @@ public enum YSON {
             throw YorkieError(code: .errInvalidArgument, message: "\(name) has unbalanced brackets")
         }
 
-        args.append(trimmed(bytes[start...]))
+        args.append(self.trimmedBytes(bytes[start...]))
         return args
     }
 

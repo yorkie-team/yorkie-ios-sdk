@@ -150,8 +150,6 @@ final class DocumentSizeContainerGCTests: XCTestCase {
         let empty = doc.getDocSize()
 
         try doc.update { root, _ in root.k = ["inner": ["a": "1"]] }
-        // NOTE: upstream JS expects {2,168}; see the divergence note on
-        // `test_removing_a_non_empty_container`.
         XCTAssertEqual(doc.getDocSize().live, DataSize(data: 2, meta: 168))
 
         // when — remove the descendant on its own first
@@ -298,10 +296,6 @@ final class DocumentSizeContainerGCTests: XCTestCase {
 
         try doc.update { root, _ in root.k = [["a": "1"]] }
         let built = doc.getDocSize()
-        // NOTE: upstream JS expects {2,144} here; see the divergence note on
-        // `test_removing_a_non_empty_container` -- the "a" key of the array's
-        // object element is still an object-member write, so it costs one fewer
-        // `timeTicketSize` on iOS than upstream.
         XCTAssertEqual(built.live, DataSize(data: 2, meta: 144))
 
         // when
