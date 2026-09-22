@@ -257,6 +257,32 @@ final class GCContainmentTests: XCTestCase {
         XCTAssertGreaterThan(root.garbageLength, 0)
     }
 
+    /// Repeatedly removing, undoing and collecting used to leave the undo silently doing
+    /// nothing: the restored value carries the original's older `createdAt`, so under the
+    /// pre-0.7.22 `createdAt` anchoring it lost the LWW comparison against the tombstone and
+    /// the document stayed empty. Anchoring on `positionedAt` (yorkie-js-sdk#1343) is what
+    /// makes the restore win.
+    @MainActor
+    func test_an_undo_still_restores_after_a_collection_has_run() throws {
+        // given
+        let doc = Document(key: "undo-after-gc")
+        try doc.update { root, _ in root.o = ["k": Int64(1)] }
+
+        // when -- remove, undo, collect, then remove and undo again.
+        try doc.update({ root, _ in root.remove(key: "o") }, "remove o")
+        try doc.undo()
+        doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [doc.changeID.getActorID()]))
+        XCTAssertEqual(doc.toSortedJSON(), "{\"o\":{\"k\":1}}", "the first undo must survive a collection")
+
+        try doc.update({ root, _ in root.remove(key: "o") }, "remove o again")
+        XCTAssertEqual(doc.toSortedJSON(), "{}")
+        try doc.undo()
+
+        // then
+        XCTAssertEqual(doc.toSortedJSON(), "{\"o\":{\"k\":1}}",
+                       "the second undo restored nothing, so the removal was never reverted")
+    }
+
     @MainActor
     func test_collects_the_tombstone_an_undone_object_remove_leaves_on_a_peer() throws {
         // given -- `SetOperation` restores the member under its original

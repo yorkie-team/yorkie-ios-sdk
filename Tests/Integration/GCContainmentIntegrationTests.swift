@@ -69,12 +69,15 @@ private func reorderToFront(_ root: JSONObject, id: String, width: Int64, height
     }
 
     _ = try items.splice(start: idx, deleteCount: 1)
-    _ = try items.splice(start: 0, deleteCount: 0, items: JSONObject())
-    (items[0] as? JSONObject)?.set([
+    // Upstream writes this as `r.items.splice(0, 0, plain)`. iOS accepts the same literal
+    // now, though it still expands to an empty container plus per-member operations rather
+    // than the single `Add` `buildCRDTElement` produces -- see the note in
+    // `JSONArray.insertAfterInternal`.
+    _ = try items.splice(start: 0, deleteCount: 0, items: [
         "id": id,
         "box": ["w": width, "h": height],
         "body": ["text": text]
-    ])
+    ] as [String: Any])
 }
 
 final class GCContainmentIntegrationTests: XCTestCase {

@@ -351,11 +351,18 @@ public class JSONArray: CustomDebugStringConvertible {
         )
         self.context.push(operation: operation)
 
-        try self.target.move(
+        // Registered the same way `MoveOperation` registers it against the root. The move
+        // abandons the element's old position node, which is charged to gc and collected once
+        // every peer has applied the winning move; leaving it unregistered here made the
+        // clone's `docSize` disagree with the root's after any array move -- and the clone's
+        // is what `Document.update` measures against `maxSizeLimit`.
+        if let deadNode = try self.target.moveAfter(
             createdAt: createdAt,
-            afterCreatedAt: prevPosCreatedAt,
+            prevCreatedAt: prevPosCreatedAt,
             executedAt: ticket
-        )
+        ) {
+            self.context.registerGCPair(GCPair(parent: self.target.getRGATreeList(), child: deadNode))
+        }
     }
 
     /**
@@ -417,6 +424,31 @@ public class JSONArray: CustomDebugStringConvertible {
                 child.pushInternal(element)
             }
             return crdtArray
+        } else if let dictionary = value as? [String: Any] {
+            // An object literal, accepted the way `[Any]` above is. Without this branch a
+            // dictionary fell through to the `errUnimplemented` throw, so an app could not
+            // insert a nested object into an array at all.
+            //
+            // This closes the API gap, NOT the operation-shape one: like the `[Any]` branch,
+            // it inserts an empty container and then pushes the members as their own
+            // operations. `buildCRDTElement` in `json/element.ts` builds children first and
+            // pushes a single `Add`, so iOS still emits a different sequence than the JS SDK
+            // for every nested literal. Closing that means porting `buildCRDTElement`, which
+            // is a change to how both proxies construct elements.
+            let crdtObject = CRDTObject(createdAt: ticket)
+            guard let clone = crdtObject.deepcopy() as? CRDTObject else {
+                throw YorkieError(code: .errUnexpected, message: "Failed to cast object.deepcopy() to CRDTObject")
+            }
+
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
+            self.context.push(operation: operation)
+
+            let child = JSONObject(target: clone, context: self.context)
+            child.set(dictionary)
+            return crdtObject
         } else if value is JSONArray {
             let crdtArray = CRDTArray(createdAt: ticket)
             guard let clone = crdtArray.deepcopy() as? CRDTArray else {
