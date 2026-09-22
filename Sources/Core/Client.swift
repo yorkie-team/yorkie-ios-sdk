@@ -2218,7 +2218,7 @@ extension Client {
             // transient storage error. The attach still proceeds, since failing it outright
             // would make a document unusable over a read glitch, but this session does not
             // persist, so whatever is stored survives for a session that can read it.
-            var loaded: Data?
+            var loaded: StoredDoc?
             do {
                 loaded = try await store.load(docKey: self.storeKey(doc.getKey()))
             } catch {
@@ -2228,7 +2228,8 @@ extension Client {
                 loaded = nil
             }
 
-            if let bytes = loaded {
+            if let stored = loaded {
+                let bytes = stored.snapshot
                 do {
                     try doc.restoreFromBytes(bytes)
                     restored = true
@@ -2379,7 +2380,11 @@ extension Client {
             return
         }
         do {
-            try await store.save(docKey: self.storeKey(doc.getKey()), bytes: doc.toBytes())
+            // TODO(0.7.22): this still re-snapshots on every local change. The
+            // incremental path -- `appendChange` per change, `saveSnapshot` only when
+            // `shouldCompact` says the log has outgrown it -- is the point of
+            // yorkie-js-sdk#1354 and is not wired yet.
+            try await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: doc.toBytes())
         } catch {
             Logger.warning("[Store] failed to persist \(doc.getKey()): \(error)")
         }

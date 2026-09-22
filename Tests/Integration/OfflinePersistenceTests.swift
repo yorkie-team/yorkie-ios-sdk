@@ -149,8 +149,8 @@ final class OfflinePersistenceTests: XCTestCase {
 
         // then: the stored envelope reflects the post-sync state — nothing left pending.
         let storeKey = "/\(clientKey)/\(docKey)"
-        let bytes = try await store.load(docKey: storeKey)
-        let persisted = try XCTUnwrap(bytes)
+        let stored = try await store.load(docKey: storeKey)
+        let persisted = try XCTUnwrap(stored).snapshot
         let restored = try Document.fromBytes(key: docKey, bytes: persisted)
         XCTAssertTrue(restored.getPendingChangeStructs().isEmpty,
                       "an acknowledged change must not stay pending in the stored envelope")
@@ -166,7 +166,7 @@ final class OfflinePersistenceTests: XCTestCase {
         let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
         let store = MemoryDocStore()
         let clientKey = UUID().uuidString
-        try await store.save(docKey: "/\(clientKey)/\(docKey)", bytes: Data([0xDE, 0xAD, 0xBE, 0xEF]))
+        try await store.saveSnapshot(docKey: "/\(clientKey)/\(docKey)", bytes: Data([0xDE, 0xAD, 0xBE, 0xEF]))
 
         let client = Client(self.rpcAddress, ClientOptions(key: clientKey, store: store))
         try await client.activate()

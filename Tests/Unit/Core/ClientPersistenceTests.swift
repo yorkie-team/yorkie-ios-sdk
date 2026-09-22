@@ -38,10 +38,10 @@ final class ClientPersistenceTests: XCTestCase {
         let store = MemoryDocStore()
         let bytes = Data("hello".utf8)
 
-        try await store.save(docKey: "doc-1", bytes: bytes)
+        try await store.saveSnapshot(docKey: "doc-1", bytes: bytes)
         let loaded = try await store.load(docKey: "doc-1")
 
-        XCTAssertEqual(loaded, bytes)
+        XCTAssertEqual(loaded?.snapshot, bytes)
     }
 
     func test_memorydocstore_load_of_an_absent_key_returns_nil() async throws {
@@ -61,17 +61,17 @@ final class ClientPersistenceTests: XCTestCase {
     func test_memorydocstore_overwrite_replaces_the_stored_bytes() async throws {
         let store = MemoryDocStore()
 
-        try await store.save(docKey: "doc-1", bytes: Data("first".utf8))
-        try await store.save(docKey: "doc-1", bytes: Data("second".utf8))
+        try await store.saveSnapshot(docKey: "doc-1", bytes: Data("first".utf8))
+        try await store.saveSnapshot(docKey: "doc-1", bytes: Data("second".utf8))
         let loaded = try await store.load(docKey: "doc-1")
 
-        XCTAssertEqual(loaded, Data("second".utf8))
+        XCTAssertEqual(loaded?.snapshot, Data("second".utf8))
     }
 
     func test_memorydocstore_remove_clears_a_previously_saved_key() async throws {
         let store = MemoryDocStore()
 
-        try await store.save(docKey: "doc-1", bytes: Data("hello".utf8))
+        try await store.saveSnapshot(docKey: "doc-1", bytes: Data("hello".utf8))
         try await store.remove(docKey: "doc-1")
         let loaded = try await store.load(docKey: "doc-1")
 
@@ -86,7 +86,7 @@ final class ClientPersistenceTests: XCTestCase {
         await withTaskGroup(of: Void.self) { group in
             for index in 0 ..< 100 {
                 group.addTask {
-                    try? await store.save(docKey: "doc-\(index % 5)", bytes: Data("v\(index)".utf8))
+                    try? await store.saveSnapshot(docKey: "doc-\(index % 5)", bytes: Data("v\(index)".utf8))
                 }
             }
         }
@@ -341,10 +341,10 @@ final class ClientPersistenceTests: XCTestCase {
         let originalPending = original.getPendingChangeStructs()
         XCTAssertEqual(originalPending.count, 2)
 
-        try await store.save(docKey: docKey, bytes: original.toBytes())
+        try await store.saveSnapshot(docKey: docKey, bytes: original.toBytes())
 
         let loaded = try await store.load(docKey: docKey)
-        let bytes = try XCTUnwrap(loaded)
+        let bytes = try XCTUnwrap(loaded).snapshot
         let restored = try Document.fromBytes(key: docKey, bytes: bytes)
 
         let restoredPending = restored.getPendingChangeStructs()
@@ -405,7 +405,7 @@ final class ClientPersistenceTests: XCTestCase {
         // then: the last write to land carries the newest bytes, not whichever save happened
         // to finish its I/O first.
         let loaded = try await store.load(docKey: storeKey)
-        let lastBytes = try XCTUnwrap(loaded)
+        let lastBytes = try XCTUnwrap(loaded).snapshot
         let lastDoc = try Document.fromBytes(key: docKey, bytes: lastBytes)
         XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"second\"}")
 
@@ -478,26 +478,47 @@ private actor FakeContendedSessionLock: SessionLock {
 /// bytes of every save in the order it completed, plus the last one to land, so a test can
 /// assert on both.
 private actor RecordingSlowDocStore: DocStore {
-    /// Sleep durations to consume, one per call to `save`, in call order. Falls back to no
-    /// delay once exhausted.
+    /// Sleep durations to consume, one per call to `saveSnapshot`, in call order. Falls back
+    /// to no delay once exhausted.
     private var delaysNanoseconds: [UInt64]
     private(set) var completionOrder = [Data]()
-    private var stored: Data?
+    private var stored: StoredDoc?
 
     init(delaysNanoseconds: [UInt64]) {
         self.delaysNanoseconds = delaysNanoseconds
     }
 
-    func save(docKey: String, bytes: Data) async throws {
+    func saveSnapshot(docKey: String, bytes: Data) async throws {
         let delay = self.delaysNanoseconds.isEmpty ? 0 : self.delaysNanoseconds.removeFirst()
         if delay > 0 {
             try? await Task.sleep(nanoseconds: delay)
         }
         self.completionOrder.append(bytes)
-        self.stored = bytes
+        self.stored = StoredDoc(snapshot: bytes)
     }
 
-    func load(docKey: String) async throws -> Data? {
+    func appendChange(docKey: String, change: StoredChange) async throws {
+        guard let entry = self.stored else {
+            return
+        }
+        var changes = entry.changes
+        if let existing = changes.firstIndex(where: { $0.clientSeq == change.clientSeq }) {
+            changes[existing] = change
+        } else {
+            changes.append(change)
+            changes.sort { $0.clientSeq < $1.clientSeq }
+        }
+        self.stored = StoredDoc(snapshot: entry.snapshot, meta: entry.meta, changes: changes)
+    }
+
+    func saveMeta(docKey: String, bytes: Data) async throws {
+        guard let entry = self.stored else {
+            return
+        }
+        self.stored = StoredDoc(snapshot: entry.snapshot, meta: bytes, changes: entry.changes)
+    }
+
+    func load(docKey: String) async throws -> StoredDoc? {
         self.stored
     }
 
