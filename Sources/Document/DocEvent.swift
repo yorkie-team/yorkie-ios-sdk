@@ -358,6 +358,12 @@ public struct LocalChangesDroppedValue {
         case actorMismatch = "actor-mismatch"
         /// The stored bytes could not be decoded at all, so nothing could be restored.
         case restoreFailed = "restore-failed"
+        /// The appended change log had a hole, so it could not be replayed and the snapshot
+        /// was kept instead.
+        ///
+        /// Distinct from ``restoreFailed``: the snapshot restored perfectly well, and what
+        /// was lost is the log written after it.
+        case logDiscontinuity = "log-discontinuity"
     }
 
     /// Why the changes were dropped.

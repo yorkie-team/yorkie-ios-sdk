@@ -2261,16 +2261,7 @@ extension Client {
                 let bytes = stored.snapshot
                 do {
                     try doc.restoreFromBytes(bytes)
-                    // The header first, then the log. `meta` carries the checkpoint the last
-                    // sync acked, and the replay needs it to know which appended changes the
-                    // server already has: those still have to be applied, because the log is
-                    // the delta between the snapshot and the current content, but they must
-                    // not be re-queued for push.
-                    if let meta = stored.meta {
-                        try doc.restoreMetaFromBytes(meta)
-                    }
-                    try doc.restoreAppendedChanges(stored.changes,
-                                                   ackedClientSeq: doc.checkpoint.getClientSeq())
+                    try await self.replayAppendedLog(stored, into: doc, snapshot: bytes, store: store)
                     restored = true
                 } catch {
                     // An envelope that cannot be restored is unusable, but it must never abort
@@ -2305,6 +2296,101 @@ extension Client {
     /// - Parameters:
     ///   - doc: The document leaving this client.
     ///   - attachment: Its attachment, holding the session lease.
+    /// Replays the appended log onto a document just restored from its snapshot, after
+    /// checking the log actually backs the header it is stored with.
+    ///
+    /// - Parameters:
+    ///   - stored: The loaded entry.
+    ///   - doc: The document, already restored from `snapshot`.
+    ///   - snapshot: The snapshot bytes, used to undo the header if the log cannot back it.
+    ///   - store: The configured store.
+    /// - Throws: Whatever restoring the snapshot or replaying the log raises.
+    private func replayAppendedLog(_ stored: StoredDoc,
+                                   into doc: Document,
+                                   snapshot: Data,
+                                   store: DocStore) async throws
+    {
+        // Two watermarks, because the log answers two questions.
+        //
+        // The *snapshot* watermark says which entries the snapshot already contains, so
+        // everything above it must be replayed to bring the root forward. It is read before
+        // the header is applied, since the header describes the server's position and not
+        // the snapshot's contents.
+        //
+        // The *ack* watermark says which of those the server has already taken, so only
+        // entries above it are queued for push.
+        let carried = try doc.getPendingChangesAfter(0)
+        let snapshotWatermark = Swift.max(carried.last?.clientSeq ?? 0, doc.checkpoint.getClientSeq())
+
+        if let meta = stored.meta {
+            try doc.restoreMetaFromBytes(meta)
+        }
+
+        let ackedWatermark = doc.checkpoint.getClientSeq()
+        let fresh = stored.changes.filter { $0.clientSeq > snapshotWatermark }
+
+        // The header is only trustworthy as far as the log backs it. If the entries between
+        // the snapshot and the acked checkpoint are missing -- an evicting store, a partial
+        // quota failure, a lossy backend -- then restoring with that header yields a root
+        // without those changes and a checkpoint that stops the server from ever resending
+        // them. An empty log is the same case.
+        //
+        // The counter is the second position the header carries, and the log has to reach
+        // *it*, not merely the checkpoint. The two differ whenever an edit is minted while a
+        // sync is in flight: the response acks N while the header records a counter of N+1.
+        // Losing only that trailing entry leaves the log reaching N -- enough to satisfy the
+        // checkpoint -- while the replay keeps the counter at N+1 over a root that holds N.
+        // The next edit then mints N+2, a gap the server rejects on every push from then on.
+        // That is not `errEpochMismatch`, so nothing re-anchors and the document never syncs
+        // again (yorkie-js-sdk#1355).
+        //
+        // Read after the header is applied, so it is the header's counter rather than the
+        // snapshot's. With no header this reduces to the checkpoint comparison, since a
+        // `toBytes` envelope's counter never leads the pending changes it carries.
+        let headerWatermark = Swift.max(ackedWatermark, doc.changeID.getClientSeq())
+        let lastReplayable = fresh.last?.clientSeq ?? snapshotWatermark
+        let backsTheHeader = lastReplayable >= headerWatermark
+
+        guard fresh.isEmpty == false || backsTheHeader == false else {
+            return
+        }
+
+        // The run has to be contiguous. A hole -- a failed append -- cannot be pushed,
+        // because the server rejects a `clientSeq` gap, so replaying it would produce a
+        // document that never syncs again.
+        let contiguous = fresh.enumerated().allSatisfy { index, change in
+            index == 0 || change.clientSeq == fresh[index - 1].clientSeq + 1
+        }
+        let startsAtWatermark = fresh.isEmpty || fresh[0].clientSeq == snapshotWatermark + 1
+
+        guard backsTheHeader, contiguous, startsAtWatermark else {
+            // Reported rather than thrown, because what is lost here is the *log*, not the
+            // envelope -- and the event exists to say what was lost. Routing this through the
+            // generic restore failure would hand the app the snapshot's pending changes
+            // (often none) and call it an actor mismatch.
+            Logger.warning("[Store] persisted change log for \(doc.getKey()) is not contiguous from clientSeq " +
+                "\(snapshotWatermark + 1); keeping the snapshot")
+            let droppedChanges = (try? Converter.fromChanges(fresh.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
+            doc.publishLocalChangesDroppedEvent(reason: .logDiscontinuity, changes: droppedChanges)
+
+            // Undo the header. It described a position the log cannot back, so keeping it
+            // would leave the document claiming content its root does not have -- and the
+            // server would never resend it. Re-restoring from the snapshot bytes returns
+            // checkpoint, changeID and epoch to what the snapshot itself carries, which the
+            // server *can* resume from.
+            try doc.restoreFromBytes(snapshot)
+
+            // Rewrite the base from those same bytes, which clears the log with it. Writing
+            // them back costs no serialization, and re-serializing here would have baked the
+            // rejected header into the new base. Removing the entry instead would discard a
+            // snapshot that restored perfectly well.
+            try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: snapshot)
+            return
+        }
+
+        try doc.restoreAppendedChanges(fresh, ackedClientSeq: ackedWatermark)
+    }
+
     func releasePersistence(for doc: Document, attachment: Attachment<Document>?) async {
         // Order matters in both directions. Quiescing first stops new writes and lets the
         // in-flight one finish, so the removal below cannot be undone by a save landing after
