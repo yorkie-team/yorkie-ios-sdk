@@ -1509,16 +1509,6 @@ public class Document: Attachable {
         (self.root.object, self.presences, self.checkpoint, self.changeID, self.localChanges)
     }
 
-    /// Overwrites this document's restorable state in place.
-    ///
-    /// The counterpart write-side of ``persistenceSnapshot()``, used by
-    /// ``restoreFromBytes(_:)`` and ``resetForReanchor()``. Drops the stale clone so the
-    /// next `update` re-clones from the new root/presences, and clears the undo/redo
-    /// history, whose reverse-ops reference the state that was just replaced. Takes a single
-    /// ``PersistedDocumentState`` rather than one parameter per field, to stay within this
-    /// project's `function_parameter_count` lint budget.
-    ///
-    /// - Parameter state: The restorable state to install.
     /// Overwrites the clocks a sync advances, leaving the root and pending changes alone.
     ///
     /// The write-side counterpart of ``metaToBytes()``. The snapshot stays put while a sync
@@ -1592,6 +1582,16 @@ public class Document: Attachable {
         self.clearHistory()
     }
 
+    /// Overwrites this document's restorable state in place.
+    ///
+    /// The counterpart write-side of ``persistenceSnapshot()``, used by
+    /// ``restoreFromBytes(_:)`` and ``resetForReanchor()``. Drops the stale clone so the
+    /// next `update` re-clones from the new root/presences, and clears the undo/redo
+    /// history, whose reverse-ops reference the state that was just replaced. Takes a single
+    /// ``PersistedDocumentState`` rather than one parameter per field, to stay within this
+    /// project's `function_parameter_count` lint budget.
+    ///
+    /// - Parameter state: The restorable state to install.
     func applyPersistedState(_ state: PersistedDocumentState) {
         self.root = state.root
         self.presences = state.presences

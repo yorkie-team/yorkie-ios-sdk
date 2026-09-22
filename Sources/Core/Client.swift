@@ -2321,23 +2321,16 @@ extension Client {
         return (acquired, restored, canPersist)
     }
 
-    /// Drops everything offline persistence held for a document that is no longer attached.
-    ///
-    /// The stored copy is removed before the lease is released, so no other session can
-    /// resume a copy that is about to be deleted.
-    ///
-    /// - Parameters:
-    ///   - doc: The document leaving this client.
-    ///   - attachment: Its attachment, holding the session lease.
     /// Replays the appended log onto a document just restored from its snapshot, after
     /// checking the log actually backs the header it is stored with.
+    ///
+    /// Deliberately non-throwing: see the note in the body.
     ///
     /// - Parameters:
     ///   - stored: The loaded entry.
     ///   - doc: The document, already restored from `snapshot`.
     ///   - snapshot: The snapshot bytes, used to undo the header if the log cannot back it.
     ///   - store: The configured store.
-    /// - Throws: Whatever restoring the snapshot or replaying the log raises.
     private func replayAppendedLog(_ stored: StoredDoc,
                                    into doc: Document,
                                    snapshot: Data,
@@ -2451,7 +2444,16 @@ extension Client {
         // leave the document claiming content its root does not have -- and the server would
         // never resend it. Re-restoring from the snapshot bytes returns checkpoint, changeID
         // and epoch to what the snapshot itself carries, which the server *can* resume from.
-        try? doc.restoreFromBytes(snapshot)
+        do {
+            try doc.restoreFromBytes(snapshot)
+        } catch {
+            // The document is now half-replayed under a header the log cannot back, while the
+            // store is about to be re-based to the snapshot. Nothing here can put it right, so
+            // say so loudly rather than leave the two silently disagreeing until the next
+            // attach re-reads the store.
+            Logger.error("[Store] could not re-restore \(doc.getKey()) from its snapshot after discarding the " +
+                "change log (\(error)); the in-memory document may disagree with the store until it is reattached")
+        }
 
         // Rewrite the base from those same bytes, which clears the log with it. Writing them
         // back costs no serialization, and re-serializing here would have baked the rejected
@@ -2460,6 +2462,14 @@ extension Client {
         try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: snapshot)
     }
 
+    /// Drops everything offline persistence held for a document that is no longer attached.
+    ///
+    /// The stored copy is removed before the lease is released, so no other session can
+    /// resume a copy that is about to be deleted.
+    ///
+    /// - Parameters:
+    ///   - doc: The document leaving this client.
+    ///   - attachment: Its attachment, holding the session lease.
     func releasePersistence(for doc: Document, attachment: Attachment<Document>?) async {
         // Order matters in both directions. Quiescing first stops new writes and lets the
         // in-flight one finish, so the removal below cannot be undone by a save landing after
@@ -2723,7 +2733,18 @@ extension Client {
     ///
     /// - Parameter doc: The document whose header to record.
     func enqueueMetaPersist(_ doc: Document) {
-        self.enqueueStoreWrite(doc) { await $0.saveMetaToStore($1) }
+        self.enqueueStoreWrite(doc) { client, doc in
+            // `poisoned` is re-read here rather than at the call site: an append already
+            // queued can fail after the sync chose this branch but before this write runs,
+            // and a header landing over a holed log costs the un-pushed edits their pending
+            // status until the server resends them.
+            let key = client.storeKey(doc.getKey())
+            if client.persistStates[key]?.poisoned == true, let store = client.store {
+                await client.writeBaseSnapshot(doc, key: key, store: store)
+            } else {
+                await client.saveMetaToStore(doc)
+            }
+        }
     }
 
     /// Queues a full snapshot write of `doc`, bypassing the append path.

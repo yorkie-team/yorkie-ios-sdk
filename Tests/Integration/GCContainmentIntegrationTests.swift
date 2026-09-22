@@ -94,20 +94,21 @@ final class GCContainmentIntegrationTests: XCTestCase {
     /// under sustained pressure.
     ///
     /// **Scope note -- convergence is deliberately not asserted here, unlike
-    /// upstream.** Upstream reorders with `r.items.splice(0, 0, plain)`,
-    /// inserting a fully-formed object literal as ONE `Add`. iOS cannot
-    /// express that: `JSONArray.insertAfterInternal` has no `[String: Any]`
-    /// branch, so a dictionary throws `errUnimplemented` and the port has to
-    /// insert an empty `JSONObject` and then fill it with separate `Set`
-    /// operations. Two peers reordering concurrently therefore interleave a
-    /// different operation sequence than upstream's, and the documents end up
-    /// disagreeing about the re-inserted entry.
+    /// upstream.** Upstream reorders with `r.items.splice(0, 0, plain)`, and
+    /// `buildCRDTElement` builds the object's members first so the whole literal
+    /// goes out as ONE `Add`. iOS accepts the same literal now, but still
+    /// inserts an empty container and pushes the members as their own
+    /// operations -- so two peers reordering concurrently interleave a different
+    /// sequence than upstream's, and the documents end up disagreeing about the
+    /// re-inserted entry.
     ///
-    /// That disagreement reproduces byte-for-byte on the commit before this
-    /// release's fix (`160aa95dc2^`), so it is not caused by, and not fixed
-    /// by, yorkie-js-sdk#1341. What this test pins is what #1341 is actually
-    /// about: the clients keep syncing. Tracked separately as the array
-    /// object-literal insert gap.
+    /// That was first assumed to be an artifact of this test having to spell the
+    /// insert out as an empty object plus `Set`s. It is not: with the literal
+    /// insert in place the divergence reproduces byte-for-byte, and it also
+    /// reproduces on the commit before the v0.7.21 fix (`160aa95dc2^`). Closing
+    /// it means porting `buildCRDTElement`, which is its own change. What this
+    /// test pins meanwhile is what #1341 is actually about: the clients keep
+    /// syncing.
     @MainActor
     func test_keeps_syncing_while_two_peers_reorder_edit_and_undo_one_element() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in

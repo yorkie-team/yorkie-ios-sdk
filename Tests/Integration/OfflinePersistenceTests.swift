@@ -127,6 +127,80 @@ final class OfflinePersistenceTests: XCTestCase {
 
     // A sync that is merely acked drains `localChanges` without appending one, so the
     // local-change hook never fires. Without the post-sync persist the stored envelope would keep
+    // A sync that PULLS has to write a snapshot, not just the header. The appended log holds
+    // LOCAL changes only -- a remote apply never fires `onLocalChange` -- so a header-only
+    // write advances the persisted `serverSeq` past a root the store never received. The
+    // server then never resends those changes and this replica loses them permanently while
+    // claiming to hold them.
+    @MainActor
+    func test_a_sync_that_pulls_persists_the_pulled_content() async throws {
+        // given: two clients on one document, only the first persisting.
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let store = MemoryDocStore()
+        let clientKey = UUID().uuidString
+        let storeKey = "/\(clientKey)/\(docKey)"
+
+        let reader = Client(self.rpcAddress, ClientOptions(key: clientKey, store: store))
+        try await reader.activate()
+        let readerDoc = Document(key: docKey)
+        try await reader.attach(readerDoc, [:], .manual)
+
+        let writer = Client(self.rpcAddress)
+        try await writer.activate()
+        let writerDoc = Document(key: docKey)
+        try await writer.attach(writerDoc, [:], .manual)
+
+        // when: the writer publishes and the reader only pulls -- it never edits, so nothing
+        // it does can reach the local-change path.
+        try await writerDoc.update { root, _ in root.fromPeer = "remote content" }
+        try await writer.sync()
+        try await reader.sync()
+        XCTAssertTrue(readerDoc.toSortedJSON().contains("remote content"), "the reader did not pull")
+
+        // then: the pulled content is in the STORED snapshot, not merely in memory.
+        // The persist is chained off the sync rather than awaited by it, so drain first --
+        // otherwise this races the write and fails for the wrong reason.
+        await reader.drainPersists()
+        let entry = try await store.load(docKey: storeKey)
+        let stored = try XCTUnwrap(entry)
+        let restored = try Document.fromBytes(key: docKey, bytes: stored.snapshot)
+        XCTAssertTrue(restored.toSortedJSON().contains("remote content"),
+                      "the pull was recorded in the header but not the snapshot, so the content is in "
+                          + "neither place the store holds while `serverSeq` claims the client has it")
+
+        try await reader.deactivate()
+        try await writer.deactivate()
+    }
+
+    // `appendChange` and `saveMeta` are both no-ops on a key the store holds nothing for, so
+    // without a base written at attach a document that is attached and synced but never
+    // edited persists nothing at all.
+    @MainActor
+    func test_attaching_persists_a_base_even_without_an_edit() async throws {
+        // given
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+        let store = MemoryDocStore()
+        let clientKey = UUID().uuidString
+        let storeKey = "/\(clientKey)/\(docKey)"
+
+        let client = Client(self.rpcAddress, ClientOptions(key: clientKey, store: store))
+        try await client.activate()
+        let doc = Document(key: docKey)
+
+        // when: attached and synced, never edited. The edit path must not be what saves this
+        // -- `persistToStore` falls back to a base write when it finds no state, which would
+        // mask the bug the moment anything is typed.
+        try await client.attach(doc, [:], .manual)
+        try await client.sync()
+
+        // then
+        await client.drainPersists()
+        let entry = try await store.load(docKey: storeKey)
+        XCTAssertNotNil(entry, "an attached document persisted nothing, so there is no base to append to")
+
+        try await client.deactivate()
+    }
+
     // an already-pushed change under a stale checkpoint and the next resume would re-push it.
     @MainActor
     func test_persists_the_advanced_checkpoint_after_a_sync() async throws {

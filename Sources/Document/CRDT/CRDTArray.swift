@@ -54,6 +54,7 @@ class CRDTArray: CRDTContainer {
      * to ``moveAfter(createdAt:prevCreatedAt:executedAt:)`` and discards the dead node
      * return value; GC pair registration happens later in ``MoveOperation/execute(root:versionVector:source:)``.
      */
+    @available(*, deprecated, message: "Use moveAfter(createdAt:prevCreatedAt:executedAt:) and register the returned dead position node; this overload discards it, which is how three of the four move paths drifted from the root's accounting.")
     func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
         try self.elements.moveAfter(createdAt: createdAt, prevCreatedAt: afterCreatedAt, executedAt: executedAt)
     }
