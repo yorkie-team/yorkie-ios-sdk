@@ -478,11 +478,6 @@ private actor FakeContendedSessionLock: SessionLock {
     }
 }
 
-/// A ``DocStore`` double whose `save` can be told to sleep before it writes, so a test can
-/// force two overlapping saves to *complete* in an order different from the one they were
-/// *called* in — the exact race chaining in `Client.enqueuePersist(_:)` closes. Records the
-/// bytes of every save in the order it completed, plus the last one to land, so a test can
-/// assert on both.
 extension ClientPersistenceTests {
     /// The empty-queue fallback for `lastAppendedClientSeq` reads the checkpoint, and a sync
     /// can advance that while the store write is suspended. Resolving it after the write
@@ -520,6 +515,12 @@ extension ClientPersistenceTests {
                            + "edit below it was never appended")
     }
 }
+
+/// A ``DocStore`` double whose `save` can be told to sleep before it writes, so a test can
+/// force two overlapping saves to *complete* in an order different from the one they were
+/// *called* in — the exact race chaining in `Client.enqueuePersist(_:)` closes. Records the
+/// bytes of every save in the order it completed, plus the last one to land, so a test can
+/// assert on both.
 
 private actor RecordingSlowDocStore: DocStore {
     /// Sleep durations to consume, one per call to `saveSnapshot`, in call order. Falls back

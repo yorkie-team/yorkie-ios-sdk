@@ -2228,7 +2228,11 @@ class CRDTTree: CRDTElement {
      */
     func deepcopy() -> CRDTElement {
         let tree = CRDTTree(root: root.deepcopy()!, createdAt: self.createdAt)
-
+        // Both tickets have to survive the copy, as they do in `tree.ts`. See the note in
+        // ``CRDTText/deepcopy()``: `movedAt` is the LWW anchor and both are charged to the
+        // element's meta size.
+        tree.remove(self.removedAt)
+        tree.setMovedAt(self.movedAt)
         return tree
     }
 

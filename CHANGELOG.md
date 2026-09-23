@@ -15,7 +15,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 > **Known gap — the persist budget is not ported.** Upstream guards every snapshot write with `maxPersistBytes`/`maxPersistMillis` and disables persistence with an event when a document exceeds them. iOS has no such guard, so a sync that pulls re-serializes the whole document with no ceiling and no way for an app to opt out. That is a stall proportional to document size on each pulling sync of a large document, not a correctness problem, and it is tracked separately.
 
 > **Breaking — a new `LocalChangesDroppedValue.Reason` case.** `logDiscontinuity` is added to that public enum, so an app with an exhaustive `switch` over `Reason` will no longer compile until it handles the new case. It is reported when a restore keeps the snapshot but cannot replay the appended change log.
-
+>
 > **Breaking — `DocStore` changed shape.** Offline persistence is now a snapshot plus an append-only change log rather than one opaque blob. `load` returns `StoredDoc?` instead of `Data?`, `save` becomes `saveSnapshot`, and `appendChange` and `saveMeta` are new. Apps using the default `MemoryDocStore` are unaffected; an app with its own `DocStore` must be updated.
 
 ### Changed

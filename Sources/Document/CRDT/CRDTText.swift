@@ -611,6 +611,11 @@ final class CRDTText: CRDTElement {
     func deepcopy() -> CRDTElement {
         let text = CRDTText(rgaTreeSplit: self.rgaTreeSplit.deepcopy(), createdAt: self.createdAt)
         text.remove(self.removedAt)
+        // `movedAt` has to survive the copy, as it does in `text.ts`. It is what
+        // `getPositionedAt()` reports, which `ElementRHT.set` now resolves LWW on, and it is
+        // charged to the element's meta size -- so dropping it lets a clone resolve a
+        // concurrent set differently from the root and measure smaller than it.
+        text.setMovedAt(self.movedAt)
         return text
     }
 

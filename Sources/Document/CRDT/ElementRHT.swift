@@ -103,6 +103,13 @@ class ElementRHT {
         } else if node!.isRemoved == false {
             // The new node loses the LWW conflict — mark it as removed so it does not appear as a
             // duplicate in `ownKeys` iteration over `nodeMapByCreatedAt`.
+            //
+            // NOTE(yorkie-js-sdk#1376): when the occupant is ALREADY a tombstone and the
+            // incoming value loses, neither branch runs -- the value is left live in
+            // `nodeMapByCreatedAt`, never installed under the key and never collected, so
+            // iteration and `get(key:)` disagree and replicas diverge permanently. Kept
+            // identical to `element_rht.ts` on purpose: fixing it here alone would diverge
+            // from the other SDKs on a path they all have to agree on.
             value.remove(node!.value.getPositionedAt())
         }
 
