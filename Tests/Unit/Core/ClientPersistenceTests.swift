@@ -483,6 +483,44 @@ private actor FakeContendedSessionLock: SessionLock {
 /// *called* in — the exact race chaining in `Client.enqueuePersist(_:)` closes. Records the
 /// bytes of every save in the order it completed, plus the last one to land, so a test can
 /// assert on both.
+extension ClientPersistenceTests {
+    /// The empty-queue fallback for `lastAppendedClientSeq` reads the checkpoint, and a sync
+    /// can advance that while the store write is suspended. Resolving it after the write
+    /// anchored the log at a `clientSeq` the snapshot does not contain: the append then found
+    /// nothing above it, the header equalled it so `logIsBehind` was false, and the edit
+    /// existed in neither the snapshot nor the log.
+    @MainActor
+    func test_the_log_watermark_is_resolved_with_the_snapshot_not_after_it() async throws {
+        // given -- a store whose first write is slow enough for a checkpoint to move.
+        let store = RecordingSlowDocStore(delaysNanoseconds: [40_000_000])
+        let docKey = "watermark-\(UUID().uuidString)".toDocKey
+        let clientKey = UUID().uuidString
+        let client = Client("http://localhost:8080", ClientOptions(key: clientKey, store: store))
+        let doc = Document(key: docKey)
+        doc.setActor(self.actor)
+
+        // when -- the base write is in flight while the checkpoint advances underneath it.
+        client.enqueuePersist(doc)
+        try await Task.sleep(nanoseconds: 5_000_000)
+        doc.checkpoint = doc.checkpoint.increasedClientSeq(by: 7)
+        await client.drainPersists()
+
+        // ...and then an ordinary edit is persisted.
+        try doc.update { root, _ in root.value = "after" }
+        client.enqueuePersist(doc)
+        await client.drainPersists()
+
+        // then -- the edit reached the log. Anchoring the watermark at the advanced
+        // checkpoint instead of the snapshot would put it above this change's `clientSeq`,
+        // so the append would find nothing to write and the edit would be in neither the
+        // snapshot nor the log.
+        let appended = await store.appendOrder
+        XCTAssertEqual(appended.count, 1,
+                       "the log was anchored at a clientSeq the stored snapshot does not contain, so the "
+                           + "edit below it was never appended")
+    }
+}
+
 private actor RecordingSlowDocStore: DocStore {
     /// Sleep durations to consume, one per call to `saveSnapshot`, in call order. Falls back
     /// to no delay once exhausted.

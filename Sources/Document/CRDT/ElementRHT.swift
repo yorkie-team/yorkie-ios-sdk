@@ -212,11 +212,12 @@ class ElementRHT {
             clone.nodeMapByCreatedAt[key] = ElementRHTNode(key: node.key, value: copiedValue)
         }
 
-        // Copy nodeMapByKey references
+        // Copy nodeMapByKey references. Looked up directly rather than searched: both maps
+        // are keyed by `createdAt.toIDString`, and the linear scan this replaces made the
+        // copy O(n^2) in the member count -- on a path every clone rebuild, `SetOperation`
+        // and undo capture goes through.
         for (key, node) in self.nodeMapByKey {
-            if let createdAtKey = self.nodeMapByCreatedAt.first(where: { $0.value.key == key && $0.value.value.createdAt == node.value.createdAt })?.key {
-                clone.nodeMapByKey[key] = clone.nodeMapByCreatedAt[createdAtKey]
-            }
+            clone.nodeMapByKey[key] = clone.nodeMapByCreatedAt[node.value.createdAt.toIDString]
         }
 
         return clone

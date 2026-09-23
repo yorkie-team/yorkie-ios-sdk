@@ -473,7 +473,9 @@ public class JSONArray: CustomDebugStringConvertible {
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
-            return crdtArray
+            // `clone` for the same reason as the two branches above: it is what was inserted,
+            // so it is what the caller's proxy has to target.
+            return clone
         } else if value is JSONObject {
             let crdtObject = CRDTObject(createdAt: ticket)
 

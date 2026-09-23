@@ -1496,19 +1496,12 @@ public class Client {
                     // local-only log; persisting remote changes incrementally as well would
                     // avoid it and is the natural follow-up.
                     self.enqueueSnapshotPersist(doc)
-                } else if self.persistStates[self.storeKey(docKey)]?.poisoned == true {
-                    // A pure push-ack, but the log has a hole: the change that failed to
-                    // append lives only in memory. Writing the header would put the persisted
-                    // `serverSeq` past content the store does not hold -- and since it is our
-                    // own acked change, the server will never resend it. Repair with a
-                    // snapshot, which embeds the whole pending queue.
-                    //
-                    // The repair-on-next-edit path cannot cover this: a sync, or a teardown,
-                    // gets there first.
-                    self.enqueueSnapshotPersist(doc)
                 } else {
-                    // A pure push-ack on a healthy log: the root did not move, so the cheap
-                    // header write is both sufficient and correct.
+                    // A pure push-ack: the root did not move, so the cheap header write is
+                    // sufficient -- unless the log cannot back the checkpoint, which
+                    // `enqueueMetaPersist` decides at write time and repairs with a snapshot.
+                    // The decision belongs there rather than here: an append queued before
+                    // this point can still fail after it.
                     self.enqueueMetaPersist(doc)
                 }
             }
@@ -2361,10 +2354,14 @@ extension Client {
             } catch {
                 Logger.warning("[Store] persisted header for \(doc.getKey()) is unreadable (\(error)); " +
                     "keeping the snapshot")
-                // The log is discarded with the header, so report what it held: an
-                // unreadable header says nothing about whether the entries decode, and an
-                // empty event would tell the app nothing was lost when something was.
-                let lost = (try? Converter.fromChanges(stored.changes.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
+                // The log is discarded with the header, so report what it held -- but only
+                // the entries above the watermark. An unreadable header says nothing about
+                // whether the entries decode, so an empty event would under-report; listing
+                // the whole log would over-report, because everything at or below the
+                // watermark survives inside the snapshot being kept, and an app re-applying
+                // those would duplicate them.
+                let lostEntries = stored.changes.filter { $0.clientSeq > snapshotWatermark }
+                let lost = (try? Converter.fromChanges(lostEntries.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
                 await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost)
                 return
             }
@@ -2402,10 +2399,15 @@ extension Client {
         // The run has to be contiguous. A hole -- a failed append -- cannot be pushed,
         // because the server rejects a `clientSeq` gap, so replaying it would produce a
         // document that never syncs again.
+        // `&+` rather than `+`: these values come from an app-implemented `DocStore`, and a
+        // store that breaks the ascending contract -- or a corrupted entry carrying
+        // `UInt32.max` -- would trap on overflow and crash `attach()` instead of taking the
+        // repair path below. A wrapped value simply fails the comparison, which is the
+        // outcome the repair is for.
         let contiguous = fresh.enumerated().allSatisfy { index, change in
-            index == 0 || change.clientSeq == fresh[index - 1].clientSeq + 1
+            index == 0 || change.clientSeq == fresh[index - 1].clientSeq &+ 1
         }
-        let startsAtWatermark = fresh.isEmpty || fresh[0].clientSeq == snapshotWatermark + 1
+        let startsAtWatermark = fresh.isEmpty || fresh[0].clientSeq == snapshotWatermark &+ 1
 
         // Decoded in its own step: a corrupt log entry must take the same repair path as a
         // discontinuous one, not escape as a snapshot failure.
@@ -2413,7 +2415,7 @@ extension Client {
 
         guard backsTheHeader, contiguous, startsAtWatermark, droppedChanges != nil else {
             Logger.warning("[Store] persisted change log for \(doc.getKey()) is not replayable from clientSeq " +
-                "\(snapshotWatermark + 1); keeping the snapshot")
+                "\(snapshotWatermark &+ 1); keeping the snapshot")
             await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
                                           dropped: droppedChanges ?? [])
             return
@@ -2648,8 +2650,16 @@ extension Client {
             // instant. Reading `carried` afterwards would let a change minted while the
             // store was writing be counted as already embedded in a snapshot taken before
             // it -- and it would then never be appended, losing that edit outright.
+            // The watermark is resolved HERE, with the snapshot, not after the write. The
+            // empty-queue fallback reads the checkpoint, and a sync can advance that while
+            // the store write is suspended: a snapshot taken at cp=N, an edit N+1 pushed and
+            // acked mid-write, and the watermark would come back N+1 for a snapshot that
+            // does not contain N+1. The append then finds nothing after it, `logIsBehind` is
+            // false because they are equal, and the edit is in neither place. `client.ts`
+            // builds this state synchronously, before the write, for the same reason.
             let snapshot = try doc.toBytes()
             let carried = try doc.getPendingChangesAfter(0)
+            let watermark = carried.last?.clientSeq ?? doc.checkpoint.getClientSeq()
             try await store.saveSnapshot(docKey: key, bytes: snapshot)
             // Anchored at the highest pending `clientSeq` the snapshot already embeds:
             // appending those again would restore them twice, once from the envelope and
@@ -2658,7 +2668,7 @@ extension Client {
                 snapshotBytes: snapshot.count,
                 logBytes: 0,
                 changeCount: 0,
-                lastAppendedClientSeq: carried.last?.clientSeq ?? doc.checkpoint.getClientSeq(),
+                lastAppendedClientSeq: watermark,
                 poisoned: false
             )
         } catch {

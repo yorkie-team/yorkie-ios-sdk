@@ -199,7 +199,7 @@ public extension Document {
     ///
     /// - Returns: The serialized header.
     /// - Throws: ``YorkieError`` when the checkpoint or change id fails to encode.
-    func metaToBytes() throws -> Data {
+    internal func metaToBytes() throws -> Data {
         let state = self.persistenceSnapshot()
 
         let persistedCheckpoint = PersistedCheckpoint(
@@ -220,7 +220,7 @@ public extension Document {
     /// - Parameter bytes: The serialized header.
     /// - Throws: ``YorkieError`` with ``ErrorCode/errInvalidArgument`` when the header is
     ///   corrupt or truncated.
-    func restoreMetaFromBytes(_ bytes: Data) throws {
+    internal func restoreMetaFromBytes(_ bytes: Data) throws {
         let blobs = try Self.unpackBlobs(bytes)
         guard blobs.count >= 2 else {
             throw YorkieError(
@@ -275,7 +275,7 @@ public extension Document {
     /// - Parameter clientSeq: The highest `clientSeq` already appended.
     /// - Returns: The changes to append, ascending by `clientSeq`.
     /// - Throws: ``YorkieError`` when a change fails to encode.
-    func getPendingChangesAfter(_ clientSeq: UInt32) throws -> [StoredChange] {
+    internal func getPendingChangesAfter(_ clientSeq: UInt32) throws -> [StoredChange] {
         try self.persistenceSnapshot().localChanges
             .filter { $0.id.getClientSeq() > clientSeq }
             .map { try StoredChange(clientSeq: $0.id.getClientSeq(), bytes: Converter.toChange($0).serializedData()) }
@@ -288,7 +288,7 @@ public extension Document {
     ///   - ackedClientSeq: The `clientSeq` the server has already acknowledged.
     /// - Throws: ``YorkieError`` with ``ErrorCode/errInvalidArgument`` when the run is not
     ///   ascending, or whatever decoding and application raise.
-    func restoreAppendedChanges(_ stored: [StoredChange], ackedClientSeq: UInt32 = 0) throws {
+    internal func restoreAppendedChanges(_ stored: [StoredChange], ackedClientSeq: UInt32 = 0) throws {
         guard stored.isEmpty == false else {
             return
         }
