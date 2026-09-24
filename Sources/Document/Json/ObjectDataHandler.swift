@@ -55,8 +55,14 @@ class ObjectDataHandler {
         }
     }
 
-    private func setAndRegister(key: String, value: CRDTElement) {
-        let removed = self.target.set(key: key, value: value)
+    /// - Parameter executedAt: The ticket the pushed ``SetOperation`` carries.
+    ///
+    ///   Not `value.createdAt`: ``SetOperation/execute(root:versionVector:source:)`` anchors
+    ///   on `executedAt`, so deriving it here would have the originating replica stamp a
+    ///   different `movedAt` than every remote one. Same reasoning as
+    ///   ``JSONObject/setToCRDTObject(key:value:executedAt:)``.
+    private func setAndRegister(key: String, value: CRDTElement, executedAt: TimeTicket) {
+        let removed = self.target.set(key: key, value: value, executedAt: executedAt)
         self.context.registerElement(value, parent: self.target)
         if let removed {
             self.context.registerRemovedElement(removed)
@@ -65,7 +71,7 @@ class ObjectDataHandler {
 
     private func setPrimitive(key: String, value: PrimitiveValue, ticket: TimeTicket) {
         let primitive = Primitive(value: value, createdAt: ticket)
-        self.setAndRegister(key: key, value: primitive)
+        self.setAndRegister(key: key, value: primitive, executedAt: ticket)
 
         let operation = SetOperation(key: key,
                                      value: primitive,
@@ -103,7 +109,7 @@ class ObjectDataHandler {
     }
 
     private func setValue(key: String, value: CRDTObject, ticket: TimeTicket) {
-        self.setAndRegister(key: key, value: value)
+        self.setAndRegister(key: key, value: value, executedAt: ticket)
 
         let operation = SetOperation(key: key,
                                      value: value.deepcopy(),
@@ -113,7 +119,7 @@ class ObjectDataHandler {
     }
 
     private func setValue(key: String, value: CRDTArray, ticket: TimeTicket) {
-        self.setAndRegister(key: key, value: value)
+        self.setAndRegister(key: key, value: value, executedAt: ticket)
 
         let operation = SetOperation(key: key,
                                      value: value,
@@ -123,7 +129,7 @@ class ObjectDataHandler {
     }
 
     private func setValue<T: YorkieCountable>(key: String, value: CRDTCounter<T>, ticket: TimeTicket) {
-        self.setAndRegister(key: key, value: value)
+        self.setAndRegister(key: key, value: value, executedAt: ticket)
 
         let operation = SetOperation(key: key,
                                      value: value,

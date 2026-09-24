@@ -321,7 +321,7 @@ public class JSONArray: CustomDebugStringConvertible {
     private func moveBeforeInternal(nextCreatedAt: TimeTicket, createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
         let previousCreatedAt = try target.getPreviousCreatedAt(createdAt: nextCreatedAt)
-        try self.target.move(createdAt: createdAt, afterCreatedAt: previousCreatedAt, executedAt: ticket)
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: previousCreatedAt, executedAt: ticket)
         let operation = MoveOperation(
             parentCreatedAt: target.createdAt,
             previousCreatedAt: previousCreatedAt,
@@ -351,11 +351,23 @@ public class JSONArray: CustomDebugStringConvertible {
         )
         self.context.push(operation: operation)
 
-        try self.target.move(
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: prevPosCreatedAt, executedAt: ticket)
+    }
+
+    /// Moves an element on the clone and registers the position node the move abandons.
+    ///
+    /// `MoveOperation` registers that node against the root; leaving it unregistered here
+    /// made the clone's `docSize` disagree with the root's after any array move -- and the
+    /// clone's is what ``Document/update(_:_:)`` measures against `maxSizeLimit`. Every move
+    /// entry point goes through this, so the four public move APIs cannot drift apart again.
+    private func registerMove(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
+        if let deadNode = try self.target.moveAfter(
             createdAt: createdAt,
-            afterCreatedAt: prevPosCreatedAt,
-            executedAt: ticket
-        )
+            prevCreatedAt: prevCreatedAt,
+            executedAt: executedAt
+        ) {
+            self.context.registerGCPair(GCPair(parent: self.target.getRGATreeList(), child: deadNode))
+        }
     }
 
     /**
@@ -365,7 +377,7 @@ public class JSONArray: CustomDebugStringConvertible {
     private func moveFrontInternal(createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
         let head = self.target.getHead()
-        try self.target.move(createdAt: createdAt, afterCreatedAt: head.createdAt, executedAt: ticket)
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: head.createdAt, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: target.createdAt, previousCreatedAt: head.createdAt, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
@@ -377,7 +389,7 @@ public class JSONArray: CustomDebugStringConvertible {
     private func moveLastInternal(createdAt: TimeTicket) throws {
         let ticket = self.context.issueTimeTicket
         let last = self.target.getLastCreatedAt()
-        try self.target.move(createdAt: createdAt, afterCreatedAt: last, executedAt: ticket)
+        try self.registerMove(createdAt: createdAt, prevCreatedAt: last, executedAt: ticket)
         let operation = MoveOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: last, createdAt: createdAt, executedAt: ticket)
         self.context.push(operation: operation)
     }
@@ -416,7 +428,39 @@ public class JSONArray: CustomDebugStringConvertible {
             for element in array {
                 child.pushInternal(element)
             }
-            return crdtArray
+            // `clone`, not `crdtArray`: the clone is what was inserted and what the members
+            // were pushed into. `insertAfter` wraps this return in a proxy and hands it to
+            // the caller, so returning the detached original gives them a proxy whose writes
+            // land nowhere the clone can see -- the root still takes them, because operations
+            // address by `createdAt`, so the two silently disagree.
+            return clone
+        } else if let dictionary = value as? [String: Any] {
+            // An object literal, accepted the way `[Any]` above is. Without this branch a
+            // dictionary fell through to the `errUnimplemented` throw, so an app could not
+            // insert a nested object into an array at all.
+            //
+            // This closes the API gap, NOT the operation-shape one: like the `[Any]` branch,
+            // it inserts an empty container and then pushes the members as their own
+            // operations. `buildCRDTElement` in `json/element.ts` builds children first and
+            // pushes a single `Add`, so iOS still emits a different sequence than the JS SDK
+            // for every nested literal. Closing that means porting `buildCRDTElement`, which
+            // is a change to how both proxies construct elements.
+            let crdtObject = CRDTObject(createdAt: ticket)
+            guard let clone = crdtObject.deepcopy() as? CRDTObject else {
+                throw YorkieError(code: .errUnexpected, message: "Failed to cast object.deepcopy() to CRDTObject")
+            }
+
+            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(clone, parent: self.target)
+
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtObject.deepcopy(), executedAt: ticket)
+            self.context.push(operation: operation)
+
+            let child = JSONObject(target: clone, context: self.context)
+            child.set(dictionary)
+            // See the note in the `[Any]` branch above: the inserted clone is what the
+            // caller's proxy has to target.
+            return clone
         } else if value is JSONArray {
             let crdtArray = CRDTArray(createdAt: ticket)
             guard let clone = crdtArray.deepcopy() as? CRDTArray else {
@@ -429,7 +473,9 @@ public class JSONArray: CustomDebugStringConvertible {
             let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: crdtArray.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
-            return crdtArray
+            // `clone` for the same reason as the two branches above: it is what was inserted,
+            // so it is what the caller's proxy has to target.
+            return clone
         } else if value is JSONObject {
             let crdtObject = CRDTObject(createdAt: ticket)
 

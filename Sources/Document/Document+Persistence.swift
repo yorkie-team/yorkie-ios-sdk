@@ -185,6 +185,131 @@ public extension Document {
         ))
     }
 
+    /// Serializes the clocks a sync advances: checkpoint, change id, epoch and document id.
+    ///
+    /// Held apart from ``toBytes()`` because a sync has to advance these constantly while
+    /// the snapshot stays put, and re-snapshotting per sync is the cost the incremental
+    /// store exists to avoid.
+    ///
+    /// The epoch and docID are learned from sync responses, so meta is the only place they
+    /// can be recorded between snapshots. Omitting the epoch made a server-side
+    /// force-compaction invisible until the next attach presented a stale one, took
+    /// `ErrEpochMismatch`, and re-anchored -- discarding every un-pushed edit for want of a
+    /// field.
+    ///
+    /// - Returns: The serialized header.
+    /// - Throws: ``YorkieError`` when the checkpoint or change id fails to encode.
+    internal func metaToBytes() throws -> Data {
+        let state = self.persistenceSnapshot()
+
+        let persistedCheckpoint = PersistedCheckpoint(
+            serverSeq: state.checkpoint.getServerSeqAsString(),
+            clientSeq: state.checkpoint.getClientSeq()
+        )
+        let checkpointBlob = try JSONEncoder().encode(persistedCheckpoint)
+        let changeIDBlob = try Converter.toChangeID(state.changeID).serializedData()
+        let epochBlob = Data(String(self.getEpoch()).utf8)
+        let docIDBlob = Data(self.getDocID().utf8)
+
+        return Self.packBlobs([checkpointBlob, changeIDBlob, epochBlob, docIDBlob])
+    }
+
+    /// Restores the clocks written by ``metaToBytes()``, leaving the root and pending
+    /// changes alone.
+    ///
+    /// - Parameter bytes: The serialized header.
+    /// - Throws: ``YorkieError`` with ``ErrorCode/errInvalidArgument`` when the header is
+    ///   corrupt or truncated.
+    internal func restoreMetaFromBytes(_ bytes: Data) throws {
+        let blobs = try Self.unpackBlobs(bytes)
+        guard blobs.count >= 2 else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "corrupt meta: expected at least 2 blobs, got \(blobs.count)"
+            )
+        }
+
+        let persistedCheckpoint: PersistedCheckpoint
+        do {
+            persistedCheckpoint = try JSONDecoder().decode(PersistedCheckpoint.self, from: blobs[0])
+        } catch {
+            throw YorkieError(code: .errInvalidArgument, message: "corrupt meta: invalid checkpoint blob")
+        }
+        guard let serverSeq = Int64(persistedCheckpoint.serverSeq) else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "corrupt meta: invalid checkpoint serverSeq \"\(persistedCheckpoint.serverSeq)\""
+            )
+        }
+
+        let changeID = try Converter.fromChangeID(PbChangeID(serializedBytes: blobs[1]))
+
+        // Trailing blobs stay optional, the same rule the `toBytes` envelope follows.
+        var epoch: Int64?
+        if blobs.count > 2 {
+            guard let text = String(data: blobs[2], encoding: .utf8), let parsed = Int64(text) else {
+                throw YorkieError(code: .errInvalidArgument, message: "corrupt meta: invalid epoch blob")
+            }
+            epoch = parsed
+        }
+
+        var docID: DocumentID?
+        if blobs.count > 3 {
+            guard let parsed = String(data: blobs[3], encoding: .utf8) else {
+                throw YorkieError(code: .errInvalidArgument, message: "corrupt meta: invalid docID blob")
+            }
+            docID = parsed
+        }
+
+        self.applyRestoredMeta(
+            checkpoint: Checkpoint(serverSeq: serverSeq, clientSeq: persistedCheckpoint.clientSeq),
+            changeID: changeID,
+            epoch: epoch,
+            docID: docID
+        )
+    }
+
+    /// Returns the pending local changes minted after `clientSeq`, each with the sequence it
+    /// carries, serialized for the append-only log.
+    ///
+    /// - Parameter clientSeq: The highest `clientSeq` already appended.
+    /// - Returns: The changes to append, ascending by `clientSeq`.
+    /// - Throws: ``YorkieError`` when a change fails to encode.
+    internal func getPendingChangesAfter(_ clientSeq: UInt32) throws -> [StoredChange] {
+        try self.persistenceSnapshot().localChanges
+            .filter { $0.id.getClientSeq() > clientSeq }
+            .map { try StoredChange(clientSeq: $0.id.getClientSeq(), bytes: Converter.toChange($0).serializedData()) }
+    }
+
+    /// Replays the appended change log onto a document just restored from its snapshot.
+    ///
+    /// - Parameters:
+    ///   - stored: The appended changes, which must ascend by `clientSeq`.
+    ///   - ackedClientSeq: The `clientSeq` the server has already acknowledged.
+    /// - Throws: ``YorkieError`` with ``ErrorCode/errInvalidArgument`` when the run is not
+    ///   ascending, or whatever decoding and application raise.
+    internal func restoreAppendedChanges(_ stored: [StoredChange], ackedClientSeq: UInt32 = 0) throws {
+        guard stored.isEmpty == false else {
+            return
+        }
+
+        var previous: UInt32?
+        for change in stored {
+            if let previous, change.clientSeq <= previous {
+                throw YorkieError(
+                    code: .errInvalidArgument,
+                    message: "appended changes must be ascending by clientSeq, got \(change.clientSeq) " +
+                        "after \(previous)"
+                )
+            }
+            previous = change.clientSeq
+        }
+
+        let pbChanges = try stored.map { try PbChange(serializedBytes: $0.bytes) }
+        let changes = try Converter.fromChanges(pbChanges)
+        try self.appendRestoredChanges(changes, ackedClientSeq: ackedClientSeq)
+    }
+
     /// Returns the current un-pushed local changes of this document.
     ///
     /// Upstream's `getPendingChangeStructs` exists only to feed its JSON `ChangeStruct`

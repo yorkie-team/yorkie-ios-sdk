@@ -95,6 +95,14 @@ struct YorkieError: Error, CustomStringConvertible {
 
         // ErrEpochMismatch is returned when the document has been compacted and the client's epoch no longer matches the server's epoch.
         case errEpochMismatch = "ErrEpochMismatch"
+        /// Returned when an offline-persistence attach cannot take the single-active-session
+        /// lock because another session already holds it for this document.
+        ///
+        /// Its own code rather than a generic argument error, so the condition is
+        /// distinguishable without matching on message text. Note that ``YorkieError`` is
+        /// internal today, so an app cannot yet read this off a caught error -- upstream
+        /// exposes it and iOS should, but widening the error surface is its own change.
+        case errDocumentOpenElsewhere = "ErrDocumentOpenElsewhere"
 
         // ErrTooManyAttachments is returned when the number of attachments exceeds the limit.
         case errTooManyAttachments = "ErrTooManyAttachments"

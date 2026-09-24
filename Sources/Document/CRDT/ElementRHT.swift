@@ -58,28 +58,59 @@ class ElementRHT {
     private var nodeMapByCreatedAt: [String: ElementRHTNode] = [:]
 
     /**
-     * `set` sets the value of the given key.
+     * `set` sets the value of the given key. An existing occupant is removed
+     * only when the incoming value wins the LWW comparison; when it loses, the
+     * occupant stays and the incoming value is marked removed instead.
+     *
+     * Both the win/lose decision and the eviction of the previous occupant are
+     * anchored on the occupant's ``CRDTElement/getPositionedAt()`` (its
+     * `movedAt`, falling back to its `createdAt`). Anchoring them on different
+     * tickets lets them disagree: ``CRDTElement/remove(_:)`` gates on the raw
+     * `createdAt`, so for an occupant whose `createdAt < executedAt <
+     * positionedAt` -- which is what an undo/redo restore produces, since it
+     * re-places the original element under a fresh ticket -- the eviction
+     * fires and tombstones the occupant, while the winner check decides the
+     * incoming value must NOT replace it. The occupant is then tombstoned but
+     * still linked as the key's value, the incoming value is dropped without
+     * being registered as removed, and `get` reports the key as absent
+     * although no operation ever removed it.
+     *
+     * The inner `node.remove(executedAt)` gate is therefore redundant once the
+     * eviction sits inside the winner branch -- that branch already guarantees
+     * `executedAt > positionedAt >= createdAt`, which is what
+     * ``CRDTElement/remove(_:)`` checks. It is kept so this reads as the
+     * mirror of Go that it is.
+     *
+     * That made rebuilding an object from a snapshot depend on the order its
+     * members happened to arrive in. Mirrors `ElementRHT.SetWithExecutedAt` in
+     * `yorkie/pkg/document/crdt/element_rht.go` (yorkie-js-sdk#1343).
      */
     @discardableResult
-    func set(key: String, value: CRDTElement) -> CRDTElement? {
+    func set(key: String, value: CRDTElement, executedAt: TimeTicket) -> CRDTElement? {
         var removed: CRDTElement?
 
         let node = self.nodeMapByKey[key]
-        if node != nil, node!.isRemoved == false, node!.remove(removedAt: value.createdAt) {
-            removed = node!.value
-        }
 
         let newNode = ElementRHTNode(key: key, value: value)
         self.nodeMapByCreatedAt[value.createdAt.toIDString] = newNode
 
-        if node == nil || value.createdAt.after(node!.value.createdAt) {
+        if node == nil || executedAt.after(node!.value.getPositionedAt()) {
+            if let node, node.isRemoved == false, node.remove(removedAt: executedAt) {
+                removed = node.value
+            }
             self.nodeMapByKey[key] = newNode
+            value.setMovedAt(executedAt)
         } else if node!.isRemoved == false {
             // The new node loses the LWW conflict — mark it as removed so it does not appear as a
-            // duplicate in `ownKeys` iteration over `nodeMapByCreatedAt`. The removal uses the same
-            // clock the winner test above uses (`createdAt`); upstream uses `getPositionedAt()`,
-            // which is equivalent here because `set` never assigns `movedAt`.
-            value.remove(node!.value.createdAt)
+            // duplicate in `ownKeys` iteration over `nodeMapByCreatedAt`.
+            //
+            // NOTE(yorkie-js-sdk#1376): when the occupant is ALREADY a tombstone and the
+            // incoming value loses, neither branch runs -- the value is left live in
+            // `nodeMapByCreatedAt`, never installed under the key and never collected, so
+            // iteration and `get(key:)` disagree and replicas diverge permanently. Kept
+            // identical to `element_rht.ts` on purpose: fixing it here alone would diverge
+            // from the other SDKs on a path they all have to agree on.
+            value.remove(node!.value.getPositionedAt())
         }
 
         return removed
@@ -173,6 +204,11 @@ class ElementRHT {
 
     /**
      * `deepcopy` returns a deep copy of this ElementRHT.
+     *
+     * Copies the node maps directly rather than replaying
+     * ``set(key:value:executedAt:)``: `set` stamps `movedAt` on the winner, so
+     * replaying it would give every copied member a `movedAt` the original
+     * never had.
      */
     func deepcopy() -> ElementRHT {
         let clone = ElementRHT()
@@ -183,11 +219,12 @@ class ElementRHT {
             clone.nodeMapByCreatedAt[key] = ElementRHTNode(key: node.key, value: copiedValue)
         }
 
-        // Copy nodeMapByKey references
+        // Copy nodeMapByKey references. Looked up directly rather than searched: both maps
+        // are keyed by `createdAt.toIDString`, and the linear scan this replaces made the
+        // copy O(n^2) in the member count -- on a path every clone rebuild, `SetOperation`
+        // and undo capture goes through.
         for (key, node) in self.nodeMapByKey {
-            if let createdAtKey = self.nodeMapByCreatedAt.first(where: { $0.value.key == key && $0.value.value.createdAt == node.value.createdAt })?.key {
-                clone.nodeMapByKey[key] = clone.nodeMapByCreatedAt[createdAtKey]
-            }
+            clone.nodeMapByKey[key] = clone.nodeMapByCreatedAt[node.value.createdAt.toIDString]
         }
 
         return clone

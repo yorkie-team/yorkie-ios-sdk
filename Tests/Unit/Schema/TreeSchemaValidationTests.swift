@@ -31,7 +31,7 @@ private func schemaElementNode(_ type: String, children: [CRDTTreeNode]) throws 
 
 private func objectWithTree(key: String, tree: CRDTTree) -> CRDTObject {
     let obj = CRDTObject(createdAt: timeT())
-    obj.set(key: key, value: tree)
+    obj.set(key: key, value: tree, executedAt: tree.createdAt)
     return obj
 }
 
@@ -380,7 +380,7 @@ final class TreeSchemaValidationTests: XCTestCase {
         // given — "content" holds a nested CRDTObject instead of a CRDTTree
         let innerObj = CRDTObject(createdAt: timeT())
         let obj = CRDTObject(createdAt: timeT())
-        obj.set(key: "content", value: innerObj)
+        obj.set(key: "content", value: innerObj, executedAt: innerObj.createdAt)
 
         // when
         let result = RulesetValidator.validateYorkieRuleset(data: obj, ruleset: self.schemaRules)

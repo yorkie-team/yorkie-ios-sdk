@@ -23,13 +23,13 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "K2", value: a2)
+        target.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         let resultK1 = target.get(key: "K1")
         XCTAssertEqual(resultK1?.toJSON(), "\"A1\"")
@@ -45,14 +45,14 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2CreatedAt = TimeTicket(lamport: 2, delimiter: 0, actorID: actorId)
         let a2 = Primitive(value: .string("A2"), createdAt: a2CreatedAt)
-        target.set(key: "K2", value: a2)
+        target.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         let result = try target.subPath(createdAt: a2CreatedAt)
         XCTAssertEqual(result, "K2")
@@ -63,14 +63,14 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2CreatedAt = TimeTicket(lamport: 2, delimiter: 0, actorID: actorId)
         let a2 = Primitive(value: .string("A2"), createdAt: a2CreatedAt)
-        target.set(key: targetKey, value: a2)
+        target.set(key: targetKey, value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         try target.purge(element: a2)
 
@@ -82,14 +82,14 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2CreatedAt = TimeTicket(lamport: 2, delimiter: 0, actorID: actorId)
         let a2 = Primitive(value: .string("A2"), createdAt: a2CreatedAt)
-        target.set(key: targetKey, value: a2)
+        target.set(key: targetKey, value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .string("A3"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         try target.deleteByKey(key: targetKey,
                                executedAt: TimeTicket(lamport: 4, delimiter: 0, actorID: self.actorId))
@@ -104,13 +104,13 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "K2", value: a2)
+        target.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .boolean(true), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         let result = target.toSortedJSON()
         let expected = """
@@ -123,13 +123,13 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "K2", value: a2)
+        target.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .boolean(true), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         let result = target.keys.sorted()
 
@@ -140,13 +140,13 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "K2", value: a2)
+        target.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .boolean(true), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         let expect = expectation(description: "")
         var result: [CRDTElement] = []
@@ -166,13 +166,13 @@ class CRDTObjectTests: XCTestCase {
         let target = CRDTObject(createdAt: TimeTicket.initial)
 
         let a1 = Primitive(value: .integer(1), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "K1", value: a1)
+        target.set(key: "K1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "K2", value: a2)
+        target.set(key: "K2", value: a2, executedAt: a2.createdAt)
 
         let a3 = Primitive(value: .boolean(true), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorId))
-        target.set(key: "K3", value: a3)
+        target.set(key: "K3", value: a3, executedAt: a3.createdAt)
 
         let expect = expectation(description: "")
         expect.expectedFulfillmentCount = 3

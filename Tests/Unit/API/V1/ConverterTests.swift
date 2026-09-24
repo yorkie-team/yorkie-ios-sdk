@@ -287,14 +287,14 @@ class ConverterTests: XCTestCase {
         let object = CRDTObject(createdAt: TimeTicket.initial)
 
         // Primitive test
-        object.set(key: "Boolean", value: Primitive(value: PrimitiveValue.boolean(true), createdAt: TimeTicket.initial))
-        object.set(key: "null", value: Primitive(value: PrimitiveValue.null, createdAt: TimeTicket.initial))
-        object.set(key: "bytes", value: Primitive(value: PrimitiveValue.bytes(Data("Data String".utf8)), createdAt: TimeTicket.initial))
-        object.set(key: "int", value: Primitive(value: PrimitiveValue.integer(Int32.max), createdAt: TimeTicket.initial))
-        object.set(key: "long", value: Primitive(value: PrimitiveValue.long(Int64.max), createdAt: TimeTicket.initial))
-        object.set(key: "double", value: Primitive(value: PrimitiveValue.double(Double.pi), createdAt: TimeTicket.initial))
-        object.set(key: "string", value: Primitive(value: PrimitiveValue.string("Hello"), createdAt: TimeTicket.initial))
-        object.set(key: "date", value: Primitive(value: PrimitiveValue.date(Date()), createdAt: TimeTicket.initial))
+        object.set(key: "Boolean", value: Primitive(value: PrimitiveValue.boolean(true), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "null", value: Primitive(value: PrimitiveValue.null, createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "bytes", value: Primitive(value: PrimitiveValue.bytes(Data("Data String".utf8)), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "int", value: Primitive(value: PrimitiveValue.integer(Int32.max), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "long", value: Primitive(value: PrimitiveValue.long(Int64.max), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "double", value: Primitive(value: PrimitiveValue.double(Double.pi), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "string", value: Primitive(value: PrimitiveValue.string("Hello"), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
+        object.set(key: "date", value: Primitive(value: PrimitiveValue.date(Date()), createdAt: TimeTicket.initial), executedAt: TimeTicket.initial)
 
         // Array Test
         let array = CRDTArray(createdAt: TimeTicket.initial)
@@ -343,7 +343,7 @@ class ConverterTests: XCTestCase {
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(object))
             XCTAssertEqual(object.toJSON(), converted.toJSON())
 
-            object.set(key: "boolean", value: boolean)
+            object.set(key: "boolean", value: boolean, executedAt: boolean.createdAt)
 
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(object))
             XCTAssertEqual(CRDTObject(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())

@@ -214,7 +214,7 @@ final class RestoreSpanConverterTests: XCTestCase {
 
         let textCreatedAt = TimeTicket(lamport: 2, delimiter: 0, actorID: actorID)
         let text = CRDTText(rgaTreeSplit: RGATreeSplit<CRDTTextValue>(), createdAt: textCreatedAt)
-        rootObject.set(key: "text", value: text)
+        rootObject.set(key: "text", value: text, executedAt: text.createdAt)
         root.registerElement(text, parent: rootObject)
 
         let head = RGATreeSplitPos(RGATreeSplitNodeID.initial, 0)

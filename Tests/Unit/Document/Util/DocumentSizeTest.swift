@@ -99,38 +99,38 @@ extension DocumentSizeTest {
         try await self.doc.update({ root, _ in
             root["k0"] = nil
         }, "test NULL")
-        await self.expectLive(with: .init(data: 8, meta: 48))
+        await self.expectLive(with: .init(data: 8, meta: 72))
 
         try await self.doc.update({ root, _ in
             root["k1"] = true
         }, "test BOOL")
-        await self.expectLive(with: .init(data: 12, meta: 72))
+        await self.expectLive(with: .init(data: 12, meta: 120))
 
         try await self.doc.update({ root, _ in
             root["k2"] = Int32(1234)
         }, "test INT 32")
-        await self.expectLive(with: .init(data: 16, meta: 96))
+        await self.expectLive(with: .init(data: 16, meta: 168))
 
         try await self.doc.update({ root, _ in
             root["k3"] = Int64(12345)
         }, "test INT 64")
-        await self.expectLive(with: .init(data: 24, meta: 120))
+        await self.expectLive(with: .init(data: 24, meta: 216))
 
         try await self.doc.update({ root, _ in
             root["k4"] = 1.79
         }, "test DOUBLE")
-        await self.expectLive(with: .init(data: 32, meta: 144))
+        await self.expectLive(with: .init(data: 32, meta: 264))
 
         try await self.doc.update({ root, _ in
             root["k5"] = "40"
         }, "test STRING x2")
-        await self.expectLive(with: .init(data: 36, meta: 168))
+        await self.expectLive(with: .init(data: 36, meta: 312))
 
         try await self.doc.update({ root, _ in
             let byteArray = Data(repeating: .zero, count: 2)
             root["k6"] = byteArray
         }, "test DATA")
-        await self.expectLive(with: .init(data: 38, meta: 192))
+        await self.expectLive(with: .init(data: 38, meta: 360))
     }
 
     // array test
@@ -138,18 +138,18 @@ extension DocumentSizeTest {
         try await self.doc.update { root, _ in
             root["arr"] = [String]()
         }
-        await self.expectLive(with: .init(data: 0, meta: 48))
+        await self.expectLive(with: .init(data: 0, meta: 72))
 
         try await self.doc.update { root, _ in
             (root["arr"] as? JSONArray)?.append("a")
         }
-        await self.expectLive(with: .init(data: 2, meta: 72))
+        await self.expectLive(with: .init(data: 2, meta: 96))
         await self.expectGC(with: .init(data: 0, meta: 0))
 
         try await self.doc.update { root, _ in
             (root["arr"] as? JSONArray)?.remove(at: 0)
         }
-        await self.expectLive(with: .init(data: 0, meta: 48))
+        await self.expectLive(with: .init(data: 0, meta: 72))
         await self.expectGC(with: .init(data: 2, meta: 48))
     }
 
@@ -158,7 +158,7 @@ extension DocumentSizeTest {
         try await self.doc.update { root, _ in
             root["counter"] = JSONCounter(value: Int32(1))
         }
-        await self.expectLive(with: .init(data: 4, meta: 48))
+        await self.expectLive(with: .init(data: 4, meta: 72))
     }
 
     // text test
@@ -218,7 +218,7 @@ extension DocumentSizeTest {
             XCTAssertEqual((root.t as? JSONTree)?.toXML(), "<doc><p></p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 0, meta: 96))
+        await self.expectLive(with: .init(data: 0, meta: 120))
         await self.expectGC(with: .init(data: 0, meta: 0))
 
         try await self.doc.update { root, _ in
@@ -228,7 +228,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, "<doc><p>helloworld</p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 20, meta: 120))
+        await self.expectLive(with: .init(data: 20, meta: 144))
 
         try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(1, 7, JSONTreeTextNode(value: "w"))
@@ -237,7 +237,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, "<doc><p>world</p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 10, meta: 144))
+        await self.expectLive(with: .init(data: 10, meta: 168))
         await self.expectGC(with: .init(data: 12, meta: 48))
 
         try await self.doc.update { root, _ in
@@ -252,7 +252,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, "<doc><p>world</p><p>abcd</p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 18, meta: 192))
+        await self.expectLive(with: .init(data: 18, meta: 216))
         try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.edit(
                 7, 13
@@ -262,7 +262,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, "<doc><p>world</p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 10, meta: 144))
+        await self.expectLive(with: .init(data: 10, meta: 168))
         await self.expectGC(with: .init(data: 20, meta: 144))
 
         try await self.doc.update { root, _ in
@@ -272,7 +272,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, "<doc><p bold=true>world</p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 26, meta: 168))
+        await self.expectLive(with: .init(data: 26, meta: 192))
 
         try await self.doc.update { root, _ in
             try (root.t as? JSONTree)?.removeStyle(0, 7, ["bold"])
@@ -281,7 +281,7 @@ extension DocumentSizeTest {
             XCTAssertEqual(xml, "<doc><p>world</p></doc>")
         }
 
-        await self.expectLive(with: .init(data: 10, meta: 144))
+        await self.expectLive(with: .init(data: 10, meta: 168))
         await self.expectGC(with: .init(data: 36, meta: 168))
     }
 
@@ -291,13 +291,13 @@ extension DocumentSizeTest {
             root["num"] = Int32(1)
             root["str"] = "hello"
         }
-        await self.expectLive(with: .init(data: 14, meta: 72))
+        await self.expectLive(with: .init(data: 14, meta: 120))
 
         try await self.doc.update { root, _ in
             root.remove(key: "num")
         }
-        await self.expectLive(with: .init(data: 10, meta: 48))
-        await self.expectGC(with: .init(data: 4, meta: 48))
+        await self.expectLive(with: .init(data: 10, meta: 72))
+        await self.expectGC(with: .init(data: 4, meta: 72))
     }
 
     // deep copy test

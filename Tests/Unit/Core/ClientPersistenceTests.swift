@@ -38,10 +38,10 @@ final class ClientPersistenceTests: XCTestCase {
         let store = MemoryDocStore()
         let bytes = Data("hello".utf8)
 
-        try await store.save(docKey: "doc-1", bytes: bytes)
+        try await store.saveSnapshot(docKey: "doc-1", bytes: bytes)
         let loaded = try await store.load(docKey: "doc-1")
 
-        XCTAssertEqual(loaded, bytes)
+        XCTAssertEqual(loaded?.snapshot, bytes)
     }
 
     func test_memorydocstore_load_of_an_absent_key_returns_nil() async throws {
@@ -61,17 +61,17 @@ final class ClientPersistenceTests: XCTestCase {
     func test_memorydocstore_overwrite_replaces_the_stored_bytes() async throws {
         let store = MemoryDocStore()
 
-        try await store.save(docKey: "doc-1", bytes: Data("first".utf8))
-        try await store.save(docKey: "doc-1", bytes: Data("second".utf8))
+        try await store.saveSnapshot(docKey: "doc-1", bytes: Data("first".utf8))
+        try await store.saveSnapshot(docKey: "doc-1", bytes: Data("second".utf8))
         let loaded = try await store.load(docKey: "doc-1")
 
-        XCTAssertEqual(loaded, Data("second".utf8))
+        XCTAssertEqual(loaded?.snapshot, Data("second".utf8))
     }
 
     func test_memorydocstore_remove_clears_a_previously_saved_key() async throws {
         let store = MemoryDocStore()
 
-        try await store.save(docKey: "doc-1", bytes: Data("hello".utf8))
+        try await store.saveSnapshot(docKey: "doc-1", bytes: Data("hello".utf8))
         try await store.remove(docKey: "doc-1")
         let loaded = try await store.load(docKey: "doc-1")
 
@@ -86,7 +86,7 @@ final class ClientPersistenceTests: XCTestCase {
         await withTaskGroup(of: Void.self) { group in
             for index in 0 ..< 100 {
                 group.addTask {
-                    try? await store.save(docKey: "doc-\(index % 5)", bytes: Data("v\(index)".utf8))
+                    try? await store.saveSnapshot(docKey: "doc-\(index % 5)", bytes: Data("v\(index)".utf8))
                 }
             }
         }
@@ -341,10 +341,10 @@ final class ClientPersistenceTests: XCTestCase {
         let originalPending = original.getPendingChangeStructs()
         XCTAssertEqual(originalPending.count, 2)
 
-        try await store.save(docKey: docKey, bytes: original.toBytes())
+        try await store.saveSnapshot(docKey: docKey, bytes: original.toBytes())
 
         let loaded = try await store.load(docKey: docKey)
-        let bytes = try XCTUnwrap(loaded)
+        let bytes = try XCTUnwrap(loaded).snapshot
         let restored = try Document.fromBytes(key: docKey, bytes: bytes)
 
         let restoredPending = restored.getPendingChangeStructs()
@@ -402,22 +402,28 @@ final class ClientPersistenceTests: XCTestCase {
         }
         await client.drainPersists()
 
-        // then: the last write to land carries the newest bytes, not whichever save happened
-        // to finish its I/O first.
-        let loaded = try await store.load(docKey: storeKey)
-        let lastBytes = try XCTUnwrap(loaded)
-        let lastDoc = try Document.fromBytes(key: docKey, bytes: lastBytes)
-        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"second\"}")
-
+        // then: the first edit writes the base snapshot and the second APPENDS to it -- the
+        // whole point of the incremental store, so only one snapshot is written.
         let completionOrder = await store.completionOrder
-        XCTAssertEqual(completionOrder.count, 2)
+        XCTAssertEqual(completionOrder.count, 1, "the second edit must append, not re-snapshot")
+        let appended = await store.appendOrder
+        XCTAssertEqual(appended.count, 1, "the second edit must be appended to the log")
+
+        // Restoring means snapshot then log: the snapshot alone is deliberately behind.
+        let entry = try await store.load(docKey: storeKey)
+        let loaded = try XCTUnwrap(entry)
+        let lastDoc = try Document.fromBytes(key: docKey, bytes: loaded.snapshot)
+        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"first\"}",
+                       "the snapshot is the base the log is appended to, so it holds the first edit")
+        try lastDoc.restoreAppendedChanges(loaded.changes)
+        XCTAssertEqual(lastDoc.toSortedJSON(), "{\"value\":\"second\"}",
+                       "snapshot plus log has to reconstruct the newest content")
+
         let firstCompletedDoc = try Document.fromBytes(key: docKey, bytes: completionOrder[0])
-        let secondCompletedDoc = try Document.fromBytes(key: docKey, bytes: completionOrder[1])
         XCTAssertEqual(
             firstCompletedDoc.toSortedJSON(), "{\"value\":\"first\"}",
             "chained: the slower first write still completes before the second one starts"
         )
-        XCTAssertEqual(secondCompletedDoc.toSortedJSON(), "{\"value\":\"second\"}")
     }
 
     // MARK: Client.getActorID()
@@ -472,32 +478,95 @@ private actor FakeContendedSessionLock: SessionLock {
     }
 }
 
+extension ClientPersistenceTests {
+    /// The empty-queue fallback for `lastAppendedClientSeq` reads the checkpoint, and a sync
+    /// can advance that while the store write is suspended. Resolving it after the write
+    /// anchored the log at a `clientSeq` the snapshot does not contain: the append then found
+    /// nothing above it, the header equalled it so `logIsBehind` was false, and the edit
+    /// existed in neither the snapshot nor the log.
+    @MainActor
+    func test_the_log_watermark_is_resolved_with_the_snapshot_not_after_it() async throws {
+        // given -- a store whose first write is slow enough for a checkpoint to move.
+        let store = RecordingSlowDocStore(delaysNanoseconds: [40_000_000])
+        let docKey = "watermark-\(UUID().uuidString)".toDocKey
+        let clientKey = UUID().uuidString
+        let client = Client("http://localhost:8080", ClientOptions(key: clientKey, store: store))
+        let doc = Document(key: docKey)
+        doc.setActor(self.actor)
+
+        // when -- the base write is in flight while the checkpoint advances underneath it.
+        client.enqueuePersist(doc)
+        try await Task.sleep(nanoseconds: 5_000_000)
+        doc.checkpoint = doc.checkpoint.increasedClientSeq(by: 7)
+        await client.drainPersists()
+
+        // ...and then an ordinary edit is persisted.
+        try doc.update { root, _ in root.value = "after" }
+        client.enqueuePersist(doc)
+        await client.drainPersists()
+
+        // then -- the edit reached the log. Anchoring the watermark at the advanced
+        // checkpoint instead of the snapshot would put it above this change's `clientSeq`,
+        // so the append would find nothing to write and the edit would be in neither the
+        // snapshot nor the log.
+        let appended = await store.appendOrder
+        XCTAssertEqual(appended.count, 1,
+                       "the log was anchored at a clientSeq the stored snapshot does not contain, so the "
+                           + "edit below it was never appended")
+    }
+}
+
 /// A ``DocStore`` double whose `save` can be told to sleep before it writes, so a test can
 /// force two overlapping saves to *complete* in an order different from the one they were
 /// *called* in — the exact race chaining in `Client.enqueuePersist(_:)` closes. Records the
 /// bytes of every save in the order it completed, plus the last one to land, so a test can
 /// assert on both.
+
 private actor RecordingSlowDocStore: DocStore {
-    /// Sleep durations to consume, one per call to `save`, in call order. Falls back to no
-    /// delay once exhausted.
+    /// Sleep durations to consume, one per call to `saveSnapshot`, in call order. Falls back
+    /// to no delay once exhausted.
     private var delaysNanoseconds: [UInt64]
     private(set) var completionOrder = [Data]()
-    private var stored: Data?
+    /// Appended changes in completion order, so a test can tell an append from a snapshot.
+    private(set) var appendOrder = [StoredChange]()
+    private var stored: StoredDoc?
 
     init(delaysNanoseconds: [UInt64]) {
         self.delaysNanoseconds = delaysNanoseconds
     }
 
-    func save(docKey: String, bytes: Data) async throws {
+    func saveSnapshot(docKey: String, bytes: Data) async throws {
         let delay = self.delaysNanoseconds.isEmpty ? 0 : self.delaysNanoseconds.removeFirst()
         if delay > 0 {
             try? await Task.sleep(nanoseconds: delay)
         }
         self.completionOrder.append(bytes)
-        self.stored = bytes
+        self.stored = StoredDoc(snapshot: bytes)
     }
 
-    func load(docKey: String) async throws -> Data? {
+    func appendChange(docKey: String, change: StoredChange) async throws {
+        guard let entry = self.stored else {
+            return
+        }
+        self.appendOrder.append(change)
+        var changes = entry.changes
+        if let existing = changes.firstIndex(where: { $0.clientSeq == change.clientSeq }) {
+            changes[existing] = change
+        } else {
+            changes.append(change)
+            changes.sort { $0.clientSeq < $1.clientSeq }
+        }
+        self.stored = StoredDoc(snapshot: entry.snapshot, meta: entry.meta, changes: changes)
+    }
+
+    func saveMeta(docKey: String, bytes: Data) async throws {
+        guard let entry = self.stored else {
+            return
+        }
+        self.stored = StoredDoc(snapshot: entry.snapshot, meta: bytes, changes: entry.changes)
+    }
+
+    func load(docKey: String) async throws -> StoredDoc? {
         self.stored
     }
 

@@ -85,7 +85,7 @@ final class CRDTTreeDuplicateIdTests: XCTestCase {
     /// when it loads a document.
     private func rebuildFromSnapshot(_ tree: CRDTTree) throws -> CRDTTree {
         let object = CRDTObject(createdAt: timeT())
-        object.set(key: "t", value: tree)
+        object.set(key: "t", value: tree, executedAt: tree.createdAt)
         let bytes = try Converter.objectToBytes(obj: object)
         let restored = try Converter.bytesToObject(bytes: bytes)
         return try XCTUnwrap(restored.get(key: "t") as? CRDTTree)

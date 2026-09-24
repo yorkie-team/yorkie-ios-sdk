@@ -516,7 +516,7 @@ final class YSONTests: XCTestCase {
             // The message matters: asserting only the code would also pass against
             // the old regex implementation, where JSONSerialization rejected the
             // untransformed literal with the same code from a different origin.
-            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: unterminated string literal")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: Text has an unterminated string")
         }
     }
 
@@ -530,7 +530,7 @@ final class YSONTests: XCTestCase {
             // The message matters: asserting only the code would also pass against
             // the old regex implementation, where JSONSerialization rejected the
             // untransformed literal with the same code from a different origin.
-            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: unbalanced parentheses in YSON")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: Tree has unbalanced parentheses")
         }
     }
 
@@ -544,7 +544,7 @@ final class YSONTests: XCTestCase {
             // The message matters: asserting only the code would also pass against
             // the old regex implementation, where JSONSerialization rejected the
             // untransformed literal with the same code from a different origin.
-            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: DedupCounter expects a value and a registers argument")
+            XCTAssertEqual(yorkieError.message, "Failed to parse YSON: DedupCounter expects two arguments, got 1")
         }
     }
 }

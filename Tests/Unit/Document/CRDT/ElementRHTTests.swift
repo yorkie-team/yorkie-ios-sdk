@@ -23,10 +23,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a2", value: a2)
+        target.set(key: "a2", value: a2, executedAt: a2.createdAt)
 
         let elementA1 = target.get(key: "a1")!
         let elementA2 = target.get(key: "a2")!
@@ -41,10 +41,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a2)
+        target.set(key: "a1", value: a2, executedAt: a2.createdAt)
 
         let result = target.get(key: "a1")
 
@@ -56,10 +56,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a2", value: a2)
+        target.set(key: "a2", value: a2, executedAt: a2.createdAt)
 
         let executedAt = TimeTicket(lamport: 3, delimiter: 0, actorID: actorId)
         let removed = try target.delete(createdAt: a2.createdAt, executedAt: executedAt)
@@ -73,10 +73,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a2", value: a2)
+        target.set(key: "a2", value: a2, executedAt: a2.createdAt)
 
         let executedAt = TimeTicket(lamport: 3, delimiter: 0, actorID: actorId)
         let removed = try target.deleteByKey(key: "a2", executedAt: executedAt)
@@ -90,10 +90,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a2", value: a2)
+        target.set(key: "a2", value: a2, executedAt: a2.createdAt)
 
         let subPath = try target.subPath(createdAt: a2.createdAt)
         XCTAssertEqual(subPath, "a2")
@@ -103,10 +103,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a2", value: a2)
+        target.set(key: "a2", value: a2, executedAt: a2.createdAt)
 
         try target.purge(element: a2)
 
@@ -118,10 +118,10 @@ class ElementRHTTests: XCTestCase {
         let target = ElementRHT()
 
         let a1 = Primitive(value: .string("A1"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorId))
-        target.set(key: "a1", value: a1)
+        target.set(key: "a1", value: a1, executedAt: a1.createdAt)
 
         let a2 = Primitive(value: .string("A2"), createdAt: TimeTicket(lamport: 2, delimiter: 0, actorID: actorId))
-        target.set(key: "a2", value: a2)
+        target.set(key: "a2", value: a2, executedAt: a2.createdAt)
 
         try target.purge(element: a2)
 
@@ -139,13 +139,13 @@ class ElementRHTTests: XCTestCase {
 
         let ticketA = TimeTicket(lamport: 2, delimiter: 0, actorID: "actorA")
         let valueA = Primitive(value: .string("red"), createdAt: ticketA)
-        rht.set(key: "color", value: valueA)
+        rht.set(key: "color", value: valueA, executedAt: valueA.createdAt)
 
         let ticketB = TimeTicket(lamport: 1, delimiter: 0, actorID: "actorB")
         let valueB = Primitive(value: .string("blue"), createdAt: ticketB)
 
         // when — Client B's operation arrives with an earlier timestamp; it loses the LWW conflict.
-        rht.set(key: "color", value: valueB)
+        rht.set(key: "color", value: valueB, executedAt: valueB.createdAt)
 
         // then — the losing value must be marked removed so it does not appear as a live entry.
         XCTAssertTrue(valueB.isRemoved, "the losing value must be marked removed by the fix")
@@ -174,19 +174,19 @@ class ElementRHTTests: XCTestCase {
         // Set "key"="first" at T3 (highest lamport) — this is the ultimate winner.
         let ticket1 = TimeTicket(lamport: 3, delimiter: 0, actorID: "actor1")
         let value1 = Primitive(value: .string("first"), createdAt: ticket1)
-        rht.set(key: "key", value: value1)
+        rht.set(key: "key", value: value1, executedAt: value1.createdAt)
 
         // Late-arriving "key"="second" at T1 — loses to T3.
         let ticket2 = TimeTicket(lamport: 1, delimiter: 0, actorID: "actor2")
         let value2 = Primitive(value: .string("second"), createdAt: ticket2)
-        rht.set(key: "key", value: value2)
+        rht.set(key: "key", value: value2, executedAt: value2.createdAt)
 
         // Late-arriving "key"="third" at T2 — loses to T3, beats T1, but still loses overall.
         let ticket3 = TimeTicket(lamport: 2, delimiter: 0, actorID: "actor3")
         let value3 = Primitive(value: .string("third"), createdAt: ticket3)
 
         // when — all late-arriving operations have been applied.
-        rht.set(key: "key", value: value3)
+        rht.set(key: "key", value: value3, executedAt: value3.createdAt)
 
         // then — both losing values must be marked removed.
         XCTAssertTrue(value2.isRemoved, "value at T1 must be marked removed")

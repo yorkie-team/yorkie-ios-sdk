@@ -187,7 +187,12 @@ final class CRDTText: CRDTElement {
         var data = 0
         var meta = self.getMetaUsage()
 
-        for node in self.rgaTreeSplit where node.isRemoved == false {
+        // The sentinel head is skipped. `rga_tree_split.ts` starts its iterator at
+        // `head.getNext()`, so the JS SDK never counts it; iOS's iterator yields it, and
+        // counting its `createdAt` made an empty Text measure one `timeTicketSize` larger
+        // here than in the JS SDK. The iterator itself is left alone -- the edit paths read
+        // the head through it.
+        for node in self.rgaTreeSplit where node !== self.rgaTreeSplit.head && node.isRemoved == false {
             let size = node.getDataSize()
             data += size.data
             meta += size.meta
@@ -606,6 +611,11 @@ final class CRDTText: CRDTElement {
     func deepcopy() -> CRDTElement {
         let text = CRDTText(rgaTreeSplit: self.rgaTreeSplit.deepcopy(), createdAt: self.createdAt)
         text.remove(self.removedAt)
+        // `movedAt` has to survive the copy, as it does in `text.ts`. It is what
+        // `getPositionedAt()` reports, which `ElementRHT.set` now resolves LWW on, and it is
+        // charged to the element's meta size -- so dropping it lets a clone resolve a
+        // concurrent set differently from the root and measure smaller than it.
+        text.setMovedAt(self.movedAt)
         return text
     }
 

@@ -177,6 +177,19 @@ public enum YSON {
     /// - Returns: The index just past the closing quote.
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when the literal is unterminated.
     private static func skipString(_ bytes: [UInt8], _ start: Int) throws -> Int {
+        let (end, closed) = self.scanStringLiteral(bytes, start)
+        guard closed else {
+            throw YorkieError(code: .errInvalidArgument, message: "unterminated string literal")
+        }
+        return end
+    }
+
+    /// Returns the index just past the JSON string literal starting at `start`, together
+    /// with whether the literal was closed.
+    ///
+    /// A literal ending in an escaped quote is indistinguishable from a closed one by
+    /// index alone, so callers that must reject truncated input need the flag.
+    private static func scanStringLiteral(_ bytes: [UInt8], _ start: Int) -> (end: Int, closed: Bool) {
         var idx = start + 1
         while idx < bytes.count {
             if bytes[idx] == Byte.backslash {
@@ -184,11 +197,45 @@ public enum YSON {
                 continue
             }
             if bytes[idx] == Byte.quote {
-                return idx + 1
+                return (idx + 1, true)
             }
             idx += 1
         }
-        throw YorkieError(code: .errInvalidArgument, message: "unterminated string literal")
+        return (bytes.count, false)
+    }
+
+    /// Trims ASCII whitespace from both ends of a byte slice.
+    private static func trimmedBytes(_ slice: ArraySlice<UInt8>) -> [UInt8] {
+        var lower = slice.startIndex
+        var upper = slice.endIndex
+        while lower < upper, self.isSpaceByte(slice[lower]) {
+            lower += 1
+        }
+        while upper > lower, self.isSpaceByte(slice[upper - 1]) {
+            upper -= 1
+        }
+        return Array(slice[lower ..< upper])
+    }
+
+    /// Returns the opening bracket that `closer` closes, or `nil` when `closer` is not a
+    /// closing bracket.
+    private static func matchingOpen(_ closer: UInt8) -> UInt8? {
+        switch closer {
+        case Byte.rparen: return Byte.lparen
+        case Byte.rbracket: return Byte.lbracket
+        case Byte.rbrace: return Byte.lbrace
+        default: return nil
+        }
+    }
+
+    /// Reports whether `bytes` is exactly one complete JSON string literal, with nothing
+    /// before or after it.
+    private static func isStringLiteral(_ bytes: [UInt8]) -> Bool {
+        guard bytes.count >= 2, bytes[0] == Byte.quote else {
+            return false
+        }
+        let (end, closed) = self.scanStringLiteral(bytes, 0)
+        return closed && end == bytes.count
     }
 
     /// Returns the index of the `)` closing the `(` whose argument begins at `start`.
@@ -197,13 +244,17 @@ public enum YSON {
     /// counting rather than a fixed-arity pattern.
     ///
     /// - Throws: ``YorkieError`` with `errInvalidArgument` when the parentheses are unbalanced.
-    private static func findMatchingParen(_ bytes: [UInt8], _ start: Int) throws -> Int {
+    private static func findMatchingParen(_ bytes: [UInt8], _ start: Int, _ name: String) throws -> Int {
         var depth = 1
         var idx = start
         while idx < bytes.count {
             let byte = bytes[idx]
             if byte == Byte.quote {
-                idx = try self.skipString(bytes, idx)
+                let (end, closed) = self.scanStringLiteral(bytes, idx)
+                guard closed else {
+                    throw YorkieError(code: .errInvalidArgument, message: "\(name) has an unterminated string")
+                }
+                idx = end
                 continue
             }
             if byte == Byte.lparen {
@@ -216,45 +267,54 @@ public enum YSON {
             }
             idx += 1
         }
-        throw YorkieError(code: .errInvalidArgument, message: "unbalanced parentheses in YSON")
+        throw YorkieError(code: .errInvalidArgument, message: "\(name) has unbalanced parentheses")
     }
 
-    /// Splits a constructor argument list on top-level commas, ignoring commas inside
-    /// nested brackets or string literals.
-    private static func splitTopLevelArgs(_ bytes: [UInt8]) throws -> [[UInt8]] {
-        func trimmed(_ slice: ArraySlice<UInt8>) -> [UInt8] {
-            var lower = slice.startIndex
-            var upper = slice.endIndex
-            while lower < upper, self.isSpaceByte(slice[lower]) {
-                lower += 1
-            }
-            while upper > lower, self.isSpaceByte(slice[upper - 1]) {
-                upper -= 1
-            }
-            return Array(slice[lower ..< upper])
-        }
-
+    /// Splits the text between a constructor's parentheses into its top-level arguments,
+    /// rejecting text that is not a well-formed argument list.
+    ///
+    /// The bracket check is what keeps an argument inside the marker object it is emitted
+    /// into. ``findMatchingParen(_:_:_:)`` balances only parentheses, so without it a stray
+    /// `}` would close the marker object early and the text after it would escape into the
+    /// parent: `Int(1},"y":{"a":2)` would parse to an object carrying a `y` key that was
+    /// never in the document.
+    private static func splitConstructorArgs(_ name: String, _ bytes: [UInt8]) throws -> [[UInt8]] {
         var args: [[UInt8]] = []
-        var depth = 0
+        var stack: [UInt8] = []
         var start = 0
         var idx = 0
         while idx < bytes.count {
             let byte = bytes[idx]
             if byte == Byte.quote {
-                idx = try self.skipString(bytes, idx)
+                // Defence in depth: `preprocessYSON` only reaches here once
+                // `findMatchingParen` has closed the argument, which it cannot do while a
+                // literal inside it is unterminated. The check keeps this function correct
+                // on its own terms if that ever changes.
+                let (end, closed) = self.scanStringLiteral(bytes, idx)
+                guard closed else {
+                    throw YorkieError(code: .errInvalidArgument, message: "\(name) has an unterminated string")
+                }
+                idx = end
                 continue
             }
             if byte == Byte.lparen || byte == Byte.lbracket || byte == Byte.lbrace {
-                depth += 1
-            } else if byte == Byte.rparen || byte == Byte.rbracket || byte == Byte.rbrace {
-                depth -= 1
-            } else if byte == Byte.comma, depth == 0 {
-                args.append(trimmed(bytes[start ..< idx]))
+                stack.append(byte)
+            } else if let open = self.matchingOpen(byte) {
+                guard stack.popLast() == open else {
+                    throw YorkieError(code: .errInvalidArgument, message: "\(name) has unbalanced brackets")
+                }
+            } else if byte == Byte.comma, stack.isEmpty {
+                args.append(self.trimmedBytes(bytes[start ..< idx]))
                 start = idx + 1
             }
             idx += 1
         }
-        args.append(trimmed(bytes[start...]))
+
+        guard stack.isEmpty else {
+            throw YorkieError(code: .errInvalidArgument, message: "\(name) has unbalanced brackets")
+        }
+
+        args.append(self.trimmedBytes(bytes[start...]))
         return args
     }
 
@@ -331,14 +391,21 @@ public enum YSON {
             }
 
             let argStart = idx + match.count + 1
-            let argEnd = try self.findMatchingParen(bytes, argStart)
-            let argContent = Array(bytes[argStart ..< argEnd])
+            let argEnd = try self.findMatchingParen(bytes, argStart, match.name)
+            let args = try self.splitConstructorArgs(match.name, self.trimmedBytes(bytes[argStart ..< argEnd]))
 
             if match.name == "DedupCounter" {
-                let args = try self.splitTopLevelArgs(argContent)
                 guard args.count == 2 else {
                     throw YorkieError(code: .errInvalidArgument,
-                                      message: "DedupCounter expects a value and a registers argument")
+                                      message: "DedupCounter expects two arguments, got \(args.count)")
+                }
+                guard args[0].isEmpty == false else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "DedupCounter expects a value for its first argument")
+                }
+                guard self.isStringLiteral(args[1]) else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "DedupCounter expects a string literal for its registers argument")
                 }
                 let value = try self.preprocessYSON(args[0], depth: depth + 1)
                 result.append(contentsOf: Array("{\"\(self.typeKey)\":\"DedupCounter\",\"\(self.dataKey)\":".utf8))
@@ -347,7 +414,15 @@ public enum YSON {
                 result.append(contentsOf: args[1])
                 result.append(Byte.rbrace)
             } else {
-                let data = try self.preprocessYSON(argContent, depth: depth + 1)
+                guard args.count == 1 else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "\(match.name) expects one argument, got \(args.count)")
+                }
+                guard args[0].isEmpty == false else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "\(match.name) expects one argument, got none")
+                }
+                let data = try self.preprocessYSON(args[0], depth: depth + 1)
                 result.append(contentsOf: Array("{\"\(self.typeKey)\":\"".utf8))
                 result.append(contentsOf: Array(match.name.utf8))
                 result.append(contentsOf: Array("\",\"\(self.dataKey)\":".utf8))

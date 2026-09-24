@@ -810,7 +810,17 @@ extension Converter {
     static func fromObject(_ pbObject: PbJSONElement.JSONObject) throws -> CRDTObject {
         let rht = ElementRHT()
         try pbObject.nodes.forEach { pbRHTNode in
-            rht.set(key: pbRHTNode.key, value: try fromElement(pbElement: pbRHTNode.element))
+            // Anchor on the member's own `positionedAt`, not on a shared clock:
+            // that is what makes rebuilding an object from a snapshot
+            // independent of the order its members happen to arrive in
+            // (yorkie-js-sdk#1343).
+            //
+            // NOTE(yorkie-js-sdk#1377): replaying through `set` also bumps a decoded
+            // tombstone's `removedAt` when it loses to the occupant, so a document that has
+            // been through a snapshot load collects and measures differently from one that
+            // has not. Matches `converter.ts`.
+            let value = try fromElement(pbElement: pbRHTNode.element)
+            rht.set(key: pbRHTNode.key, value: value, executedAt: value.getPositionedAt())
         }
 
         let obj = CRDTObject(createdAt: fromTimeTicket(pbObject.createdAt), memberNodes: rht)

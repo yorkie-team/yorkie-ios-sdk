@@ -35,8 +35,8 @@ class CRDTObject: CRDTContainer {
      * - Returns: Removed value with the key
      */
     @discardableResult
-    func set(key: String, value: CRDTElement) -> CRDTElement? {
-        return self.memberNodes.set(key: key, value: value)
+    func set(key: String, value: CRDTElement, executedAt: TimeTicket) -> CRDTElement? {
+        return self.memberNodes.set(key: key, value: value, executedAt: executedAt)
     }
 
     /**
@@ -120,12 +120,9 @@ extension CRDTObject {
      * `deepcopy` copies itself deeply.
      */
     func deepcopy() -> CRDTElement {
-        let clone = CRDTObject(createdAt: self.createdAt)
-        for memberNode in self.memberNodes {
-            clone.memberNodes.set(key: memberNode.key, value: memberNode.value.deepcopy())
-        }
-
+        let clone = CRDTObject(createdAt: self.createdAt, memberNodes: self.memberNodes.deepcopy())
         clone.remove(self.removedAt)
+        clone.setMovedAt(self.movedAt)
         return clone
     }
 

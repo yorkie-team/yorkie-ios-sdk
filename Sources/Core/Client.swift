@@ -208,6 +208,8 @@ public class Client {
     private let sessionLock: SessionLock
     /// The in-flight persist for each store key, so writes for one document stay ordered.
     private var persistTasks = [String: Task<Void, Never>]()
+    /// What the append-or-compact decision is made from, per store key.
+    private var persistStates = [String: DocumentPersistState]()
 
     /// Keys with an in-flight attach.
     ///
@@ -1467,18 +1469,41 @@ public class Client {
             try doc.applyChangePack(responsePack)
             attachment.updateHeartbeatTime()
 
-            // Re-persist after a successful sync. A push that is merely acked, pulling
-            // nothing, advances the checkpoint and drains the pushed changes from
-            // `localChanges` without appending one — so the local-change hook never fires and
-            // the stored envelope would keep an already-pushed change under a stale
-            // checkpoint until the next edit. A resume from that envelope re-pushes a change
-            // the server has already applied. This is a full overwrite, so it does not grow.
+            // Record the post-sync header. A push that is merely acked, pulling nothing,
+            // advances the checkpoint and drains the pushed changes from `localChanges`
+            // without appending one — so the local-change hook never fires and the stored
+            // header would stay behind until the next edit. A resume from that state
+            // re-pushes a change the server has already applied.
+            //
+            // The header only, not a snapshot: an online client syncs constantly, and
+            // re-snapshotting per sync is exactly the cost the incremental store exists to
+            // avoid. The log is left alone too — see ``saveMetaToStore(_:)``.
+            //
             // Gated on the attachment still being live, since a deactivate can interleave
             // here and a write queued after its drain would land once the lease is already
             // free — and on the attachment persisting at all, so a sync cannot write over an
             // envelope this session failed to read and deliberately left alone.
             if self.store != nil, self.getDocumentAttachment(docKey)?.persistsToStore == true {
-                self.enqueuePersist(doc)
+                if responsePack.hasChanges() || responsePack.hasSnapshot() {
+                    // The response moved the root, and the append log holds *local* changes
+                    // only -- nothing in it carries remote content. Writing the header alone
+                    // would advance the persisted `serverSeq` past a root the store never
+                    // received, so the server would never resend those changes and this
+                    // replica would lose them permanently while claiming to hold them. A
+                    // snapshot is the only thing that records them.
+                    //
+                    // Cost: a pull re-serializes the document. That is the price of a
+                    // local-only log; persisting remote changes incrementally as well would
+                    // avoid it and is the natural follow-up.
+                    self.enqueueSnapshotPersist(doc)
+                } else {
+                    // A pure push-ack: the root did not move, so the cheap header write is
+                    // sufficient -- unless the log cannot back the checkpoint, which
+                    // `enqueueMetaPersist` decides at write time and repairs with a snapshot.
+                    // The decision belongs there rather than here: an append queued before
+                    // this point can still fail after it.
+                    self.enqueueMetaPersist(doc)
+                }
             }
 
             if doc.status == .removed {
@@ -2033,6 +2058,29 @@ extension Client {
     }
 }
 
+/// Tracks what the append-or-compact decision for one document is made from.
+struct DocumentPersistState {
+    /// Size of the stored snapshot the log is appended to.
+    var snapshotBytes: Int
+    /// Total size of the appended change log.
+    var logBytes: Int
+    /// Number of appended changes.
+    var changeCount: Int
+    /// The highest `clientSeq` already appended, so an edit appends only what is new.
+    var lastAppendedClientSeq: UInt32
+    /// Set when an append failed, leaving the log with a hole.
+    ///
+    /// A holed log cannot be replayed, so the next edit writes a fresh snapshot instead of
+    /// appending into it. That loses nothing -- a snapshot embeds the whole pending queue --
+    /// while appending into a holed log would lose the entire offline session at restore.
+    var poisoned: Bool
+
+    /// The subset ``shouldCompact(_:)`` decides from.
+    var sizes: PersistState {
+        PersistState(snapshotBytes: self.snapshotBytes, logBytes: self.logBytes, changeCount: self.changeCount)
+    }
+}
+
 /// Offline persistence: the store, the single-active-session lease, and the resume paths
 /// that reconcile a restored document with what the server still has.
 ///
@@ -2083,6 +2131,13 @@ extension Client {
             return
         }
         attachment.persistsToStore = true
+
+        // Seed the base snapshot now rather than on the first edit. `appendChange` and
+        // `saveMeta` are both documented no-ops on a key the store holds nothing for, so a
+        // document that is attached and synced but never edited would otherwise persist
+        // nothing at all -- and the append path needs a base to append to.
+        self.enqueueSnapshotPersist(doc)
+
         doc.onLocalChange = { [weak self, weak doc] in
             guard let self, let doc else {
                 return
@@ -2202,7 +2257,7 @@ extension Client {
         if let store = self.store {
             guard let handle = await self.sessionLock.acquire(name: self.sessionLockName(doc.getKey())) else {
                 throw YorkieError(
-                    code: .errInvalidArgument,
+                    code: .errDocumentOpenElsewhere,
                     message: "document \"\(doc.getKey())\" is already open in another session under offline "
                         + "persistence; only one active session per document is allowed to avoid silent edit loss"
                 )
@@ -2218,7 +2273,7 @@ extension Client {
             // transient storage error. The attach still proceeds, since failing it outright
             // would make a document unusable over a read glitch, but this session does not
             // persist, so whatever is stored survives for a session that can read it.
-            var loaded: Data?
+            var loaded: StoredDoc?
             do {
                 loaded = try await store.load(docKey: self.storeKey(doc.getKey()))
             } catch {
@@ -2228,9 +2283,11 @@ extension Client {
                 loaded = nil
             }
 
-            if let bytes = loaded {
+            if let stored = loaded {
+                let bytes = stored.snapshot
                 do {
                     try doc.restoreFromBytes(bytes)
+                    await self.replayAppendedLog(stored, into: doc, snapshot: bytes, store: store)
                     restored = true
                 } catch {
                     // An envelope that cannot be restored is unusable, but it must never abort
@@ -2257,6 +2314,160 @@ extension Client {
         return (acquired, restored, canPersist)
     }
 
+    /// Replays the appended log onto a document just restored from its snapshot, after
+    /// checking the log actually backs the header it is stored with.
+    ///
+    /// Deliberately non-throwing: see the note in the body.
+    ///
+    /// - Parameters:
+    ///   - stored: The loaded entry.
+    ///   - doc: The document, already restored from `snapshot`.
+    ///   - snapshot: The snapshot bytes, used to undo the header if the log cannot back it.
+    ///   - store: The configured store.
+    private func replayAppendedLog(_ stored: StoredDoc,
+                                   into doc: Document,
+                                   snapshot: Data,
+                                   store: DocStore) async
+    {
+        // Two watermarks, because the log answers two questions.
+        //
+        // The *snapshot* watermark says which entries the snapshot already contains, so
+        // everything above it must be replayed to bring the root forward. It is read before
+        // the header is applied, since the header describes the server's position and not
+        // the snapshot's contents.
+        //
+        // The *ack* watermark says which of those the server has already taken, so only
+        // entries above it are queued for push.
+        // Nothing below may throw out of this function. By the time it runs, the snapshot has
+        // already restored successfully and `doc` is about to be mutated; letting a failure
+        // escape would reach the attach handler, which reports `restoreFailed` and DELETES
+        // the stored entry -- destroying a snapshot that restored perfectly well, and the
+        // un-pushed edits inside it, because one log entry was bad. A corrupt log says
+        // nothing about the snapshot, so every failure below falls into the same
+        // discontinuity repair: keep the snapshot, drop the log, say what was lost.
+        let carried = (try? doc.getPendingChangesAfter(0)) ?? []
+        let snapshotWatermark = Swift.max(carried.last?.clientSeq ?? 0, doc.checkpoint.getClientSeq())
+
+        if let meta = stored.meta {
+            do {
+                try doc.restoreMetaFromBytes(meta)
+            } catch {
+                Logger.warning("[Store] persisted header for \(doc.getKey()) is unreadable (\(error)); " +
+                    "keeping the snapshot")
+                // The log is discarded with the header, so report what it held -- but only
+                // the entries above the watermark. An unreadable header says nothing about
+                // whether the entries decode, so an empty event would under-report; listing
+                // the whole log would over-report, because everything at or below the
+                // watermark survives inside the snapshot being kept, and an app re-applying
+                // those would duplicate them.
+                let lostEntries = stored.changes.filter { $0.clientSeq > snapshotWatermark }
+                let lost = (try? Converter.fromChanges(lostEntries.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
+                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost)
+                return
+            }
+        }
+
+        let ackedWatermark = doc.checkpoint.getClientSeq()
+        let fresh = stored.changes.filter { $0.clientSeq > snapshotWatermark }
+
+        // The header is only trustworthy as far as the log backs it. If the entries between
+        // the snapshot and the acked checkpoint are missing -- an evicting store, a partial
+        // quota failure, a lossy backend -- then restoring with that header yields a root
+        // without those changes and a checkpoint that stops the server from ever resending
+        // them. An empty log is the same case.
+        //
+        // The counter is the second position the header carries, and the log has to reach
+        // *it*, not merely the checkpoint. The two differ whenever an edit is minted while a
+        // sync is in flight: the response acks N while the header records a counter of N+1.
+        // Losing only that trailing entry leaves the log reaching N -- enough to satisfy the
+        // checkpoint -- while the replay keeps the counter at N+1 over a root that holds N.
+        // The next edit then mints N+2, a gap the server rejects on every push from then on.
+        // That is not `errEpochMismatch`, so nothing re-anchors and the document never syncs
+        // again (yorkie-js-sdk#1355).
+        //
+        // Read after the header is applied, so it is the header's counter rather than the
+        // snapshot's. With no header this reduces to the checkpoint comparison, since a
+        // `toBytes` envelope's counter never leads the pending changes it carries.
+        let headerWatermark = Swift.max(ackedWatermark, doc.changeID.getClientSeq())
+        let lastReplayable = fresh.last?.clientSeq ?? snapshotWatermark
+        let backsTheHeader = lastReplayable >= headerWatermark
+
+        guard fresh.isEmpty == false || backsTheHeader == false else {
+            return
+        }
+
+        // The run has to be contiguous. A hole -- a failed append -- cannot be pushed,
+        // because the server rejects a `clientSeq` gap, so replaying it would produce a
+        // document that never syncs again.
+        // `&+` rather than `+`: these values come from an app-implemented `DocStore`, and a
+        // store that breaks the ascending contract -- or a corrupted entry carrying
+        // `UInt32.max` -- would trap on overflow and crash `attach()` instead of taking the
+        // repair path below. A wrapped value simply fails the comparison, which is the
+        // outcome the repair is for.
+        let contiguous = fresh.enumerated().allSatisfy { index, change in
+            index == 0 || change.clientSeq == fresh[index - 1].clientSeq &+ 1
+        }
+        let startsAtWatermark = fresh.isEmpty || fresh[0].clientSeq == snapshotWatermark &+ 1
+
+        // Decoded in its own step: a corrupt log entry must take the same repair path as a
+        // discontinuous one, not escape as a snapshot failure.
+        let droppedChanges = (try? Converter.fromChanges(fresh.map { try PbChange(serializedBytes: $0.bytes) }))
+
+        guard backsTheHeader, contiguous, startsAtWatermark, droppedChanges != nil else {
+            Logger.warning("[Store] persisted change log for \(doc.getKey()) is not replayable from clientSeq " +
+                "\(snapshotWatermark &+ 1); keeping the snapshot")
+            await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
+                                          dropped: droppedChanges ?? [])
+            return
+        }
+
+        do {
+            try doc.restoreAppendedChanges(fresh, ackedClientSeq: ackedWatermark)
+        } catch {
+            // The replay itself failed partway, so `doc` may hold some of the log. The
+            // snapshot re-restore below is what puts it back to a known state.
+            Logger.warning("[Store] replaying the change log for \(doc.getKey()) failed (\(error)); " +
+                "keeping the snapshot")
+            await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
+                                          dropped: droppedChanges ?? [])
+        }
+    }
+
+    /// Keeps the snapshot and throws the appended log away, reporting what was lost.
+    ///
+    /// Reported rather than thrown, because what is lost is the *log*, not the envelope --
+    /// and the event exists to say so. Routing it through the generic restore failure would
+    /// hand the app the snapshot's pending changes (often none), call it an actor mismatch,
+    /// and delete a snapshot that restored perfectly well.
+    private func discardAppendedLog(for doc: Document,
+                                    snapshot: Data,
+                                    store: DocStore,
+                                    dropped: [Change]) async
+    {
+        doc.publishLocalChangesDroppedEvent(reason: .logDiscontinuity, changes: dropped)
+
+        // Undo the header. It described a position the log cannot back, so keeping it would
+        // leave the document claiming content its root does not have -- and the server would
+        // never resend it. Re-restoring from the snapshot bytes returns checkpoint, changeID
+        // and epoch to what the snapshot itself carries, which the server *can* resume from.
+        do {
+            try doc.restoreFromBytes(snapshot)
+        } catch {
+            // The document is now half-replayed under a header the log cannot back, while the
+            // store is about to be re-based to the snapshot. Nothing here can put it right, so
+            // say so loudly rather than leave the two silently disagreeing until the next
+            // attach re-reads the store.
+            Logger.error("[Store] could not re-restore \(doc.getKey()) from its snapshot after discarding the " +
+                "change log (\(error)); the in-memory document may disagree with the store until it is reattached")
+        }
+
+        // Rewrite the base from those same bytes, which clears the log with it. Writing them
+        // back costs no serialization, and re-serializing here would have baked the rejected
+        // header into the new base. Removing the entry instead would discard a snapshot that
+        // restored perfectly well.
+        try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: snapshot)
+    }
+
     /// Drops everything offline persistence held for a document that is no longer attached.
     ///
     /// The stored copy is removed before the lease is released, so no other session can
@@ -2271,6 +2482,10 @@ extension Client {
         // it -- detach queues one itself, by clearing presence. Releasing the lease last means
         // no other session can start resuming a copy that is about to be deleted.
         await self.quiescePersistence(for: doc)
+        // Dropped with the stored entry: a later attach of the same key must start from a
+        // fresh base write rather than appending against sizes that describe a snapshot the
+        // store no longer holds.
+        self.persistStates.removeValue(forKey: self.storeKey(doc.getKey()))
         if let store = self.store {
             do {
                 try await store.remove(docKey: self.storeKey(doc.getKey()))
@@ -2378,10 +2593,114 @@ extension Client {
         guard let store = self.store else {
             return
         }
+        let key = self.storeKey(doc.getKey())
+
+        // No tracked state means the base snapshot was never written -- the attach path
+        // seeds it. Writing one here rather than appending into a key the store holds
+        // nothing for, which both shipped stores treat as a silent success.
+        guard var state = self.persistStates[key] else {
+            await self.writeBaseSnapshot(doc, key: key, store: store)
+            return
+        }
+
+        // A previous append failed, so the log has a hole and cannot be replayed. A fresh
+        // snapshot loses nothing -- it embeds the whole pending queue -- while appending
+        // into a holed log would lose the entire offline session at restore.
+        if state.poisoned {
+            await self.writeBaseSnapshot(doc, key: key, store: store)
+            return
+        }
+
         do {
-            try await store.save(docKey: self.storeKey(doc.getKey()), bytes: doc.toBytes())
+            // Driven off the pending queue rather than an event payload, so a coalesced or
+            // missed notification cannot silently drop a change.
+            let pending = try doc.getPendingChangesAfter(state.lastAppendedClientSeq)
+            for change in pending {
+                try await store.appendChange(docKey: key, change: change)
+                state.lastAppendedClientSeq = change.clientSeq
+                state.logBytes += change.bytes.count
+                state.changeCount += 1
+            }
+            self.persistStates[key] = state
         } catch {
+            state.poisoned = true
+            self.persistStates[key] = state
+            Logger.warning("[Store] failed to append a change for \(doc.getKey()) (\(error)); the log now has a " +
+                "hole, so the next local change re-snapshots instead of appending into it")
+            return
+        }
+
+        if shouldCompact(state.sizes) {
+            await self.writeBaseSnapshot(doc, key: key, store: store)
+        }
+    }
+
+    /// Writes a full snapshot and resets the log accounting for `key`.
+    ///
+    /// This is both the base write and the repair: `saveSnapshot` drops the appended log
+    /// and the stored header atomically, so the snapshot it leaves is self-contained.
+    ///
+    /// - Parameters:
+    ///   - doc: The document to serialize.
+    ///   - key: Its store key.
+    ///   - store: The configured store.
+    func writeBaseSnapshot(_ doc: Document, key: String, store: DocStore) async {
+        do {
+            // Both reads happen before the write is awaited, so they describe the same
+            // instant. Reading `carried` afterwards would let a change minted while the
+            // store was writing be counted as already embedded in a snapshot taken before
+            // it -- and it would then never be appended, losing that edit outright.
+            // The watermark is resolved HERE, with the snapshot, not after the write. The
+            // empty-queue fallback reads the checkpoint, and a sync can advance that while
+            // the store write is suspended: a snapshot taken at cp=N, an edit N+1 pushed and
+            // acked mid-write, and the watermark would come back N+1 for a snapshot that
+            // does not contain N+1. The append then finds nothing after it, `logIsBehind` is
+            // false because they are equal, and the edit is in neither place. `client.ts`
+            // builds this state synchronously, before the write, for the same reason.
+            let snapshot = try doc.toBytes()
+            let carried = try doc.getPendingChangesAfter(0)
+            let watermark = carried.last?.clientSeq ?? doc.checkpoint.getClientSeq()
+            try await store.saveSnapshot(docKey: key, bytes: snapshot)
+            // Anchored at the highest pending `clientSeq` the snapshot already embeds:
+            // appending those again would restore them twice, once from the envelope and
+            // once from the log.
+            self.persistStates[key] = DocumentPersistState(
+                snapshotBytes: snapshot.count,
+                logBytes: 0,
+                changeCount: 0,
+                lastAppendedClientSeq: watermark,
+                poisoned: false
+            )
+        } catch {
+            // Leave the state poisoned rather than absent, so the next local change tries a
+            // snapshot again instead of appending into a key whose base write never landed.
+            var state = self.persistStates[key] ?? DocumentPersistState(
+                snapshotBytes: 0, logBytes: 0, changeCount: 0, lastAppendedClientSeq: 0, poisoned: true
+            )
+            state.poisoned = true
+            self.persistStates[key] = state
             Logger.warning("[Store] failed to persist \(doc.getKey()): \(error)")
+        }
+    }
+
+    /// Records the post-sync header, leaving the snapshot and the appended log alone.
+    ///
+    /// The log is deliberately not trimmed here. It does two jobs: it holds un-pushed
+    /// changes so they survive a reload, and it is the delta between the snapshot and the
+    /// document's current content. Dropping acknowledged entries serves the first and
+    /// destroys the second, because nothing brings the snapshot forward on a push-ack -- the
+    /// content would then exist in neither place while the persisted `serverSeq` claims the
+    /// server has it.
+    ///
+    /// - Parameter doc: The document whose header to record.
+    func saveMetaToStore(_ doc: Document) async {
+        guard let store = self.store else {
+            return
+        }
+        do {
+            try await store.saveMeta(docKey: self.storeKey(doc.getKey()), bytes: doc.metaToBytes())
+        } catch {
+            Logger.warning("[Store] failed to record the header for \(doc.getKey()): \(error)")
         }
     }
 
@@ -2419,7 +2738,74 @@ extension Client {
     /// exists to keep. Serializing per key makes the last write win the way it reads.
     ///
     /// - Parameter doc: The document to persist.
+    /// Queues a header write of `doc`, behind any persist of the same document already in
+    /// flight.
+    ///
+    /// Shares ``enqueuePersist(_:)``'s per-key chain: a header write and a snapshot write
+    /// race the same entry, so they have to be ordered against each other and not merely
+    /// against their own kind.
+    ///
+    /// - Parameter doc: The document whose header to record.
+    func enqueueMetaPersist(_ doc: Document) {
+        self.enqueueStoreWrite(doc) { client, doc in
+            // `poisoned` is re-read here rather than at the call site: an append already
+            // queued can fail after the sync chose this branch but before this write runs,
+            // and a header landing over a holed log costs the un-pushed edits their pending
+            // status until the server resends them.
+            let key = client.storeKey(doc.getKey())
+            let state = client.persistStates[key]
+
+            // A header write is only safe while the log actually holds everything the
+            // checkpoint covers. Two ways it does not:
+            //
+            // - the log has a hole, so the change that failed to append lives only in memory;
+            // - an append was still queued when the sync drained the change it was going to
+            //   read. `persistToStore` reads the pending queue when its chained task runs,
+            //   not when the edit happened, so a sync completing first leaves the change in
+            //   neither the snapshot nor the log while `lastAppendedClientSeq` stays behind.
+            //
+            // Writing the header either way records a `serverSeq` past content the store does
+            // not hold, and the server will not resend a change it has already taken. The
+            // restore guard does catch it and falls back to the snapshot, but that costs the
+            // un-pushed edits their pending status -- a snapshot here avoids it entirely.
+            //
+            // In healthy operation `lastAppendedClientSeq` is never below the checkpoint, so
+            // this is an invariant check rather than a live branch.
+            let logIsBehind = (state?.lastAppendedClientSeq ?? 0) < doc.checkpoint.getClientSeq()
+            if state?.poisoned == true || logIsBehind, let store = client.store {
+                await client.writeBaseSnapshot(doc, key: key, store: store)
+            } else {
+                await client.saveMetaToStore(doc)
+            }
+        }
+    }
+
+    /// Queues a full snapshot write of `doc`, bypassing the append path.
+    ///
+    /// Used where the log cannot represent what has to be persisted: a pull, whose remote
+    /// content never enters the local-only log, and a push-ack on a holed log.
+    ///
+    /// - Parameter doc: The document to snapshot.
+    func enqueueSnapshotPersist(_ doc: Document) {
+        self.enqueueStoreWrite(doc) { client, doc in
+            guard let store = client.store else {
+                return
+            }
+            await client.writeBaseSnapshot(doc, key: client.storeKey(doc.getKey()), store: store)
+        }
+    }
+
     func enqueuePersist(_ doc: Document) {
+        self.enqueueStoreWrite(doc) { await $0.persistToStore($1) }
+    }
+
+    /// Chains one store write for `doc` behind any write of the same document already in
+    /// flight.
+    ///
+    /// - Parameters:
+    ///   - doc: The document being written.
+    ///   - write: The write to run once the chain reaches it.
+    private func enqueueStoreWrite(_ doc: Document, _ write: @escaping (Client, Document) async -> Void) {
         let key = self.storeKey(doc.getKey())
         let previous = self.persistTasks[key]
         let task = Task { [weak self] in
@@ -2427,7 +2813,7 @@ extension Client {
             guard let self else {
                 return
             }
-            await self.persistToStore(doc)
+            await write(self, doc)
         }
         self.persistTasks[key] = task
         Task { [weak self] in

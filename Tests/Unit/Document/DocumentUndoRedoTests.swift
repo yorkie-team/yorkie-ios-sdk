@@ -122,7 +122,7 @@ final class DocumentUndoRedoTests: XCTestCase {
         XCTAssertEqual(json, "{\"a\":1}")
     }
 
-    func test_undo_object_overwrite_is_a_known_limitation() async throws {
+    func test_undo_object_overwrite_restores_the_previous_value() async throws {
         let doc = Document(key: "undo-overwrite")
         try await doc.update { root, _ in root.a = Int64(1) }
         try await doc.update { root, _ in root.a = Int64(2) }
@@ -133,14 +133,13 @@ final class DocumentUndoRedoTests: XCTestCase {
         try await doc.undo()
         let json = await doc.toSortedJSON()
 
-        // KNOWN LIMITATION: undoing an object-property overwrite should restore the previous
-        // value ({"a":1}), but iOS's ElementRHT resolves conflicts by createdAt. The restored
-        // value carries an older createdAt and loses, so the overwrite is not reverted. The fix
-        // is to port the ElementRHT positionedAt/movedAt mechanism (newer than the iOS port),
-        // tracked as a follow-up.
-        XCTExpectFailure("object-set overwrite undo needs the ElementRHT positionedAt mechanism") {
-            XCTAssertEqual(json, "{\"a\":1}")
-        }
+        // This was a known limitation until v0.7.22: iOS's `ElementRHT` resolved
+        // conflicts by `createdAt`, so the restored value -- which carries the
+        // original, older `createdAt` -- lost the comparison and the overwrite was
+        // never reverted. Porting yorkie-js-sdk#1343 brought over the
+        // `positionedAt`/`movedAt` anchoring the fix needed, so the undo now
+        // restores the previous value.
+        XCTAssertEqual(json, "{\"a\":1}")
     }
 
     func test_undo_and_redo_text_edit() async throws {

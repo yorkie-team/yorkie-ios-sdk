@@ -96,20 +96,19 @@ final class DocumentSizeContainerGCTests: XCTestCase {
             let built: DataSize
         }
 
-        // NOTE: the upstream JS constants for these three cases are {2,120}, {2,96},
-        // and {2,168} respectively. iOS's `ElementRHT.set` never assigns `movedAt`
-        // to the value it stores (see the note in `ElementRHT.swift`), unlike
-        // upstream, which sets it on every object-member write. Every object-member
-        // element therefore costs one fewer `timeTicketSize` (24 bytes) here than in
-        // JS -- a pre-existing, documented divergence already reflected in
-        // `DocumentSizeTest.swift`, not something this GC fix touches.
+        // These now match the upstream JS constants exactly -- {2,120}, {2,96} and
+        // {2,168}. They did not until v0.7.22: `ElementRHT.set` never assigned
+        // `movedAt` to the value it stored, so every object-member element cost one
+        // fewer `timeTicketSize` (24 bytes) here than in JS. Porting
+        // yorkie-js-sdk#1343 restored the `setMovedAt` upstream has always had, and
+        // closed that divergence.
         let cases: [Case] = [
-            Case(name: "object", build: { root in root.k = ["a": "1"] }, built: DataSize(data: 2, meta: 72)),
-            Case(name: "array", build: { root in root.k = ["a"] }, built: DataSize(data: 2, meta: 72)),
+            Case(name: "object", build: { root in root.k = ["a": "1"] }, built: DataSize(data: 2, meta: 120)),
+            Case(name: "array", build: { root in root.k = ["a"] }, built: DataSize(data: 2, meta: 96)),
             Case(
                 name: "nested object",
                 build: { root in root.k = ["inner": ["a": "1"]] },
-                built: DataSize(data: 2, meta: 96)
+                built: DataSize(data: 2, meta: 168)
             )
         ]
 
@@ -151,9 +150,7 @@ final class DocumentSizeContainerGCTests: XCTestCase {
         let empty = doc.getDocSize()
 
         try doc.update { root, _ in root.k = ["inner": ["a": "1"]] }
-        // NOTE: upstream JS expects {2,168}; see the divergence note on
-        // `test_removing_a_non_empty_container`.
-        XCTAssertEqual(doc.getDocSize().live, DataSize(data: 2, meta: 96))
+        XCTAssertEqual(doc.getDocSize().live, DataSize(data: 2, meta: 168))
 
         // when — remove the descendant on its own first
         try doc.update { root, _ in
@@ -299,11 +296,7 @@ final class DocumentSizeContainerGCTests: XCTestCase {
 
         try doc.update { root, _ in root.k = [["a": "1"]] }
         let built = doc.getDocSize()
-        // NOTE: upstream JS expects {2,144} here; see the divergence note on
-        // `test_removing_a_non_empty_container` -- the "a" key of the array's
-        // object element is still an object-member write, so it costs one fewer
-        // `timeTicketSize` on iOS than upstream.
-        XCTAssertEqual(built.live, DataSize(data: 2, meta: 96))
+        XCTAssertEqual(built.live, DataSize(data: 2, meta: 144))
 
         // when
         try doc.update { root, _ in
