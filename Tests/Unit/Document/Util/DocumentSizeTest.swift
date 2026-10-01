@@ -322,25 +322,12 @@ extension DocumentSizeTest {
         XCTAssertEqual(expectedDocSize, cloneSize)
     }
 
-    // Ports: "KNOWN: split and merge cycles drive the live size negative"
-    // (packages/sdk/test/unit/document/document_size_test.ts, added by
-    // yorkie-js-sdk#1358, commit 9c15ab29).
-    //
-    // Repeating a split and the merge that undoes it drives `live.meta`
-    // negative. Every cycle returns the tree to what it started as, so the
-    // live size should return to what it started as too; instead it drops
-    // per cycle, reaching a large negative number after 100 cycles.
-    //
-    // Predates #1358 and is not about splitByPath/mergeByPath: it reproduces
-    // through `editByPath(p, p, nil, 1)` and the cross-boundary `editByPath`
-    // merge, which is what this case drives. What #1358 changes is the
-    // reach -- the two helpers lowered to a delete plus an insert before it,
-    // which accounted correctly, so this is the one thing they did better.
-    //
-    // Tracked as yorkie-team/yorkie#1998.
-    func test_known_split_and_merge_cycles_drive_the_live_size_negative() async throws {
-        try XCTSkipIf(true, "KNOWN: split/merge cycles drive doc.getDocSize().live negative — mirrors JS it.skip, tracked as yorkie-team/yorkie#1998")
-
+    func test_accounts_for_the_element_a_split_creates() async throws {
+        // A split mints a new element node, and the phase that does it dropped
+        // the size its own `split` call reported, so live never carried it. A
+        // split and the merge that undoes it then did not cancel out: live.meta
+        // walked down by a ticket per cycle, without bound. Tracked as
+        // yorkie-team/yorkie#1998.
         try await self.doc.update { root, _ in
             root.t = JSONTree(initialRoot:
                 JSONTreeElementNode(type: "doc", children: [
@@ -350,22 +337,104 @@ extension DocumentSizeTest {
                 ])
             )
         }
+        var size = await self.doc.getDocSize()
+        XCTAssertEqual(size.live, DataSize(data: 20, meta: 168))
 
-        let before = await self.doc.getDocSize().live
+        // Split after `a`: a new <span> and a text split, one ticket each.
+        try await self.doc.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 0, 1], nil, 1)
+        }
+        var xml = await(self.doc.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(xml, "<doc><p><span>a</span><span>bcdefghij</span></p></doc>")
+        size = await self.doc.getDocSize()
+        XCTAssertEqual(size.live, DataSize(data: 20, meta: 216))
 
+        // Merge the boundary back. The <span> the split created is tombstoned, so
+        // its size moves to gc. The text stays two nodes, which is why live keeps
+        // the ticket the text split added rather than returning to its pre-split
+        // value -- the expectation #1998 states.
+        try await self.doc.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 1, 0])
+        }
+        xml = await(self.doc.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(xml, "<doc><p><span>abcdefghij</span></p></doc>")
+        size = await self.doc.getDocSize()
+        XCTAssertEqual(size.live, DataSize(data: 20, meta: 192))
+        XCTAssertEqual(size.gc, DataSize(data: 0, meta: 48))
+
+        // Every further cycle needs no text split, so live returns to the same
+        // two values instead of drifting.
         for _ in 0 ..< 100 {
             try await self.doc.update { root, _ in
                 try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 0, 1], nil, 1)
             }
+            size = await self.doc.getDocSize()
+            XCTAssertEqual(size.live, DataSize(data: 20, meta: 216))
             try await self.doc.update { root, _ in
                 try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 1, 0])
             }
+            size = await self.doc.getDocSize()
+            XCTAssertEqual(size.live, DataSize(data: 20, meta: 192))
+        }
+    }
+
+    func test_charges_live_only_for_attribute_values_it_was_holding() async throws {
+        // RHT mints a tombstone even for a key the element never carried -- so a
+        // remove arriving before its set still wins -- and supersedes an existing
+        // tombstone when the same key is removed twice or set again. None of
+        // those replace a live value, yet live was debited for each, so toggling
+        // one key walked it down without bound and eventually negative, at which
+        // point the document size limit stops applying.
+        func newDoc() async throws -> Document {
+            let doc = Document(key: "test-doc")
+            try await doc.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "abc")])
+                    ])
+                )
+            }
+            let size = await doc.getDocSize()
+            XCTAssertEqual(size.live, DataSize(data: 6, meta: 144))
+            return doc
         }
 
-        let xml = await(self.doc.getRoot().t as? JSONTree)?.toXML()
-        XCTAssertEqual(xml, "<doc><p><span>abcdefghij</span></p></doc>")
+        let absent = try await newDoc()
+        try await absent.update { root, _ in
+            try (root.t as? JSONTree)?.removeStyleByPath([0], [1], ["never-set"])
+        }
+        var size = await absent.getDocSize()
+        XCTAssertEqual(size.live, DataSize(data: 6, meta: 144))
+        XCTAssertEqual(size.gc, DataSize(data: 18, meta: 24))
 
-        let after = await self.doc.getDocSize().live
-        XCTAssertEqual(after, before)
+        let twice = try await newDoc()
+        try await twice.update { root, _ in
+            try (root.t as? JSONTree)?.styleByPath([0], [1], ["bold": "true"])
+        }
+        size = await twice.getDocSize()
+        XCTAssertEqual(size.live, DataSize(data: 26, meta: 168))
+        for _ in 0 ..< 2 {
+            try await twice.update { root, _ in
+                try (root.t as? JSONTree)?.removeStyleByPath([0], [1], ["bold"])
+            }
+            size = await twice.getDocSize()
+            XCTAssertEqual(size.live, DataSize(data: 6, meta: 144))
+        }
+
+        // Toggling was already correct here -- the restyle credits live for the
+        // node it revives, which cancels the debit -- and has to stay that way.
+        let toggled = try await newDoc()
+        for _ in 0 ..< 100 {
+            try await toggled.update { root, _ in
+                try (root.t as? JSONTree)?.styleByPath([0], [1], ["bold": "true"])
+            }
+            size = await toggled.getDocSize()
+            XCTAssertEqual(size.live, DataSize(data: 26, meta: 168))
+            try await toggled.update { root, _ in
+                try (root.t as? JSONTree)?.removeStyleByPath([0], [1], ["bold"])
+            }
+            size = await toggled.getDocSize()
+            XCTAssertEqual(size.live, DataSize(data: 6, meta: 144))
+        }
     }
 }
