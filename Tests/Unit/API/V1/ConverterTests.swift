@@ -531,4 +531,31 @@ class ConverterTests: XCTestCase {
         XCTAssertEqual(rebuiltRoot.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [])), 1, "the restored tombstone must be collectable")
         XCTAssertEqual(rebuiltRoot.garbageLength, 0)
     }
+
+    // A snapshot written by iOS before 0.7.23 encoded the RGATreeSplit head
+    // sentinel. Decoding it must not insert it as an extra node.
+    func test_should_skip_an_encoded_text_head_sentinel() async throws {
+        // given — a text, and its encoding with a head sentinel prepended the way
+        // older iOS snapshots carried it.
+        let doc = Document(key: "test-doc")
+        try await doc.update { root, _ in
+            root.text = JSONText()
+            _ = (root.text as? JSONText)?.edit(0, 0, "hello")
+        }
+        let rootObject = await doc.getRootObject()
+        let text = try XCTUnwrap(rootObject.get(key: "text") as? CRDTText)
+        var pbText = Converter.toText(text).text
+        var head = PbTextNode()
+        head.id = Converter.toTextNodeID(id: RGATreeSplitNodeID.initial)
+        pbText.nodes.insert(head, at: 0)
+        pbText.nodes.insert(head, at: 0)
+
+        // when
+        let decoded = Converter.fromText(pbText)
+
+        // then — the same content and the same size as the source text.
+        XCTAssertEqual(decoded.toJSON(), text.toJSON())
+        XCTAssertEqual(decoded.getDataSize(), text.getDataSize())
+        XCTAssertEqual(Converter.toText(decoded).text.nodes.count, pbText.nodes.count - 2)
+    }
 }

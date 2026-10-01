@@ -959,6 +959,13 @@ extension Converter {
 
         var prev = rgaTreeSplit.head
         pbText.nodes.forEach { pbNode in
+            // A snapshot iOS wrote before 0.7.23 carries the head sentinel (and,
+            // after a few round trips, copies of it). The head already exists, so
+            // inserting it again adds an empty node that charges docSize.live and
+            // takes over the head's entry in the ID map. The server never sends one.
+            guard fromTextNodeID(pbNode.id) != RGATreeSplitNodeID.initial else {
+                return
+            }
             let current = rgaTreeSplit.insertAfter(prev, fromTextNode(pbNode))
             if pbNode.hasInsPrevID {
                 current.setInsPrev(rgaTreeSplit.findNode(fromTextNodeID(pbNode.insPrevID)))
