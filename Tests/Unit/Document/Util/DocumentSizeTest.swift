@@ -321,4 +321,51 @@ extension DocumentSizeTest {
         let cloneSize = clone.getDocSize()
         XCTAssertEqual(expectedDocSize, cloneSize)
     }
+
+    // Ports: "KNOWN: split and merge cycles drive the live size negative"
+    // (packages/sdk/test/unit/document/document_size_test.ts, added by
+    // yorkie-js-sdk#1358, commit 9c15ab29).
+    //
+    // Repeating a split and the merge that undoes it drives `live.meta`
+    // negative. Every cycle returns the tree to what it started as, so the
+    // live size should return to what it started as too; instead it drops
+    // per cycle, reaching a large negative number after 100 cycles.
+    //
+    // Predates #1358 and is not about splitByPath/mergeByPath: it reproduces
+    // through `editByPath(p, p, nil, 1)` and the cross-boundary `editByPath`
+    // merge, which is what this case drives. What #1358 changes is the
+    // reach -- the two helpers lowered to a delete plus an insert before it,
+    // which accounted correctly, so this is the one thing they did better.
+    //
+    // Tracked as yorkie-team/yorkie#1998.
+    func test_known_split_and_merge_cycles_drive_the_live_size_negative() async throws {
+        try XCTSkipIf(true, "KNOWN: split/merge cycles drive doc.getDocSize().live negative — mirrors JS it.skip, tracked as yorkie-team/yorkie#1998")
+
+        try await self.doc.update { root, _ in
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "p", children: [
+                        JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "abcdefghij")])
+                    ])
+                ])
+            )
+        }
+
+        let before = await self.doc.getDocSize().live
+
+        for _ in 0 ..< 100 {
+            try await self.doc.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 0, 1], nil, 1)
+            }
+            try await self.doc.update { root, _ in
+                try (root.t as? JSONTree)?.editByPath([0, 0, 1], [0, 1, 0])
+            }
+        }
+
+        let xml = await(self.doc.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(xml, "<doc><p><span>abcdefghij</span></p></doc>")
+
+        let after = await self.doc.getDocSize().live
+        XCTAssertEqual(after, before)
+    }
 }

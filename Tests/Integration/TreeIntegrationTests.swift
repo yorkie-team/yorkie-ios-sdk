@@ -759,6 +759,201 @@ final class TreeIntegrationTests: XCTestCase {
 
         return try? JSONDecoder().decode(T.self, from: data)
     }
+
+    // MARK: - Tree.SplitByPath/MergeByPath concurrency
+
+    // Ports: packages/sdk/test/integration/tree_concurrent_split_merge_test.ts
+    // (yorkie-js-sdk#1358, commit 9c15ab29, "Stop splitByPath and mergeByPath
+    // from copying content").
+    //
+    // `splitByPath`/`mergeByPath` used to lower to a delete plus an insert of
+    // a value copy. A copied node is one no concurrent operation has ever
+    // seen, so each replica's copy survived on its own and concurrent edits
+    // went past it: two replicas merging neighbouring boundaries lost a span
+    // outright, two splitting at different positions reordered the text, and
+    // clearing the formatting while another replica split left the text half
+    // formatted. Both helpers now route through `edit`, which already carries
+    // a real CRDT split/merge and its concurrency handling, so each case
+    // below converges on the correct tree.
+
+    /// `oneSpan` is `<doc><p><span>abcde</span></p></doc>`.
+    private var oneSpanTree: JSONTreeElementNode {
+        JSONTreeElementNode(type: "doc", children: [
+            JSONTreeElementNode(type: "p", children: [
+                JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "abcde")])
+            ])
+        ])
+    }
+
+    /// `boldSpan` is `oneSpan` with the span carrying `bold`.
+    private var boldSpanTree: JSONTreeElementNode {
+        JSONTreeElementNode(type: "doc", children: [
+            JSONTreeElementNode(type: "p", children: [
+                JSONTreeElementNode(type: "span",
+                                    children: [JSONTreeTextNode(value: "abcde")],
+                                    attributes: ["bold": "true"])
+            ])
+        ])
+    }
+
+    /// `twoSpans` is `<doc><p><span>abc</span><span>de</span></p></doc>`.
+    private var twoSpansTree: JSONTreeElementNode {
+        JSONTreeElementNode(type: "doc", children: [
+            JSONTreeElementNode(type: "p", children: [
+                JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "abc")]),
+                JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "de")])
+            ])
+        ])
+    }
+
+    /// `threeSpans` is `<doc><p><span>ab</span><span>cd</span><span>ef</span></p></doc>`.
+    private var threeSpansTree: JSONTreeElementNode {
+        JSONTreeElementNode(type: "doc", children: [
+            JSONTreeElementNode(type: "p", children: [
+                JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "ab")]),
+                JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "cd")]),
+                JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "ef")])
+            ])
+        ])
+    }
+
+    /// `concurrentlySplitMerge` seeds both replicas with `initial`, runs `op1` on
+    /// one and `op2` on the other without either having seen the other, then
+    /// syncs until they settle and checks that they agree on `expected`.
+    @MainActor
+    private func concurrentlySplitMerge(
+        _ title: String,
+        _ initial: JSONTreeElementNode,
+        _ op1: (JSONTree) throws -> Void,
+        _ op2: (JSONTree) throws -> Void,
+        _ expected: String
+    ) async throws {
+        try await withTwoClientsAndDocuments(title) { c1, d1, c2, d2 in
+            try d1.update { root, _ in
+                root.t = JSONTree(initialRoot: initial)
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+
+            try d1.update { root, _ in
+                guard let tree = root.t as? JSONTree else { return XCTFail("root.t is not a JSONTree") }
+                try op1(tree)
+            }
+            try d2.update { root, _ in
+                guard let tree = root.t as? JSONTree else { return XCTFail("root.t is not a JSONTree") }
+                try op2(tree)
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            let d1XML = (d1.getRoot().t as? JSONTree)?.toXML()
+            XCTAssertEqual(d1XML, expected)
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+        }
+    }
+
+    // Ports: "does not duplicate content when two replicas split the same position"
+    //
+    // The tail survives once, not twice.
+    //
+    // KNOWN LIMITATION (tracked upstream): each replica still contributes its
+    // own boundary, so an empty node sits between them. Collapsing the two
+    // into one would mean recognizing a concurrent split at the same
+    // position, which the §7.5 advance does not do today. The empty node is
+    // asserted rather than tolerated, so lifting the limitation fails here
+    // and says so.
+    @MainActor
+    func test_does_not_duplicate_content_when_two_replicas_split_the_same_position() async throws {
+        try await self.concurrentlySplitMerge(
+            self.description,
+            self.oneSpanTree,
+            { try $0.splitByPath([0, 0, 3]) },
+            { try $0.splitByPath([0, 0, 3]) },
+            /* html */ "<doc><p><span>abc</span><span></span><span>de</span></p></doc>"
+        )
+    }
+
+    // Ports: "does not duplicate content when two replicas merge the same boundary"
+    @MainActor
+    func test_does_not_duplicate_content_when_two_replicas_merge_the_same_boundary() async throws {
+        try await self.concurrentlySplitMerge(
+            self.description,
+            self.twoSpansTree,
+            { try $0.mergeByPath([0, 1]) },
+            { try $0.mergeByPath([0, 1]) },
+            /* html */ "<doc><p><span>abcde</span></p></doc>"
+        )
+    }
+
+    // Ports: "keeps every span when two replicas merge neighbouring boundaries"
+    //
+    // Both merges land, so all three spans end up as one. Copying the children
+    // used to lose a span instead: each replica deleted the node it merged and
+    // re-inserted its children into a left sibling the other replica had
+    // already removed, and both agreed on `abcd`.
+    @MainActor
+    func test_keeps_every_span_when_two_replicas_merge_neighbouring_boundaries() async throws {
+        try await self.concurrentlySplitMerge(
+            self.description,
+            self.threeSpansTree,
+            { try $0.mergeByPath([0, 1]) },
+            { try $0.mergeByPath([0, 2]) },
+            /* html */ "<doc><p><span>abcdef</span></p></doc>"
+        )
+    }
+
+    // Ports: "keeps the text in order when two replicas split at different positions"
+    //
+    // Two boundaries in one node give three pieces. Copying the tail used to
+    // write each replica's view of it into the tree, landing on `aebcde`.
+    @MainActor
+    func test_keeps_the_text_in_order_when_two_replicas_split_at_different_positions() async throws {
+        try await self.concurrentlySplitMerge(
+            self.description,
+            self.oneSpanTree,
+            { try $0.splitByPath([0, 0, 1]) },
+            { try $0.splitByPath([0, 0, 4]) },
+            /* html */ "<doc><p><span>a</span><span>bcd</span><span>e</span></p></doc>"
+        )
+    }
+
+    // Ports: "applies a concurrent style change to both halves of a split"
+    //
+    // The half the split opened is the same node to the style, so clearing the
+    // formatting reaches it. A copied node was one the concurrent style had
+    // never seen, so it kept `bold` and the text came back half formatted --
+    // the shape an editor hits when one person clears formatting while another
+    // splits.
+    @MainActor
+    func test_applies_a_concurrent_style_change_to_both_halves_of_a_split() async throws {
+        try await self.concurrentlySplitMerge(
+            self.description,
+            self.boldSpanTree,
+            { try $0.splitByPath([0, 0, 2]) },
+            { try $0.removeStyleByPath([0, 0], [0, 1], ["bold"]) },
+            /* html */ "<doc><p><span>ab</span><span>cde</span></p></doc>"
+        )
+    }
+
+    // Ports: "keeps the text in order when a split meets a merge"
+    //
+    // The two structural changes compose: the split boundary stands and the
+    // rest merges behind it. Copying the content used to move it instead,
+    // landing on `<span>ade</span><span>bc</span>` -- the same text,
+    // reordered, on both replicas.
+    @MainActor
+    func test_keeps_the_text_in_order_when_a_split_meets_a_merge() async throws {
+        try await self.concurrentlySplitMerge(
+            self.description,
+            self.twoSpansTree,
+            { try $0.mergeByPath([0, 1]) },
+            { try $0.splitByPath([0, 0, 1]) },
+            /* html */ "<doc><p><span>a</span><span>bcde</span></p></doc>"
+        )
+    }
 }
 
 final class TreeIntegrationEditTests: XCTestCase {

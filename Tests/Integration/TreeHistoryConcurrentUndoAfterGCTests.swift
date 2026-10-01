@@ -271,6 +271,62 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
         }
     }
 
+    // Ports: "KNOWN: undo one of two concurrent splits of the same node"
+    // (packages/sdk/test/integration/history_tree_concurrent_test.ts, added by
+    // yorkie-js-sdk#1358, commit 9c15ab29).
+    //
+    // Undoing one of two concurrent splits of the same node drops the text
+    // between the two boundaries. `abcde` split at 1 and at 4 settles as
+    // `a|bcd|e`; undoing the split at 4 should give `a|bcde`, but it gives
+    // `a|b|e` and both replicas agree on `abe`.
+    //
+    // The reverse of a split is a merge across the boundary it created. With a
+    // second boundary inside the same original node, that merge resolves over
+    // a range wider than the one the split opened, so it swallows the piece
+    // between them. Undoing the *first* split is correct, which is what makes
+    // this specific to a boundary that has another one after it.
+    //
+    // Tracked as yorkie-team/yorkie#1999, and shared rather than SDK-only:
+    // `pkg/document/operations/tree_edit.go` carries the same
+    // `redoSplitLevel`/`splitReverseAt` structure and says so. Predates
+    // yorkie-js-sdk#1358 and reproduces through `editByPath(p, p, nil, 1)`,
+    // the split path #1237 made canonical, which is why that is what this
+    // case drives rather than `splitByPath`.
+    @MainActor
+    func test_known_undo_one_of_two_concurrent_splits_of_the_same_node() async throws {
+        try XCTSkipIf(true, "KNOWN: undo of one of two concurrent splits of the same node drops the text between the boundaries — mirrors JS it.skip, tracked as yorkie-team/yorkie#1999")
+
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p", children: [
+                            JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "abcde")])
+                        ])
+                    ])
+                )
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            try d1.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).editByPath([0, 0, 1], [0, 0, 1], nil, 1)
+            }
+            try d2.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).editByPath([0, 0, 4], [0, 0, 4], nil, 1)
+            }
+            try await settle(c1, c2)
+
+            XCTAssertEqual((d1.getRoot().t as? JSONTree)?.toXML(), "<doc><p><span>a</span><span>bcd</span><span>e</span></p></doc>")
+
+            try d2.undo()
+            try await settle(c1, c2)
+
+            XCTAssertEqual((d1.getRoot().t as? JSONTree)?.toXML(), "<doc><p><span>a</span><span>bcde</span></p></doc>")
+            try assertConverged(d1, d2, "after undo")
+        }
+    }
+
     // MARK: - Shared runners
 
     /// Both undos revive both deleted runs by identity, restoring the pre-delete

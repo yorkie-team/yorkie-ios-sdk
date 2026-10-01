@@ -411,4 +411,64 @@ final class TreeStyleMovedAnchorIntegrationTests: XCTestCase {
         try await c2.deactivate()
         try await c3.deactivate()
     }
+
+    // Ports: "KNOWN: keeps the attribute when the merge removes the left-sibling
+    // anchor" (packages/sdk/test/integration/tree_style_moved_anchor_test.ts,
+    // added by yorkie-js-sdk#1358, commit 9c15ab29).
+    //
+    // A merge concurrent with a split-and-style leaves the attribute on one
+    // replica only. The text converges; the attribute never does, and both
+    // replicas stay attached with later edits propagating normally.
+    //
+    // On the merging replica the style's from-anchor resolves onto the
+    // merge-source tombstone, the range collapses (start past end) and the
+    // traversal yields nothing, so the style is a silent no-op. The reversed
+    // range recovery covers exactly this collapsed range, but it delegates to
+    // a guard keyed on the declared parent (bails when the parent is still
+    // live). Here the from position's parent `<p>` is still alive; it is the
+    // left-sibling anchor that the merge removed, so the guard bails and the
+    // recovery never runs.
+    //
+    // Recorded alongside the other merge-moved style anchor limitations in
+    // this file rather than under a dedicated tracking issue of its own.
+    @MainActor
+    func test_known_keeps_the_attribute_when_the_merge_removes_the_left_sibling_anchor() async throws {
+        try XCTSkipIf(true, "KNOWN: merge concurrent with a split-and-style leaves the attribute on one replica only — mirrors JS it.skip")
+
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try d1.update { root, _ in
+                root.tree = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "p", children: [
+                        JSONTreeElementNode(type: "span",
+                                            children: [JSONTreeTextNode(value: "abcde")],
+                                            attributes: ["bold": "true"]),
+                        JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "fghij")])
+                    ])
+                ]))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // d1 drops the attribute and merges the two spans.
+            try d1.update { root, _ in
+                try (root.tree as? JSONTree)?.removeStyleByPath([0, 0], [0, 1], ["bold"])
+                try (root.tree as? JSONTree)?.editByPath([0, 0, 5], [0, 1, 0])
+            }
+
+            // d2 splits the second span twice and styles the middle piece.
+            try d2.update { root, _ in
+                try (root.tree as? JSONTree)?.editByPath([0, 1, 4], [0, 1, 4], nil, 1)
+                try (root.tree as? JSONTree)?.editByPath([0, 1, 2], [0, 1, 2], nil, 1)
+                try (root.tree as? JSONTree)?.styleByPath([0, 2], ["bold": "true"])
+            }
+
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+
+            XCTAssertEqual((d1.getRoot().tree as? JSONTree)?.toXML(),
+                           "<doc><p><span>abcdefg</span><span bold=\"true\">hi</span><span>j</span></p></doc>")
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+        }
+    }
 }
