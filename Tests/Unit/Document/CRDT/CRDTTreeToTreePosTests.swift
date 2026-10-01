@@ -93,7 +93,7 @@ final class CRDTTreeToTreePosTests: XCTestCase {
         // reaches the live root and resolves normally.
         let index = try tree.toIndex(text, text)
 
-        // then
-        XCTAssertGreaterThanOrEqual(index, 0)
+        // then — the removed `<p>` resolves to the live root at offset 0.
+        XCTAssertEqual(index, 0)
     }
 }

@@ -231,13 +231,11 @@ final class TextAttrLedgerTests: XCTestCase {
     /// A style that spans both live and already-deleted text, then an undo of
     /// it.
     ///
-    /// NOTE ON WHAT THIS DOES NOT COVER. `canStyle` skips a node whose removal
-    /// the change had already seen, and a local change has seen every removal
-    /// in its own replica -- so the history below never reaches a tombstoned
-    /// node at all, and the accounting case for one is exercised in
-    /// `StyleTombstoneTests` instead, on the concurrent histories that do
-    /// reach it. This test pins only that the ledger stays exact along the
-    /// local path.
+    /// `canStyle` reads no removal state, so the style below also lands on the
+    /// already-deleted text: this test covers the gc branch of `accAttrWrite`
+    /// as well as the live one, and pins that the ledger stays exact through
+    /// the style and its undo. The concurrent histories are in
+    /// `StyleTombstoneTests`.
     @MainActor
     func test_balances_a_style_that_spans_deleted_text_and_its_undo() throws {
         // given

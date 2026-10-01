@@ -34,11 +34,11 @@ import XCTest
 ///
 /// The contract these tests pin, shared with the server:
 ///
-/// - a removal the styling change had already SEEN wins, so a user never
-///   styles text they already deleted (a local change has seen every
-///   removal in its own replica, which is the whole of the local case);
-/// - a removal CONCURRENT with the style does not, so the style lands on the
-///   tombstone everywhere.
+/// - a style lands on every node whose creation the styling change knew
+///   about, removed or not -- `canStyle` reads no removal state, so this
+///   includes text the same client had already deleted;
+/// - so a removal CONCURRENT with the style lands it on the tombstone
+///   everywhere, and every replica agrees.
 ///
 /// This SDK used to refuse every removed node, which diverges in both
 /// orderings; the server decided it on `editedAt.after(removedAt)`, which
