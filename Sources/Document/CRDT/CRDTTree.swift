@@ -778,6 +778,23 @@ extension CRDTTreeNode: GCChild {
 }
 
 /**
+ * `attrGCPair` builds the GC pair for an RHT node a style edit turned into
+ * garbage. `wasLive` says whether docSize.live was holding the value this node
+ * replaces: only then does collecting it take a size out of live.
+ *
+ * A tombstone minted over a key that was absent, or over one that was already
+ * removed, was never live. Charging it to live anyway walked the live size
+ * down by the attribute's size on every such edit, without bound — a rich-text
+ * editor toggling one key is exactly that loop — and drove it negative, at
+ * which point the document size limit stops applying. Those go to gc alone,
+ * by the same `gcOnlySize` route `getGCPairs` already takes for the tombstones
+ * a snapshot rebuild finds.
+ */
+private func attrGCPair(_ parent: CRDTTreeNode, _ child: RHTNode, _ wasLive: Bool) -> GCPair {
+    wasLive ? GCPair(parent: parent, child: child) : GCPair(parent: parent, child: child, gcOnlySize: child.getDataSize())
+}
+
+/**
  * `ticketKnown` returns true if the given ticket is causally known to the
  * editor, i.e. the editor's version vector covers the ticket's lamport clock
  * for the same actor. For local operations (no version vector), all tickets are
@@ -1248,7 +1265,9 @@ class CRDTTree: CRDTElement {
         // 03. Split text node if the left node is a text node.
         if leftNode.isText {
             let (_, splitedDiff) = try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset)
-            diff = splitedDiff
+            // Accumulated, not assigned: `diff` is provably empty here today, but
+            // assigning is the same trap that left the split phase unaccounted.
+            diff.addDataSizes(others: splitedDiff)
         }
 
         // 04. Find the appropriate left node. If some nodes are inserted at the
@@ -1462,8 +1481,8 @@ class CRDTTree: CRDTElement {
                                                   splitLevel: 0) // dummy value.
                     )
 
-                    for (prev, _) in updatedAttrPairs where prev != nil {
-                        pairs.append(GCPair(parent: node, child: prev))
+                    for case (let prev?, _) in updatedAttrPairs {
+                        pairs.append(attrGCPair(node, prev, false))
                     }
                 }
 
@@ -1505,8 +1524,8 @@ class CRDTTree: CRDTElement {
                                                           toPath: self.toPath(next, next),
                                                           value: TreeChangeValue.attributes(siblingAffectedAttrs),
                                                           splitLevel: 0))
-                            for (prev, _) in siblingPairs where prev != nil {
-                                pairs.append(GCPair(parent: next, child: prev))
+                            for case (let prev?, _) in siblingPairs {
+                                pairs.append(attrGCPair(next, prev, false))
                             }
                         }
                         for attr in attributes {
@@ -1585,9 +1604,14 @@ class CRDTTree: CRDTElement {
                     node.attrs = RHT()
                 }
                 for key in attributesToRemove {
+                    var wasLive = node.attrs!.has(key: key)
                     let nodesToBeRemoved = node.attrs!.remove(key: key, executedAt: editedAt)
                     for rhtNode in nodesToBeRemoved {
-                        pairs.append(GCPair(parent: node, child: rhtNode))
+                        pairs.append(attrGCPair(node, rhtNode, wasLive))
+                        // Only the node replacing the live value takes a size out of
+                        // live; a second one in the same call is the tombstone it
+                        // superseded.
+                        wasLive = false
                     }
                 }
 
@@ -1621,10 +1645,12 @@ class CRDTTree: CRDTElement {
                         }
                         var removedAny = false
                         for key in attributesToRemove {
+                            var wasLive = next.attrs!.has(key: key)
                             let nodesToBeRemoved = next.attrs!.remove(key: key, executedAt: editedAt)
                             removedAny = removedAny || !nodesToBeRemoved.isEmpty
                             for rhtNode in nodesToBeRemoved {
-                                pairs.append(GCPair(parent: next, child: rhtNode))
+                                pairs.append(attrGCPair(next, rhtNode, wasLive))
+                                wasLive = false
                             }
                         }
                         if removedAny {
@@ -1655,7 +1681,8 @@ class CRDTTree: CRDTElement {
      * advancing past concurrent split siblings at each level (§7.5/§7.7) and
      * skipping the current operation's own split products.
      */
-    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws {
+    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws -> DataSize {
+        var diff = DataSize(data: 0, meta: 0)
         var splitCount: Int32 = 0
         var parent = from.parent
         var left: CRDTTreeNode = from.left
@@ -1683,11 +1710,18 @@ class CRDTTree: CRDTElement {
             }
 
             let rawOffset = left !== parent ? try parent.findOffset(node: left, includeRemoved: true) + 1 : 0
-            try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            // The metadata the new element adds belongs in docSize.live, the
+            // same as every other `split` caller books it. Dropping it here left
+            // live without the elements a split mints, so a split and the merge
+            // that undoes it did not cancel out and the live size walked down by
+            // a ticket per cycle, without bound.
+            let (_, splitDiff) = try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            diff.addDataSizes(others: splitDiff)
             left = parent
             parent = nextParent
             splitCount += 1
         }
+        return diff
     }
 
     /// `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
@@ -1858,7 +1892,8 @@ class CRDTTree: CRDTElement {
 
         // 04. Split: split the element nodes for the given split level.
         if splitLevel > 0 {
-            try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
+            let splitDiff = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
+            diff.addDataSizes(others: splitDiff)
 
             changes.append(TreeChange(actor: editedAt.actorID,
                                       type: .content,
