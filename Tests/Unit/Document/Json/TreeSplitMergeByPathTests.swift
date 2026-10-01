@@ -56,6 +56,30 @@ final class TreeSplitMergeByPathTests: XCTestCase {
         return doc
     }
 
+    /// Tree paths count UTF-16 units, so the merge boundary after a left sibling
+    /// holding a surrogate pair must not land inside it.
+    @MainActor
+    func test_merges_after_a_left_sibling_holding_a_surrogate_pair() throws {
+        // given
+        let doc = Document(key: "tree-merge-utf16-\(UUID().uuidString)")
+        try doc.update { root, _ in
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "a😀")]),
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "b")])
+                ])
+            )
+        }
+
+        // when
+        try doc.update { root, _ in
+            try (root.t as? JSONTree)?.mergeByPath([1])
+        }
+
+        // then
+        XCTAssertEqual((doc.getRoot().t as? JSONTree)?.toXML(), "<doc><p>a😀b</p></doc>")
+    }
+
     /// Mirrors JS: "Can split a text position and a child position"
     @MainActor
     func test_can_split_a_text_position_and_a_child_position() throws {

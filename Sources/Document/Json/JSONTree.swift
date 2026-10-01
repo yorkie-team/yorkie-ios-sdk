@@ -391,7 +391,10 @@ public class JSONTree {
         let parentPath = Array(path.dropLast())
         let fromPath = parentPath + [
             offset - 1,
-            leftSibling.hasTextChild ? leftSibling.getChildrenText().count : leftSibling.children.count
+            // UTF-16 units, as tree paths count them (`CRDTTreeNode.size` is an
+            // `NSString.length`). `String.count` counts graphemes, which put the
+            // boundary inside a surrogate pair and cut the left text's tail.
+            leftSibling.hasTextChild ? leftSibling.getChildrenText().utf16.count : leftSibling.children.count
         ]
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(path + [0])
