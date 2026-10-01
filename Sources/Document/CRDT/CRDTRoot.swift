@@ -116,10 +116,36 @@ class CRDTRoot {
      */
     private var sizeInGC: [GCChargeKey: DataSize] = [:]
     /**
-     * `gcPairMap` is a hash table that maps the IDString of GCChild to the
-     * element itself and its parent.
+     * `GCPairKey` identifies a registered GC pair by both of its ends.
+     *
+     * The parent is named by its object identity. That is enough within one
+     * root, and safe: a registered ``GCPair`` holds its parent strongly, so a
+     * parent cannot be freed — and its identifier reused — while a key naming
+     * it is in the map.
      */
-    private var gcPairMap: [String: GCPair]
+    private struct GCPairKey: Hashable {
+        let parent: ObjectIdentifier
+        let child: String
+    }
+
+    /**
+     * `gcPairMap` is a hash table of the registered GC pairs, keyed by both of
+     * a pair's ends.
+     *
+     * The child's IDString alone is not unique document-wide. An RHTNode is
+     * identified by (updatedAt, key), and a split deep-copies the attributes of
+     * the node it splits -- tombstones included, because the copy has to reject
+     * the same stale styles the original does. The copy is therefore a distinct
+     * piece of garbage wearing the original's id. Keying on the child alone made
+     * the two collide, and since `registerGCPair` reads a second registration
+     * under a known key as an un-registration, the second tombstone cancelled
+     * the first instead of joining it.
+     *
+     * The parent is the discriminator because it is what `purge` is called on:
+     * two pairs that share a parent and a child id name the same collectable
+     * thing, two that differ in either do not.
+     */
+    private var gcPairMap: [GCPairKey: GCPair]
 
     /**
      * `docSize` is a structure that represents the size of the document.
@@ -491,19 +517,30 @@ class CRDTRoot {
     }
 
     /**
+     * `keyOf` returns the `gcPairMap` key identifying the given pair, or `nil`
+     * when the pair is missing either end.
+     */
+    private func keyOf(_ pair: GCPair) -> GCPairKey? {
+        guard let parent = pair.parent, let child = pair.child else {
+            return nil
+        }
+        return GCPairKey(parent: ObjectIdentifier(parent), child: child.toIDString)
+    }
+
+    /**
      * `registerGCPair` registers the given pair to hash table.
      */
     func registerGCPair(_ pair: GCPair) {
-        guard let childID = pair.child?.toIDString else {
+        guard let key = self.keyOf(pair) else {
             return
         }
 
-        if self.gcPairMap[childID] != nil {
-            self.gcPairMap.removeValue(forKey: childID)
+        if self.gcPairMap[key] != nil {
+            self.gcPairMap.removeValue(forKey: key)
             return
         }
 
-        self.gcPairMap[childID] = pair
+        self.gcPairMap[key] = pair
 
         if let gcOnlySize = pair.gcOnlySize {
             // NOTE: The child's size was never counted in docSize.live (it was
@@ -542,11 +579,11 @@ class CRDTRoot {
      * `getDataSize()` no longer includes the tombstone ticket.
      */
     func unregisterGCPair(_ pair: GCPair) {
-        guard let childID = pair.child?.toIDString, self.gcPairMap[childID] != nil else {
+        guard let key = self.keyOf(pair), self.gcPairMap[key] != nil else {
             return
         }
 
-        self.gcPairMap.removeValue(forKey: childID)
+        self.gcPairMap.removeValue(forKey: key)
 
         guard let size = pair.child?.getDataSize() else {
             return
@@ -663,7 +700,7 @@ class CRDTRoot {
             }
         }
 
-        for pair in self.gcPairMap.values {
+        for (key, pair) in self.gcPairMap {
             if let child = pair.child, child.removedAt == nil {
                 // Node was revived but its pair was not unregistered. Reverse the
                 // GC accounting (gc → live) and drop the stale entry via
@@ -678,7 +715,7 @@ class CRDTRoot {
                 if let datasize = pair.child?.getDataSize() {
                     self.docSize.gc.subDataSize(others: datasize)
                 }
-                self.gcPairMap.removeValue(forKey: child.toIDString)
+                self.gcPairMap.removeValue(forKey: key)
                 count += 1
             }
         }
