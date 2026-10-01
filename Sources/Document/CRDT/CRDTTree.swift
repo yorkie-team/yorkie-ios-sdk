@@ -1209,36 +1209,6 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `registerPendingGCPair` buffers a GC pair for a node that was born
-     * tombstoned (split off an already-removed node). The pair is picked up
-     * by the next `edit` or `style` call via `drainPendingGCPairs`. `size`
-     * is the net-new size created by the split; it is accounted to
-     * docSize.gc at registration since the node was never live.
-     */
-    func registerPendingGCPair(_ node: CRDTTreeNode, _ size: DataSize) {
-        self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: size))
-    }
-
-    /**
-     * `pushPendingGCPair` buffers an already-built pair, for garbage whose
-     * parent is not this tree -- an attribute tombstone belongs to the node
-     * holding it, not to the tree.
-     */
-    func pushPendingGCPair(_ pair: GCPair) {
-        self.pendingGCPairs.append(pair)
-    }
-
-    /**
-     * `drainPendingGCPairs` returns the buffered GC pairs and clears the
-     * buffer.
-     */
-    func drainPendingGCPairs() -> [GCPair] {
-        let pairs = self.pendingGCPairs
-        self.pendingGCPairs = []
-        return pairs
-    }
-
-    /**
      * `findNodesAndSplitText` finds `TreePos` of the given `CRDTTreeNodeID` and
      * splits nodes for the given split level.
      *
@@ -3103,5 +3073,39 @@ private extension CRDTTree {
             }
         }
         return (target, anchorLeft, guardResult.isInterloper)
+    }
+}
+
+// MARK: - Pending GC pairs
+
+extension CRDTTree {
+    /**
+     * `registerPendingGCPair` buffers a GC pair for a node that was born
+     * tombstoned (split off an already-removed node). The pair is picked up
+     * by the next `edit` or `style` call via `drainPendingGCPairs`. `size`
+     * is the net-new size created by the split; it is accounted to
+     * docSize.gc at registration since the node was never live.
+     */
+    func registerPendingGCPair(_ node: CRDTTreeNode, _ size: DataSize) {
+        self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: size))
+    }
+
+    /**
+     * `pushPendingGCPair` buffers an already-built pair, for garbage whose
+     * parent is not this tree -- an attribute tombstone belongs to the node
+     * holding it, not to the tree.
+     */
+    func pushPendingGCPair(_ pair: GCPair) {
+        self.pendingGCPairs.append(pair)
+    }
+
+    /**
+     * `drainPendingGCPairs` returns the buffered GC pairs and clears the
+     * buffer.
+     */
+    func drainPendingGCPairs() -> [GCPair] {
+        let pairs = self.pendingGCPairs
+        self.pendingGCPairs = []
+        return pairs
     }
 }
