@@ -551,8 +551,13 @@ final class CRDTTreeNode: IndexTreeNode {
                        insNextParent !== split.parent,
                        split.innerChildren.isEmpty
                     {
-                        try split.parent?.detachChild(child: split)
-                        try insNextParent.insertBefore(split, insNext)
+                        // Moved rather than detached and re-inserted: a split born
+                        // tombstoned contributes no visible size to either parent, so
+                        // detaching would take its tokens off the source that it never
+                        // held and re-inserting would change the destination's size,
+                        // which it must not. `moveChildBefore` carries the same
+                        // tombstone-aware semantics `moveChild` documents.
+                        try insNextParent.moveChildBefore(split, insNext)
                     }
                 }
             }
@@ -1766,6 +1771,9 @@ class CRDTTree: CRDTElement {
     /**
      * `edit` edits the tree with the given range and content.
      * If the content is undefined, the range will be removed.
+     *
+     * The last element of the result is the visible-index size the split phase
+     * opened, which the inserted content size before it does not include.
      */
     @discardableResult
     func edit(
@@ -1775,7 +1783,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1891,6 +1899,14 @@ class CRDTTree: CRDTElement {
         pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, mergeDest, toBeMergedNodes, editedAt))
 
         // 04. Split: split the element nodes for the given split level.
+        //
+        // The boundaries it opens grow the visible index, which nothing else in
+        // this method reports: they are not content, so `insertedContentSize`
+        // below does not see them, and they remove nothing, so the removed range
+        // does not either. Measured off the tree rather than computed as
+        // 2 * splitLevel, so a split whose product is born tombstoned, or one the
+        // tree has no room for, reports the growth it really produced.
+        let sizeBeforeSplit = self.size
         if splitLevel > 0 {
             let splitDiff = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
             diff.addDataSizes(others: splitDiff)
@@ -1904,6 +1920,8 @@ class CRDTTree: CRDTElement {
                                       value: nil,
                                       splitLevel: 0))
         }
+
+        let splitSize = self.size - sizeBeforeSplit
 
         // 05. Insert: insert the given nodes at the given position.
         //
@@ -1983,7 +2001,7 @@ class CRDTTree: CRDTElement {
         // subtree top-down (a child's recreate resolves its parent by identity).
         let outRemoved = spansComplete ? removedSpans : []
         let outInserted = spansComplete ? Array(insertedSpans.reversed()) : []
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize)
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize, splitSize)
     }
 
     /**
@@ -2132,7 +2150,7 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         return try self.edit(
