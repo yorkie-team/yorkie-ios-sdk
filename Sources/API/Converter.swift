@@ -1362,7 +1362,9 @@ extension Converter {
      */
     static func toTextNodes(_ rgaTreeSplit: RGATreeSplit<CRDTTextValue>) -> [PbTextNode] {
         var pbTextNodes = [PbTextNode]()
-        for textNode in rgaTreeSplit {
+        // iOS's iterator yields the head sentinel, which JS's skips. Encoding it
+        // made every decode insert an extra empty node after the real head.
+        for textNode in rgaTreeSplit where textNode !== rgaTreeSplit.head {
             var pbTextNode = PbTextNode()
             pbTextNode.id = toTextNodeID(id: textNode.id)
             pbTextNode.value = String(describing: textNode.value.content)
