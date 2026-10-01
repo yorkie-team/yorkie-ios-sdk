@@ -868,13 +868,6 @@ func accAttrWrite(_ write: RHTWrite, _ parent: GCParent, _ nodeIsLive: Bool, _ p
 }
 
 /**
- * `ticketKnown` returns true if the given ticket is causally known to the
- * editor, i.e. the editor's version vector covers the ticket's lamport clock
- * for the same actor. For local operations (no version vector), all tickets are
- * considered known.
- */
-
-/**
  * `CRDTTree` is a CRDT implementation of a tree.
  */
 class CRDTTree: CRDTElement {
