@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.23] - 2026-10-01
+
+> Requires a Yorkie server v0.7.23 or later: six of these mirror [yorkie v0.7.23](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.23) one for one, because the defects were in shared CRDT logic.
+
+> **Wire change — string attributes are stored as themselves.** A style value that is an ordinary string is now stored and sent raw (`color="red"` sends `red`, as the server stores it) instead of JSON-encoded. A string that is itself a JSON document (`"1"`, `"true"`) keeps its quotes. Apps reading attribute values (`StyleOpInfo`/`EditOpInfo.attributes`, `JSONTreeElementNode.attributes`, `CRDTTextValue.getAttributes()`) now receive `red` where they received `"red"`; booleans and numbers are unchanged. An iOS client older than this release drops such a value when it renders the document, so upgrade every client together.
+
+> **Behavioural change — a style lands on concurrently deleted text.** `canStyle` no longer reads removal state, so a style concurrent with a deletion is applied on every replica. Undoing the style and then the deletion brings the text back without the attributes it carried. The server and every SDK have to be on v0.7.23 for replicas to agree.
+
+> **Behavioural change — attribute sizes.** An attribute is charged for its logical value in UTF-8 bytes, matching the server, so documents with string or non-ASCII attributes measure differently against `maxSizeLimit`.
+
+### Fixed
+
+- Stop splitByPath and mergeByPath from duplicating content in PR_URL_PLACEHOLDER
+- Charge live only for the tree sizes it was actually holding in PR_URL_PLACEHOLDER
+- Report a split's boundary growth to undo/redo reconciliation in PR_URL_PLACEHOLDER
+- Give a split's copied tree attribute tombstone its own place in GC in PR_URL_PLACEHOLDER
+- Recreate a restored node tombstoned, and carry a text attribute's removal flag in PR_URL_PLACEHOLDER
+- Charge an attribute to live only while it is the live value in PR_URL_PLACEHOLDER
+- Stop canStyle reading removal state, and charge a tombstone's style in PR_URL_PLACEHOLDER
+- Keep the newer tombstone when a tree node is removed twice, as the JS SDK and server do in PR_URL_PLACEHOLDER
+- Stop encoding the text head sentinel into a snapshot, which added an empty node on every offline-persistence round trip in PR_URL_PLACEHOLDER
+- Measure the mergeByPath boundary in UTF-16 units, so a merge after an emoji no longer cuts the left text in PR_URL_PLACEHOLDER
+
 ## [v0.7.22] - 2026-09-22
 
 > Requires a Yorkie server v0.7.22 or later: three of these are the client halves of fixes shipping with [yorkie v0.7.22](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.22).
