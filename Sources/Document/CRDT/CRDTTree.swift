@@ -420,7 +420,15 @@ final class CRDTTreeNode: IndexTreeNode {
     func remove(_ removedAt: TimeTicket) -> Bool {
         let alived = !self.isRemoved
 
-        if self.removedAt == nil || removedAt <= self.removedAt! {
+        // Overwrite with the newer tombstone, which is LWW for concurrent
+        // deletions. This kept the EARLIER one, so replicas receiving two
+        // removals in different orders disagreed on `removedAt`, which feeds
+        // `canDelete` and the GC boundary.
+        if let current = self.removedAt {
+            if removedAt.after(current) {
+                self.removedAt = removedAt
+            }
+        } else {
             self.removedAt = removedAt
         }
 
