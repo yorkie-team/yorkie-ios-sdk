@@ -18,16 +18,16 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ### Fixed
 
-- Stop splitByPath and mergeByPath from duplicating content in PR_URL_PLACEHOLDER
-- Charge live only for the tree sizes it was actually holding in PR_URL_PLACEHOLDER
-- Report a split's boundary growth to undo/redo reconciliation in PR_URL_PLACEHOLDER
-- Give a split's copied tree attribute tombstone its own place in GC in PR_URL_PLACEHOLDER
-- Recreate a restored node tombstoned, and carry a text attribute's removal flag in PR_URL_PLACEHOLDER
-- Charge an attribute to live only while it is the live value in PR_URL_PLACEHOLDER
-- Stop canStyle reading removal state, and charge a tombstone's style in PR_URL_PLACEHOLDER
-- Keep the newer tombstone when a tree node is removed twice, as the JS SDK and server do in PR_URL_PLACEHOLDER
-- Stop encoding the text head sentinel into a snapshot, which added an empty node on every offline-persistence round trip in PR_URL_PLACEHOLDER
-- Measure the mergeByPath boundary in UTF-16 units, so a merge after an emoji no longer cuts the left text in PR_URL_PLACEHOLDER
+- Stop splitByPath and mergeByPath from duplicating content in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Charge live only for the tree sizes it was actually holding in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Report a split's boundary growth to undo/redo reconciliation in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Give a split's copied tree attribute tombstone its own place in GC in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Recreate a restored node tombstoned, and carry a text attribute's removal flag in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Charge an attribute to live only while it is the live value in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Stop canStyle reading removal state, and charge a tombstone's style in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Keep the newer tombstone when a tree node is removed twice, as the JS SDK and server do in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Stop encoding the text head sentinel into a snapshot, which added an empty node on every offline-persistence round trip in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Measure the mergeByPath boundary in UTF-16 units, so a merge after an emoji no longer cuts the left text in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
 
 ## [v0.7.22] - 2026-09-22
 
