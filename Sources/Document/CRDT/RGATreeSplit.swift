@@ -34,6 +34,12 @@ protocol RGATreeSplitValue {
     init()
     var count: Int { get }
     func substring(from: Int, to: Int) -> Self
+    /// Shortens this value in place, keeping the object identity. A split has to
+    /// keep the LEFT node's value object, because `CRDTRoot` identifies a GC
+    /// pair's parent by object identity: replacing it orphans every pair already
+    /// registered against it, so the tombstone survives while the ledger says it
+    /// was collected.
+    func truncate(_ offset: Int)
     func getDataSize() -> DataSize
 }
 
@@ -425,7 +431,11 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      * `deepcopy` returns a new instance of this RGATreeSplitNode without structural info.
      */
     func deepcopy() -> RGATreeSplitNode<T> {
-        RGATreeSplitNode(self.id, self.value, self.removedAt)
+        // The value has to be copied, not shared. `Document` builds its clone
+        // from the root and applies every operation to both; a shared value means
+        // the clone's split or style mutates the root as a side effect, and the
+        // root's own application then sees an already-mutated value.
+        RGATreeSplitNode(self.id, self.value.substring(from: 0, to: self.value.count), self.removedAt)
     }
 
     /**
@@ -437,9 +447,12 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     private func splitValue(_ offset: Int32) -> T {
-        let value = self.value
-        self.value = value.substring(from: 0, to: Int(offset))
-        return value.substring(from: Int(offset), to: value.count)
+        // Take the right part first -- `substring` deep-copies the attributes --
+        // then shorten this value IN PLACE rather than replacing it, so the GC
+        // pairs registered against it keep pointing at a live object.
+        let right = self.value.substring(from: Int(offset), to: self.value.count)
+        self.value.truncate(Int(offset))
+        return right
     }
 }
 
@@ -857,6 +870,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
         diff.addDataSizes(others: node.getDataSize(), splitNode.getDataSize())
         diff.subDataSize(others: prvSize)
+
+        // A split deep-copies the value's attributes, so every tombstone among
+        // them is duplicated under the new node. The copy was never in
+        // docSize.live -- `getDataSize` excludes removed attributes -- so it
+        // enters gc only, and purge subtracts the same size back out.
+        if let splitValue = splitNode.value as? CRDTTextValue {
+            for attr in splitValue.getRemovedAttrs() {
+                self.pendingGCPairs.append(GCPair(parent: splitValue, child: attr, gcOnlySize: attr.getDataSize()))
+            }
+        }
 
         // NOTE: A piece split off an already-tombstoned node inherits
         // `removedAt` without going through `remove()`, so no GC pair is

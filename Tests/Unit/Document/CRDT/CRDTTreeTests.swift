@@ -419,10 +419,11 @@ final class CRDTTreeEditTests: XCTestCase {
         // the insert.
         let mergeTicket = TimeTicket(lamport: knownTicket.lamport + 1, delimiter: 0, actorID: self.otherActor)
         try tree.editT((0, 5), nil, 0, mergeTicket, timeT)
-        _ = try tree.style((fromPos, toPos), ["bold": "\"x\""], timeT(), stylerVV)
+        _ = try tree.style((fromPos, toPos), ["bold": stringifyAttrValue("x")], timeT(), stylerVV)
 
-        // then
-        XCTAssertEqual(try? inserted.attrs?.get(key: "bold"), "\"x\"")
+        // then — "x" is not a JSON document, so it is stored as itself: the same
+        // bytes the server would hold for this attribute.
+        XCTAssertEqual(try? inserted.attrs?.get(key: "bold"), "x")
     }
 
     // Ported from yorkie-js-sdk v0.7.18: CRDTTree.Edit — keeps an ordered from-anchor range off

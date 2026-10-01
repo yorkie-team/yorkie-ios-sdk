@@ -81,10 +81,19 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
+     * `truncate` shortens this value in place, keeping the object identity so
+     * that GC pairs registered against it are not orphaned. See
+     * ``RGATreeSplitValue/truncate(_:)``.
+     */
+    func truncate(_ offset: Int) {
+        self.content = self.content.substring(to: offset) as NSString
+    }
+
+    /**
      * `setAttr` sets attribute of the given key, updated time and value.
      */
     @discardableResult
-    func setAttr(key: String, value: String, updatedAt: TimeTicket) -> (RHTNode?, RHTNode?) {
+    func setAttr(key: String, value: String, updatedAt: TimeTicket) -> RHTWrite {
         self.attributes.set(key: key, value: value, executedAt: updatedAt)
     }
 
@@ -103,7 +112,11 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
             data: content.length * 2,
             meta: 0
         )
-        for node in self.attributes {
+        // A removed attribute belongs to docSize.gc, not to live.
+        // `CRDTTreeNode.getDataSize` makes the same exclusion; the two halves
+        // have to answer this the same way or a document's size stops being a
+        // function of its content.
+        for node in self.attributes where !node.isRemoved {
             let size = node.getDataSize()
             dataSize.data += size.data
             dataSize.meta += size.meta
@@ -123,8 +136,10 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
             var data = [String]()
 
             for (key, value) in attrs.sorted(by: { $0.key < $1.key }) {
-                if value.value.count > 2, value.value.first == "\"", value.value.last == "\"" {
-                    data.append("\"\(key)\":\(value.value)")
+                // A peer that stores values raw writes ones that do not parse as
+                // JSON; quote those as strings rather than emitting invalid JSON.
+                if value.value.toJSONObject is String {
+                    data.append("\"\(key)\":\(convertToJSONString(logicalAttrValue(value.value)))")
                 } else {
                     data.append("\"\(key)\":\(value.value)")
                 }
@@ -158,13 +173,27 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
+     * `getRemovedAttrs` reports the tombstoned attributes this value holds,
+     * which a split has just duplicated from its source. The copy is new garbage
+     * under a new parent with no registration of its own -- the original's pair
+     * names the original's parent -- so without this it could never be
+     * collected.
+     */
+    func getRemovedAttrs() -> [RHTNode] {
+        self.attributes.filter { $0.removedAt != nil }
+    }
+
+    /**
      * `getGCPairs` returns the pairs of GC.
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
 
+        // `getDataSize` skips removed attributes, so a tombstoned attribute is
+        // not part of the live size this root was built with. Registering it
+        // without `gcOnlySize` would debit live for bytes it never held.
         for node in self.attributes where node.removedAt != nil {
-            pairs.append(GCPair(parent: self, child: node))
+            pairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
         }
 
         return pairs
@@ -422,14 +451,10 @@ final class CRDTText: CRDTElement {
                                       attributes: attributes))
 
             for (key, jsonValue) in attributes {
-                let (prev, _) = node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
-                if prev != nil {
-                    pairs.append(GCPair(parent: node.value, child: prev))
-                }
-
-                if let curr = node.value.getAttrs().getNodeByKey(key) {
-                    diff.addDataSizes(others: curr.getDataSize())
-                }
+                accAttrWrite(node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt),
+                             node.value,
+                             &pairs,
+                             &diff)
             }
         }
 
@@ -513,10 +538,15 @@ final class CRDTText: CRDTElement {
                                       attributes: removedAttributes))
 
             for key in attributesToRemove {
-                let gcNodes = node.value.getAttrs().remove(key: key, executedAt: editedAt)
-                for rhtNode in gcNodes {
-                    pairs.append(GCPair(parent: node.value, child: rhtNode))
-                    diff.addDataSizes(others: rhtNode.getDataSize())
+                // The loop above skips removed nodes, so every node reaching here
+                // is live and the only question is whether the ATTRIBUTE was.
+                var attrWasLive = node.value.getAttrs().has(key: key)
+                for rhtNode in node.value.getAttrs().remove(key: key, executedAt: editedAt) {
+                    pairs.append(attrGCPair(node.value, rhtNode, attrWasLive))
+                    // Only the node that replaces the live value settles the live
+                    // value's bytes; a second one in the same call is the
+                    // tombstone it superseded, which was never in live.
+                    attrWasLive = false
                 }
             }
         }
@@ -636,9 +666,9 @@ extension CRDTText: CRDTGCPairContainable {
         // NOTE: Only called when a root is built from a snapshot, where
         // docSize.live counted visible nodes only. Tombstoned nodes (and the
         // attribute tombstones inside them) were never part of live, so their
-        // pairs carry `gcOnlySize`. Attribute tombstones of visible nodes ARE
-        // counted in live (getDataSize does not skip them), so their pairs use
-        // the normal live→gc accounting.
+        // pairs carry `gcOnlySize`. So do the attribute tombstones of visible
+        // nodes: `CRDTTextValue.getDataSize` skips removed attributes, matching
+        // the tree half, so those bytes are not in live either.
         for node in self.rgaTreeSplit {
             let isRemoved = node.removedAt != nil
             if isRemoved {

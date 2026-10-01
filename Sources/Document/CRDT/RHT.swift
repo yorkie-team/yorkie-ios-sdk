@@ -54,11 +54,35 @@ class RHTNode: GCChild {
      * `getDataSize` returns the data size of the element
      */
     func getDataSize() -> DataSize {
+        // Charge the LOGICAL value in UTF-8 bytes, which is what the Go SDK stores
+        // and charges. A JSON-encoded string is stored with its quotes, and
+        // `count` counted grapheme clusters where Go's `len()` counts UTF-8
+        // bytes, so the same document had a different size allowance per SDK.
         .init(
-            data: (self.key.count + self.value.count) * 2,
+            data: (self.key.utf8.count + logicalAttrValue(self.value).utf8.count) * 2,
             meta: timeTicketSize
         )
     }
+}
+
+/**
+ * `RHTWrite` is what an ``RHT/set(key:value:executedAt:)`` reports back, so the
+ * caller can keep docSize honest without inspecting the map afterwards. Reading
+ * the map cannot tell a write that installed a node from one that lost LWW and
+ * left the incumbent in place, and charging live for the latter makes the
+ * running size depend on delivery order.
+ */
+struct RHTWrite {
+    /// The node this write put in the map, `nil` when the write lost LWW and
+    /// changed nothing. Its size is what enters docSize.live.
+    var installed: RHTNode?
+    /// A tombstone this write replaced. It was registered as garbage when it was
+    /// removed, so the caller re-registers the pair to cancel that registration.
+    var revived: RHTNode?
+    /// A LIVE node this write replaced. RHT overrides immutably, so the old node
+    /// is dropped with no tombstone, but its bytes were counted in docSize.live
+    /// and have to leave it.
+    var superseded: RHTNode?
 }
 
 /**
@@ -73,25 +97,27 @@ class RHT {
      * `set` sets the value of the given key.
      */
     @discardableResult
-    func set(key: String, value: String, executedAt: TimeTicket) -> (RHTNode?, RHTNode?) {
+    func set(key: String, value: String, executedAt: TimeTicket) -> RHTWrite {
         let prev = self.nodeMapByKey[key]
 
-        if prev != nil && prev!.isRemoved && executedAt.after(prev!.updatedAt) {
+        if let prev, !executedAt.after(prev.updatedAt) {
+            return RHTWrite()
+        }
+
+        if let prev, prev.isRemoved {
             self.numberOfRemovedElement -= 1
         }
 
-        if prev == nil || executedAt.after(prev!.updatedAt) {
-            let node = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
-            self.nodeMapByKey[key] = node
+        let installed = RHTNode(key: key, value: value, updatedAt: executedAt, isRemoved: false)
+        self.nodeMapByKey[key] = installed
 
-            if prev != nil, prev!.isRemoved {
-                return (prev, node)
-            }
-
-            return (nil, node)
+        guard let prev else {
+            return RHTWrite(installed: installed)
         }
-
-        return (prev?.isRemoved ?? false ? prev : nil, nil)
+        if prev.isRemoved {
+            return RHTWrite(installed: installed, revived: prev)
+        }
+        return RHTWrite(installed: installed, superseded: prev)
     }
 
     /**
@@ -255,7 +281,10 @@ class RHT {
     var toDictionary: [String: Any] {
         self.nodeMapByKey.compactMapValues { node -> Any? in
             guard !node.isRemoved else { return nil }
-            return try? JSONSerialization.jsonObject(with: Data(node.value.utf8), options: .fragmentsAllowed)
+            // `toJSONObject` falls back to the raw string: a peer that stores
+            // values raw writes ones that do not parse, and dropping them here
+            // would hide the attribute.
+            return node.value.toJSONObject
         }
     }
 

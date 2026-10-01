@@ -662,18 +662,18 @@ final class CRDTTreeNode: IndexTreeNode {
     func setAttrs(
         _ attrs: [String: String],
         _ editedAt: TimeTicket
-    ) -> [(RHTNode?, RHTNode?)] {
+    ) -> [RHTWrite] {
         if self.attrs == nil {
             self.attrs = RHT()
         }
 
-        var pairs = [(RHTNode?, RHTNode?)]()
+        var writes = [RHTWrite]()
 
         for attr in attrs {
-            pairs.append(self.attrs!.set(key: attr.key, value: attr.value, executedAt: editedAt))
+            writes.append(self.attrs!.set(key: attr.key, value: attr.value, executedAt: editedAt))
         }
 
-        return pairs
+        return writes
     }
 
     /**
@@ -688,7 +688,13 @@ final class CRDTTreeNode: IndexTreeNode {
         if let attrs = node.attrs?.toObject() {
             for key in attrs.keys.sorted() {
                 if let value = attrs[key]?.value {
-                    xml += " \(key)=\(value)"
+                    // A string, JSON-encoded or written raw by a peer, renders
+                    // quoted; anything else renders as stored.
+                    if value.toJSONObject is String {
+                        xml += " \(key)=\"\(logicalAttrValue(value))\""
+                    } else {
+                        xml += " \(key)=\(value)"
+                    }
                 }
             }
         }
@@ -819,8 +825,28 @@ extension CRDTTreeNode: GCChild {
  * by the same `gcOnlySize` route `getGCPairs` already takes for the tombstones
  * a snapshot rebuild finds.
  */
-private func attrGCPair(_ parent: CRDTTreeNode, _ child: RHTNode, _ wasLive: Bool) -> GCPair {
+func attrGCPair(_ parent: GCParent, _ child: RHTNode, _ wasLive: Bool) -> GCPair {
     wasLive ? GCPair(parent: parent, child: child) : GCPair(parent: parent, child: child, gcOnlySize: child.getDataSize())
+}
+
+/**
+ * `accAttrWrite` books one attribute write into the ledger. It reads only what
+ * the write reported, never the map: a write that lost LWW installed nothing, so
+ * it must charge nothing, and a node visited twice in one traversal (once as
+ * Start and once as End) loses LWW on the second visit and is naturally deduped.
+ * Deciding from the map instead made live depend on delivery order and, where a
+ * token guard suppressed only one half, drove it negative.
+ */
+func accAttrWrite(_ write: RHTWrite, _ parent: GCParent, _ pairs: inout [GCPair], _ diff: inout DataSize) {
+    if let revived = write.revived {
+        pairs.append(attrGCPair(parent, revived, false))
+    }
+    if let superseded = write.superseded {
+        diff.subDataSize(others: superseded.getDataSize())
+    }
+    if let installed = write.installed {
+        diff.addDataSizes(others: installed.getDataSize())
+    }
 }
 
 /**
@@ -1469,8 +1495,8 @@ class CRDTTree: CRDTElement {
 
                 let updatedAttrPairs = node.setAttrs(attributes, editedAt)
                 var affectedAttrs = [String: String]()
-                for (_, curr) in updatedAttrPairs {
-                    if let key = curr?.key {
+                for write in updatedAttrPairs {
+                    if let key = write.installed?.key {
                         affectedAttrs[key] = attributes[key]
                     }
                 }
@@ -1488,18 +1514,10 @@ class CRDTTree: CRDTElement {
                                                   value: TreeChangeValue.attributes(affectedAttrs),
                                                   splitLevel: 0) // dummy value.
                     )
-
-                    for case (let prev?, _) in updatedAttrPairs {
-                        pairs.append(attrGCPair(node, prev, false))
-                    }
                 }
 
-                for attr in attributes {
-                    let key = attr.key
-                    let curr = node.attrs?.getNodeByKey(key)
-                    if let curr, tokenType != .end {
-                        diff.addDataSizes(others: curr.getDataSize())
-                    }
+                for write in updatedAttrPairs {
+                    accAttrWrite(write, node, &pairs, &diff)
                 }
 
                 // Propagate style to unknown split siblings so that a style
@@ -1516,8 +1534,8 @@ class CRDTTree: CRDTElement {
                         }
                         let siblingPairs = next.setAttrs(attributes, editedAt)
                         var siblingAffectedAttrs = [String: String]()
-                        for (_, curr) in siblingPairs {
-                            if let key = curr?.key {
+                        for write in siblingPairs {
+                            if let key = write.installed?.key {
                                 siblingAffectedAttrs[key] = attributes[key]
                             }
                         }
@@ -1532,16 +1550,9 @@ class CRDTTree: CRDTElement {
                                                           toPath: self.toPath(next, next),
                                                           value: TreeChangeValue.attributes(siblingAffectedAttrs),
                                                           splitLevel: 0))
-                            for case (let prev?, _) in siblingPairs {
-                                pairs.append(attrGCPair(next, prev, false))
-                            }
                         }
-                        for attr in attributes {
-                            let key = attr.key
-                            let curr = next.attrs?.getNodeByKey(key)
-                            if let curr {
-                                diff.addDataSizes(others: curr.getDataSize())
-                            }
+                        for write in siblingPairs {
+                            accAttrWrite(write, next, &pairs, &diff)
                         }
                         current = next
                     }

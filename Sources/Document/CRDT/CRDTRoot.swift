@@ -535,7 +535,15 @@ class CRDTRoot {
             return
         }
 
-        if self.gcPairMap[key] != nil {
+        if let prev = self.gcPairMap[key] {
+            // A second registration under the same key un-registers: the child is
+            // no longer collectable, it was revived. Subtract exactly what the
+            // first registration added, or the bytes stay charged to gc for the
+            // life of the document -- the count drops to zero, so nothing else
+            // notices, while MaxSizeLimit keeps reading them.
+            if let size = prev.gcOnlySize ?? prev.child?.getDataSize() {
+                self.docSize.gc.subDataSize(others: size)
+            }
             self.gcPairMap.removeValue(forKey: key)
             return
         }

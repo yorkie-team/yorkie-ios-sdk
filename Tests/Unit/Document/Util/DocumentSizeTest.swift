@@ -411,8 +411,12 @@ extension DocumentSizeTest {
         try await twice.update { root, _ in
             try (root.t as? JSONTree)?.styleByPath([0], [1], ["bold": "true"])
         }
+        // 22, not 26: an attribute is charged for its LOGICAL value in UTF-8
+        // bytes, so `bold="true"` costs (4 + 4) * 2 = 16 here exactly as it does
+        // on the Go side. The old number counted the JSON quotes this SDK adds
+        // when it stores the value (yorkie-team/yorkie#2003).
         size = await twice.getDocSize()
-        XCTAssertEqual(size.live, DataSize(data: 26, meta: 168))
+        XCTAssertEqual(size.live, DataSize(data: 22, meta: 168))
         for _ in 0 ..< 2 {
             try await twice.update { root, _ in
                 try (root.t as? JSONTree)?.removeStyleByPath([0], [1], ["bold"])
@@ -429,7 +433,7 @@ extension DocumentSizeTest {
                 try (root.t as? JSONTree)?.styleByPath([0], [1], ["bold": "true"])
             }
             size = await toggled.getDocSize()
-            XCTAssertEqual(size.live, DataSize(data: 26, meta: 168))
+            XCTAssertEqual(size.live, DataSize(data: 22, meta: 168))
             try await toggled.update { root, _ in
                 try (root.t as? JSONTree)?.removeStyleByPath([0], [1], ["bold"])
             }
