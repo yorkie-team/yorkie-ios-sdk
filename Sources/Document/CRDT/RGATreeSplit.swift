@@ -34,6 +34,12 @@ protocol RGATreeSplitValue {
     init()
     var count: Int { get }
     func substring(from: Int, to: Int) -> Self
+    /// Shortens this value in place, keeping the object identity. A split has to
+    /// keep the LEFT node's value object, because `CRDTRoot` identifies a GC
+    /// pair's parent by object identity: replacing it orphans every pair already
+    /// registered against it, so the tombstone survives while the ledger says it
+    /// was collected.
+    func truncate(_ offset: Int)
     func getDataSize() -> DataSize
 }
 
@@ -387,12 +393,21 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `canStyle` checks if node is able to set style.
      */
-    func canStyle(
-        _ editedAt: TimeTicket,
-        clientLamportAtChange: Int64
-    ) -> Bool {
-        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-        return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    ///
+    /// The only question is whether the styling change knew this node existed.
+    /// It deliberately does NOT ask whether the node has since been removed, and
+    /// that is a convergence requirement: a style is applied unconditionally on
+    /// the replica that issues it — the node is live there — and can never be
+    /// retracted afterwards, so every other replica has to apply it too. Any rule
+    /// that reads `removedAt` is delivery-order dependent, because `removedAt` is
+    /// last-writer-wins and mutable while a style is evaluated once, when it
+    /// arrives.
+    ///
+    /// The cost is that a style covers text the same client had already deleted,
+    /// invisibly, so undoing the style and then the deletion brings the text back
+    /// without the attributes it carried.
+    func canStyle(_ versionVector: VersionVector?) -> Bool {
+        ticketKnown(versionVector, self.createdAt)
     }
 
     /**
@@ -425,7 +440,11 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      * `deepcopy` returns a new instance of this RGATreeSplitNode without structural info.
      */
     func deepcopy() -> RGATreeSplitNode<T> {
-        RGATreeSplitNode(self.id, self.value, self.removedAt)
+        // The value has to be copied, not shared. `Document` builds its clone
+        // from the root and applies every operation to both; a shared value means
+        // the clone's split or style mutates the root as a side effect, and the
+        // root's own application then sees an already-mutated value.
+        RGATreeSplitNode(self.id, self.value.substring(from: 0, to: self.value.count), self.removedAt)
     }
 
     /**
@@ -437,9 +456,12 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     private func splitValue(_ offset: Int32) -> T {
-        let value = self.value
-        self.value = value.substring(from: 0, to: Int(offset))
-        return value.substring(from: Int(offset), to: value.count)
+        // Take the right part first -- `substring` deep-copies the attributes --
+        // then shorten this value IN PLACE rather than replacing it, so the GC
+        // pairs registered against it keep pointing at a live object.
+        let right = self.value.substring(from: Int(offset), to: self.value.count)
+        self.value.truncate(Int(offset))
+        return right
     }
 }
 
@@ -858,6 +880,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         diff.addDataSizes(others: node.getDataSize(), splitNode.getDataSize())
         diff.subDataSize(others: prvSize)
 
+        // A split deep-copies the value's attributes, so every tombstone among
+        // them is duplicated under the new node. The copy was never in
+        // docSize.live -- `getDataSize` excludes removed attributes -- so it
+        // enters gc only, and purge subtracts the same size back out.
+        if let splitValue = splitNode.value as? CRDTTextValue {
+            for attr in splitValue.getRemovedAttrs() {
+                self.pendingGCPairs.append(GCPair(parent: splitValue, child: attr, gcOnlySize: attr.getDataSize()))
+            }
+        }
+
         // NOTE: A piece split off an already-tombstoned node inherits
         // `removedAt` without going through `remove()`, so no GC pair is
         // created for it in the normal deletion path. Buffer one here so it
@@ -1240,7 +1272,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         guard !candidates.isEmpty else {
             return ([], [], [])
         }
-        let isLocal = vector == nil
+        // An empty vector is a local change too, as yorkie-js-sdk and the server
+        // read it; treating it as remote made every node look unknown, so the
+        // deletion removed nothing.
+        let isLocal = vector == nil || vector?.size() == 0
         // 01. Collect nodes to remove and keep.
         var nodesToRemove: [RGATreeSplitNode<T>] = []
         var nodesToKeep: [RGATreeSplitNode<T>?] = []

@@ -475,31 +475,87 @@ extension IndexTreeNode {
             throw YorkieError(code: .errRefused, message: "Text node cannot have children")
         }
 
-        let removed = child.isRemoved
-
-        if let oldParent = child.parent {
-            // The child may already have been spliced out of its parent's list by
-            // a concurrent operation (e.g. cascade delete of a split sibling),
-            // which already reconciled the old ancestors' size. In that case only
-            // re-parent; otherwise detach with size accounting.
-            if let offset = oldParent.innerChildren.firstIndex(where: { $0 === child }) {
-                oldParent.innerChildren.splice(offset, 1, with: [])
-                if !removed {
-                    var ancestor = child.parent
-                    while ancestor != nil {
-                        ancestor?.size -= child.paddedSize
-                        if ancestor!.isRemoved {
-                            break
-                        }
-                        ancestor = ancestor?.parent
-                    }
-                }
-            }
-            child.parent = nil
-        }
-
+        let removed = self.detachForMove(child)
         self.innerChildren.append(child)
         child.parent = self
+        self.attachAfterMove(child, removed)
+    }
+
+    /**
+     * `moveChildBefore` detaches the given child from its current parent (if
+     * any) and inserts it before `reference` among this node's children,
+     * preserving the visible size on both parents. It is ``moveChild(child:)``
+     * with a position: see there for why a removed child relocates no size.
+     *
+     * Both failures are decided before anything moves, so a refused move leaves
+     * the tree exactly as it was rather than holding a child that belongs to no
+     * parent. The reference's offset is still read after the detach, since
+     * removing the child can shift it when the two share a parent.
+     */
+    func moveChildBefore(_ child: Self, _ reference: Self) throws {
+        guard self.isText == false else {
+            throw YorkieError(code: .errRefused, message: "Text node cannot have children")
+        }
+        // Already where it is being asked to go, and the detach below would make
+        // the reference impossible to find again.
+        if child === reference {
+            return
+        }
+        guard self.innerChildren.contains(where: { $0 === reference }) else {
+            throw YorkieError(code: .errInvalidArgument, message: "reference is not a child")
+        }
+
+        let removed = self.detachForMove(child)
+        guard let offset = self.innerChildren.firstIndex(where: { $0 === reference }) else {
+            throw YorkieError(code: .errInvalidArgument, message: "reference is not a child")
+        }
+        self.innerChildren.splice(offset, 0, with: [child])
+        child.parent = self
+        self.attachAfterMove(child, removed)
+    }
+
+    /**
+     * `detachForMove` takes the child off its current parent, if it has one,
+     * subtracting its size from that parent's ancestors, and reports whether
+     * the child is a tombstone — which the re-attachment needs to know too.
+     *
+     * A tombstone moves no size: it contributes none to either parent, because
+     * removal already took it out of its ancestors. Splitting the move into this
+     * pair and ``attachAfterMove(_:_:)`` keeps that rule in one place.
+     */
+    private func detachForMove(_ child: Self) -> Bool {
+        let removed = child.isRemoved
+        guard let oldParent = child.parent else {
+            return removed
+        }
+
+        // The child may already have been spliced out of its parent's list by
+        // a concurrent operation (e.g. cascade delete of a split sibling),
+        // which already reconciled the old ancestors' size. In that case only
+        // re-parent; otherwise detach with size accounting.
+        if let offset = oldParent.innerChildren.firstIndex(where: { $0 === child }) {
+            oldParent.innerChildren.splice(offset, 1, with: [])
+            if !removed {
+                var ancestor = child.parent
+                while let current = ancestor {
+                    current.size -= child.paddedSize
+                    if current.isRemoved {
+                        break
+                    }
+                    ancestor = current.parent
+                }
+            }
+        }
+        child.parent = nil
+
+        return removed
+    }
+
+    /**
+     * `attachAfterMove` adds the child's size to its new parent's ancestors,
+     * the mirror of ``detachForMove(_:)``. `removed` is what that call reported.
+     */
+    private func attachAfterMove(_ child: Self, _ removed: Bool) {
         if !removed {
             child.updateAncestorsSize()
         }
@@ -544,7 +600,14 @@ extension IndexTreeNode {
 
         let clone = self.cloneElement(issueTimeTicket: issuedTimeTicket)
         try self.parent?.insertAfterInternal(newNode: clone, referenceNode: self)
-        clone.updateAncestorsSize()
+        // A piece born tombstoned -- split off a node a concurrent deletion has
+        // already removed -- is not visible, so it must not change its live
+        // ancestors' size. (`updateAncestorsSize` would subtract it, since it
+        // signs by removal, from ancestors it was never added to.) `remove`
+        // holds the same invariant from the other side.
+        if !clone.isRemoved {
+            clone.updateAncestorsSize()
+        }
 
         let left = Array(self.innerChildren[0 ..< Int(offset)])
         let right = Array(self.innerChildren[Int(offset)...])

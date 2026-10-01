@@ -438,6 +438,7 @@ public class Document: Attachable {
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: .undoRedo)
         let executionResult = try change.execute(root: self.root, presences: &self.presences, source: .undoRedo)
         let opInfos = executionResult.opInfos
+        let executedOperations = executionResult.operations
         let reverseOps = executionResult.reverseOps
 
         if !reverseOps.isEmpty {
@@ -449,7 +450,16 @@ public class Document: Attachable {
         }
 
         // NOTE: skip propagating the change when nothing was applied.
-        if change.presenceChange == nil, opInfos.isEmpty {
+        //
+        // The test is whether an operation RAN, not whether it produced an
+        // `OperationInfo`. Those differ: a style may change CRDT state without
+        // anything an editor could render, because `canStyle` admits a node
+        // another client removed concurrently and a tombstone has no index to
+        // report. Gating on `opInfos` dropped such a reverse style -- it mutated
+        // this replica and never reached the others. `Change.execute` omits an
+        // operation whose target was removed while the undo was pending, so that
+        // case is still gated out.
+        if change.presenceChange == nil, executedOperations.isEmpty {
             return
         }
 

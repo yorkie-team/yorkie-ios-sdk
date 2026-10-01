@@ -420,7 +420,15 @@ final class CRDTTreeNode: IndexTreeNode {
     func remove(_ removedAt: TimeTicket) -> Bool {
         let alived = !self.isRemoved
 
-        if self.removedAt == nil || removedAt <= self.removedAt! {
+        // Overwrite with the newer tombstone, which is LWW for concurrent
+        // deletions. This kept the EARLIER one, so replicas receiving two
+        // removals in different orders disagreed on `removedAt`, which feeds
+        // `canDelete` and the GC boundary.
+        if let current = self.removedAt {
+            if removedAt.after(current) {
+                self.removedAt = removedAt
+            }
+        } else {
             self.removedAt = removedAt
         }
 
@@ -551,13 +559,34 @@ final class CRDTTreeNode: IndexTreeNode {
                        insNextParent !== split.parent,
                        split.innerChildren.isEmpty
                     {
-                        try split.parent?.detachChild(child: split)
-                        try insNextParent.insertBefore(split, insNext)
+                        // Moved rather than detached and re-inserted: a split born
+                        // tombstoned contributes no visible size to either parent, so
+                        // detaching would take its tokens off the source that it never
+                        // held and re-inserting would change the destination's size,
+                        // which it must not. `moveChildBefore` carries the same
+                        // tombstone-aware semantics `moveChild` documents.
+                        try insNextParent.moveChildBefore(split, insNext)
                     }
                 }
             }
             self.insNextID = split.id
             tree.registerNode(split)
+
+            // NOTE: `splitElement` deep-copies the node's attributes, tombstones
+            // included -- it has to, or the two halves of what was one node would
+            // resolve a concurrent style differently and never reconverge. Each
+            // copied tombstone is a distinct piece of garbage that no removal path
+            // produced, so buffer a registration for it; otherwise it sits in the
+            // split's RHT forever, uncounted and unpurgeable.
+            //
+            // `getDataSize` skips removed attributes, so the split's diff never
+            // charged these to docSize.live -- `gcOnlySize` sends each straight to
+            // docSize.gc, and purge subtracts the same amount back. This is the
+            // same routing `getGCPairs` already uses for the tombstones a snapshot
+            // rebuild finds.
+            for pair in split.getGCPairs() {
+                tree.pushPendingGCPair(pair)
+            }
 
             // NOTE: A piece split off an already-tombstoned node inherits
             // `removedAt` without going through `remove()`, so no GC pair is
@@ -617,14 +646,11 @@ final class CRDTTreeNode: IndexTreeNode {
     /**
      * `canStyle` checks if node is able to style.
      */
-    func canStyle(
-        _ editedAt: TimeTicket,
-        _ clientLamportAtChange: Int64
-    ) -> Bool {
-        if self.isText { return false }
-        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-
-        return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    ///
+    /// It answers the same question as ``RGATreeSplitNode/canStyle(_:)``, the
+    /// same way — see the contract there.
+    func canStyle(_ versionVector: VersionVector?) -> Bool {
+        !self.isText && ticketKnown(versionVector, self.createdAt)
     }
 
     /**
@@ -633,18 +659,18 @@ final class CRDTTreeNode: IndexTreeNode {
     func setAttrs(
         _ attrs: [String: String],
         _ editedAt: TimeTicket
-    ) -> [(RHTNode?, RHTNode?)] {
+    ) -> [RHTWrite] {
         if self.attrs == nil {
             self.attrs = RHT()
         }
 
-        var pairs = [(RHTNode?, RHTNode?)]()
+        var writes = [RHTWrite]()
 
         for attr in attrs {
-            pairs.append(self.attrs!.set(key: attr.key, value: attr.value, executedAt: editedAt))
+            writes.append(self.attrs!.set(key: attr.key, value: attr.value, executedAt: editedAt))
         }
 
-        return pairs
+        return writes
     }
 
     /**
@@ -659,7 +685,13 @@ final class CRDTTreeNode: IndexTreeNode {
         if let attrs = node.attrs?.toObject() {
             for key in attrs.keys.sorted() {
                 if let value = attrs[key]?.value {
-                    xml += " \(key)=\(value)"
+                    // A string, JSON-encoded or written raw by a peer, renders
+                    // quoted; anything else renders as stored.
+                    if value.toJSONObject is String {
+                        xml += " \(key)=\"\(logicalAttrValue(value))\""
+                    } else {
+                        xml += " \(key)=\(value)"
+                    }
                 }
             }
         }
@@ -778,19 +810,61 @@ extension CRDTTreeNode: GCChild {
 }
 
 /**
- * `ticketKnown` returns true if the given ticket is causally known to the
- * editor, i.e. the editor's version vector covers the ticket's lamport clock
- * for the same actor. For local operations (no version vector), all tickets are
- * considered known.
+ * `attrGCPair` builds the GC pair for an RHT node a style edit turned into
+ * garbage. `wasLive` says whether docSize.live was holding the value this node
+ * replaces: only then does collecting it take a size out of live.
+ *
+ * A tombstone minted over a key that was absent, or over one that was already
+ * removed, was never live. Charging it to live anyway walked the live size
+ * down by the attribute's size on every such edit, without bound — a rich-text
+ * editor toggling one key is exactly that loop — and drove it negative, at
+ * which point the document size limit stops applying. Those go to gc alone,
+ * by the same `gcOnlySize` route `getGCPairs` already takes for the tombstones
+ * a snapshot rebuild finds.
  */
-private func ticketKnown(_ versionVector: VersionVector?, _ ticket: TimeTicket) -> Bool {
-    guard let versionVector else {
-        return true
+func attrGCPair(_ parent: GCParent, _ child: RHTNode, _ attrWasLive: Bool, _ nodeIsLive: Bool) -> GCPair {
+    if attrWasLive, nodeIsLive {
+        return GCPair(parent: parent, child: child)
     }
-    guard let lamport = versionVector.get(ticket.actorID) else {
-        return false
+
+    // A live attribute on a removed node is already counted inside that node's
+    // gc charge.
+    let gcOnlySize = attrWasLive ? DataSize(data: 0, meta: 0) : child.getDataSize()
+    return GCPair(parent: parent, child: child, gcOnlySize: gcOnlySize)
+}
+
+/**
+ * `accAttrWrite` books one attribute write into the ledger. It reads only what
+ * the write reported, never the map: a write that lost LWW installed nothing, so
+ * it must charge nothing, and a node visited twice in one traversal (once as
+ * Start and once as End) loses LWW on the second visit and is naturally deduped.
+ * Deciding from the map instead made live depend on delivery order and, where a
+ * token guard suppressed only one half, drove it negative.
+ */
+func accAttrWrite(_ write: RHTWrite, _ parent: GCParent, _ nodeIsLive: Bool, _ pairs: inout [GCPair], _ size: inout DocSize) {
+    if let revived = write.revived {
+        pairs.append(attrGCPair(parent, revived, false, nodeIsLive))
     }
-    return lamport >= ticket.lamport
+
+    // `nodeIsLive` is false when the container does not count this node's
+    // attributes in live at all -- a tombstoned node, which `CRDTText` and
+    // `CRDTTree` `getDataSize` both skip. The bytes are inside the gc charge the
+    // node's removal took, and collection subtracts the node's size as it stands
+    // when it is purged, so the same delta goes to gc.
+    if let superseded = write.superseded {
+        if nodeIsLive {
+            size.live.subDataSize(others: superseded.getDataSize())
+        } else {
+            size.gc.subDataSize(others: superseded.getDataSize())
+        }
+    }
+    if let installed = write.installed {
+        if nodeIsLive {
+            size.live.addDataSizes(others: installed.getDataSize())
+        } else {
+            size.gc.addDataSizes(others: installed.getDataSize())
+        }
+    }
 }
 
 /**
@@ -1163,27 +1237,6 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `registerPendingGCPair` buffers a GC pair for a node that was born
-     * tombstoned (split off an already-removed node). The pair is picked up
-     * by the next `edit` or `style` call via `drainPendingGCPairs`. `size`
-     * is the net-new size created by the split; it is accounted to
-     * docSize.gc at registration since the node was never live.
-     */
-    func registerPendingGCPair(_ node: CRDTTreeNode, _ size: DataSize) {
-        self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: size))
-    }
-
-    /**
-     * `drainPendingGCPairs` returns the buffered GC pairs and clears the
-     * buffer.
-     */
-    func drainPendingGCPairs() -> [GCPair] {
-        let pairs = self.pendingGCPairs
-        self.pendingGCPairs = []
-        return pairs
-    }
-
-    /**
      * `findNodesAndSplitText` finds `TreePos` of the given `CRDTTreeNodeID` and
      * splits nodes for the given split level.
      *
@@ -1248,7 +1301,9 @@ class CRDTTree: CRDTElement {
         // 03. Split text node if the left node is a text node.
         if leftNode.isText {
             let (_, splitedDiff) = try leftNode.split(self, pos.leftSiblingID.offset - leftNode.id.offset)
-            diff = splitedDiff
+            // Accumulated, not assigned: `diff` is provably empty here today, but
+            // assigning is the same trap that left the split phase unaccounted.
+            diff.addDataSizes(others: splitedDiff)
         }
 
         // 04. Find the appropriate left node. If some nodes are inserted at the
@@ -1395,9 +1450,9 @@ class CRDTTree: CRDTElement {
         _ attributes: [String: String]?,
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector?
-    ) throws -> ([GCPair], [TreeChange], DataSize, [String: String], [String]) {
+    ) throws -> ([GCPair], [TreeChange], DocSize, [String: String], [String]) {
         let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
-        var diff = rangeDiff
+        var size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
 
         let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
         let traverseFromParent = recovery?.fromParent ?? fromParent
@@ -1411,16 +1466,7 @@ class CRDTTree: CRDTElement {
         var capturedPrev = false
         try self.traverseInPosRange(traverseFromParent, traverseFromLeft, toParent, toLeft) { token, _ in
             let (node, tokenType) = token
-            let actorID = node.createdAt.actorID
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            if node.canStyle(
-                editedAt,
-                clientLamportAtChange
-            ), !node.isText, let attributes {
+            if node.canStyle(versionVector), let attributes {
                 if shouldSkipToken(node, tokenType) {
                     return
                 }
@@ -1442,8 +1488,8 @@ class CRDTTree: CRDTElement {
 
                 let updatedAttrPairs = node.setAttrs(attributes, editedAt)
                 var affectedAttrs = [String: String]()
-                for (_, curr) in updatedAttrPairs {
-                    if let key = curr?.key {
+                for write in updatedAttrPairs {
+                    if let key = write.installed?.key {
                         affectedAttrs[key] = attributes[key]
                     }
                 }
@@ -1451,7 +1497,10 @@ class CRDTTree: CRDTElement {
                 let parentOfNode = node.parent!
                 let previousNode = node.prevSibling ?? node.parent!
 
-                if !affectedAttrs.isEmpty {
+                // A tombstoned node is not part of the rendered document, and
+                // `toIndex` on one yields a zero-width range that means nothing
+                // to an editor. The text half makes the same exclusion.
+                if !affectedAttrs.isEmpty, !node.isRemoved {
                     try changes.append(TreeChange(actor: editedAt.actorID,
                                                   type: .style,
                                                   from: self.toIndex(parentOfNode, previousNode),
@@ -1461,18 +1510,10 @@ class CRDTTree: CRDTElement {
                                                   value: TreeChangeValue.attributes(affectedAttrs),
                                                   splitLevel: 0) // dummy value.
                     )
-
-                    for (prev, _) in updatedAttrPairs where prev != nil {
-                        pairs.append(GCPair(parent: node, child: prev))
-                    }
                 }
 
-                for attr in attributes {
-                    let key = attr.key
-                    let curr = node.attrs?.getNodeByKey(key)
-                    if let curr, tokenType != .end {
-                        diff.addDataSizes(others: curr.getDataSize())
-                    }
+                for write in updatedAttrPairs {
+                    accAttrWrite(write, node, !node.isRemoved, &pairs, &size)
                 }
 
                 // Propagate style to unknown split siblings so that a style
@@ -1489,8 +1530,8 @@ class CRDTTree: CRDTElement {
                         }
                         let siblingPairs = next.setAttrs(attributes, editedAt)
                         var siblingAffectedAttrs = [String: String]()
-                        for (_, curr) in siblingPairs {
-                            if let key = curr?.key {
+                        for write in siblingPairs {
+                            if let key = write.installed?.key {
                                 siblingAffectedAttrs[key] = attributes[key]
                             }
                         }
@@ -1505,16 +1546,9 @@ class CRDTTree: CRDTElement {
                                                           toPath: self.toPath(next, next),
                                                           value: TreeChangeValue.attributes(siblingAffectedAttrs),
                                                           splitLevel: 0))
-                            for (prev, _) in siblingPairs where prev != nil {
-                                pairs.append(GCPair(parent: next, child: prev))
-                            }
                         }
-                        for attr in attributes {
-                            let key = attr.key
-                            let curr = next.attrs?.getNodeByKey(key)
-                            if let curr {
-                                diff.addDataSizes(others: curr.getDataSize())
-                            }
+                        for write in siblingPairs {
+                            accAttrWrite(write, next, !next.isRemoved, &pairs, &size)
                         }
                         current = next
                     }
@@ -1524,7 +1558,7 @@ class CRDTTree: CRDTElement {
 
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
-        return (pairs, changes, diff, prevAttributes, newAttrKeys)
+        return (pairs, changes, size, prevAttributes, newAttrKeys)
     }
 
     /**
@@ -1538,10 +1572,10 @@ class CRDTTree: CRDTElement {
         _ attributesToRemove: [String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], [TreeChange], DataSize, [String: String]) {
+    ) throws -> ([GCPair], [TreeChange], DocSize, [String: String]) {
         let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector,
                                                                                              advanceSplitSiblings: false)
-        var diff = rangeDiff
+        let size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
 
         let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
         let traverseFromParent = recovery?.fromParent ?? fromParent
@@ -1556,16 +1590,7 @@ class CRDTTree: CRDTElement {
 
         try self.traverseInPosRange(traverseFromParent, traverseFromLeft, toParent, toLeft) { token, _ in
             let (node, tokenType) = token
-            let actorID = node.createdAt.actorID
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            if node.canStyle(
-                editedAt,
-                clientLamportAtChange
-            ), !attributesToRemove.isEmpty {
+            if node.canStyle(versionVector), !attributesToRemove.isEmpty {
                 if shouldSkipToken(node, tokenType) {
                     return
                 }
@@ -1584,25 +1609,36 @@ class CRDTTree: CRDTElement {
                 if node.attrs == nil {
                     node.attrs = RHT()
                 }
+                // `canStyle` admits a node removed concurrently with this change,
+                // so `nodeIsLive` is the third question `attrGCPair` asks.
+                let nodeIsLive = !node.isRemoved
                 for key in attributesToRemove {
+                    var wasLive = node.attrs!.has(key: key)
                     let nodesToBeRemoved = node.attrs!.remove(key: key, executedAt: editedAt)
                     for rhtNode in nodesToBeRemoved {
-                        pairs.append(GCPair(parent: node, child: rhtNode))
+                        pairs.append(attrGCPair(node, rhtNode, wasLive, nodeIsLive))
+                        // Only the node replacing the live value takes a size out of
+                        // live; a second one in the same call is the tombstone it
+                        // superseded.
+                        wasLive = false
                     }
                 }
 
                 let parentOfNode = node.parent!
                 let previousNode = node.prevSibling ?? node.parent!
 
-                try changes.append(TreeChange(actor: editedAt.actorID,
-                                              type: .removeStyle,
-                                              from: self.toIndex(parentOfNode, previousNode),
-                                              to: self.toIndex(node, node),
-                                              fromPath: self.toPath(parentOfNode, previousNode),
-                                              toPath: self.toPath(node, node),
-                                              value: value,
-                                              splitLevel: 0) // dummy value.
-                )
+                // See `style`: a tombstoned node reports no change to editors.
+                if nodeIsLive {
+                    try changes.append(TreeChange(actor: editedAt.actorID,
+                                                  type: .removeStyle,
+                                                  from: self.toIndex(parentOfNode, previousNode),
+                                                  to: self.toIndex(node, node),
+                                                  fromPath: self.toPath(parentOfNode, previousNode),
+                                                  toPath: self.toPath(node, node),
+                                                  value: value,
+                                                  splitLevel: 0) // dummy value.
+                    )
+                }
 
                 // Propagate remove-style to unknown split siblings so that a
                 // removeStyle operation whose range was determined before the
@@ -1621,10 +1657,12 @@ class CRDTTree: CRDTElement {
                         }
                         var removedAny = false
                         for key in attributesToRemove {
+                            var wasLive = next.attrs!.has(key: key)
                             let nodesToBeRemoved = next.attrs!.remove(key: key, executedAt: editedAt)
                             removedAny = removedAny || !nodesToBeRemoved.isEmpty
                             for rhtNode in nodesToBeRemoved {
-                                pairs.append(GCPair(parent: next, child: rhtNode))
+                                pairs.append(attrGCPair(next, rhtNode, wasLive, !next.isRemoved))
+                                wasLive = false
                             }
                         }
                         if removedAny {
@@ -1647,7 +1685,7 @@ class CRDTTree: CRDTElement {
 
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
-        return (pairs, changes, diff, prevAttributes)
+        return (pairs, changes, size, prevAttributes)
     }
 
     /**
@@ -1655,7 +1693,8 @@ class CRDTTree: CRDTElement {
      * advancing past concurrent split siblings at each level (§7.5/§7.7) and
      * skipping the current operation's own split products.
      */
-    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws {
+    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws -> DataSize {
+        var diff = DataSize(data: 0, meta: 0)
         var splitCount: Int32 = 0
         var parent = from.parent
         var left: CRDTTreeNode = from.left
@@ -1683,11 +1722,18 @@ class CRDTTree: CRDTElement {
             }
 
             let rawOffset = left !== parent ? try parent.findOffset(node: left, includeRemoved: true) + 1 : 0
-            try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            // The metadata the new element adds belongs in docSize.live, the
+            // same as every other `split` caller books it. Dropping it here left
+            // live without the elements a split mints, so a split and the merge
+            // that undoes it did not cancel out and the live size walked down by
+            // a ticket per cycle, without bound.
+            let (_, splitDiff) = try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            diff.addDataSizes(others: splitDiff)
             left = parent
             parent = nextParent
             splitCount += 1
         }
+        return diff
     }
 
     /// `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
@@ -1732,6 +1778,9 @@ class CRDTTree: CRDTElement {
     /**
      * `edit` edits the tree with the given range and content.
      * If the content is undefined, the range will be removed.
+     *
+     * The last element of the result is the visible-index size the split phase
+     * opened, which the inserted content size before it does not include.
      */
     @discardableResult
     func edit(
@@ -1741,7 +1790,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1857,8 +1906,17 @@ class CRDTTree: CRDTElement {
         pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, mergeDest, toBeMergedNodes, editedAt))
 
         // 04. Split: split the element nodes for the given split level.
+        //
+        // The boundaries it opens grow the visible index, which nothing else in
+        // this method reports: they are not content, so `insertedContentSize`
+        // below does not see them, and they remove nothing, so the removed range
+        // does not either. Measured off the tree rather than computed as
+        // 2 * splitLevel, so a split whose product is born tombstoned, or one the
+        // tree has no room for, reports the growth it really produced.
+        let sizeBeforeSplit = self.size
         if splitLevel > 0 {
-            try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
+            let splitDiff = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
+            diff.addDataSizes(others: splitDiff)
 
             changes.append(TreeChange(actor: editedAt.actorID,
                                       type: .content,
@@ -1869,6 +1927,8 @@ class CRDTTree: CRDTElement {
                                       value: nil,
                                       splitLevel: 0))
         }
+
+        let splitSize = self.size - sizeBeforeSplit
 
         // 05. Insert: insert the given nodes at the given position.
         //
@@ -1948,7 +2008,7 @@ class CRDTTree: CRDTElement {
         // subtree top-down (a child's recreate resolves its parent by identity).
         let outRemoved = spansComplete ? removedSpans : []
         let outInserted = spansComplete ? Array(insertedSpans.reversed()) : []
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize)
+        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize, splitSize)
     }
 
     /**
@@ -2097,7 +2157,7 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int) {
+    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         return try self.edit(
@@ -2349,7 +2409,16 @@ class CRDTTree: CRDTElement {
             var childNode = parentNode
             while parentNode.isRemoved {
                 childNode = parentNode
-                parentNode = childNode.parent!
+                // If the subtree has been detached by garbage collection, the walk
+                // can run off the top of it. Report it instead of dereferencing
+                // nil. Throwing rather than returning nil is deliberate: a nil
+                // position would go on to resolve a bogus index and edit the
+                // wrong range.
+                guard let next = childNode.parent else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "least alive ancestor of \(childNode.id.toIDString): node not found")
+                }
+                parentNode = next
             }
 
             let childOffset = try parentNode.findOffset(node: childNode, includeRemoved: includeRemoved)
@@ -2828,6 +2897,9 @@ extension CRDTTree {
      *
      * A genuinely absent parent → skip: the node stays unplaced/invisible, which
      * is convergent because every replica resolves parent-absent identically.
+     * A parent present but TOMBSTONED → the node is placed but born tombstoned,
+     * stamped with the parent's `removedAt`, and `nil` is returned (see
+     * `attach` below).
      */
     private func recreateFromSpan(_ span: TreeRestoreSpan, _ offset: Int32, _ length: Int32) throws -> CRDTTreeNode? {
         guard let parentID = span.parentID,
@@ -2864,6 +2936,38 @@ extension CRDTTree {
 
         let siblings = parent.innerChildren
 
+        // `attach` finishes every anchor rung below: register the node, then decide
+        // whether it is born live or born tombstoned.
+        //
+        // The parent may have been tombstoned since this node was purged, in which
+        // case the node is born tombstoned rather than live. This mirrors the
+        // convention the concurrent-insert path already follows (a node inserted
+        // under a removed parent is made a tombstone immediately). Recreating it
+        // live would leave a node that the next purge of the parent unlinks but
+        // never unregisters -- reachable from nothing, still in nodeMapByID --
+        // which is what sends `toTreePos` off the top of a detached subtree
+        // (yorkie-team/yorkie#2008).
+        //
+        // The stamp is the PARENT's removedAt, not the restoring operation's
+        // ticket: that is the ticket the removal already wrote onto every sibling
+        // it swept, so the node rejoins them carrying what it would have carried
+        // had it never been purged, and it agrees with a replica that recreated it
+        // live and then had the removal sweep it.
+        //
+        // Accounting: the node is garbage the moment it is born, and its size was
+        // never in `docSize.live` -- returning nil keeps it out of `restore`'s
+        // recreated list, which is the only thing that books a recreated node into
+        // live. So the pair carries `gcOnlySize`: charge `docSize.gc` only.
+        func attach() -> CRDTTreeNode? {
+            self.registerNode(node)
+            if parent.isRemoved, let parentRemovedAt = parent.removedAt {
+                node.remove(parentRemovedAt)
+                self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
+                return nil
+            }
+            return node
+        }
+
         // (a) same-insertion successor / predecessor piece (text): exact slot.
         if span.isText {
             if let succ = self.findFloorNode(CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset + length)),
@@ -2871,16 +2975,14 @@ extension CRDTTree {
                let succIdx = siblings.firstIndex(where: { $0 === succ })
             {
                 try parent.insertAt(node, succIdx)
-                self.registerNode(node)
-                return node
+                return attach()
             }
             if offset > span.id.offset || offset > 0 {
                 if let pred = self.findFloorNode(CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset - 1)),
                    pred.isText, pred.parent === parent
                 {
                     try parent.insertAfter(node, pred)
-                    self.registerNode(node)
-                    return node
+                    return attach()
                 }
             }
         }
@@ -2890,8 +2992,7 @@ extension CRDTTree {
            let left = self.findFloorNode(leftSiblingID), left.parent === parent
         {
             try parent.insertAfter(node, left)
-            self.registerNode(node)
-            return node
+            return attach()
         }
 
         // (c) captured right boundary sibling (redundant anchor): insert before it.
@@ -2900,8 +3001,7 @@ extension CRDTTree {
            let rightIdx = siblings.firstIndex(where: { $0 === right })
         {
             try parent.insertAt(node, rightIdx)
-            self.registerNode(node)
-            return node
+            return attach()
         }
 
         // (d) deterministic id-order fallback: first slot whose child id > node id.
@@ -2909,8 +3009,7 @@ extension CRDTTree {
         // total order this rung needs.
         let insertIdx = siblings.firstIndex { $0.id > node.id } ?? siblings.count
         try parent.insertAt(node, insertIdx)
-        self.registerNode(node)
-        return node
+        return attach()
     }
 
     /**
@@ -2978,5 +3077,39 @@ private extension CRDTTree {
             }
         }
         return (target, anchorLeft, guardResult.isInterloper)
+    }
+}
+
+// MARK: - Pending GC pairs
+
+extension CRDTTree {
+    /**
+     * `registerPendingGCPair` buffers a GC pair for a node that was born
+     * tombstoned (split off an already-removed node). The pair is picked up
+     * by the next `edit` or `style` call via `drainPendingGCPairs`. `size`
+     * is the net-new size created by the split; it is accounted to
+     * docSize.gc at registration since the node was never live.
+     */
+    func registerPendingGCPair(_ node: CRDTTreeNode, _ size: DataSize) {
+        self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: size))
+    }
+
+    /**
+     * `pushPendingGCPair` buffers an already-built pair, for garbage whose
+     * parent is not this tree -- an attribute tombstone belongs to the node
+     * holding it, not to the tree.
+     */
+    func pushPendingGCPair(_ pair: GCPair) {
+        self.pendingGCPairs.append(pair)
+    }
+
+    /**
+     * `drainPendingGCPairs` returns the buffered GC pairs and clears the
+     * buffer.
+     */
+    func drainPendingGCPairs() -> [GCPair] {
+        let pairs = self.pendingGCPairs
+        self.pendingGCPairs = []
+        return pairs
     }
 }

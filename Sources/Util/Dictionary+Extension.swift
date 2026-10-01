@@ -27,7 +27,7 @@ extension AnyValueTypeDictionary {
         var convertedDictionary: [String: String] = [:]
 
         for (key, value) in dictionary {
-            convertedDictionary[key] = convertToJSONString(value)
+            convertedDictionary[key] = stringifyAttrValue(value)
         }
 
         return convertedDictionary
@@ -79,6 +79,10 @@ extension StringValueTypeDictionary {
         }
 
         return jsonObject.mapValues {
+            // See `stringifyAttrValue`: a plain string is stored as itself.
+            if let string = $0 as? String, !isJSONDocument(string) {
+                return string
+            }
             if let result = try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
                let stringValue = String(data: result, encoding: .utf8)
             {

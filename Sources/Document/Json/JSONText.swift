@@ -168,12 +168,13 @@ public class JSONText {
         let ticket = context.issueTimeTicket
         let stringAttrs = StringValueTypeDictionary.stringifyAttributes(attributes)
 
-        let (pairs, diff, _, _, _) = try text.setStyle(
+        let (pairs, size, _, _, _) = try text.setStyle(
             range,
             stringAttrs,
             ticket
         )
-        self.context?.acc(diff)
+        self.context?.acc(size.live)
+        self.context?.accGC(size.gc)
 
         context.push(
             operation: StyleOperation.create(

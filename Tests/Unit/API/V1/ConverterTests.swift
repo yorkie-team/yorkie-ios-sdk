@@ -16,6 +16,9 @@
 
 import XCTest
 @testable import Yorkie
+#if SWIFT_TEST
+@testable import YorkieTestHelper
+#endif
 
 class ConverterTests: XCTestCase {
     func test_data_to_hexString() {
@@ -459,5 +462,100 @@ class ConverterTests: XCTestCase {
         // source parent's mergedInto forwards to the surviving merge target.
         XCTAssertEqual(movedChild?.mergedFrom, sourceParent?.id, "movedChild.mergedFrom should reference the tombstoned source parent")
         XCTAssertEqual(sourceParent?.mergedInto, firstP?.id, "sourceParent.mergedInto should reference the surviving merge target")
+    }
+
+    // Ported from yorkie-js-sdk PR #1364 (commit 248551a1, yorkie-team/yorkie#2006):
+    // snapshot_converter_test.ts — "should round-trip a tombstoned text attribute".
+    //
+    // A text attribute is tombstoned by a Style op carrying attributesToRemove. The
+    // route to one through the public API is undoing a Style that introduced a
+    // brand-new key: `StyleOperation.execute` collects such keys into
+    // `reverseAttrsToRemove` and hands back a remove-style reverse op, whose
+    // execution leaves an RHT node with `removedAt` set.
+    //
+    // `toTextNodes` must carry that tombstone onto the wire and `fromTextNode` must
+    // restore it, exactly as the tree path already does via `toRHT`/`fromRHT`.
+    // Without that, the tombstone decodes as a live attribute stamped with the
+    // removal's own ticket -- the newest ticket in play -- so it wins LWW against
+    // every older write, and the GC pair is lost as well.
+    func test_should_round_trip_a_tombstoned_text_attribute() async throws {
+        // given — undo a style that introduced a brand-new "bold" key, so the
+        // reverse operation removes it, tombstoning the attribute rather than
+        // dropping it.
+        let doc = Document(key: "test-doc")
+
+        try await doc.update { root, _ in
+            root.text = JSONText()
+            _ = (root.text as? JSONText)?.edit(0, 0, "hello")
+        }
+        try await doc.update { root, _ in
+            _ = (root.text as? JSONText)?.setStyle(0, 5, ["bold": "true"])
+        }
+
+        let canUndo = await doc.canUndo
+        XCTAssertTrue(canUndo)
+        try await doc.undo()
+
+        let liveRoot = await doc.getRootObject()
+        XCTAssertEqual(liveRoot.toSortedJSON(), "{\"text\":[{\"val\":\"hello\"}]}", "the undone attribute must not render")
+
+        let garbageLength = await doc.getGarbageLength()
+        XCTAssertEqual(garbageLength, 1, "the tombstone is one GC pair")
+
+        // Size baseline. `doc.getDocSize()` is a running total accumulated op by
+        // op, and its `live` half carries an unrelated, pre-existing drift here:
+        // when RHT.remove supersedes a live attribute node with a tombstone node,
+        // only the tombstone's size is moved out of live, so the superseded node's
+        // bytes are never released. Recomputing a root from the very same object
+        // graph (no converter involved) shows it, so that fresh accounting is the
+        // apples-to-apples baseline for "what a snapshot round-trip should
+        // reproduce". The `gc` half is undrifted, and is checked against the live
+        // document directly.
+        let copiedObject = try XCTUnwrap(liveRoot.deepcopy() as? CRDTObject)
+        let baseline = CRDTRoot(rootObject: copiedObject)
+
+        // when — round-trip through the snapshot converter.
+        let bytes = try Converter.objectToBytes(obj: liveRoot)
+        let rebuiltObject = try Converter.bytesToObject(bytes: bytes)
+        let rebuiltRoot = CRDTRoot(rootObject: rebuiltObject)
+
+        let docSize = await doc.getDocSize()
+
+        // then — the same four equalities the JS/Go side asserts.
+        XCTAssertEqual(rebuiltRoot.toSortedJSON(), liveRoot.toSortedJSON(), "content must match after a snapshot round-trip")
+        XCTAssertEqual(rebuiltRoot.garbageLength, garbageLength, "garbage length must match after a snapshot round-trip")
+        XCTAssertEqual(rebuiltRoot.getDocSize().gc, docSize.gc, "gc size must match after a snapshot round-trip")
+        XCTAssertEqual(rebuiltRoot.getDocSize().live, baseline.getDocSize().live, "live size must match after a snapshot round-trip")
+
+        // and — the restored tombstone must be genuinely collectable.
+        XCTAssertEqual(rebuiltRoot.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [])), 1, "the restored tombstone must be collectable")
+        XCTAssertEqual(rebuiltRoot.garbageLength, 0)
+    }
+
+    // A snapshot written by iOS before 0.7.23 encoded the RGATreeSplit head
+    // sentinel. Decoding it must not insert it as an extra node.
+    func test_should_skip_an_encoded_text_head_sentinel() async throws {
+        // given — a text, and its encoding with a head sentinel prepended the way
+        // older iOS snapshots carried it.
+        let doc = Document(key: "test-doc")
+        try await doc.update { root, _ in
+            root.text = JSONText()
+            _ = (root.text as? JSONText)?.edit(0, 0, "hello")
+        }
+        let rootObject = await doc.getRootObject()
+        let text = try XCTUnwrap(rootObject.get(key: "text") as? CRDTText)
+        var pbText = Converter.toText(text).text
+        var head = PbTextNode()
+        head.id = Converter.toTextNodeID(id: RGATreeSplitNodeID.initial)
+        pbText.nodes.insert(head, at: 0)
+        pbText.nodes.insert(head, at: 0)
+
+        // when
+        let decoded = Converter.fromText(pbText)
+
+        // then — the same content and the same size as the source text.
+        XCTAssertEqual(decoded.toJSON(), text.toJSON())
+        XCTAssertEqual(decoded.getDataSize(), text.getDataSize())
+        XCTAssertEqual(Converter.toText(decoded).text.nodes.count, pbText.nodes.count - 2)
     }
 }

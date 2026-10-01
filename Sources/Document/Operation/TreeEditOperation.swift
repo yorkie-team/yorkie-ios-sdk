@@ -101,6 +101,11 @@ final class TreeEditOperation: Operation {
     /// content this operation carries; a reverse range covering a dropped copy would delete a
     /// neighbour on redo.
     private var insertedContentSize: Int?
+    /// The visible-index size the boundaries this execution's forward `edit` opened: two tokens per
+    /// element it split, zero for a split with no visible effect. A split creates boundaries rather
+    /// than inserting nodes, so ``insertedContentSize`` never sees them; reconciliation needs both,
+    /// and reads their sum through ``getContentSize()``.
+    private var splitSize: Int?
     /// Set on boundary-deletion ops that were generated to reverse a split. When this op executes
     /// (as undo), ``toReverseOperation(_:_:_:)`` uses this value to regenerate a proper split op
     /// for redo, rather than re-inserting the tombstoned boundary nodes as content.
@@ -347,7 +352,7 @@ final class TreeEditOperation: Operation {
         // accepted. The reverse operation and the undo stack both read that size rather than the
         // content this operation carried: a range covering content the tree refused would delete a
         // neighbour on redo.
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize) = try tree.edit(
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize, splitSize) = try tree.edit(
             (self.fromPos, self.toPos),
             self.contents?.compactMap { $0.deepcopy() },
             self.splitLevel,
@@ -362,6 +367,7 @@ final class TreeEditOperation: Operation {
         let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
         self.lastToIdx = preEditFromIdx + removedSize
         self.insertedContentSize = insertedContentSize
+        self.splitSize = splitSize
 
         // Build the reverse op for undo.
         // A pure split (splitLevel > 0, no content inserted, no nodes removed) gets a
@@ -374,7 +380,7 @@ final class TreeEditOperation: Operation {
         if self.splitLevel == 0 {
             reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, preTombstoned: preTombstoned, mergeLevel: mergeLevel, removedSpans: removedSpans, insertedSpans: insertedSpans)
         } else if isPureSplit {
-            reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx)
+            reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx, splitSize)
         } else {
             reverseOp = nil
         }
@@ -557,8 +563,14 @@ final class TreeEditOperation: Operation {
     /// `toSplitReverseOperation` creates the reverse operation for a pure split edit (splitLevel > 0).
     ///
     /// A split creates element boundaries (one close token + one open token per level). The reverse
-    /// is a boundary-deletion: a `splitLevel=0` edit that removes those `2 * splitLevel` tokens,
-    /// merging the split elements back together.
+    /// is a boundary-deletion: a `splitLevel=0` edit that removes those tokens, merging the split
+    /// elements back together.
+    ///
+    /// `boundarySize` is how many tokens the split actually opened, not `2 * splitLevel`, which is
+    /// only how many it asked for: the split loop stops when it runs out of ancestors to split, and
+    /// a level the tree has no room for would size this range over tokens the split never opened.
+    /// The undo then deletes live content past its own boundary and merges elements the split never
+    /// separated.
     ///
     /// The boundary-deletion op carries ``redoSplitLevel`` so that *its* reverse regenerates a
     /// proper split (redo) rather than re-inserting the tombstoned boundary nodes as content.
@@ -566,14 +578,21 @@ final class TreeEditOperation: Operation {
     /// - Parameters:
     ///   - tree: The tree after the split has been applied.
     ///   - preEditFromIdx: The from index captured before the split.
+    ///   - boundarySize: The visible-index size the split opened.
     /// - Returns: The boundary-deletion ``TreeEditOperation``, or `nil` when the split was a no-op.
-    private func toSplitReverseOperation(_ tree: CRDTTree, _ preEditFromIdx: Int) throws -> Operation? {
-        let boundarySize = 2 * Int(self.splitLevel)
+    private func toSplitReverseOperation(_ tree: CRDTTree, _ preEditFromIdx: Int, _ boundarySize: Int) throws -> Operation? {
+        // The split had no visible effect — a concurrent deletion tombstoned the element it
+        // split, so its boundary occupies no visible index, or there was no ancestor left to
+        // split at all. Nothing for an undo to merge.
+        if boundarySize == 0 {
+            return nil
+        }
+
         let reverseFromIdx = preEditFromIdx
         let reverseToIdx = preEditFromIdx + boundarySize
 
-        // Guard: if the indices exceed the post-split tree size, the split was a no-op
-        // (e.g. a concurrent parent deletion tombstoned the split result).
+        // Belt and braces against a range that runs off the end of the tree: deleting it would
+        // take out live content to the right of the boundary.
         if reverseToIdx > tree.size {
             return nil
         }
@@ -672,7 +691,7 @@ final class TreeEditOperation: Operation {
     /// the dropped copy would move every index in the stack past content that was never inserted.
     func getContentSize() -> Int {
         if let insertedContentSize = self.insertedContentSize {
-            return insertedContentSize
+            return insertedContentSize + (self.splitSize ?? 0)
         }
         return self.contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
     }

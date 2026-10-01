@@ -116,10 +116,36 @@ class CRDTRoot {
      */
     private var sizeInGC: [GCChargeKey: DataSize] = [:]
     /**
-     * `gcPairMap` is a hash table that maps the IDString of GCChild to the
-     * element itself and its parent.
+     * `GCPairKey` identifies a registered GC pair by both of its ends.
+     *
+     * The parent is named by its object identity. That is enough within one
+     * root, and safe: a registered ``GCPair`` holds its parent strongly, so a
+     * parent cannot be freed — and its identifier reused — while a key naming
+     * it is in the map.
      */
-    private var gcPairMap: [String: GCPair]
+    private struct GCPairKey: Hashable {
+        let parent: ObjectIdentifier
+        let child: String
+    }
+
+    /**
+     * `gcPairMap` is a hash table of the registered GC pairs, keyed by both of
+     * a pair's ends.
+     *
+     * The child's IDString alone is not unique document-wide. An RHTNode is
+     * identified by (updatedAt, key), and a split deep-copies the attributes of
+     * the node it splits -- tombstones included, because the copy has to reject
+     * the same stale styles the original does. The copy is therefore a distinct
+     * piece of garbage wearing the original's id. Keying on the child alone made
+     * the two collide, and since `registerGCPair` reads a second registration
+     * under a known key as an un-registration, the second tombstone cancelled
+     * the first instead of joining it.
+     *
+     * The parent is the discriminator because it is what `purge` is called on:
+     * two pairs that share a parent and a child id name the same collectable
+     * thing, two that differ in either do not.
+     */
+    private var gcPairMap: [GCPairKey: GCPair]
 
     /**
      * `docSize` is a structure that represents the size of the document.
@@ -145,7 +171,9 @@ class CRDTRoot {
             if let array = element as? CRDTArray {
                 for node in array.getAllRGANodes() {
                     if node.getElementEntry() == nil, node.getPositionRemovedAt() != nil {
-                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node))
+                        // A dead position node holds no element, so the live size
+                        // this root was just built from never counted it.
+                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node, gcOnlySize: node.getDataSize()))
                     }
                 }
             }
@@ -491,19 +519,47 @@ class CRDTRoot {
     }
 
     /**
+     * `keyOf` returns the `gcPairMap` key identifying the given pair, or `nil`
+     * when the pair is missing either end.
+     */
+    private func keyOf(_ pair: GCPair) -> GCPairKey? {
+        guard let parent = pair.parent, let child = pair.child else {
+            return nil
+        }
+        return GCPairKey(parent: ObjectIdentifier(parent), child: child.toIDString)
+    }
+
+    /**
      * `registerGCPair` registers the given pair to hash table.
      */
     func registerGCPair(_ pair: GCPair) {
-        guard let childID = pair.child?.toIDString else {
+        guard let key = self.keyOf(pair) else {
             return
         }
 
-        if self.gcPairMap[childID] != nil {
-            self.gcPairMap.removeValue(forKey: childID)
+        if let prev = self.gcPairMap[key] {
+            // A second registration under the same key un-registers: the child is
+            // no longer collectable, it was revived. Subtract exactly what the
+            // first registration added, or the bytes stay charged to gc for the
+            // life of the document -- the count drops to zero, so nothing else
+            // notices, while MaxSizeLimit keeps reading them.
+            //
+            // An attribute always contributes its own size while it is in the map:
+            // collection reads `getDataSize`, and nothing else's charge covers it
+            // once the write that revives it replaces it with a live node. A pair
+            // registered with a zero `gcOnlySize` -- a live attribute removed from
+            // a node that was ALREADY a tombstone -- would otherwise give back
+            // nothing. A born-dead split piece is the other way round: the rest of
+            // its bytes really are inside a sibling's charge.
+            let size = prev.child is RHTNode ? prev.child?.getDataSize() : (prev.gcOnlySize ?? prev.child?.getDataSize())
+            if let size {
+                self.docSize.gc.subDataSize(others: size)
+            }
+            self.gcPairMap.removeValue(forKey: key)
             return
         }
 
-        self.gcPairMap[childID] = pair
+        self.gcPairMap[key] = pair
 
         if let gcOnlySize = pair.gcOnlySize {
             // NOTE: The child's size was never counted in docSize.live (it was
@@ -542,11 +598,11 @@ class CRDTRoot {
      * `getDataSize()` no longer includes the tombstone ticket.
      */
     func unregisterGCPair(_ pair: GCPair) {
-        guard let childID = pair.child?.toIDString, self.gcPairMap[childID] != nil else {
+        guard let key = self.keyOf(pair), self.gcPairMap[key] != nil else {
             return
         }
 
-        self.gcPairMap.removeValue(forKey: childID)
+        self.gcPairMap.removeValue(forKey: key)
 
         guard let size = pair.child?.getDataSize() else {
             return
@@ -663,7 +719,7 @@ class CRDTRoot {
             }
         }
 
-        for pair in self.gcPairMap.values {
+        for (key, pair) in self.gcPairMap {
             if let child = pair.child, child.removedAt == nil {
                 // Node was revived but its pair was not unregistered. Reverse the
                 // GC accounting (gc → live) and drop the stale entry via
@@ -678,7 +734,7 @@ class CRDTRoot {
                 if let datasize = pair.child?.getDataSize() {
                     self.docSize.gc.subDataSize(others: datasize)
                 }
-                self.gcPairMap.removeValue(forKey: child.toIDString)
+                self.gcPairMap.removeValue(forKey: key)
                 count += 1
             }
         }
@@ -715,6 +771,19 @@ class CRDTRoot {
      */
     func acc(_ diff: DataSize) {
         self.docSize.live.addDataSizes(others: diff)
+    }
+
+    /**
+     * `accGC` accumulates the given DataSize to gc.
+     *
+     * `docSize.gc` has to stay equal to the sum of the CURRENT size of every
+     * registered pair's child, because collection subtracts exactly that when it
+     * purges one. Writing an attribute onto a node that is already a tombstone
+     * changes the size of a child registered earlier, with no pair of its own to
+     * carry the difference. That is what this reports.
+     */
+    func accGC(_ diff: DataSize) {
+        self.docSize.gc.addDataSizes(others: diff)
     }
 }
 
