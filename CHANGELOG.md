@@ -28,6 +28,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 - Keep the newer tombstone when a tree node is removed twice, as the JS SDK and server do in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
 - Stop encoding the text head sentinel into a snapshot, which added an empty node on every offline-persistence round trip in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
 - Measure the mergeByPath boundary in UTF-16 units, so a merge after an emoji no longer cuts the left text in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
+- Read an empty version vector as local when deleting text, as the JS SDK and server do, so such a deletion is no longer dropped in https://github.com/yorkie-team/yorkie-ios-sdk/pull/277
 
 ## [v0.7.22] - 2026-09-22
 
