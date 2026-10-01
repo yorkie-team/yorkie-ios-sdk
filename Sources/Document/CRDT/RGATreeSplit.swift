@@ -1272,7 +1272,10 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         guard !candidates.isEmpty else {
             return ([], [], [])
         }
-        let isLocal = vector == nil
+        // An empty vector is a local change too, as yorkie-js-sdk and the server
+        // read it; treating it as remote made every node look unknown, so the
+        // deletion removed nothing.
+        let isLocal = vector == nil || vector?.size() == 0
         // 01. Collect nodes to remove and keep.
         var nodesToRemove: [RGATreeSplitNode<T>] = []
         var nodesToKeep: [RGATreeSplitNode<T>?] = []
