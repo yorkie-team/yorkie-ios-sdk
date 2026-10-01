@@ -1366,11 +1366,16 @@ extension Converter {
             var pbTextNode = PbTextNode()
             pbTextNode.id = toTextNodeID(id: textNode.id)
             pbTextNode.value = String(describing: textNode.value.content)
-            textNode.value.getAttributes().forEach { key, value in
+            // Every attribute, tombstones included, with its removal flag: the
+            // tree path in this file has always done both. Dropping a tombstone
+            // lets an older concurrent write win on a replica hydrated from the
+            // snapshot, which a replica replaying the changes rejects.
+            textNode.value.getAttrs().forEach { rhtNode in
                 var attr = PbNodeAttr()
-                attr.value = value.value
-                attr.updatedAt = toTimeTicket(value.updatedAt)
-                pbTextNode.attributes[key] = attr
+                attr.value = rhtNode.value
+                attr.updatedAt = toTimeTicket(rhtNode.updatedAt)
+                attr.isRemoved = rhtNode.isRemoved
+                pbTextNode.attributes[rhtNode.key] = attr
             }
             if let removedAt = textNode.removedAt {
                 pbTextNode.removedAt = toTimeTicket(removedAt)
@@ -1387,7 +1392,10 @@ extension Converter {
     static func fromTextNode(_ pbTextNode: PbTextNode) -> RGATreeSplitNode<CRDTTextValue> {
         let textValue = CRDTTextValue(pbTextNode.value)
         pbTextNode.attributes.forEach {
-            textValue.setAttr(key: $0.key, value: $0.value.value, updatedAt: fromTimeTicket($0.value.updatedAt))
+            textValue.getAttrs().setInternal(key: $0.key,
+                                             value: $0.value.value,
+                                             executedAt: fromTimeTicket($0.value.updatedAt),
+                                             removed: $0.value.isRemoved)
         }
         let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), textValue)
         if  pbTextNode.hasRemovedAt {

@@ -2427,7 +2427,16 @@ class CRDTTree: CRDTElement {
             var childNode = parentNode
             while parentNode.isRemoved {
                 childNode = parentNode
-                parentNode = childNode.parent!
+                // If the subtree has been detached by garbage collection, the walk
+                // can run off the top of it. Report it instead of dereferencing
+                // nil. Throwing rather than returning nil is deliberate: a nil
+                // position would go on to resolve a bogus index and edit the
+                // wrong range.
+                guard let next = childNode.parent else {
+                    throw YorkieError(code: .errInvalidArgument,
+                                      message: "least alive ancestor of \(childNode.id.toIDString): node not found")
+                }
+                parentNode = next
             }
 
             let childOffset = try parentNode.findOffset(node: childNode, includeRemoved: includeRemoved)
@@ -2906,6 +2915,9 @@ extension CRDTTree {
      *
      * A genuinely absent parent → skip: the node stays unplaced/invisible, which
      * is convergent because every replica resolves parent-absent identically.
+     * A parent present but TOMBSTONED → the node is placed but born tombstoned,
+     * stamped with the parent's `removedAt`, and `nil` is returned (see
+     * `attach` below).
      */
     private func recreateFromSpan(_ span: TreeRestoreSpan, _ offset: Int32, _ length: Int32) throws -> CRDTTreeNode? {
         guard let parentID = span.parentID,
@@ -2942,6 +2954,38 @@ extension CRDTTree {
 
         let siblings = parent.innerChildren
 
+        // `attach` finishes every anchor rung below: register the node, then decide
+        // whether it is born live or born tombstoned.
+        //
+        // The parent may have been tombstoned since this node was purged, in which
+        // case the node is born tombstoned rather than live. This mirrors the
+        // convention the concurrent-insert path already follows (a node inserted
+        // under a removed parent is made a tombstone immediately). Recreating it
+        // live would leave a node that the next purge of the parent unlinks but
+        // never unregisters -- reachable from nothing, still in nodeMapByID --
+        // which is what sends `toTreePos` off the top of a detached subtree
+        // (yorkie-team/yorkie#2008).
+        //
+        // The stamp is the PARENT's removedAt, not the restoring operation's
+        // ticket: that is the ticket the removal already wrote onto every sibling
+        // it swept, so the node rejoins them carrying what it would have carried
+        // had it never been purged, and it agrees with a replica that recreated it
+        // live and then had the removal sweep it.
+        //
+        // Accounting: the node is garbage the moment it is born, and its size was
+        // never in `docSize.live` -- returning nil keeps it out of `restore`'s
+        // recreated list, which is the only thing that books a recreated node into
+        // live. So the pair carries `gcOnlySize`: charge `docSize.gc` only.
+        func attach() -> CRDTTreeNode? {
+            self.registerNode(node)
+            if parent.isRemoved, let parentRemovedAt = parent.removedAt {
+                node.remove(parentRemovedAt)
+                self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
+                return nil
+            }
+            return node
+        }
+
         // (a) same-insertion successor / predecessor piece (text): exact slot.
         if span.isText {
             if let succ = self.findFloorNode(CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset + length)),
@@ -2949,16 +2993,14 @@ extension CRDTTree {
                let succIdx = siblings.firstIndex(where: { $0 === succ })
             {
                 try parent.insertAt(node, succIdx)
-                self.registerNode(node)
-                return node
+                return attach()
             }
             if offset > span.id.offset || offset > 0 {
                 if let pred = self.findFloorNode(CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset - 1)),
                    pred.isText, pred.parent === parent
                 {
                     try parent.insertAfter(node, pred)
-                    self.registerNode(node)
-                    return node
+                    return attach()
                 }
             }
         }
@@ -2968,8 +3010,7 @@ extension CRDTTree {
            let left = self.findFloorNode(leftSiblingID), left.parent === parent
         {
             try parent.insertAfter(node, left)
-            self.registerNode(node)
-            return node
+            return attach()
         }
 
         // (c) captured right boundary sibling (redundant anchor): insert before it.
@@ -2978,8 +3019,7 @@ extension CRDTTree {
            let rightIdx = siblings.firstIndex(where: { $0 === right })
         {
             try parent.insertAt(node, rightIdx)
-            self.registerNode(node)
-            return node
+            return attach()
         }
 
         // (d) deterministic id-order fallback: first slot whose child id > node id.
@@ -2987,8 +3027,7 @@ extension CRDTTree {
         // total order this rung needs.
         let insertIdx = siblings.firstIndex { $0.id > node.id } ?? siblings.count
         try parent.insertAt(node, insertIdx)
-        self.registerNode(node)
-        return node
+        return attach()
     }
 
     /**
