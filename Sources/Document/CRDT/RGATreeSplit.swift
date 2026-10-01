@@ -393,12 +393,21 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     /**
      * `canStyle` checks if node is able to set style.
      */
-    func canStyle(
-        _ editedAt: TimeTicket,
-        clientLamportAtChange: Int64
-    ) -> Bool {
-        let nodeExisted = self.createdAt.lamport <= clientLamportAtChange
-        return nodeExisted && (self.removedAt == nil || editedAt.after(self.removedAt!))
+    ///
+    /// The only question is whether the styling change knew this node existed.
+    /// It deliberately does NOT ask whether the node has since been removed, and
+    /// that is a convergence requirement: a style is applied unconditionally on
+    /// the replica that issues it — the node is live there — and can never be
+    /// retracted afterwards, so every other replica has to apply it too. Any rule
+    /// that reads `removedAt` is delivery-order dependent, because `removedAt` is
+    /// last-writer-wins and mutable while a style is evaluated once, when it
+    /// arrives.
+    ///
+    /// The cost is that a style covers text the same client had already deleted,
+    /// invisibly, so undoing the style and then the deletion brings the text back
+    /// without the attributes it carried.
+    func canStyle(_ versionVector: VersionVector?) -> Bool {
+        ticketKnown(versionVector, self.createdAt)
     }
 
     /**

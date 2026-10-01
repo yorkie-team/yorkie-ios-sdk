@@ -125,19 +125,20 @@ struct StyleOperation: Operation {
 
         var allPairs = [GCPair]()
         var allChanges = [TextChange]()
-        var allDiff = DataSize(data: 0, meta: 0)
+        var allSize = DocSize(live: DataSize(data: 0, meta: 0), gc: DataSize(data: 0, meta: 0))
         var reversePrevAttributes = [String: String]()
         var reverseAttrsToRemove = [String]()
 
         // 01. Handle attributesToRemove (remove style attributes).
         if self.attributesToRemove.isEmpty == false {
-            let (pairs, diff, changes, prevAttributes) = try text.removeStyle(
+            let (pairs, size, changes, prevAttributes) = try text.removeStyle(
                 (self.fromPos, self.toPos),
                 self.attributesToRemove,
                 self.executedAt,
                 versionVector
             )
-            allDiff.addDataSizes(others: diff)
+            allSize.live.addDataSizes(others: size.live)
+            allSize.gc.addDataSizes(others: size.gc)
             allPairs.append(contentsOf: pairs)
             allChanges.append(contentsOf: changes)
             for (key, value) in prevAttributes {
@@ -147,13 +148,14 @@ struct StyleOperation: Operation {
 
         // 02. Handle attributes (set style attributes).
         if self.attributes.isEmpty == false {
-            let (pairs, diff, changes, prevAttributes, attrsToRemove) = try text.setStyle(
+            let (pairs, size, changes, prevAttributes, attrsToRemove) = try text.setStyle(
                 (self.fromPos, self.toPos),
                 self.attributes,
                 self.executedAt,
                 versionVector
             )
-            allDiff.addDataSizes(others: diff)
+            allSize.live.addDataSizes(others: size.live)
+            allSize.gc.addDataSizes(others: size.gc)
             allPairs.append(contentsOf: pairs)
             allChanges.append(contentsOf: changes)
             for (key, value) in prevAttributes {
@@ -162,7 +164,8 @@ struct StyleOperation: Operation {
             reverseAttrsToRemove.append(contentsOf: attrsToRemove)
         }
 
-        root.acc(allDiff)
+        root.acc(allSize.live)
+        root.accGC(allSize.gc)
 
         for pair in allPairs {
             root.registerGCPair(pair)

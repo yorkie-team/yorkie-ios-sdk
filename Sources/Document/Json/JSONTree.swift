@@ -491,8 +491,9 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _, diff, _, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
-        self.context?.acc(diff)
+        let (pairs, _, size, _, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
+        self.context?.acc(size.live)
+        self.context?.accGC(size.gc)
 
         context.push(
             operation: TreeStyleOperation(
@@ -573,8 +574,9 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _, diff, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
-        self.context?.acc(diff)
+        let (pairs, _, size, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+        self.context?.acc(size.live)
+        self.context?.accGC(size.gc)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)

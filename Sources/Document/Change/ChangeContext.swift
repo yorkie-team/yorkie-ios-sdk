@@ -164,4 +164,11 @@ class ChangeContext {
     func acc(_ diff: DataSize) {
         self.root.acc(diff)
     }
+
+    /**
+     * `accGC` accumulates the given DataSize to gc. See ``CRDTRoot/accGC(_:)``.
+     */
+    func accGC(_ diff: DataSize) {
+        self.root.accGC(diff)
+    }
 }

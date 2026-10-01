@@ -388,33 +388,20 @@ final class CRDTText: CRDTElement {
         _ attributes: [String: String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], DataSize, [TextChange], [String: String], [String]) {
-        var diff = DataSize(data: 0, meta: 0)
+    ) throws -> ([GCPair], DocSize, [TextChange], [String: String], [String]) {
+        var size = DocSize(live: DataSize(data: 0, meta: 0), gc: DataSize(data: 0, meta: 0))
         // 01. split nodes with from and to
         let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
         let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
 
-        diff.addDataSizes(others: diffTo, diffFrom)
+        size.live.addDataSizes(others: diffTo, diffFrom)
 
         // 02. style nodes between from and to
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
         var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
-        for node in nodes {
-            let actorID = node.createdAt.actorID
-
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            let canStyle = node.canStyle(
-                editedAt,
-                clientLamportAtChange: clientLamportAtChange
-            )
-            if canStyle {
-                toBeStyleds.append(node)
-            }
+        for node in nodes where node.canStyle(versionVector) {
+            toBeStyleds.append(node)
         }
 
         // Capture previous attribute values from the first styled node for reverse op.
@@ -422,13 +409,23 @@ final class CRDTText: CRDTElement {
         var attributesToRemove = [String]()
         var capturedPrev = false
 
+        // The reverse operation restores what the VISIBLE text held, so the prior
+        // values come from the first LIVE node in the range. `canStyle` admits
+        // tombstones, and the first node in the range can be one -- capturing
+        // from it made an undo write an attribute onto text that never carried
+        // it. The fallback to the first node keeps an all-tombstone range
+        // undoable.
+        let captureFrom = toBeStyleds.first { !$0.isRemoved } ?? toBeStyleds.first
+
         var pairs = [GCPair]()
         for node in toBeStyleds {
-            if node.isRemoved {
-                continue
-            }
+            // `canStyle` admits a node removed CONCURRENTLY with this style, which
+            // has to be styled for the replicas to agree. It is not part of the
+            // rendered text, though, so it reports no change to editors and its
+            // bytes move through gc rather than live.
+            let nodeIsLive = !node.isRemoved
 
-            if !capturedPrev {
+            if !capturedPrev, node === captureFrom {
                 let attrs = node.value.getAttrs()
                 for key in attributes.keys {
                     if attrs.has(key: key) {
@@ -442,25 +439,28 @@ final class CRDTText: CRDTElement {
                 capturedPrev = true
             }
 
-            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
-            changes.append(TextChange(type: .style,
-                                      actor: editedAt.actorID,
-                                      from: fromIdx,
-                                      to: toIdx,
-                                      content: nil,
-                                      attributes: attributes))
+            if nodeIsLive {
+                let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
+                changes.append(TextChange(type: .style,
+                                          actor: editedAt.actorID,
+                                          from: fromIdx,
+                                          to: toIdx,
+                                          content: nil,
+                                          attributes: attributes))
+            }
 
             for (key, jsonValue) in attributes {
                 accAttrWrite(node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt),
                              node.value,
+                             nodeIsLive,
                              &pairs,
-                             &diff)
+                             &size)
             }
         }
 
         pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
 
-        return (pairs, diff, changes, prevAttributes, attributesToRemove)
+        return (pairs, size, changes, prevAttributes, attributesToRemove)
     }
 
     /**
@@ -474,46 +474,36 @@ final class CRDTText: CRDTElement {
         _ attributesToRemove: [String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], DataSize, [TextChange], [String: String]) {
-        var diff = DataSize(data: 0, meta: 0)
+    ) throws -> ([GCPair], DocSize, [TextChange], [String: String]) {
+        var size = DocSize(live: DataSize(data: 0, meta: 0), gc: DataSize(data: 0, meta: 0))
         // 01. split nodes with from and to
         let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
         let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
 
-        diff.addDataSizes(others: diffTo, diffFrom)
+        size.live.addDataSizes(others: diffTo, diffFrom)
 
         // 02. find nodes to remove style from
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
         var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
-        for node in nodes {
-            let actorID = node.createdAt.actorID
-
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            let canStyle = node.canStyle(
-                editedAt,
-                clientLamportAtChange: clientLamportAtChange
-            )
-            if canStyle {
-                toBeStyleds.append(node)
-            }
+        for node in nodes where node.canStyle(versionVector) {
+            toBeStyleds.append(node)
         }
 
         // Capture previous attribute values from the first styled node for reverse op.
         var prevAttributes = [String: String]()
         var capturedPrev = false
 
+        // See setStyle: the prior values come from the first LIVE node.
+        let captureFrom = toBeStyleds.first { !$0.isRemoved } ?? toBeStyleds.first
+
         var pairs = [GCPair]()
         for node in toBeStyleds {
-            if node.isRemoved {
-                continue
-            }
+            // See setStyle: a node removed concurrently with this change is
+            // styled but is not part of the rendered text.
+            let nodeIsLive = !node.isRemoved
 
-            if !capturedPrev {
+            if !capturedPrev, node === captureFrom {
                 let attrs = node.value.getAttrs()
                 for key in attributesToRemove where attrs.has(key: key) {
                     if let value = try? attrs.get(key: key) {
@@ -523,26 +513,29 @@ final class CRDTText: CRDTElement {
                 capturedPrev = true
             }
 
-            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
+            if nodeIsLive {
+                let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
 
-            // `nil` per key signals attribute removal to editors (e.g. Quill).
-            var removedAttributes = [String: String?]()
-            for key in attributesToRemove {
-                removedAttributes.updateValue(nil, forKey: key)
+                // `nil` per key signals attribute removal to editors (e.g. Quill).
+                var removedAttributes = [String: String?]()
+                for key in attributesToRemove {
+                    removedAttributes.updateValue(nil, forKey: key)
+                }
+                changes.append(TextChange(type: .style,
+                                          actor: editedAt.actorID,
+                                          from: fromIdx,
+                                          to: toIdx,
+                                          content: nil,
+                                          attributes: removedAttributes))
             }
-            changes.append(TextChange(type: .style,
-                                      actor: editedAt.actorID,
-                                      from: fromIdx,
-                                      to: toIdx,
-                                      content: nil,
-                                      attributes: removedAttributes))
 
             for key in attributesToRemove {
-                // The loop above skips removed nodes, so every node reaching here
-                // is live and the only question is whether the ATTRIBUTE was.
+                // `canStyle` admits a node removed concurrently with this change,
+                // so the NODE holding the attribute may itself be a tombstone --
+                // the third case `attrGCPair` asks about.
                 var attrWasLive = node.value.getAttrs().has(key: key)
                 for rhtNode in node.value.getAttrs().remove(key: key, executedAt: editedAt) {
-                    pairs.append(attrGCPair(node.value, rhtNode, attrWasLive))
+                    pairs.append(attrGCPair(node.value, rhtNode, attrWasLive, nodeIsLive))
                     // Only the node that replaces the live value settles the live
                     // value's bytes; a second one in the same call is the
                     // tombstone it superseded, which was never in live.
@@ -553,7 +546,7 @@ final class CRDTText: CRDTElement {
 
         pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
 
-        return (pairs, diff, changes, prevAttributes)
+        return (pairs, size, changes, prevAttributes)
     }
 
     /**

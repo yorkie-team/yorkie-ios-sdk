@@ -171,7 +171,9 @@ class CRDTRoot {
             if let array = element as? CRDTArray {
                 for node in array.getAllRGANodes() {
                     if node.getElementEntry() == nil, node.getPositionRemovedAt() != nil {
-                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node))
+                        // A dead position node holds no element, so the live size
+                        // this root was just built from never counted it.
+                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node, gcOnlySize: node.getDataSize()))
                     }
                 }
             }
@@ -541,7 +543,16 @@ class CRDTRoot {
             // first registration added, or the bytes stay charged to gc for the
             // life of the document -- the count drops to zero, so nothing else
             // notices, while MaxSizeLimit keeps reading them.
-            if let size = prev.gcOnlySize ?? prev.child?.getDataSize() {
+            //
+            // An attribute always contributes its own size while it is in the map:
+            // collection reads `getDataSize`, and nothing else's charge covers it
+            // once the write that revives it replaces it with a live node. A pair
+            // registered with a zero `gcOnlySize` -- a live attribute removed from
+            // a node that was ALREADY a tombstone -- would otherwise give back
+            // nothing. A born-dead split piece is the other way round: the rest of
+            // its bytes really are inside a sibling's charge.
+            let size = prev.child is RHTNode ? prev.child?.getDataSize() : (prev.gcOnlySize ?? prev.child?.getDataSize())
+            if let size {
                 self.docSize.gc.subDataSize(others: size)
             }
             self.gcPairMap.removeValue(forKey: key)
@@ -760,6 +771,19 @@ class CRDTRoot {
      */
     func acc(_ diff: DataSize) {
         self.docSize.live.addDataSizes(others: diff)
+    }
+
+    /**
+     * `accGC` accumulates the given DataSize to gc.
+     *
+     * `docSize.gc` has to stay equal to the sum of the CURRENT size of every
+     * registered pair's child, because collection subtracts exactly that when it
+     * purges one. Writing an attribute onto a node that is already a tombstone
+     * changes the size of a child registered earlier, with no pair of its own to
+     * carry the difference. That is what this reports.
+     */
+    func accGC(_ diff: DataSize) {
+        self.docSize.gc.addDataSizes(others: diff)
     }
 }
 
