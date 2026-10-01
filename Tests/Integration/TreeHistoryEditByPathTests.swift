@@ -71,6 +71,43 @@ final class TreeHistoryEditByPathSplitMergeTests: XCTestCase {
         XCTAssertEqual(xmlOf(doc), before)
     }
 
+    // Ports: "should undo a split deeper than the tree"
+    //
+    // The split loop stops when it runs out of ancestors to split, so a split
+    // level the tree has no room for opens fewer boundaries than it asked
+    // for. Sizing the reverse as 2 * splitLevel then covers tokens the split
+    // never opened, and the undo deletes live content beyond its own
+    // boundary. Tracked with yorkie-team/yorkie#1999.
+    @MainActor
+    func test_should_undo_a_split_deeper_than_the_tree() throws {
+        // given
+        let doc = Document(key: "editbypath-split-deeper-than-tree")
+        try doc.update { root, _ in
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "doc", children: [
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ABCD")]),
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "0123456789")])
+                ])
+            )
+        }
+
+        let before = xmlOf(doc)
+        XCTAssertEqual(before, "<doc><p>ABCD</p><p>0123456789</p></doc>")
+
+        // when — only one level below <doc> is splittable, so level 3 splits once
+        try doc.update { root, _ in
+            try (root.t as? JSONTree)?.editByPath([0, 2], [0, 2], nil, 3)
+        }
+        XCTAssertEqual(xmlOf(doc), "<doc><p>AB</p><p>CD</p><p>0123456789</p></doc>")
+
+        // then
+        try doc.undo()
+        XCTAssertEqual(xmlOf(doc), before, "the undo must merge only the boundary the split opened")
+
+        try doc.redo()
+        XCTAssertEqual(xmlOf(doc), "<doc><p>AB</p><p>CD</p><p>0123456789</p></doc>")
+    }
+
     // Ports: "should redo editByPath split"
     @MainActor
     func test_can_redo_editByPath_split() throws {
