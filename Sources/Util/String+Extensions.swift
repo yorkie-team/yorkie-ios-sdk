@@ -51,6 +51,43 @@ extension String {
     }
 }
 
+/**
+ * `isJSONDocument` reports whether the given string would parse as JSON, and so
+ * could not be told apart from the value it encodes if it were stored raw.
+ */
+func isJSONDocument(_ value: String) -> Bool {
+    guard let data = value.data(using: .utf8) else {
+        return false
+    }
+    return (try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])) != nil
+}
+
+/**
+ * `stringifyAttrValue` encodes one attribute value for storage.
+ *
+ * A string that is not itself a JSON document is stored as-is, which is what
+ * the Go SDK stores for the same attribute, so `color="red"` puts the same three
+ * bytes on the wire from either SDK. A string that IS a JSON document keeps its
+ * quotes, because raw storage could not tell it from the value it encodes: "1"
+ * would come back as the number 1 and "true" as the boolean.
+ */
+func stringifyAttrValue(_ value: Any) -> String {
+    if let string = value as? String, !isJSONDocument(string) {
+        return string
+    }
+    return convertToJSONString(value)
+}
+
+/**
+ * `logicalAttrValue` returns the attribute value as a peer storing values raw
+ * would hold it: a JSON-encoded string yields the string itself, anything else
+ * yields the stored text unchanged. A value written raw does not parse at all
+ * and passes straight through.
+ */
+func logicalAttrValue(_ stored: String) -> String {
+    (stored.toJSONObject as? String) ?? stored
+}
+
 func convertToJSONString(_ data: Any) -> String {
     if let jsonData = try? JSONSerialization.data(withJSONObject: data, options: [.fragmentsAllowed, .withoutEscapingSlashes, .sortedKeys]),
        let escapedValue = String(bytes: jsonData, encoding: .utf8)

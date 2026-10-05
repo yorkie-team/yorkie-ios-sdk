@@ -37,4 +37,20 @@ final class CRDTTextTests: XCTestCase {
         try text.edit(text.indexRangeToPosRange(3, 3), "\n", TimeTicket.initial)
         XCTAssertEqual("[{\"val\":\"ABC\"},{\"val\":\"\\n\"},{\"val\":\"D\"}]", text.toJSON())
     }
+
+    // An empty version vector is a local change, as yorkie-js-sdk's deleteNodes
+    // and the server read it; it must not make every node look unknown.
+    func test_should_delete_with_an_empty_version_vector() throws {
+        // given
+        let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: TimeTicket.initial)
+        let actorID = "000000000000000000000001"
+        try text.edit(text.indexRangeToPosRange(0, 0), "ABCD", TimeTicket(lamport: 1, delimiter: 0, actorID: actorID))
+
+        // when
+        try text.edit(text.indexRangeToPosRange(1, 3), "",
+                      TimeTicket(lamport: 2, delimiter: 0, actorID: actorID), nil, VersionVector())
+
+        // then
+        XCTAssertEqual("[{\"val\":\"A\"},{\"val\":\"D\"}]", text.toJSON())
+    }
 }

@@ -277,7 +277,7 @@ final class CRDTTreeEditTests: XCTestCase {
         let sizeBefore = tree.size
         let fromPos = try tree.findPos(0)
         let toPos = try tree.findPos(4)
-        let (_, _, _, removedNodes, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), nil, 0, timeT(), timeT, nil)
+        let (_, _, _, removedNodes, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), nil, 0, timeT(), timeT, nil)
 
         XCTAssertEqual(removedNodes.count, 2, "both the <p> and its text child are removed")
         let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
@@ -419,10 +419,11 @@ final class CRDTTreeEditTests: XCTestCase {
         // the insert.
         let mergeTicket = TimeTicket(lamport: knownTicket.lamport + 1, delimiter: 0, actorID: self.otherActor)
         try tree.editT((0, 5), nil, 0, mergeTicket, timeT)
-        _ = try tree.style((fromPos, toPos), ["bold": "\"x\""], timeT(), stylerVV)
+        _ = try tree.style((fromPos, toPos), ["bold": stringifyAttrValue("x")], timeT(), stylerVV)
 
-        // then
-        XCTAssertEqual(try? inserted.attrs?.get(key: "bold"), "\"x\"")
+        // then — "x" is not a JSON document, so it is stored as itself: the same
+        // bytes the server would hold for this attribute.
+        XCTAssertEqual(try? inserted.attrs?.get(key: "bold"), "x")
     }
 
     // Ported from yorkie-js-sdk v0.7.18: CRDTTree.Edit — keeps an ordered from-anchor range off

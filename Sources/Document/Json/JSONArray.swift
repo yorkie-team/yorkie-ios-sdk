@@ -366,7 +366,9 @@ public class JSONArray: CustomDebugStringConvertible {
             prevCreatedAt: prevCreatedAt,
             executedAt: executedAt
         ) {
-            self.context.registerGCPair(GCPair(parent: self.target.getRGATreeList(), child: deadNode))
+            // A dead position node holds no element, so `getDataSize` never counted
+            // it into live -- `gcOnlySize` says "add to gc, take nothing out of live".
+            self.context.registerGCPair(GCPair(parent: self.target.getRGATreeList(), child: deadNode, gcOnlySize: deadNode.getDataSize()))
         }
     }
 

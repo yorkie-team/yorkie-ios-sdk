@@ -152,171 +152,6 @@ typealias TextNode = JSONTreeTextNode
 typealias TreeNode = JSONTreeNode
 
 /**
- * `toTreeNode` returns tree node from CRDTTreeNode.
- */
-func toTreeNode(_ node: CRDTTreeNode) -> any TreeNode {
-    if node.isText {
-        return TextNode(value: node.value)
-    }
-
-    var newNode = ElementNode(
-        type: node.type,
-        children: node.children.map { toTreeNode($0) }
-    )
-    if let attrs = node.attrs {
-        newNode.attributes = parseObjectValues(attrs.toDictionaryStringObject())
-    }
-
-    return newNode
-}
-
-/**
- * `createSplitNode` returns new node which is split from the given node.
- */
-func createSplitNode(
-    node: CRDTTreeNode,
-    offset: Int
-) -> ElementNode {
-    let type: TreeNodeType
-    let parentNode = node.parent
-
-    if node.isText, parentNode != nil {
-        type = parentNode!.type
-    } else {
-        type = node.type
-    }
-
-    var attributes: [String: String] = [:]
-    if let attrs = node.attrs {
-        let parsedAttrs = parseObjectValues(attrs.toDictionaryStringObject())
-        if !parsedAttrs.isEmpty {
-            attributes = parsedAttrs
-        }
-    }
-
-    if node.isText, let parentAttrs = parentNode?.attrs {
-        let parsedParentAttrs = parseObjectValues(parentAttrs.toDictionaryStringObject())
-        if !parsedParentAttrs.isEmpty {
-            attributes = parsedParentAttrs
-        }
-    }
-
-    let children: [any TreeNode]
-
-    if node.isText {
-        if parentNode == nil || parentNode?.getChildrenText().count == offset {
-            children = []
-        } else {
-            let childrenText = parentNode?.getChildrenText() ?? ""
-            let endIndex = childrenText.endIndex
-            let startIndex = childrenText.index(childrenText.startIndex, offsetBy: offset)
-            let value = String(childrenText[startIndex ..< endIndex])
-
-            children = [
-                JSONTreeTextNode(value: value)
-            ]
-        }
-    } else {
-        children = node.children.dropFirst(offset).map { toTreeNode($0) }
-    }
-
-    let newNode = ElementNode(type: type, children: children, attributes: attributes)
-    return newNode
-}
-
-/**
- * `separateSplit` separates the split operation into insert and delete operations.
- */
-func separateSplit(
-    treePos: TreePos<CRDTTreeNode>,
-    path: [Int]
-) -> [(fromPath: [Int], toPath: [Int], content: (any TreeNode)?)] {
-    let node = treePos.node
-    let parentPath = Array(path.dropLast())
-    let parentNode = node.parent
-    let last: Int
-
-    if node.isText, let parentNode {
-        last = parentNode.getChildrenText().count
-    } else {
-        last = node.children.count
-    }
-
-    let toPath = parentPath + [last]
-    var insertPath = parentPath
-    var res: [(fromPath: [Int], toPath: [Int], content: (any TreeNode)?)] = []
-
-    insertPath[insertPath.count - 1] += 1
-
-    if path != toPath {
-        res.append((fromPath: path, toPath: toPath, content: nil))
-    }
-    let newNode = createSplitNode(node: node, offset: path.last ?? 0)
-    res.append((fromPath: insertPath, toPath: insertPath, content: newNode))
-
-    return res
-}
-
-/**
- * `parseObjectValues` returns the JSON parsable string values to the origin states.
- */
-func parseObjectValues(_ attrs: [String: String]) -> [String: String] {
-    var attributes: [String: String] = [:]
-    for (key, value) in attrs {
-        if let data = value.data(using: .utf8) {
-            do {
-                attributes[key] = try JSONSerialization.jsonObject(with: data, options: []) as? String
-            } catch {
-                // Handle JSON parse error if needed
-                attributes[key] = value
-            }
-        } else {
-            attributes[key] = value
-        }
-    }
-    return attributes
-}
-
-/**
- * `separateMerge` separates the merge operation into insert and delete operations.
- */
-func separateMerge(
-    treePos: TreePos<CRDTTreeNode>,
-    path: [Int]
-) -> [(fromPath: [Int], toPath: [Int], contents: [any TreeNode])] {
-    let parentNode = treePos.node
-    let offset = Int(treePos.offset)
-
-    let node = parentNode.children[offset]
-    let leftSiblingNode = parentNode.children[offset - 1]
-    let children = node.children
-    let parentPath = Array(path.dropLast())
-
-    var res: [(fromPath: [Int], toPath: [Int], contents: [any TreeNode])] = []
-    res.append((path, parentPath + [offset + 1], []))
-
-    if children.isEmpty {
-        return res
-    }
-
-    let length: Int
-    if leftSiblingNode.hasTextChild {
-        length = leftSiblingNode.getChildrenText().count
-    } else {
-        length = leftSiblingNode.children.count
-    }
-
-    var insertPath = parentPath
-    insertPath.append(offset - 1)
-    insertPath.append(length)
-
-    let nodes = children.map { toTreeNode($0) }
-
-    res.append((insertPath, insertPath, nodes))
-    return res
-}
-
-/**
  * `buildDescendants` builds descendants of the given tree node.
  */
 func buildDescendants(treeNode: any JSONTreeNode, parent: CRDTTreeNode, context: ChangeContext) throws {
@@ -505,22 +340,22 @@ public class JSONTree {
         guard !path.isEmpty else {
             throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
+        // A split divides the node holding the position into two siblings, so it
+        // needs a parent to hold them. The root has none, and `edit` takes the
+        // position anyway and pushes an operation that changes nothing.
         let treePos = try tree.pathToTreePos(path)
-        let commands = separateSplit(treePos: treePos, path: path)
+        let target = treePos.node.isText ? treePos.node.parent : treePos.node
 
-        for command in commands {
-            let fromPath = command.fromPath
-            let toPath = command.toPath
-
-            let fromPos = try tree.pathToPos(fromPath)
-            let toPos = try tree.pathToPos(toPath)
-            let content = [command.content] as? [any TreeNode] ?? []
-            _ = try self.editInternal(
-                fromPos,
-                toPos,
-                content
-            )
+        guard target?.parent != nil else {
+            throw YorkieError(code: .errInvalidArgument, message: "the root node cannot be split")
         }
+
+        // Split through `edit`'s split level rather than lowering to a delete plus
+        // an insert of a copied node. The copy made each replica insert its own
+        // node, so two replicas splitting the same position kept both copies.
+        let pos = try tree.pathToPos(path)
+
+        _ = try self.editInternal(pos, pos, [], 1)
     }
 
     /**
@@ -540,22 +375,31 @@ public class JSONTree {
         if treePos.node.isText {
             throw YorkieError(code: .errInvalidArgument, message: "text node cannot be merged")
         }
-        let commands = separateMerge(treePos: treePos, path: path)
+        let parentNode = treePos.node
+        let offset = Int(treePos.offset)
 
-        for command in commands {
-            let fromPath = command.fromPath
-            let toPath = command.toPath
-            let content = command.contents
-
-            let fromPos = try tree.pathToPos(fromPath)
-            let toPos = try tree.pathToPos(toPath)
-
-            _ = try self.editInternal(
-                fromPos,
-                toPos,
-                content
-            )
+        guard offset > 0, offset - 1 < parentNode.children.count else {
+            throw YorkieError(code: .errInvalidArgument, message: "the first child cannot be merged")
         }
+        let leftSibling = parentNode.children[offset - 1]
+
+        // Merge by deleting the empty range across the boundary, rather than
+        // lowering to a delete of the node plus an insert of its children copied
+        // into the left sibling. The copy made each replica insert its own
+        // children, so two replicas merging the same boundary kept both copies.
+        // Deleting the boundary tokens re-inserts nothing and is idempotent.
+        let parentPath = Array(path.dropLast())
+        let fromPath = parentPath + [
+            offset - 1,
+            // UTF-16 units, as tree paths count them (`CRDTTreeNode.size` is an
+            // `NSString.length`). `String.count` counts graphemes, which put the
+            // boundary inside a surrogate pair and cut the left text's tail.
+            leftSibling.hasTextChild ? leftSibling.getChildrenText().utf16.count : leftSibling.children.count
+        ]
+        let fromPos = try tree.pathToPos(fromPath)
+        let toPos = try tree.pathToPos(path + [0])
+
+        _ = try self.editInternal(fromPos, toPos, [])
     }
 
     /**
@@ -650,8 +494,9 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _, diff, _, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
-        self.context?.acc(diff)
+        let (pairs, _, size, _, _) = try tree.style((fromPos, toPos), stringAttrs, ticket, nil)
+        self.context?.acc(size.live)
+        self.context?.accGC(size.gc)
 
         context.push(
             operation: TreeStyleOperation(
@@ -732,8 +577,9 @@ public class JSONTree {
 
         let ticket = context.issueTimeTicket
 
-        let (pairs, _, diff, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
-        self.context?.acc(diff)
+        let (pairs, _, size, _) = try tree.removeStyle((fromPos, toPos), attributesToRemove, ticket)
+        self.context?.acc(size.live)
+        self.context?.accGC(size.gc)
 
         for pair in pairs {
             self.context?.registerGCPair(pair)
@@ -776,7 +622,9 @@ public class JSONTree {
         let ticket = context.lastTimeTicket
         let crdtNodes: [CRDTTreeNode]?
 
-        if let contents = contents as? [JSONTreeTextNode] {
+        // Check the first element like JS's `contents[0]?.type === DefaultTextType`:
+        // `[] as? [JSONTreeTextNode]` succeeds, and would insert an empty text node.
+        if contents?.first is JSONTreeTextNode, let contents = contents as? [JSONTreeTextNode] {
             var compVal = ""
             for content in contents {
                 compVal += content.value as String
@@ -791,7 +639,7 @@ public class JSONTree {
         // operation can carry them: every other replica then uses them instead of reconstructing them
         // from the operation, which it cannot do correctly once content has descendants.
         var splitTickets = [TimeTicket]()
-        let (_, pairs, diff, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
+        let (_, pairs, diff, _, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
             let issued = context.issueTimeTicket
             splitTickets.append(issued)
             return issued

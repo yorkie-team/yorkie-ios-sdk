@@ -151,3 +151,22 @@ extension VersionVector: Sequence {
         return self.vector.makeIterator()
     }
 }
+
+/**
+ * `ticketKnown` returns true if the given ticket is causally known to the
+ * editor, i.e. the editor's version vector covers the ticket's lamport clock
+ * for the same actor. For local operations (a `nil` or empty version vector),
+ * all tickets are considered known.
+ */
+func ticketKnown(_ versionVector: VersionVector?, _ ticket: TimeTicket) -> Bool {
+    // An empty vector is a local change, the same way the server reads
+    // `len(vv) == 0` -- not just an absent one. The two have to agree or the
+    // same operation is causally known on one side and not the other.
+    guard let versionVector, versionVector.size() > 0 else {
+        return true
+    }
+    guard let lamport = versionVector.get(ticket.actorID) else {
+        return false
+    }
+    return lamport >= ticket.lamport
+}

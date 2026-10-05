@@ -96,7 +96,8 @@ struct MoveOperation: Operation {
         }
 
         if let deadNode = try array.moveAfter(createdAt: self.createdAt, prevCreatedAt: self.previousCreatedAt, executedAt: self.executedAt) {
-            root.registerGCPair(GCPair(parent: array.getRGATreeList(), child: deadNode))
+            // See `JSONArray.registerMove`: a dead position node was never in live.
+            root.registerGCPair(GCPair(parent: array.getRGATreeList(), child: deadNode, gcOnlySize: deadNode.getDataSize()))
         }
 
         guard let index = try Int(array.subPath(createdAt: self.createdAt)) else {

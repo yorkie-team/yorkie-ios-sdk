@@ -81,10 +81,19 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
+     * `truncate` shortens this value in place, keeping the object identity so
+     * that GC pairs registered against it are not orphaned. See
+     * ``RGATreeSplitValue/truncate(_:)``.
+     */
+    func truncate(_ offset: Int) {
+        self.content = self.content.substring(to: offset) as NSString
+    }
+
+    /**
      * `setAttr` sets attribute of the given key, updated time and value.
      */
     @discardableResult
-    func setAttr(key: String, value: String, updatedAt: TimeTicket) -> (RHTNode?, RHTNode?) {
+    func setAttr(key: String, value: String, updatedAt: TimeTicket) -> RHTWrite {
         self.attributes.set(key: key, value: value, executedAt: updatedAt)
     }
 
@@ -103,7 +112,11 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
             data: content.length * 2,
             meta: 0
         )
-        for node in self.attributes {
+        // A removed attribute belongs to docSize.gc, not to live.
+        // `CRDTTreeNode.getDataSize` makes the same exclusion; the two halves
+        // have to answer this the same way or a document's size stops being a
+        // function of its content.
+        for node in self.attributes where !node.isRemoved {
             let size = node.getDataSize()
             dataSize.data += size.data
             dataSize.meta += size.meta
@@ -123,8 +136,10 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
             var data = [String]()
 
             for (key, value) in attrs.sorted(by: { $0.key < $1.key }) {
-                if value.value.count > 2, value.value.first == "\"", value.value.last == "\"" {
-                    data.append("\"\(key)\":\(value.value)")
+                // A peer that stores values raw writes ones that do not parse as
+                // JSON; quote those as strings rather than emitting invalid JSON.
+                if value.value.toJSONObject is String {
+                    data.append("\"\(key)\":\(convertToJSONString(logicalAttrValue(value.value)))")
                 } else {
                     data.append("\"\(key)\":\(value.value)")
                 }
@@ -158,13 +173,27 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
+     * `getRemovedAttrs` reports the tombstoned attributes this value holds,
+     * which a split has just duplicated from its source. The copy is new garbage
+     * under a new parent with no registration of its own -- the original's pair
+     * names the original's parent -- so without this it could never be
+     * collected.
+     */
+    func getRemovedAttrs() -> [RHTNode] {
+        self.attributes.filter { $0.removedAt != nil }
+    }
+
+    /**
      * `getGCPairs` returns the pairs of GC.
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
 
+        // `getDataSize` skips removed attributes, so a tombstoned attribute is
+        // not part of the live size this root was built with. Registering it
+        // without `gcOnlySize` would debit live for bytes it never held.
         for node in self.attributes where node.removedAt != nil {
-            pairs.append(GCPair(parent: self, child: node))
+            pairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
         }
 
         return pairs
@@ -359,33 +388,20 @@ final class CRDTText: CRDTElement {
         _ attributes: [String: String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], DataSize, [TextChange], [String: String], [String]) {
-        var diff = DataSize(data: 0, meta: 0)
+    ) throws -> ([GCPair], DocSize, [TextChange], [String: String], [String]) {
+        var size = DocSize(live: DataSize(data: 0, meta: 0), gc: DataSize(data: 0, meta: 0))
         // 01. split nodes with from and to
         let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
         let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
 
-        diff.addDataSizes(others: diffTo, diffFrom)
+        size.live.addDataSizes(others: diffTo, diffFrom)
 
         // 02. style nodes between from and to
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
         var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
-        for node in nodes {
-            let actorID = node.createdAt.actorID
-
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            let canStyle = node.canStyle(
-                editedAt,
-                clientLamportAtChange: clientLamportAtChange
-            )
-            if canStyle {
-                toBeStyleds.append(node)
-            }
+        for node in nodes where node.canStyle(versionVector) {
+            toBeStyleds.append(node)
         }
 
         // Capture previous attribute values from the first styled node for reverse op.
@@ -393,13 +409,23 @@ final class CRDTText: CRDTElement {
         var attributesToRemove = [String]()
         var capturedPrev = false
 
+        // The reverse operation restores what the VISIBLE text held, so the prior
+        // values come from the first LIVE node in the range. `canStyle` admits
+        // tombstones, and the first node in the range can be one -- capturing
+        // from it made an undo write an attribute onto text that never carried
+        // it. The fallback to the first node keeps an all-tombstone range
+        // undoable.
+        let captureFrom = toBeStyleds.first { !$0.isRemoved } ?? toBeStyleds.first
+
         var pairs = [GCPair]()
         for node in toBeStyleds {
-            if node.isRemoved {
-                continue
-            }
+            // `canStyle` admits a node removed CONCURRENTLY with this style, which
+            // has to be styled for the replicas to agree. It is not part of the
+            // rendered text, though, so it reports no change to editors and its
+            // bytes move through gc rather than live.
+            let nodeIsLive = !node.isRemoved
 
-            if !capturedPrev {
+            if !capturedPrev, node === captureFrom {
                 let attrs = node.value.getAttrs()
                 for key in attributes.keys {
                     if attrs.has(key: key) {
@@ -413,29 +439,28 @@ final class CRDTText: CRDTElement {
                 capturedPrev = true
             }
 
-            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
-            changes.append(TextChange(type: .style,
-                                      actor: editedAt.actorID,
-                                      from: fromIdx,
-                                      to: toIdx,
-                                      content: nil,
-                                      attributes: attributes))
+            if nodeIsLive {
+                let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
+                changes.append(TextChange(type: .style,
+                                          actor: editedAt.actorID,
+                                          from: fromIdx,
+                                          to: toIdx,
+                                          content: nil,
+                                          attributes: attributes))
+            }
 
             for (key, jsonValue) in attributes {
-                let (prev, _) = node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt)
-                if prev != nil {
-                    pairs.append(GCPair(parent: node.value, child: prev))
-                }
-
-                if let curr = node.value.getAttrs().getNodeByKey(key) {
-                    diff.addDataSizes(others: curr.getDataSize())
-                }
+                accAttrWrite(node.value.setAttr(key: key, value: jsonValue, updatedAt: editedAt),
+                             node.value,
+                             nodeIsLive,
+                             &pairs,
+                             &size)
             }
         }
 
         pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
 
-        return (pairs, diff, changes, prevAttributes, attributesToRemove)
+        return (pairs, size, changes, prevAttributes, attributesToRemove)
     }
 
     /**
@@ -449,46 +474,36 @@ final class CRDTText: CRDTElement {
         _ attributesToRemove: [String],
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([GCPair], DataSize, [TextChange], [String: String]) {
-        var diff = DataSize(data: 0, meta: 0)
+    ) throws -> ([GCPair], DocSize, [TextChange], [String: String]) {
+        var size = DocSize(live: DataSize(data: 0, meta: 0), gc: DataSize(data: 0, meta: 0))
         // 01. split nodes with from and to
         let (_, diffTo, toRight) = try self.rgaTreeSplit.findNodeWithSplit(range.1, editedAt)
         let (_, diffFrom, fromRight) = try self.rgaTreeSplit.findNodeWithSplit(range.0, editedAt)
 
-        diff.addDataSizes(others: diffTo, diffFrom)
+        size.live.addDataSizes(others: diffTo, diffFrom)
 
         // 02. find nodes to remove style from
         var changes = [TextChange]()
         let nodes = self.rgaTreeSplit.findBetween(fromRight, toRight)
         var toBeStyleds = [RGATreeSplitNode<CRDTTextValue>]()
-        for node in nodes {
-            let actorID = node.createdAt.actorID
-
-            var clientLamportAtChange: Int64 = .max
-
-            if let versionVector {
-                clientLamportAtChange = versionVector.get(actorID) ?? 0
-            }
-            let canStyle = node.canStyle(
-                editedAt,
-                clientLamportAtChange: clientLamportAtChange
-            )
-            if canStyle {
-                toBeStyleds.append(node)
-            }
+        for node in nodes where node.canStyle(versionVector) {
+            toBeStyleds.append(node)
         }
 
         // Capture previous attribute values from the first styled node for reverse op.
         var prevAttributes = [String: String]()
         var capturedPrev = false
 
+        // See setStyle: the prior values come from the first LIVE node.
+        let captureFrom = toBeStyleds.first { !$0.isRemoved } ?? toBeStyleds.first
+
         var pairs = [GCPair]()
         for node in toBeStyleds {
-            if node.isRemoved {
-                continue
-            }
+            // See setStyle: a node removed concurrently with this change is
+            // styled but is not part of the rendered text.
+            let nodeIsLive = !node.isRemoved
 
-            if !capturedPrev {
+            if !capturedPrev, node === captureFrom {
                 let attrs = node.value.getAttrs()
                 for key in attributesToRemove where attrs.has(key: key) {
                     if let value = try? attrs.get(key: key) {
@@ -498,32 +513,40 @@ final class CRDTText: CRDTElement {
                 capturedPrev = true
             }
 
-            let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
+            if nodeIsLive {
+                let (fromIdx, toIdx) = try self.rgaTreeSplit.findIndexesFromRange(node.createPosRange)
 
-            // `nil` per key signals attribute removal to editors (e.g. Quill).
-            var removedAttributes = [String: String?]()
-            for key in attributesToRemove {
-                removedAttributes.updateValue(nil, forKey: key)
+                // `nil` per key signals attribute removal to editors (e.g. Quill).
+                var removedAttributes = [String: String?]()
+                for key in attributesToRemove {
+                    removedAttributes.updateValue(nil, forKey: key)
+                }
+                changes.append(TextChange(type: .style,
+                                          actor: editedAt.actorID,
+                                          from: fromIdx,
+                                          to: toIdx,
+                                          content: nil,
+                                          attributes: removedAttributes))
             }
-            changes.append(TextChange(type: .style,
-                                      actor: editedAt.actorID,
-                                      from: fromIdx,
-                                      to: toIdx,
-                                      content: nil,
-                                      attributes: removedAttributes))
 
             for key in attributesToRemove {
-                let gcNodes = node.value.getAttrs().remove(key: key, executedAt: editedAt)
-                for rhtNode in gcNodes {
-                    pairs.append(GCPair(parent: node.value, child: rhtNode))
-                    diff.addDataSizes(others: rhtNode.getDataSize())
+                // `canStyle` admits a node removed concurrently with this change,
+                // so the NODE holding the attribute may itself be a tombstone --
+                // the third case `attrGCPair` asks about.
+                var attrWasLive = node.value.getAttrs().has(key: key)
+                for rhtNode in node.value.getAttrs().remove(key: key, executedAt: editedAt) {
+                    pairs.append(attrGCPair(node.value, rhtNode, attrWasLive, nodeIsLive))
+                    // Only the node that replaces the live value settles the live
+                    // value's bytes; a second one in the same call is the
+                    // tombstone it superseded, which was never in live.
+                    attrWasLive = false
                 }
             }
         }
 
         pairs.append(contentsOf: self.rgaTreeSplit.drainPendingGCPairs())
 
-        return (pairs, diff, changes, prevAttributes)
+        return (pairs, size, changes, prevAttributes)
     }
 
     /**
@@ -636,9 +659,9 @@ extension CRDTText: CRDTGCPairContainable {
         // NOTE: Only called when a root is built from a snapshot, where
         // docSize.live counted visible nodes only. Tombstoned nodes (and the
         // attribute tombstones inside them) were never part of live, so their
-        // pairs carry `gcOnlySize`. Attribute tombstones of visible nodes ARE
-        // counted in live (getDataSize does not skip them), so their pairs use
-        // the normal live→gc accounting.
+        // pairs carry `gcOnlySize`. So do the attribute tombstones of visible
+        // nodes: `CRDTTextValue.getDataSize` skips removed attributes, matching
+        // the tree half, so those bytes are not in live either.
         for node in self.rgaTreeSplit {
             let isRemoved = node.removedAt != nil
             if isRemoved {

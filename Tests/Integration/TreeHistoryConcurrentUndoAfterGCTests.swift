@@ -271,6 +271,47 @@ final class TreeHistoryConcurrentUndoAfterGCTests: XCTestCase {
         }
     }
 
+    // Ports: "undo one of two concurrent splits of the same node"
+    // (packages/sdk/test/integration/history_tree_concurrent_test.ts).
+    //
+    // A remote split reported no visible-index growth to reconciliation, so a
+    // stacked split reverse to the right of it never shifted and its boundary
+    // deletion deleted live text instead of the boundary it had opened. Fixed
+    // with yorkie-team/yorkie#1999 (yorkie-js-sdk#1360); this is the case that
+    // recorded it.
+    @MainActor
+    func test_undo_one_of_two_concurrent_splits_of_the_same_node() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            try d1.update { root, _ in
+                root.t = JSONTree(initialRoot:
+                    JSONTreeElementNode(type: "doc", children: [
+                        JSONTreeElementNode(type: "p", children: [
+                            JSONTreeElementNode(type: "span", children: [JSONTreeTextNode(value: "abcde")])
+                        ])
+                    ])
+                )
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            try d1.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).editByPath([0, 0, 1], [0, 0, 1], nil, 1)
+            }
+            try d2.update { root, _ in
+                try XCTUnwrap(root.t as? JSONTree).editByPath([0, 0, 4], [0, 0, 4], nil, 1)
+            }
+            try await settle(c1, c2)
+
+            XCTAssertEqual((d1.getRoot().t as? JSONTree)?.toXML(), "<doc><p><span>a</span><span>bcd</span><span>e</span></p></doc>")
+
+            try d2.undo()
+            try await settle(c1, c2)
+
+            XCTAssertEqual((d1.getRoot().t as? JSONTree)?.toXML(), "<doc><p><span>a</span><span>bcde</span></p></doc>")
+            try assertConverged(d1, d2, "after undo")
+        }
+    }
+
     // MARK: - Shared runners
 
     /// Both undos revive both deleted runs by identity, restoring the pre-delete

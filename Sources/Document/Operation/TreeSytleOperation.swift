@@ -75,7 +75,7 @@ class TreeStyleOperation: Operation {
 
         let changes: [TreeChange]
         let pairs: [GCPair]
-        var diff: DataSize
+        var size: DocSize
         // Attribute state captured from the first styled node, used to build the reverse op.
         var reversePrevAttributes = [String: String]()
         var reverseAttrsToRemove = [String]()
@@ -83,7 +83,7 @@ class TreeStyleOperation: Operation {
         if self.attributes.isEmpty == false {
             let prevAttributes: [String: String]
             let newAttrKeys: [String]
-            (pairs, changes, diff, prevAttributes, newAttrKeys) = try tree.style(
+            (pairs, changes, size, prevAttributes, newAttrKeys) = try tree.style(
                 (self.fromPos, self.toPos),
                 self.attributes,
                 self.executedAt,
@@ -93,7 +93,7 @@ class TreeStyleOperation: Operation {
             reverseAttrsToRemove = newAttrKeys
         } else {
             let prevAttributes: [String: String]
-            (pairs, changes, diff, prevAttributes) = try tree.removeStyle(
+            (pairs, changes, size, prevAttributes) = try tree.removeStyle(
                 (self.fromPos, self.toPos),
                 self.attributesToRemove,
                 self.executedAt,
@@ -102,7 +102,8 @@ class TreeStyleOperation: Operation {
             reversePrevAttributes = prevAttributes
         }
 
-        root.acc(diff)
+        root.acc(size.live)
+        root.accGC(size.gc)
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)
 
