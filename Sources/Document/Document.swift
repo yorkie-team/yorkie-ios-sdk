@@ -640,13 +640,28 @@ public class Document: Attachable {
         let clientSeq = Int64(pack.getCheckpoint().getClientSeq())
 
         // 01. Apply snapshot or changes to the root object.
-        if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
-            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot, clientSeq)
-        } else {
-            try self.applyChanges(pack.getChanges(), source: .remote)
+        //
+        // NOTE(yorkie-js-sdk#1403): the checkpoint below is only reached once this succeeds,
+        // so a throw here leaves it where it was and the server redelivers this same pack on
+        // every sync. Log that once, naming the checkpoint the document is stuck at, before
+        // letting the error out -- otherwise the only signal is a sync that never makes
+        // progress. This runs at the default log level and repeats on every redelivery, so
+        // everything it interpolates must be metadata: the key, the checkpoint, and an error
+        // that (per `Change.execute` / `applyChange`) names the change and the operation by
+        // type and ticket only -- never an operation's payload.
+        do {
+            if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
+                try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot, clientSeq)
+            } else {
+                try self.applyChanges(pack.getChanges(), source: .remote)
 
-            // Remove local changes applied to server.
-            self.removePushedLocalChanges(clientSeq: clientSeq)
+                // Remove local changes applied to server.
+                self.removePushedLocalChanges(clientSeq: clientSeq)
+            }
+        } catch {
+            Logger.error("[Document] \"\(self.key)\" cannot apply the pack at checkpoint \(self.checkpoint.toTestString); " +
+                "the server will redeliver it until this is resolved: \(error)")
+            throw error
         }
 
         // 02. Update the checkpoint.
@@ -1080,7 +1095,25 @@ public class Document: Attachable {
             // it. Drop the clone so the next access rebuilds it from the root, the
             // way `update` does on failure.
             self.clone = nil
-            throw error
+
+            // NOTE(yorkie-js-sdk#1403): only a remote change is named -- see
+            // `Change.execute`'s matching gate. The document key is only known here, so it
+            // is added as the error passes through: an already-named `errChangeApplyFailed`
+            // (naming the operation) gets the key folded into its message, and any other
+            // failure on this path (e.g. a precondition unrelated to a single operation) is
+            // named fresh with the change id and the document key.
+            guard source == .remote else {
+                throw error
+            }
+
+            if let yorkieError = error as? YorkieError, yorkieError.code == .errChangeApplyFailed {
+                throw YorkieError(code: .errChangeApplyFailed, message: "document \"\(self.key)\" \(yorkieError.message)")
+            }
+
+            throw YorkieError(
+                code: .errChangeApplyFailed,
+                message: "document \"\(self.key)\" failed to apply change \(change.id.toTestString): \(error)"
+            )
         }
     }
 

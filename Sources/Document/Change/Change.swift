@@ -79,10 +79,37 @@ public struct Change {
         var executedOperations: [Operation] = []
         var reverseOps: [HistoryOperation] = []
 
-        for operation in self.operations {
-            // NOTE: a nil result means the operation was skipped during undo/redo
-            // (e.g. the target element was already removed).
-            guard let result = try operation.execute(root: root, versionVector: versionVector, source: source) else {
+        for (opIndex, operation) in self.operations.enumerated() {
+            let result: ExecutionResult?
+            do {
+                // NOTE: a nil result means the operation was skipped during undo/redo
+                // (e.g. the target element was already removed).
+                result = try operation.execute(root: root, versionVector: versionVector, source: source)
+            } catch {
+                // NOTE(yorkie-js-sdk#1403): only a remote change is named. The checkpoint
+                // does not advance past a change that throws, so the server redelivers it
+                // forever while `Document.update` and undo/redo report a failing operation
+                // straight to the caller that asked for it -- wrapping those would replace
+                // the code an operation deliberately threw (`errInvalidArgument`,
+                // `errInvalidType`, ...) with `errChangeApplyFailed` for every consumer.
+                guard source == .remote else {
+                    throw error
+                }
+
+                // NOTE: the failing operation is only identifiable here. Name it now so the
+                // document can report which operation of which change is stuck; the document
+                // key is added as the error passes through `Document.applyChange`. The name
+                // is the operation's type and target ticket, never `toTestString`: that
+                // embeds the operation's payload -- plaintext document content -- and this
+                // message reaches application logs on every redelivery.
+                let operationName = "\(type(of: operation)) on \(operation.parentCreatedAt.toTestString)"
+                throw YorkieError(
+                    code: .errChangeApplyFailed,
+                    message: "failed to apply change \(self.id.toTestString) at operation \(opIndex) (\(operationName)): \(error)"
+                )
+            }
+
+            guard let result else {
                 continue
             }
             changeOpInfos.append(contentsOf: result.opInfos)
