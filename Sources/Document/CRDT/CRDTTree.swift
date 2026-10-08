@@ -2626,6 +2626,29 @@ extension CRDTTree: GCParent {
         node.insPrevID = nil
         node.insNextID = nil
     }
+
+    /**
+     * `purgeBarrierAt` implements `GCParent.purgeBarrierAt`. `findNodesAndSplitText`
+     * walks the parent's children, removed ones included, advancing while the
+     * next sibling was created after the incoming edit; a tombstoned sibling
+     * with an older ticket ends that walk. Purging detaches it from the
+     * parent, so the next sibling inherits the decision and must be causally
+     * stable first.
+     */
+    func purgeBarrierAt(node: any GCChild) -> TimeTicket? {
+        guard let node = node as? CRDTTreeNode, let parent = node.parent else {
+            return nil
+        }
+
+        // `innerChildren` is the node's own stored array, not a recomputed
+        // copy, so reading it here costs nothing extra on every collection
+        // pass.
+        let siblings = parent.innerChildren
+        guard let offset = siblings.firstIndex(where: { $0 === node }) else {
+            return nil
+        }
+        return siblings[safe: offset + 1]?.id.createdAt
+    }
 }
 
 extension CRDTTree: CRDTGCPairContainable {
@@ -2636,11 +2659,16 @@ extension CRDTTree: CRDTGCPairContainable {
         var pairs = [GCPair]()
         // NOTE: `traverse` only visits visible children, which never includes
         // removed nodes. `traverseAll` is required to register tombstones
-        // (including pieces split off a tombstoned node) after snapshot load.
-        // These pairs carry `gcOnlySize` because `getDataSize` of the freshly
-        // built root only counted visible nodes into docSize.live.
+        // (including pieces split off a tombstoned node) when the tree is
+        // registered: snapshot load, a Set/Add/ArraySet payload, an undo
+        // re-set. These pairs carry `gcOnlySize` because the tree's registered
+        // live size only counted visible nodes.
         self.indexTree.traverseAll { node, _ in
-            if node.removedAt != nil {
+            // The walk includes the root, and purging is detachment from a
+            // parent, which the root does not have. It is never legitimately
+            // removed, but a crafted Set/Add payload can mark it so; leave it
+            // unbooked, as Go does.
+            if node.removedAt != nil, node.parent != nil {
                 pairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
             }
 
@@ -2962,6 +2990,17 @@ extension CRDTTree {
                                 attributes: span.attrs?.deepcopy())
         }
 
+        // The span's attributes are a deep copy of the node's RHT, tombstones
+        // included -- they have to be, or a recreated node would resolve a
+        // concurrent style differently from a replica that never lost it. Each
+        // copied tombstone is a fresh piece of garbage that no removal path
+        // produced: without a registration it sits in the RHT forever,
+        // uncounted and unpurgeable, and `getDataSize` excludes it so the
+        // node's own charge does not cover it either. `getGCPairs` marks each
+        // `gcOnlySize`, which is what sends it to gc alone. Booked by `attach`
+        // for both a live and a removed parent, as Go's `recreateFromSpan` does.
+        let recreatedAttrPairs = span.isText ? [] : node.getGCPairs()
+
         let siblings = parent.innerChildren
 
         // `attach` finishes every anchor rung below: register the node, then decide
@@ -2988,6 +3027,9 @@ extension CRDTTree {
         // live. So the pair carries `gcOnlySize`: charge `docSize.gc` only.
         func attach() -> CRDTTreeNode? {
             self.registerNode(node)
+            for pair in recreatedAttrPairs {
+                self.pendingGCPairs.append(pair)
+            }
             if parent.isRemoved, let parentRemovedAt = parent.removedAt {
                 node.remove(parentRemovedAt)
                 self.pendingGCPairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))

@@ -195,29 +195,10 @@ class CRDTRoot {
         self.gcPairMap = [:]
         self.docSize = .init(live: .init(data: 0, meta: 0), gc: .init(data: 0, meta: 0))
 
-        self.registerElement(self.rootObject, parent: nil)
         // NOTE(hackerwins): tombstoned elements are not re-registered here:
-        // `registerElement` above already booked every one of them into gc.
-        self.rootObject.getDescendants(callback: { element, _ in
-            if let element = element as? CRDTGCPairContainable {
-                for pair in element.getGCPairs() {
-                    self.registerGCPair(pair)
-                }
-            }
-            // NOTE(#1227): Register dead position nodes in CRDTArray as GC pairs so
-            // they are collected once all peers have applied the winning move.
-            if let array = element as? CRDTArray {
-                for node in array.getAllRGANodes() {
-                    if node.getElementEntry() == nil, node.getPositionRemovedAt() != nil {
-                        // A dead position node holds no element, so the live size
-                        // this root was just built from never counted it.
-                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node, gcOnlySize: node.getDataSize()))
-                    }
-                }
-            }
-
-            return false
-        })
+        // `registerElement` below already books every one of them into gc,
+        // along with the tombstones its elements carry inside themselves.
+        self.registerElement(self.rootObject, parent: nil)
     }
 
     /**
@@ -291,6 +272,53 @@ class CRDTRoot {
         // subtree, so doing it while the first pass is still walking would move
         // descendants live has not been charged for yet, and drive live negative.
         self.adoptTombstones(element)
+
+        // The two passes above see elements only. A Text/Tree/Array also holds
+        // tombstones *inside* itself -- removed tree nodes, removed text pieces,
+        // removed attributes, dead array positions -- and those are collected
+        // through `gcPairMap`, which only a GC pair reaches.
+        //
+        // Every route that brings such an element in has to book them, not just
+        // snapshot load: a Set/Add/ArraySet payload is decoded by the same
+        // readers a snapshot is, and an undo re-sets a `deepcopy` of a removed
+        // container whose tree may still hold nodes that were tombstoned before
+        // it. Left unbooked they are invisible to every later edit, yet charged
+        // to nothing and collectable by nothing, so the bytes stay in the
+        // document forever.
+        self.registerInternalGCPairs(element)
+    }
+
+    /**
+     * `registerInternalGCPairs` books the tombstones the given element and its
+     * descendant elements carry inside themselves into gc. Freshly created
+     * content has none, so this costs one walk of the registered subtree and
+     * no registration in the common case.
+     */
+    private func registerInternalGCPairs(_ element: CRDTElement) {
+        let register: (CRDTElement) -> Void = { [unowned self] element in
+            if let element = element as? CRDTGCPairContainable {
+                for pair in element.getGCPairs() {
+                    self.registerGCPair(pair)
+                }
+            }
+            // NOTE(#1227): Register dead position nodes in CRDTArray as GC pairs
+            // so they are collected once all peers have applied the winning move.
+            if let array = element as? CRDTArray {
+                for node in array.getAllRGANodes() {
+                    if node.getElementEntry() == nil, node.getPositionRemovedAt() != nil {
+                        // A dead position node holds no element, so the live size
+                        // its array was registered with never counted it.
+                        self.registerGCPair(GCPair(parent: array.getRGATreeList(), child: node, gcOnlySize: node.getDataSize()))
+                    }
+                }
+            }
+        }
+
+        register(element)
+        (element as? CRDTContainer)?.getDescendants { element, _ in
+            register(element)
+            return false
+        }
     }
 
     /**
@@ -718,6 +746,16 @@ class CRDTRoot {
 
     /**
      * `garbageCollect` purges elements that were removed before the given time.
+     *
+     * A pass can hold a purge back (see `GCParent.purgeBarrierAt`), and holding
+     * one back can be the only reason another is held back: purging a node
+     * hands its successor to the node in front of it, and that successor is
+     * one this pass already found stable. So a pass that both purged and
+     * deferred may have more to do, and the loop repeats until a pass purges
+     * nothing new or defers nothing. Everything held back stays on the
+     * worklist for the next vector that covers it. The repeat also makes the
+     * result independent of iteration order, which decides only how many
+     * passes it takes, not what ends up collected.
      */
     @discardableResult
     func garbageCollect(minSyncedVersionVector: VersionVector) -> Int {
@@ -726,6 +764,24 @@ class CRDTRoot {
         // Records whose element has deallocated can never be looked up again
         // (see `GCChargeKey`); drop them so they do not accumulate.
         self.sizeInGC = self.sizeInGC.filter { $0.key.isAlive }
+
+        while true {
+            let (purged, deferred) = self.collect(minSyncedVersionVector: minSyncedVersionVector)
+            count += purged
+
+            if purged == 0 || deferred == 0 {
+                return count
+            }
+        }
+    }
+
+    /**
+     * `collect` runs one collection pass, reporting how much it purged and how
+     * much it held back on a barrier.
+     */
+    private func collect(minSyncedVersionVector: VersionVector) -> (purged: Int, deferred: Int) {
+        var count = 0
+        var deferred = 0
 
         for createdAt in self.gcElementSetByCreatedAt {
             // NOTE(hackerwins): Neither lookup is guaranteed to hit. A document
@@ -742,23 +798,35 @@ class CRDTRoot {
                 continue
             }
 
-            if let removedAt = pair.element.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
-                do {
-                    try parent.purge(element: pair.element)
-                } catch {
-                    // A throw here now means a genuine mis-registration: both
-                    // purge paths return quietly when the slot has merely been
-                    // taken over by a restored copy. Skip rather than
-                    // deregister -- deregistering an element the purge left
-                    // linked in the tree drops its registration and releases
-                    // its `docSize.gc` charge, which is exactly the charge with
-                    // nothing reporting it as garbage that the guard above
-                    // exists to prevent. Letting it throw is #1340.
-                    Logger.error("garbageCollect: failed to purge \(createdAt)", error: error)
-                    continue
-                }
-                count += self.deregisterElement(pair.element)
+            guard let removedAt = pair.element.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) else {
+                continue
             }
+
+            // A tombstone is not only a value that is gone, it is also a place in
+            // its parent that other replicas may still be deciding against.
+            // `removedAt` covers the value; the barrier covers the place.
+            if let elementBarrier = parent.purgeBarrierAt(element: pair.element),
+               !minSyncedVersionVector.afterOrEqual(other: elementBarrier)
+            {
+                deferred += 1
+                continue
+            }
+
+            do {
+                try parent.purge(element: pair.element)
+            } catch {
+                // A throw here now means a genuine mis-registration: both
+                // purge paths return quietly when the slot has merely been
+                // taken over by a restored copy. Skip rather than
+                // deregister -- deregistering an element the purge left
+                // linked in the tree drops its registration and releases
+                // its `docSize.gc` charge, which is exactly the charge with
+                // nothing reporting it as garbage that the guard above
+                // exists to prevent. Letting it throw is #1340.
+                Logger.error("garbageCollect: failed to purge \(createdAt)", error: error)
+                continue
+            }
+            count += self.deregisterElement(pair.element)
         }
 
         for (key, pair) in self.gcPairMap {
@@ -771,17 +839,24 @@ class CRDTRoot {
                 continue
             }
 
-            if let child = pair.child, let removedAt = child.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) {
-                pair.parent?.purge(node: child)
-                if let datasize = pair.child?.getDataSize() {
-                    self.docSize.gc.subDataSize(others: datasize)
-                }
-                self.gcPairMap.removeValue(forKey: key)
-                count += 1
+            guard let child = pair.child, let removedAt = child.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) else {
+                continue
             }
+
+            if let barrier = pair.parent?.purgeBarrierAt(node: child),
+               !minSyncedVersionVector.afterOrEqual(other: barrier)
+            {
+                deferred += 1
+                continue
+            }
+
+            pair.parent?.purge(node: child)
+            self.docSize.gc.subDataSize(others: child.getDataSize())
+            self.gcPairMap.removeValue(forKey: key)
+            count += 1
         }
 
-        return count
+        return (count, deferred)
     }
 
     /**

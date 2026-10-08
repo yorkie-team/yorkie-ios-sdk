@@ -145,7 +145,27 @@ protocol CRDTContainer: CRDTElement {
 
     func purge(element: CRDTElement) throws
 
+    /**
+     * `purgeBarrierAt` is the element-side form of `GCParent.purgeBarrierAt`,
+     * for a container whose purge unlinks a node of its RGA order
+     * (``CRDTArray``). Declared as a requirement so ``CRDTArray``'s override is
+     * still reached through a `CRDTContainer` existential.
+     */
+    func purgeBarrierAt(element: CRDTElement) -> TimeTicket?
+
     func delete(createdAt: TimeTicket, executedAt: TimeTicket) throws -> CRDTElement
 
     func getDescendants(callback: (_ element: CRDTElement, _ parent: CRDTContainer?) -> Bool)
+}
+
+extension CRDTContainer {
+    /**
+     * `purgeBarrierAt` defaults to no barrier. Only ``CRDTArray`` overrides
+     * this; ``CRDTObject``'s members are keyed by name, not by a surviving
+     * linked order, so purging one cannot move an insertion rule's stopping
+     * point.
+     */
+    func purgeBarrierAt(element: CRDTElement) -> TimeTicket? {
+        return nil
+    }
 }

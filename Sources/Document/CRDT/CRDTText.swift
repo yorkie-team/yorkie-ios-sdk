@@ -173,18 +173,11 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
-     * `getRemovedAttrs` reports the tombstoned attributes this value holds,
-     * which a split has just duplicated from its source. The copy is new garbage
-     * under a new parent with no registration of its own -- the original's pair
-     * names the original's parent -- so without this it could never be
-     * collected.
-     */
-    func getRemovedAttrs() -> [RHTNode] {
-        self.attributes.filter { $0.removedAt != nil }
-    }
-
-    /**
      * `getGCPairs` returns the pairs of GC.
+     *
+     * Also satisfies `RGATreeSplitValue.getGCPairs`, through which
+     * `RGATreeSplit.bookCopiedAttrTombstones` reaches this value's tombstoned
+     * attributes whenever a split or a restore duplicates them into a copy.
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()

@@ -41,6 +41,20 @@ protocol RGATreeSplitValue {
     /// was collected.
     func truncate(_ offset: Int)
     func getDataSize() -> DataSize
+
+    /// Returns the pairs for the tombstones this value carries, for a value
+    /// that has any (``CRDTTextValue``'s removed attributes). Declared as a
+    /// requirement, with a default empty implementation below, so a
+    /// conforming type's override is reached through the generic `T` bound as
+    /// well as through any existential.
+    func getGCPairs() -> [GCPair]
+}
+
+extension RGATreeSplitValue {
+    /// Most values carry no tombstones of their own.
+    func getGCPairs() -> [GCPair] {
+        return []
+    }
 }
 
 /**
@@ -504,12 +518,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     private var treeByID: LLRBTree<RGATreeSplitNodeID, RGATreeSplitNode<T>>
 
     /**
-     * `pendingGCPairs` buffers GC pairs for nodes that were created
-     * already-tombstoned by splitting a removed node. Such pieces inherit
-     * `removedAt` without ever passing through `remove()`, so they would
-     * otherwise never be registered for GC. Callers that split nodes
-     * (`edit`, `CRDTText.setStyle`, `CRDTText.removeStyle`) drain this
-     * buffer into their returned GC pairs.
+     * `pendingGCPairs` buffers GC pairs for garbage that no `remove()` call
+     * produced: nodes created already-tombstoned by splitting a removed node,
+     * and attribute tombstones duplicated by a value copy (a split, or
+     * `restore` recreating a purged piece; see `bookCopiedAttrTombstones`).
+     * Either would otherwise never be registered for GC. Callers that split or
+     * restore nodes (`edit`, `CRDTText.setStyle`, `CRDTText.removeStyle`,
+     * `restore`) drain this buffer into their returned GC pairs.
      */
     private var pendingGCPairs: [GCPair] = []
 
@@ -881,14 +896,8 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         diff.subDataSize(others: prvSize)
 
         // A split deep-copies the value's attributes, so every tombstone among
-        // them is duplicated under the new node. The copy was never in
-        // docSize.live -- `getDataSize` excludes removed attributes -- so it
-        // enters gc only, and purge subtracts the same size back out.
-        if let splitValue = splitNode.value as? CRDTTextValue {
-            for attr in splitValue.getRemovedAttrs() {
-                self.pendingGCPairs.append(GCPair(parent: splitValue, child: attr, gcOnlySize: attr.getDataSize()))
-            }
-        }
+        // them is duplicated under the new node.
+        self.bookCopiedAttrTombstones(splitNode.value)
 
         // NOTE: A piece split off an already-tombstoned node inherits
         // `removedAt` without going through `remove()`, so no GC pair is
@@ -985,6 +994,12 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     // Gap: recreate [cursor, gapEnd) with its original ID.
                     let gapEnd = Swift.min(pieceStart, span.end)
                     let value = span.value.substring(from: Int(cursor - span.start), to: Swift.min(Int(gapEnd - span.start), span.value.count))
+                    // `substring` deep-copied the span's attributes, tombstones
+                    // included, exactly as a split does. Book them here for the
+                    // same reason `splitNode` does -- see
+                    // `bookCopiedAttrTombstones`. The buffer is drained below
+                    // into this call's returned pairs.
+                    self.bookCopiedAttrTombstones(value)
                     let newNode = RGATreeSplitNode(RGATreeSplitNodeID(span.createdAt, cursor), value)
                     liveDiff.addDataSizes(others: newNode.getDataSize())
                     let prev = try self.findRestoreAnchor(
@@ -1085,9 +1100,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             }
         }
 
-        // Defensive: retombstone only ever isolates live pieces, so splitNode
-        // never buffers anything here — drain anyway to stay consistent with
-        // every other caller of isolateRange/splitNode.
+        // retombstone only isolates live pieces, so splitNode buffers no
+        // born-removed piece here, but a split still books the attribute
+        // tombstones it copies.
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
         return (pairs, changes, diff)
@@ -1252,8 +1267,25 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     }
 
     /**
-     * `drainPendingGCPairs` returns the GC pairs buffered for born-tombstoned
-     * split pieces and clears the buffer.
+     * `bookCopiedAttrTombstones` registers the attribute tombstones a freshly
+     * copied value has just duplicated. `CRDTTextValue.substring` -- which both
+     * `splitNode` and `restore`'s recreate path go through -- deep-copies the
+     * whole RHT, tombstones included; it has to, or a piece would resolve a
+     * concurrent style differently from a replica that never split or never
+     * lost it. Each copy is a fresh piece of garbage under a new parent with no
+     * registration of its own: the original's pair names the original's
+     * parent, so without this the copy sits in the RHT forever, uncounted and
+     * unpurgeable. The copy was never in `docSize.live` -- `getDataSize`
+     * excludes removed attributes -- so `gcOnlySize` charges it to gc alone,
+     * and `purge` subtracts the same size back out.
+     */
+    private func bookCopiedAttrTombstones(_ value: T) {
+        self.pendingGCPairs.append(contentsOf: value.getGCPairs())
+    }
+
+    /**
+     * `drainPendingGCPairs` returns the GC pairs buffered in `pendingGCPairs`
+     * and clears the buffer.
      */
     func drainPendingGCPairs() -> [GCPair] {
         let pairs = self.pendingGCPairs
@@ -1408,6 +1440,20 @@ extension RGATreeSplit: GCParent {
 
         node.setInsPrev(nil)
         node.setInsNext(nil)
+    }
+
+    /**
+     * `purgeBarrierAt` implements `GCParent.purgeBarrierAt`. `findNodeWithSplit`
+     * skips forward while the next node was created after the incoming edit,
+     * so a tombstone whose `createdAt` precedes the edit stops that walk.
+     * Unlinking it hands the next node the stopping decision, which is only the
+     * same decision once that node is causally stable.
+     */
+    func purgeBarrierAt(node: any GCChild) -> TimeTicket? {
+        guard let node = node as? RGATreeSplitNode<T> else {
+            return nil
+        }
+        return node.next?.createdAt
     }
 }
 

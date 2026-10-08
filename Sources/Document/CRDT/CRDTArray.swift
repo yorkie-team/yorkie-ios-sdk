@@ -280,6 +280,15 @@ extension CRDTArray {
     }
 
     /**
+     * `purgeBarrierAt` implements `CRDTContainer.purgeBarrierAt`: purging an
+     * element unlinks the position node holding it, so the array's order
+     * decides when that is safe.
+     */
+    func purgeBarrierAt(element: CRDTElement) -> TimeTicket? {
+        return self.elements.purgeBarrierAt(element: element)
+    }
+
+    /**
      * `delete` deletes  the element of the given creation time.
      */
     @discardableResult

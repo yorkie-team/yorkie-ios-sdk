@@ -773,6 +773,38 @@ extension RGATreeList: GCParent {
         guard let posNode = node as? RGATreeListNode else { return }
         self.purgeDeadPosition(positionCreatedAt: posNode.positionCreatedAt)
     }
+
+    /// `purgeBarrierAt` implements `GCParent.purgeBarrierAt` for a dead
+    /// position node a move left behind: the ticket that must be covered
+    /// before it may be unlinked is the one `findNextBeforeExecutedAt` would
+    /// read in its place.
+    func purgeBarrierAt(node: any GCChild) -> TimeTicket? {
+        guard let posNode = node as? RGATreeListNode else { return nil }
+        return Self.successorBarrierAt(posNode)
+    }
+}
+
+extension RGATreeList {
+    /// `purgeBarrierAt` is the element-side form: the ticket that must be
+    /// covered before the given element may be purged is the one
+    /// `findNextBeforeExecutedAt` would read in its place, found through the
+    /// position node currently holding it.
+    func purgeBarrierAt(element: CRDTElement) -> TimeTicket? {
+        // Same identity guard as `purge`: an entry now holding a different
+        // element is not this element's position, and `purge` declines anyway.
+        guard let entry = self.elementMapByCreatedAt[element.createdAt], entry.element === element else {
+            return nil
+        }
+        return Self.successorBarrierAt(entry.positionNode)
+    }
+
+    /// Returns the positioning ticket of the node that would take over as
+    /// `findNextBeforeExecutedAt`'s stopping point once the given node is
+    /// unlinked. `nil` at the tail: with nothing behind it, unlinking cannot
+    /// send an insert past anything.
+    private static func successorBarrierAt(_ node: RGATreeListNode) -> TimeTicket? {
+        return node.next?.positionedAt
+    }
 }
 
 // MARK: - Sequence conformance
