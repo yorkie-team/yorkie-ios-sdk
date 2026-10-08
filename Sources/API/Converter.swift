@@ -821,10 +821,10 @@ extension Converter {
             // independent of the order its members happen to arrive in
             // (yorkie-js-sdk#1343).
             //
-            // NOTE(yorkie-js-sdk#1377): replaying through `set` also bumps a decoded
-            // tombstone's `removedAt` when it loses to the occupant, so a document that has
-            // been through a snapshot load collects and measures differently from one that
-            // has not. Matches `converter.ts`.
+            // `set`'s losing branch is gated on the incoming value not already being removed,
+            // so a decoded tombstone that loses here keeps its own `removedAt` rather than
+            // being bumped to the occupant's `positionedAt` (yorkie-js-sdk#1377). Matches
+            // `converter.ts`.
             let value = try fromElement(pbElement: pbRHTNode.element)
             rht.set(key: pbRHTNode.key, value: value, executedAt: value.getPositionedAt())
         }

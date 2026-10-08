@@ -1534,6 +1534,34 @@ public class Document: Attachable {
         (self.root.object, self.presences, self.checkpoint, self.changeID, self.localChanges)
     }
 
+    /// Moves this document's `clientSeq` counter forward to the given sequence, and never
+    /// backward.
+    ///
+    /// Exists for one caller: the offline-persistence log-discontinuity repair, which has to
+    /// undo a persisted header without undoing the counter inside it. ``restoreFromBytes(_:)``
+    /// returns checkpoint, epoch and change id to what the snapshot carries, which is right for
+    /// a header the appended log cannot back -- except for the counter. A counter is not a
+    /// claim about content the way a checkpoint is: it records which `clientSeq` values this
+    /// client has already minted, and the server has taken some of them. Rewinding it to the
+    /// snapshot's counter mints those sequences a second time; the server skips them as
+    /// duplicates and the next ack, whose `clientSeq` covers them, drops them from the pending
+    /// queue as pushed. The edits are lost with no event.
+    ///
+    /// The position to hand over is the acked checkpoint, not the header's counter. The server
+    /// validates continuity from the position it holds, so the next change must be its
+    /// `clientSeq` plus one; the counter can lead that, and resuming there would mint past the
+    /// server and wedge every later push on `ErrInvalidClientSeq`.
+    ///
+    /// The counter only ever rises, so the guard is the whole contract: a caller that hands over
+    /// a stale position cannot pull the document back into reusing sequence numbers.
+    ///
+    /// - Parameter clientSeq: The sequence to advance to.
+    func advanceClientSeqTo(_ clientSeq: UInt32) {
+        if clientSeq > self.changeID.getClientSeq() {
+            self.changeID = self.changeID.setClientSeq(clientSeq)
+        }
+    }
+
     /// Overwrites the clocks a sync advances, leaving the root and pending changes alone.
     ///
     /// The write-side counterpart of ``metaToBytes()``. The snapshot stays put while a sync

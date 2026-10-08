@@ -17,23 +17,57 @@
 typealias CRDTElementPair = (element: CRDTElement, parent: CRDTContainer?)
 
 /**
- * `GCChargeKey` keys ``CRDTRoot/sizeInGC`` by element identity.
+ * `GCChargeKey` keys ``CRDTRoot/sizeInGC`` by element identity, without
+ * retaining the element.
  *
  * `CRDTElement` is a class-bound protocol, so `ObjectIdentifier` is the
- * identity. The element is held alongside it because `ObjectIdentifier` does
- * not retain: without this the element could deallocate and a later allocation
- * could reuse its address, silently inheriting its charge. `Map<CRDTElement,
- * DataSize>` in `root.ts` retains for the same reason.
+ * identity, captured at construction so equality and hashing keep working
+ * once the element is gone. The element itself is held `weak`: ``CRDTRoot/release(_:)``
+ * writes a zero-size record for a tombstone the restore orphaned, and drops it
+ * from `gcElementSetByCreatedAt` in the same breath, so nothing ever collects
+ * it or deregisters it. A strong reference here -- `Map<CRDTElement, DataSize>`
+ * in `root.ts`, before it became a `WeakMap` -- would then be the one thing
+ * still keeping the whole orphaned subtree alive, growing by one subtree per
+ * remove/undo (yorkie-js-sdk#1377). `NSMapTable`'s weak-to-strong personality
+ * was tried first, as the more literal counterpart of `WeakMap`, but its
+ * Swift overlay retains the key across a `object(forKey:)` lookup when the
+ * key is held through a protocol existential -- the opposite of what a weak
+ * map promises -- so it is not safe here. A `weak var` behind a plain
+ * `Dictionary` key has no such hazard: unlike a real `WeakMap`, the entry
+ * itself is not reclaimed the instant the element deallocates, but the
+ * element -- and the subtree it roots -- is no longer kept alive by it, which
+ * is the leak this exists to close.
+ *
+ * A key whose element has gone equals no other key. Once an element
+ * deallocates its `ObjectIdentifier` can be handed to a new object at the same
+ * address; matching on the identifier alone would let that new element read
+ * the dead one's charge. A dead record is unreachable either way -- nothing can
+ * probe with its element -- so ``CRDTRoot/garbageCollect(minSyncedVersionVector:)``
+ * drops dead records rather than letting them accumulate.
  */
 private struct GCChargeKey: Hashable {
-    let element: CRDTElement
+    private weak var element: CRDTElement?
+    private let identifier: ObjectIdentifier
+
+    init(element: CRDTElement) {
+        self.element = element
+        self.identifier = ObjectIdentifier(element)
+    }
+
+    /// Whether the element this key names is still alive.
+    var isAlive: Bool {
+        self.element != nil
+    }
 
     static func == (lhs: GCChargeKey, rhs: GCChargeKey) -> Bool {
-        lhs.element === rhs.element
+        guard lhs.identifier == rhs.identifier, let left = lhs.element, let right = rhs.element else {
+            return false
+        }
+        return left === right
     }
 
     func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(self.element))
+        hasher.combine(self.identifier)
     }
 }
 
@@ -113,6 +147,10 @@ class CRDTRoot {
      * `acc` and ``registerGCPair(_:)`` book against live regardless of this
      * ledger, so a Text or Tree edited inside an already-removed container keeps
      * that content charged to live (yorkie-js-sdk#1349).
+     *
+     * ``GCChargeKey`` holds its element `weak`, so a released tombstone's zero
+     * record has no retirement of its own without pinning the subtree it
+     * describes for the life of the document -- see the type's own comment.
      */
     private var sizeInGC: [GCChargeKey: DataSize] = [:]
     /**
@@ -684,6 +722,10 @@ class CRDTRoot {
     @discardableResult
     func garbageCollect(minSyncedVersionVector: VersionVector) -> Int {
         var count = 0
+
+        // Records whose element has deallocated can never be looked up again
+        // (see `GCChargeKey`); drop them so they do not accumulate.
+        self.sizeInGC = self.sizeInGC.filter { $0.key.isAlive }
 
         for createdAt in self.gcElementSetByCreatedAt {
             // NOTE(hackerwins): Neither lookup is guaranteed to hit. A document

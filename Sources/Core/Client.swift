@@ -2345,8 +2345,20 @@ extension Client {
         // un-pushed edits inside it, because one log entry was bad. A corrupt log says
         // nothing about the snapshot, so every failure below falls into the same
         // discontinuity repair: keep the snapshot, drop the log, say what was lost.
+        //
+        // The document's own counter joins the max, because it is the highest `clientSeq`
+        // this client has MINTED -- and a minted sequence is never replayable, whether the
+        // snapshot contains it or it was lost. It normally ties the other two (the counter
+        // equals the last pending entry, or the checkpoint when the queue is empty), so it
+        // only leads for a base a prior run of ``discardAppendedLog(for:snapshot:store:dropped:ackedWatermark:)``
+        // rewrote: that repair persists the snapshot with the acked counter carried forward,
+        // deliberately ahead of the snapshot's own checkpoint. Without it, the next edit
+        // appended after such a repair starts above `watermark + 1` and the contiguity guard
+        // below discards it (yorkie-js-sdk#1377).
         let carried = (try? doc.getPendingChangesAfter(0)) ?? []
-        let snapshotWatermark = Swift.max(carried.last?.clientSeq ?? 0, doc.checkpoint.getClientSeq())
+        let snapshotWatermark = Swift.max(carried.last?.clientSeq ?? 0,
+                                          doc.checkpoint.getClientSeq(),
+                                          doc.changeID.getClientSeq())
 
         if let meta = stored.meta {
             do {
@@ -2362,7 +2374,12 @@ extension Client {
                 // those would duplicate them.
                 let lostEntries = stored.changes.filter { $0.clientSeq > snapshotWatermark }
                 let lost = (try? Converter.fromChanges(lostEntries.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
-                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost)
+                // Meta never applied, so `doc`'s checkpoint is still exactly the snapshot's own --
+                // the same position `snapshotWatermark` already reflects. Handing it over as the
+                // acked watermark makes the repair's counter carry a no-op here, which is correct:
+                // there is no acked header position beyond the snapshot to carry forward.
+                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost,
+                                              ackedWatermark: doc.checkpoint.getClientSeq())
                 return
             }
         }
@@ -2386,8 +2403,9 @@ extension Client {
         // again (yorkie-js-sdk#1355).
         //
         // Read after the header is applied, so it is the header's counter rather than the
-        // snapshot's. With no header this reduces to the checkpoint comparison, since a
-        // `toBytes` envelope's counter never leads the pending changes it carries.
+        // snapshot's. With no header this cannot trip: the snapshot's own counter is already
+        // folded into `snapshotWatermark` above, so `headerWatermark` never leads the
+        // watermark the log is measured against.
         let headerWatermark = Swift.max(ackedWatermark, doc.changeID.getClientSeq())
         let lastReplayable = fresh.last?.clientSeq ?? snapshotWatermark
         let backsTheHeader = lastReplayable >= headerWatermark
@@ -2417,7 +2435,7 @@ extension Client {
             Logger.warning("[Store] persisted change log for \(doc.getKey()) is not replayable from clientSeq " +
                 "\(snapshotWatermark &+ 1); keeping the snapshot")
             await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
-                                          dropped: droppedChanges ?? [])
+                                          dropped: droppedChanges ?? [], ackedWatermark: ackedWatermark)
             return
         }
 
@@ -2429,7 +2447,7 @@ extension Client {
             Logger.warning("[Store] replaying the change log for \(doc.getKey()) failed (\(error)); " +
                 "keeping the snapshot")
             await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
-                                          dropped: droppedChanges ?? [])
+                                          dropped: droppedChanges ?? [], ackedWatermark: ackedWatermark)
         }
     }
 
@@ -2439,10 +2457,19 @@ extension Client {
     /// and the event exists to say so. Routing it through the generic restore failure would
     /// hand the app the snapshot's pending changes (often none), call it an actor mismatch,
     /// and delete a snapshot that restored perfectly well.
+    ///
+    /// - Parameters:
+    ///   - doc: The document to repair.
+    ///   - snapshot: The snapshot bytes to re-restore from.
+    ///   - store: The configured store.
+    ///   - dropped: The appended changes the repair is discarding, reported on the event.
+    ///   - ackedWatermark: The header's acked checkpoint, read before this repair undid it --
+    ///     the position to carry the `clientSeq` counter forward to.
     private func discardAppendedLog(for doc: Document,
                                     snapshot: Data,
                                     store: DocStore,
-                                    dropped: [Change]) async
+                                    dropped: [Change],
+                                    ackedWatermark: UInt32) async
     {
         doc.publishLocalChangesDroppedEvent(reason: .logDiscontinuity, changes: dropped)
 
@@ -2450,22 +2477,52 @@ extension Client {
         // leave the document claiming content its root does not have -- and the server would
         // never resend it. Re-restoring from the snapshot bytes returns checkpoint, changeID
         // and epoch to what the snapshot itself carries, which the server *can* resume from.
+        var rebased = snapshot
         do {
             try doc.restoreFromBytes(snapshot)
+
+            // ...except the counter, which is not a claim about content. The header's
+            // *checkpoint* names sequences the server has already taken, and the snapshot's
+            // counter can be below it: a snapshot at counter 3 under a header that acked 7.
+            // Minting 4..7 again gets them skipped as duplicates on push, and the next ack --
+            // whose clientSeq covers them -- drops them from the pending queue as pushed. New
+            // edits lost with no event, which is the one outcome this whole repair exists to
+            // avoid.
+            //
+            // The acked checkpoint, not the header's counter. The server validates continuity
+            // from the position it holds, so the next change has to be its clientSeq plus
+            // one; the counter can lead that (an edit minted while a sync was in flight), and
+            // it is exactly the entry that lead came from that the log has lost. Resuming at
+            // the counter would mint past the server's position and wedge every later push on
+            // `ErrInvalidClientSeq` (yorkie-js-sdk#1377).
+            doc.advanceClientSeqTo(ackedWatermark)
+
+            // Rewrite the base from the *repaired* document, which clears the log with it.
+            // Re-serializing rather than writing `snapshot` straight back is what makes the
+            // counter correction survive: `saveSnapshot` drops the meta blob that held the
+            // acked position, and the original envelope's change id still carries the
+            // snapshot's pre-ack counter -- so persisting it would reproduce this very repair
+            // (and its silent clientSeq reuse) on the next reload.
+            //
+            // Re-serializing cannot smuggle the rejected header back in. `restoreFromBytes`
+            // just above returned root, presences, checkpoint, epoch, docID and the pending
+            // queue to what the snapshot carries, so `toBytes` re-emits that same envelope;
+            // the counter is the one field that differs, and advancing it is the whole point.
+            rebased = try doc.toBytes()
         } catch {
             // The document is now half-replayed under a header the log cannot back, while the
             // store is about to be re-based to the snapshot. Nothing here can put it right, so
             // say so loudly rather than leave the two silently disagreeing until the next
-            // attach re-reads the store.
+            // attach re-reads the store. `rebased` still holds the original snapshot bytes --
+            // whichever step failed, `doc`'s in-memory state cannot be trusted enough to
+            // re-serialize, so the store is re-based to what is known good instead.
             Logger.error("[Store] could not re-restore \(doc.getKey()) from its snapshot after discarding the " +
                 "change log (\(error)); the in-memory document may disagree with the store until it is reattached")
         }
 
-        // Rewrite the base from those same bytes, which clears the log with it. Writing them
-        // back costs no serialization, and re-serializing here would have baked the rejected
-        // header into the new base. Removing the entry instead would discard a snapshot that
-        // restored perfectly well.
-        try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: snapshot)
+        // Removing the entry instead of rewriting it would discard a snapshot that restored
+        // perfectly well.
+        try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: rebased)
     }
 
     /// Drops everything offline persistence held for a document that is no longer attached.

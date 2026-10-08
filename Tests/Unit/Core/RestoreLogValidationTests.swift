@@ -130,9 +130,17 @@ final class RestoreLogValidationTests: XCTestCase {
         XCTAssertEqual(resuming.checkpoint, snapshotDoc.checkpoint)
         XCTAssertEqual(resuming.getPendingChangeStructs().map { $0.id.getClientSeq() }, [1])
 
-        // and: the store has been re-based to the snapshot -- log and header both cleared.
+        // and: the store has been re-based to the snapshot's content -- log and header both
+        // cleared. The bytes themselves are re-serialized rather than the original snapshot
+        // bytes written back verbatim (yorkie-js-sdk#1395): the counter is carried forward to
+        // the acked checkpoint (2), ahead of the snapshot's own (1), so a later reload does not
+        // repeat this repair and reuse clientSeq 2.
         let restoredEntry = try await store.load(docKey: storeKey)
-        XCTAssertEqual(restoredEntry?.snapshot, snapshot)
+        let rebasedSnapshot = try XCTUnwrap(restoredEntry?.snapshot)
+        let rebasedDoc = try Document.fromBytes(key: docKey, bytes: rebasedSnapshot)
+        XCTAssertEqual(rebasedDoc.toSortedJSON(), snapshotDoc.toSortedJSON())
+        XCTAssertEqual(rebasedDoc.checkpoint, snapshotDoc.checkpoint)
+        XCTAssertEqual(rebasedDoc.changeID.getClientSeq(), 2)
         XCTAssertEqual(restoredEntry?.changes, [])
         XCTAssertNil(restoredEntry?.meta)
     }
@@ -175,8 +183,13 @@ final class RestoreLogValidationTests: XCTestCase {
         XCTAssertEqual(resuming.toSortedJSON(), snapshotDoc.toSortedJSON())
         XCTAssertEqual(resuming.getPendingChangeStructs().map { $0.id.getClientSeq() }, [1])
 
+        // The rebased base is re-serialized with the counter carried forward to the acked
+        // checkpoint (2), ahead of the snapshot's own (1) (yorkie-js-sdk#1395).
         let restoredEntry = try await store.load(docKey: storeKey)
-        XCTAssertEqual(restoredEntry?.snapshot, snapshot)
+        let rebasedSnapshot = try XCTUnwrap(restoredEntry?.snapshot)
+        let rebasedDoc = try Document.fromBytes(key: docKey, bytes: rebasedSnapshot)
+        XCTAssertEqual(rebasedDoc.toSortedJSON(), snapshotDoc.toSortedJSON())
+        XCTAssertEqual(rebasedDoc.changeID.getClientSeq(), 2)
         XCTAssertEqual(restoredEntry?.changes, [])
         XCTAssertNil(restoredEntry?.meta)
     }
@@ -219,8 +232,13 @@ final class RestoreLogValidationTests: XCTestCase {
         XCTAssertEqual(resuming.toSortedJSON(), snapshotDoc.toSortedJSON())
         XCTAssertEqual(resuming.getPendingChangeStructs().map { $0.id.getClientSeq() }, [1])
 
+        // The rebased base is re-serialized with the counter carried forward to the acked
+        // checkpoint (3), ahead of the snapshot's own (1) (yorkie-js-sdk#1395).
         let restoredEntry = try await store.load(docKey: storeKey)
-        XCTAssertEqual(restoredEntry?.snapshot, snapshot)
+        let rebasedSnapshot = try XCTUnwrap(restoredEntry?.snapshot)
+        let rebasedDoc = try Document.fromBytes(key: docKey, bytes: rebasedSnapshot)
+        XCTAssertEqual(rebasedDoc.toSortedJSON(), snapshotDoc.toSortedJSON())
+        XCTAssertEqual(rebasedDoc.changeID.getClientSeq(), 3)
         XCTAssertEqual(restoredEntry?.changes, [])
         XCTAssertNil(restoredEntry?.meta)
     }
@@ -293,5 +311,116 @@ final class RestoreLogValidationTests: XCTestCase {
         // clientSeq 3, minted after that ack, must.
         let pending = resuming.getPendingChangeStructs()
         XCTAssertEqual(pending.map { $0.id.getClientSeq() }, [3])
+    }
+
+    // MARK: clientSeq rewind across the repair (yorkie-js-sdk#1395, js#8d965dd2)
+
+    @MainActor
+    func test_repair_does_not_reuse_clientSeqs_the_discarded_header_said_were_acked() async throws {
+        // given: the same shape as "one short of the header's changeID.clientSeq" above -- the
+        // header acked clientSeq 2 while recording a counter of 3 (an edit minted while that
+        // sync was in flight), and the log lost the trailing entry, so the repair falls back
+        // to the snapshot. The snapshot's own counter (1) sits below the acked position:
+        // restoring it verbatim would let the next edit mint clientSeq 2 again, which the
+        // server has already taken and will silently drop on the next ack.
+        let store = MemoryDocStore()
+        let docKey = "restore-clientseq-rewind"
+        let client = self.makeClient(store: store, clientKey: "clientseq-rewind-client")
+        let storeKey = client.storeKey(docKey)
+
+        let (snapshot, _) = try self.makeBaseSnapshot(docKey: docKey)
+        let filler = try self.fillerChangeBytes(1)
+        let meta = try self.makeMetaBytes(docKey: docKey, ackedClientSeq: 2, headerClientSeq: 3)
+
+        try await store.saveSnapshot(docKey: storeKey, bytes: snapshot)
+        try await store.appendChange(docKey: storeKey, change: StoredChange(clientSeq: 2, bytes: filler[0]))
+        try await store.saveMeta(docKey: storeKey, bytes: meta)
+
+        let resuming = Document(key: docKey)
+        resuming.setActor(self.actor)
+        var dropped: LocalChangesDroppedEvent?
+        resuming.subscribe { event, _ in
+            if let event = event as? LocalChangesDroppedEvent {
+                dropped = event
+            }
+        }
+
+        // when: the repair runs...
+        _ = try await client.prepareOfflineResume(for: resuming)
+        let event = try XCTUnwrap(dropped)
+        XCTAssertEqual(event.value.reason, .logDiscontinuity)
+
+        // ...and a new edit is minted afterwards.
+        try resuming.update { root, _ in
+            root.afterRepair = "edit"
+        }
+
+        // then: it must continue from the acked checkpoint (2), not the snapshot's stale
+        // counter (1) -- clientSeq 2 is not safe to mint again.
+        let pending = resuming.getPendingChangeStructs()
+        XCTAssertEqual(pending.map { $0.id.getClientSeq() }, [1, 3],
+                       "a new edit after the repair must not reuse a clientSeq the server already acked")
+    }
+
+    @MainActor
+    func test_repair_persists_the_advanced_counter_so_a_second_reload_does_not_repeat_it() async throws {
+        // given: the same discontinuity as above.
+        let store = MemoryDocStore()
+        let docKey = "restore-clientseq-rewind-persist"
+        let clientKey = "clientseq-rewind-persist-client"
+        let client = self.makeClient(store: store, clientKey: clientKey)
+        let storeKey = client.storeKey(docKey)
+
+        let (snapshot, _) = try self.makeBaseSnapshot(docKey: docKey)
+        let filler = try self.fillerChangeBytes(1)
+        let meta = try self.makeMetaBytes(docKey: docKey, ackedClientSeq: 2, headerClientSeq: 3)
+
+        try await store.saveSnapshot(docKey: storeKey, bytes: snapshot)
+        try await store.appendChange(docKey: storeKey, change: StoredChange(clientSeq: 2, bytes: filler[0]))
+        try await store.saveMeta(docKey: storeKey, bytes: meta)
+
+        let resuming = Document(key: docKey)
+        resuming.setActor(self.actor)
+        var dropped: LocalChangesDroppedEvent?
+        resuming.subscribe { event, _ in
+            if let event = event as? LocalChangesDroppedEvent {
+                dropped = event
+            }
+        }
+
+        // when: the repair runs once...
+        _ = try await client.prepareOfflineResume(for: resuming)
+        XCTAssertNotNil(dropped, "the fixture must actually exercise the repair for this to test anything")
+
+        // then: the base the repair writes back must itself carry the advanced counter --
+        // writing the original (pre-ack) snapshot bytes straight back, as the repair used to,
+        // would stage the very same rewind for the next reload.
+        let rebasedEntry = try await store.load(docKey: storeKey)
+        let rebasedSnapshot = try XCTUnwrap(rebasedEntry?.snapshot)
+        let rebasedDoc = try Document.fromBytes(key: docKey, bytes: rebasedSnapshot)
+        XCTAssertGreaterThanOrEqual(rebasedDoc.changeID.getClientSeq(), 2,
+                                    "the rebased base must carry the acked counter, not the snapshot's own")
+
+        // and: a second, independent resume of the same persisted document -- a later launch
+        // of the same client -- must be quiet: no repeat repair, no dropped edit.
+        let secondClient = self.makeClient(store: store, clientKey: clientKey)
+        let secondDoc = Document(key: docKey)
+        secondDoc.setActor(self.actor)
+        var secondDropped: LocalChangesDroppedEvent?
+        secondDoc.subscribe { event, _ in
+            if let event = event as? LocalChangesDroppedEvent {
+                secondDropped = event
+            }
+        }
+        _ = try await secondClient.prepareOfflineResume(for: secondDoc)
+        XCTAssertNil(secondDropped, "a reload of the already-repaired base must not repeat the repair")
+
+        // and: the edit appended after the repair must still replay, and a fresh edit must
+        // mint above the acked position rather than reusing clientSeq 2.
+        try secondDoc.update { root, _ in
+            root.afterReload = "edit"
+        }
+        let pending = secondDoc.getPendingChangeStructs()
+        XCTAssertEqual(pending.last?.id.getClientSeq(), 3)
     }
 }
