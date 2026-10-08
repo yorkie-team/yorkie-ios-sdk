@@ -124,3 +124,20 @@ func ensureNoLoneSurrogate(_ value: String) throws {
         throw YorkieError(code: .errInvalidArgument, message: "content must not contain a lone UTF-16 surrogate")
     }
 }
+
+/**
+ * `escapeXMLAttr` escapes a name or a value for interpolation into a
+ * double-quoted XML attribute.
+ *
+ * Both halves are peer-chosen: the key is whatever a style was called with,
+ * and the value is what the peer wrote, raw for a peer that stores values raw.
+ * Interpolated unescaped, either could forge structure in the markup `toXML`
+ * builds.
+ */
+func escapeXMLAttr(_ value: String) -> String {
+    value.replacingOccurrences(of: "&", with: "&amp;")
+        .replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;")
+        .replacingOccurrences(of: "\"", with: "&quot;")
+        .replacingOccurrences(of: "'", with: "&apos;")
+}

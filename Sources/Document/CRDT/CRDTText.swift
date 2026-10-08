@@ -138,11 +138,12 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
             for (key, value) in attrs.sorted(by: { $0.key < $1.key }) {
                 // A peer that stores values raw writes ones that do not parse as
                 // JSON; quote those as strings rather than emitting invalid JSON.
-                if value.value.toJSONObject is String {
-                    data.append("\"\(key)\":\(convertToJSONString(logicalAttrValue(value.value)))")
-                } else {
-                    data.append("\"\(key)\":\(value.value)")
-                }
+                // A non-string is re-encoded, never interpolated, and the key
+                // is escaped: a peer-chosen attribute must not be able to forge
+                // structure in `Document.toJSON`.
+                let parsed = value.value.toJSONObject
+                let encoded = parsed is String ? convertToJSONString(logicalAttrValue(value.value)) : convertToJSONString(parsed)
+                data.append("\(convertToJSONString(key)):\(encoded)")
             }
 
             attrsString = "\"attrs\":{\(data.joined(separator: ","))},"

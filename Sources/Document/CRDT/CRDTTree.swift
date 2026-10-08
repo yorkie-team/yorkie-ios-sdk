@@ -827,12 +827,11 @@ final class CRDTTreeNode: IndexTreeNode {
             for key in attrs.keys.sorted() {
                 if let value = attrs[key]?.value {
                     // A string, JSON-encoded or written raw by a peer, renders
-                    // quoted; anything else renders as stored.
-                    if value.toJSONObject is String {
-                        xml += " \(key)=\"\(logicalAttrValue(value))\""
-                    } else {
-                        xml += " \(key)=\(value)"
-                    }
+                    // as the string; anything else keeps the JSON form it is
+                    // stored as. Both halves are escaped and the value is always
+                    // quoted, as in yorkie-js-sdk.
+                    let rendered = value.toJSONObject is String ? logicalAttrValue(value) : value
+                    xml += " \(escapeXMLAttr(key))=\"\(escapeXMLAttr(rendered))\""
                 }
             }
         }

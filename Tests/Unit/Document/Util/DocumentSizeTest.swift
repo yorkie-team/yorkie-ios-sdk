@@ -81,7 +81,7 @@ extension DocumentSizeTest {
         try root.append(contentsOf: [para])
         try para.append(contentsOf: [CRDTTreeNode(id: .initial, type: "text", value: "helloworld")])
 
-        XCTAssertEqual(root.toXML, "<r><p bold=true>helloworld</p></r>")
+        XCTAssertEqual(root.toXML, "<r><p bold=\"true\">helloworld</p></r>")
 
         // split text node
         guard let left = para.children.first else { fatalError() }
@@ -91,8 +91,8 @@ extension DocumentSizeTest {
         // split element node
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
         XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
-        XCTAssertEqual(rightElem!.toXML, "<p bold=true>world</p>")
-        XCTAssertEqual(para.toXML, "<p bold=true>hello</p>")
+        XCTAssertEqual(rightElem!.toXML, "<p bold=\"true\">world</p>")
+        XCTAssertEqual(para.toXML, "<p bold=\"true\">hello</p>")
     }
 
     func test_if_primitive_type_has_correct_live_size() async throws {
@@ -269,7 +269,7 @@ extension DocumentSizeTest {
             try (root.t as? JSONTree)?.style(0, 7, ["bold": true])
 
             let xml = (root.t as? JSONTree)?.toXML()
-            XCTAssertEqual(xml, "<doc><p bold=true>world</p></doc>")
+            XCTAssertEqual(xml, "<doc><p bold=\"true\">world</p></doc>")
         }
 
         await self.expectLive(with: .init(data: 26, meta: 192))

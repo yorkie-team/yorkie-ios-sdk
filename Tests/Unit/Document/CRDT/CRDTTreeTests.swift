@@ -705,13 +705,13 @@ final class CRDTTreeSplitTests: XCTestCase {
             timeT(),
             timeT
         )
-        XCTAssertEqual(tree.toXML(), "<root><p bold=true>helloworld</p></root>")
+        XCTAssertEqual(tree.toXML(), "<root><p bold=\"true\">helloworld</p></root>")
 
         // when — split at position 6 (after "hello"), splitLevel 1
         try tree.editT((6, 6), nil, 1, timeT(), timeT)
 
         // then — both siblings carry bold="true"
-        XCTAssertEqual(tree.toXML(), "<root><p bold=true>hello</p><p bold=true>world</p></root>")
+        XCTAssertEqual(tree.toXML(), "<root><p bold=\"true\">hello</p><p bold=\"true\">world</p></root>")
     }
 }
 
