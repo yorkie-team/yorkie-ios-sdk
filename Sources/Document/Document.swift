@@ -670,6 +670,39 @@ public class Document: Attachable {
     }
 
     /**
+     * `acknowledgePushedChanges` removes the local changes the server has confirmed, and
+     * forwards only the client seq of the checkpoint. It is for a response pack dropped
+     * without applying its remote state: the server seq must stay put so the skipped state
+     * is pulled again later, while the confirmed changes must not be pushed again. The
+     * server dedupes a re-pushed change when storing it, but a snapshot it builds for the
+     * same request would apply that change a second time.
+     *
+     * The pack's metadata is not remote state, and is taken in full: the compaction epoch
+     * and the removal flag describe the document itself, not the content being skipped, and
+     * neither is re-sent by a later pull the way the skipped changes are.
+     *
+     * - Parameter pack: The change pack whose remote state (changes or snapshot) was dropped.
+     */
+    func acknowledgePushedChanges(_ pack: ChangePack) {
+        let clientSeq = pack.getCheckpoint().getClientSeq()
+        self.removePushedLocalChanges(clientSeq: Int64(clientSeq))
+        self.checkpoint.forward(other: Checkpoint(serverSeq: self.checkpoint.getServerSeq(), clientSeq: clientSeq))
+
+        // Dropping the epoch would leave the client presenting a superseded one on the next
+        // request, which the server answers with an epoch mismatch -- a re-anchor that
+        // discards exactly the un-pushed edits push-only mode exists to keep. A compaction is
+        // also the shape that arrives as a snapshot, i.e. precisely the pack this path drops.
+        self.epoch = pack.getEpoch()
+
+        // A removal is terminal: there is no later pull to learn it from, because the server
+        // row is gone. Skipping it leaves the document attached and its persisted envelope
+        // pointing at a row that no longer exists.
+        if pack.isRemoved {
+            self.applyStatus(.removed)
+        }
+    }
+
+    /**
      * `hasLocalChanges` returns whether this document has local changes or not.
      *
      */

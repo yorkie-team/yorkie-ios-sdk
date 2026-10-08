@@ -1460,20 +1460,34 @@ public class Client {
 
             let responsePack = try Converter.fromChangePack(message.changePack)
 
-            // NOTE(chacha912, hackerwins): If syncLoop already executed with
-            // PushPull, ignore the response when the syncMode is PushOnly.
-            if responsePack.hasChanges() && (attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff) {
-                return doc
-            }
+            // NOTE(chacha912, hackerwins): An explicit sync(doc) still pulls while the
+            // document is in PushOnly or SyncOff, e.g. after syncLoop already ran PushPull.
+            // Drop any remote state it brings back, a snapshot included: the server seq stays
+            // put, so the skipped state is pulled again once realtime sync resumes. The push
+            // itself did land, so still take the client seq ack rather than push the same
+            // changes again, along with the pack's metadata (compaction epoch, removal flag),
+            // which describes the document rather than the content being skipped.
+            let dropsRemoteState = (responsePack.hasChanges() || responsePack.hasSnapshot()) &&
+                (attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff)
 
-            try doc.applyChangePack(responsePack)
+            if dropsRemoteState {
+                doc.acknowledgePushedChanges(responsePack)
+            } else {
+                try doc.applyChangePack(responsePack)
+            }
             attachment.updateHeartbeatTime()
 
-            // Record the post-sync header. A push that is merely acked, pulling nothing,
-            // advances the checkpoint and drains the pushed changes from `localChanges`
-            // without appending one — so the local-change hook never fires and the stored
-            // header would stay behind until the next edit. A resume from that state
-            // re-pushes a change the server has already applied.
+            // Whether the response actually moved the root. A dropped pack does not: it only
+            // takes the push ack, which leaves the document exactly where the pure push-ack
+            // branch below expects it.
+            let movedRoot = !dropsRemoteState && (responsePack.hasChanges() || responsePack.hasSnapshot())
+
+            // Record the post-sync header. A push that is merely acked, pulling nothing (or a
+            // pulled pack dropped because the document is in PushOnly/SyncOff), advances the
+            // checkpoint and drains the pushed changes from `localChanges` without appending
+            // one — so the local-change hook never fires and the stored header would stay
+            // behind until the next edit. A resume from that state re-pushes a change the
+            // server has already applied.
             //
             // The header only, not a snapshot: an online client syncs constantly, and
             // re-snapshotting per sync is exactly the cost the incremental store exists to
@@ -1484,7 +1498,7 @@ public class Client {
             // free — and on the attachment persisting at all, so a sync cannot write over an
             // envelope this session failed to read and deliberately left alone.
             if self.store != nil, self.getDocumentAttachment(docKey)?.persistsToStore == true {
-                if responsePack.hasChanges() || responsePack.hasSnapshot() {
+                if movedRoot {
                     // The response moved the root, and the append log holds *local* changes
                     // only -- nothing in it carries remote content. Writing the header alone
                     // would advance the persisted `serverSeq` past a root the store never
@@ -1497,7 +1511,8 @@ public class Client {
                     // avoid it and is the natural follow-up.
                     self.enqueueSnapshotPersist(doc)
                 } else {
-                    // A pure push-ack: the root did not move, so the cheap header write is
+                    // A pure push-ack (nothing pulled, or a pulled pack dropped in
+                    // PushOnly/SyncOff): the root did not move, so the cheap header write is
                     // sufficient -- unless the log cannot back the checkpoint, which
                     // `enqueueMetaPersist` decides at write time and repairs with a snapshot.
                     // The decision belongs there rather than here: an append queued before
