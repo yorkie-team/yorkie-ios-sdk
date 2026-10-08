@@ -54,6 +54,40 @@ private struct FaultInjectingOperation: Yorkie.Operation {
     }
 }
 
+/// An `Operation` that writes a `Primitive` integer under `key` into the root object on success,
+/// and throws on its `failOnCall`th invocation instead of writing anything. Two instances
+/// sharing one `CallCounter` reproduce "a change whose first operation lands for real and whose
+/// second throws" (yorkie-js-sdk#1397's `throwOnNthCall(2)` over `r.a = 1; r.b = 2`), which
+/// `FaultInjectingOperation` cannot: it never writes, so there would be nothing to observe as
+/// "landed".
+private struct FaultInjectingSetOperation: Yorkie.Operation {
+    let parentCreatedAt: TimeTicket
+    var executedAt: TimeTicket
+    let key: String
+    let value: Int64
+    let failOnCall: Int
+    let counter: CallCounter
+
+    var effectedCreatedAt: TimeTicket { self.executedAt }
+    var toTestString: String { "FAULT_SET(\(self.key))" }
+
+    func execute(root: CRDTRoot, versionVector: VersionVector?, source: OpSource) throws -> ExecutionResult? {
+        if self.counter.increment() == self.failOnCall {
+            throw YorkieError(code: .errUnexpected, message: "boom")
+        }
+        guard let parent = root.find(createdAt: self.parentCreatedAt) as? CRDTObject else {
+            throw YorkieError(code: .errUnexpected, message: "root object not found")
+        }
+        let primitive = Primitive(value: .long(self.value), createdAt: self.executedAt)
+        let removed = parent.set(key: self.key, value: primitive, executedAt: self.executedAt)
+        root.registerElement(primitive, parent: parent)
+        if let removed {
+            root.registerRemovedElement(removed)
+        }
+        return ExecutionResult(opInfos: [], reverseOp: nil)
+    }
+}
+
 /// Ported from yorkie-js-sdk#1394 "Guard empty-text anchors and reset the clone
 /// on failed applies": `packages/sdk/test/unit/document/clone_reset_test.ts`.
 ///
@@ -126,5 +160,134 @@ final class DocumentCloneResetTests: XCTestCase {
 
         // then -- the update completed normally; undo's refusal never touched the clone.
         XCTAssertEqual(doc.getRoot().k as? Int64, 2)
+    }
+
+    /// Ported from yorkie-js-sdk#1397 "Burn the lamport when a change's root pass throws":
+    /// the four tests `clone_reset_test.ts` added alongside it.
+    ///
+    /// `Document.update` mutates the clone directly through the `JSONObject` proxy rather than
+    /// through `Operation.execute` (unlike `applyChange`/`executeUndoRedo`, which run a change
+    /// against the clone and the root in turn), so the single `change.execute(root: self.root)`
+    /// call these tests drive through `updateWithOperationForTest` IS the root pass -- there is
+    /// no earlier clone-side `execute` call to distinguish it from, mirroring JS's own comment
+    /// that every `SetOperation.execute` call `Document.update` makes is a root-pass call.
+    @MainActor
+    func test_drops_the_clone_when_a_local_change_fails_on_the_root() throws {
+        // given
+        let target = Document(key: "lamport-burn-clone")
+        target.setActor(self.actorA)
+
+        let counter = CallCounter()
+        let op = FaultInjectingOperation(parentCreatedAt: .initial, executedAt: .initial, failOnCall: 1, counter: counter)
+
+        // when -- the one and only execute call (the root pass) throws immediately.
+        XCTAssertThrowsError(try target.updateWithOperationForTest([op]))
+
+        // then
+        XCTAssertNil(target.getClone())
+    }
+
+    // Pins the known gap the clone reset does not close, so a change in this contract is a
+    // deliberate one: a failed `update` records nothing, so the prefix that reached the root is
+    // local-only state.
+    @MainActor
+    func test_records_nothing_for_a_local_change_that_fails_on_the_root() async throws {
+        // given
+        let target = Document(key: "lamport-burn-records-nothing")
+        target.setActor(self.actorA)
+
+        let counter = CallCounter()
+        // `executedAt` becomes the written primitive's createdAt, which must not collide with
+        // the root object's own `.initial` ticket in the createdAt registry.
+        let opA = FaultInjectingSetOperation(
+            parentCreatedAt: .initial,
+            executedAt: TimeTicket(lamport: 1, delimiter: 1, actorID: self.actorA),
+            key: "a", value: 1, failOnCall: 2, counter: counter
+        )
+        let opB = FaultInjectingSetOperation(
+            parentCreatedAt: .initial,
+            executedAt: TimeTicket(lamport: 1, delimiter: 2, actorID: self.actorA),
+            key: "b", value: 2, failOnCall: 2, counter: counter
+        )
+
+        // when -- "a" lands (1st call), "b" throws (2nd call).
+        XCTAssertThrowsError(try target.updateWithOperationForTest([opA, opB]))
+
+        // then -- the prefix is in the root and stays there, unqueued.
+        XCTAssertEqual(target.toSortedJSON(), "{\"a\":1}")
+        let hasLocalChanges = await target.hasLocalChanges()
+        XCTAssertFalse(hasLocalChanges)
+        XCTAssertFalse(target.canUndo)
+
+        try target.update { root, _ in
+            root.c = Int64(3)
+        }
+        // The counter is untouched -- nothing was queued, so the next change is still this
+        // client's first and leaves no hole for the server to reject.
+        XCTAssertEqual(target.changeID.getClientSeq(), 1)
+    }
+
+    // The other half of that contract, and the reason the failed change still has to leave a
+    // trace: the prefix burned its TimeTickets into the root, so the next change must not
+    // reissue them.
+    @MainActor
+    func test_does_not_reissue_the_tickets_a_failed_local_change_burned() throws {
+        // given
+        let target = Document(key: "lamport-burn-no-reissue")
+        target.setActor(self.actorA)
+        let before = target.changeID.getLamport()
+
+        let counter = CallCounter()
+        // `executedAt` becomes the written primitive's createdAt, which must not collide with
+        // the root object's own `.initial` ticket in the createdAt registry.
+        let opA = FaultInjectingSetOperation(
+            parentCreatedAt: .initial,
+            executedAt: TimeTicket(lamport: 1, delimiter: 1, actorID: self.actorA),
+            key: "a", value: 1, failOnCall: 2, counter: counter
+        )
+        let opB = FaultInjectingSetOperation(
+            parentCreatedAt: .initial,
+            executedAt: TimeTicket(lamport: 1, delimiter: 2, actorID: self.actorA),
+            key: "b", value: 2, failOnCall: 2, counter: counter
+        )
+
+        // when
+        XCTAssertThrowsError(try target.updateWithOperationForTest([opA, opB]))
+
+        // then -- the lamport the prefix issued its tickets under is spent, even though the
+        // change it belonged to was never recorded.
+        XCTAssertGreaterThan(target.changeID.getLamport(), before)
+
+        try target.update { root, _ in
+            root.c = Int64(3)
+        }
+
+        // Both "a" (the landed prefix) and "c" (the next change) are reachable with their own
+        // values, i.e. neither took over the other's slot.
+        XCTAssertEqual(target.toSortedJSON(), "{\"a\":1,\"c\":3}")
+    }
+
+    // Pins the other half of that contract: `Change.execute` applies the presence change only
+    // after every operation has succeeded, so a change that throws partway carries its presence
+    // no further than its operations.
+    @MainActor
+    func test_applies_no_presence_for_a_local_change_that_fails_on_the_root() throws {
+        // given
+        let target = Document(key: "lamport-burn-no-presence")
+        target.setActor(self.actorA)
+
+        let counter = CallCounter()
+        let op = FaultInjectingOperation(parentCreatedAt: .initial, executedAt: .initial, failOnCall: 1, counter: counter)
+
+        // when
+        XCTAssertThrowsError(try target.updateWithOperationForTest([op], presence: StringValueTypeDictionary.stringifyAttributes(["cursor": 1])))
+
+        // then
+        XCTAssertNil(target.getPresenceForTest(self.actorA))
+
+        // The same shape without a throwing operation does record the presence, so the assertion
+        // above is about the failure and not about presence never reaching `presences` here.
+        try target.updateWithOperationForTest([], presence: StringValueTypeDictionary.stringifyAttributes(["cursor": 2]))
+        XCTAssertEqual(target.getPresenceForTest(self.actorA)?["cursor"] as? Int, 2)
     }
 }
