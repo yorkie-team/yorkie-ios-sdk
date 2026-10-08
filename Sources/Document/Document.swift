@@ -297,61 +297,113 @@ public class Document: Attachable {
         }
 
         // 02. Update the root object and presences from changes.
-        if context.hasChange {
-            Logger.trace("trying to update a local change: \(self.toJSON())")
+        try self.commitLocalChange(context: context, actorID: actorID)
+    }
 
-            let prev = PrevPresenceState(
-                hadPresence: self.presences[actorID] != nil,
-                wasOnline: self.status == .attached,
-                presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
-            )
+    /**
+     * `commitLocalChange` executes the operations and presence change accumulated on `context`
+     * against the real root, records the resulting ``Change``, and publishes its events.
+     * A no-op when `context` carries neither.
+     *
+     * Factored out of ``update(_:_:)`` so ``updateWithOperationForTest(_:presence:)`` can drive
+     * a root-pass throw with a controlled ``Operation``, bypassing the updater/proxy path:
+     * Swift has no prototype to patch the way yorkie-js-sdk's test does on
+     * `SetOperation.prototype.execute`.
+     */
+    private func commitLocalChange(context: ChangeContext, actorID: ActorID) throws {
+        guard context.hasChange else { return }
 
-            let change = context.toChange()
-            let executionResult = try? change.execute(root: self.root, presences: &self.presences)
-            let opInfos = executionResult?.opInfos ?? []
+        Logger.trace("trying to update a local change: \(self.toJSON())")
 
-            // NOTE: in update(Set on array), the element is replaced with a new value.
-            // The history stack may still reference the old element's createdAt, so reconcile.
-            for op in change.operations {
-                if let arraySet = op as? ArraySetOperation {
-                    self.internalHistory.reconcileCreatedAt(
-                        prevCreatedAt: arraySet.getCreatedAt(),
-                        currCreatedAt: arraySet.getValue().createdAt
-                    )
-                }
+        let prev = PrevPresenceState(
+            hadPresence: self.presences[actorID] != nil,
+            wasOnline: self.status == .attached,
+            presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+        )
+
+        let change = context.toChange()
+        let executionResult: ChangeExecutionResult
+        do {
+            executionResult = try change.execute(root: self.root, presences: &self.presences)
+        } catch {
+            // `Change.execute` does not roll back, so an operation that throws on this root
+            // pass leaves the prefix that already ran in the root. The change is never queued
+            // and `changeID` is left as it was, so the next change would build its context
+            // from the same ID, reissue the TimeTickets the prefix already burned and take
+            // over the prefix's slots -- two live elements under one id. Burn the lamport (and
+            // this actor's version-vector entry with it) so no later ticket can collide, but
+            // keep `clientSeq`, which names queued changes to the server and must stay
+            // gapless.
+            self.clone = nil
+            if !context.isPresenceOnlyChange {
+                self.changeID = context.getNextID().setClientSeq(self.changeID.getClientSeq())
             }
-
-            self.localChanges.append(change)
-            self.onLocalChange?()
-            if let reverseOps = executionResult?.reverseOps, !reverseOps.isEmpty {
-                self.internalHistory.pushUndo(reverseOps)
-            }
-            // NOTE: clear redo when a new local operation is applied.
-            if !opInfos.isEmpty {
-                self.internalHistory.clearRedo()
-            }
-            self.changeID = context.getNextID()
-
-            // 03. Publish the document change event.
-            // NOTE(chacha912): Check opInfos, which represent the actually executed operations.
-            if !opInfos.isEmpty {
-                let changeInfo = ChangeInfo(message: change.message ?? "",
-                                            operations: opInfos,
-                                            actorID: actorID,
-                                            clientSeq: change.id.getClientSeq(),
-                                            serverSeq: change.id.getServerSeq())
-                let changeEvent = LocalChangeEvent(value: changeInfo)
-                self.publish(changeEvent)
-            }
-
-            if change.presenceChange != nil {
-                if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: .local) {
-                    self.publish(presenceEvent)
-                }
-            }
-
-            Logger.trace("after update a local change: \(self.toJSON())")
+            throw error
         }
+        let opInfos = executionResult.opInfos
+
+        // NOTE: in update(Set on array), the element is replaced with a new value.
+        // The history stack may still reference the old element's createdAt, so reconcile.
+        for op in change.operations {
+            if let arraySet = op as? ArraySetOperation {
+                self.internalHistory.reconcileCreatedAt(
+                    prevCreatedAt: arraySet.getCreatedAt(),
+                    currCreatedAt: arraySet.getValue().createdAt
+                )
+            }
+        }
+
+        self.localChanges.append(change)
+        self.onLocalChange?()
+        if !executionResult.reverseOps.isEmpty {
+            self.internalHistory.pushUndo(executionResult.reverseOps)
+        }
+        // NOTE: clear redo when a new local operation is applied.
+        if !opInfos.isEmpty {
+            self.internalHistory.clearRedo()
+        }
+        self.changeID = context.getNextID()
+
+        // 03. Publish the document change event.
+        // NOTE(chacha912): Check opInfos, which represent the actually executed operations.
+        if !opInfos.isEmpty {
+            let changeInfo = ChangeInfo(message: change.message ?? "",
+                                        operations: opInfos,
+                                        actorID: actorID,
+                                        clientSeq: change.id.getClientSeq(),
+                                        serverSeq: change.id.getServerSeq())
+            let changeEvent = LocalChangeEvent(value: changeInfo)
+            self.publish(changeEvent)
+        }
+
+        if change.presenceChange != nil {
+            if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: .local) {
+                self.publish(presenceEvent)
+            }
+        }
+
+        Logger.trace("after update a local change: \(self.toJSON())")
+    }
+
+    /**
+     * `updateWithOperationForTest` pushes `ops` (and, optionally, a presence change) directly
+     * onto a fresh ``ChangeContext`` and commits it, bypassing ``update(_:_:)``'s updater/proxy
+     * path. Test only -- see ``commitLocalChange(context:actorID:)``.
+     */
+    func updateWithOperationForTest(_ ops: [Operation], presence: StringValueTypeDictionary? = nil) throws {
+        guard let actorID = self.actorID else {
+            throw YorkieError(code: .errUnexpected, message: "actor ID is null.")
+        }
+
+        let clone = self.cloned
+        let context = ChangeContext(prevID: self.changeID, root: clone.root)
+        for op in ops {
+            context.push(operation: op)
+        }
+        if let presence {
+            context.presenceChange = .put(presence: presence)
+        }
+        try self.commitLocalChange(context: context, actorID: actorID)
     }
 
     /**
@@ -516,7 +568,19 @@ public class Document: Attachable {
         let change = context.toChange()
         // Execute on the clone first, then on the real root.
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: .undoRedo)
-        let executionResult = try change.execute(root: self.root, presences: &self.presences, source: .undoRedo)
+        let executionResult: ChangeExecutionResult
+        do {
+            executionResult = try change.execute(root: self.root, presences: &self.presences, source: .undoRedo)
+        } catch {
+            // Same hazard as the root pass in `update()`: the operations that ran burned their
+            // tickets into the root, the change is never queued and `changeID` never advances, so
+            // the next change would reissue them. Burn the lamport, keep `clientSeq`. The caller
+            // (`executeUndoRedo`) drops the clone.
+            if !context.isPresenceOnlyChange {
+                self.changeID = context.getNextID().setClientSeq(self.changeID.getClientSeq())
+            }
+            throw error
+        }
         let opInfos = executionResult.opInfos
         let executedOperations = executionResult.operations
         let reverseOps = executionResult.reverseOps
