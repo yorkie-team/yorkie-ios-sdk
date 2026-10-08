@@ -467,6 +467,24 @@ public class Document: Attachable {
                 // inserting them again would leave two nodes under one id. Restore-mode reverses
                 // revive by identity and keep theirs.
                 try treeEdit.reissueContentIDs { context.issueTimeTicket }
+
+                // A split reverse — the undo of a merge, or the redo of a split — mints one
+                // element per split level, and each needs a ticket this loop does not otherwise
+                // issue: `op.executedAt` above is exactly one ticket per operation. Left without
+                // them, `TreeEditOperation.execute` falls back to reconstructing them by counting
+                // delimiters up from its own `executedAt`, which runs straight over the ticket the
+                // NEXT operation in this same entry is about to be issued on the next loop
+                // iteration — landing two LIVE elements under one id, on every replica and on the
+                // server, since the change carries both operations. Issuing and recording them
+                // here, before the loop moves on, is what stops any replica reconstructing them.
+                //
+                // One per level is an upper bound, not an exact count: the split stops early when
+                // it reaches the root. A ticket nobody consumes only advances the delimiter, while
+                // one short would silently reopen the fallback. Mirrors yorkie's `executeUndoRedo`.
+                let level = treeEdit.splitLevel
+                if level > 0 {
+                    treeEdit.setSplitTickets((0 ..< level).map { _ in context.issueTimeTicket })
+                }
             }
 
             context.push(operation: op)

@@ -249,6 +249,29 @@ final class TreeEditOperation: Operation {
         self.splitTickets = tickets
     }
 
+    /// `setActor` sets the given actor to this operation and to the tickets its split issued.
+    ///
+    /// A document edited before `Client.attach` runs under the initial actor, and
+    /// `Document.setActor` re-stamps every pending local change once the real actor
+    /// arrives, by calling this through an `Operation` existential. The default
+    /// implementation rewrites `executedAt` alone, which would leave the split
+    /// tickets recorded at edit time naming the old actor: they are issued from the
+    /// change's own context, so every reader — the converter's split-ticket decode,
+    /// and any replica reasoning about which change minted a node — expects them to
+    /// carry the change's actor. Re-stamp them here. The lamport and the delimiters
+    /// are untouched, so their order (and the identities the split mints) is
+    /// unchanged.
+    ///
+    /// - Parameter actorID: The actor to stamp onto ``executedAt`` and every split ticket.
+    func setActor(_ actorID: ActorID) {
+        self.executedAt.setActor(actorID)
+        self.splitTickets = self.splitTickets.map {
+            var ticket = $0
+            ticket.setActor(actorID)
+            return ticket
+        }
+    }
+
     /**
      * `execute` executes this operation on the given `CRDTRoot`.
      */

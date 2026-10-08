@@ -21,6 +21,14 @@ public protocol JSONTreeNode: Equatable {
     var toJSONString: String { get }
 }
 
+/// `comparePath` compares two paths of equal length in document order.
+private func comparePath(_ lhs: [Int], _ rhs: [Int]) -> Int {
+    for index in 0 ..< lhs.count where lhs[index] != rhs[index] {
+        return lhs[index] - rhs[index]
+    }
+    return 0
+}
+
 struct TreeChangeWithPath {
     let actor: ActorID
     let type: TreeChangeType
@@ -455,6 +463,12 @@ public class JSONTree {
             throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
 
+        // Same contract as the index form: a range given backwards is a caller
+        // error, not an empty range.
+        if comparePath(fromPath, toPath) > 0 {
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
+        }
+
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
 
@@ -544,6 +558,12 @@ public class JSONTree {
         }
         if fromPath.isEmpty || toPath.isEmpty {
             throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
+        }
+
+        // Same contract as the index form: a range given backwards is a caller
+        // error, not an empty range.
+        if comparePath(fromPath, toPath) > 0 {
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
         let fromPos = try tree.pathToPos(fromPath)

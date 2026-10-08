@@ -320,6 +320,18 @@ protocol Operation {
         versionVector: VersionVector?,
         source: OpSource
     ) throws -> ExecutionResult?
+
+    /**
+     * `setActor` sets the given actor to this operation.
+     *
+     * Declared as a protocol requirement (rather than left as an extension-only
+     * method) so that a conforming type can override it: `Change.setActor` and
+     * `Document.setActor` call it through an `Operation` existential, which
+     * dispatches statically to the extension default for any method not in this
+     * requirement list — an override elsewhere would silently never run.
+     * ``TreeEditOperation`` relies on this to also re-stamp its split tickets.
+     */
+    mutating func setActor(_ actorID: ActorID)
 }
 
 extension Operation {

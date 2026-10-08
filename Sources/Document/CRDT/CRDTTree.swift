@@ -415,11 +415,44 @@ final class CRDTTreeNode: IndexTreeNode {
      * the chain walks that read them treat them as trusted structural
      * pointers. Drop them on the way in rather than let a peer hand the tree a
      * chain of its choosing.
+     *
+     * `mergedFrom`/`mergedAt`/`mergedInto` are deliberately NOT cleared here.
+     * They are on the wire too, but what a decoder does with them is part of a
+     * replicated contract: the server decodes the same bytes to build its
+     * snapshots, so an iOS-only strip would leave this replica holding a
+     * different tree than the server and than any other SDK. The walks that
+     * read them are cycle-guarded instead, which is what keeps a forged chain
+     * from spinning a replica without changing what the fields mean.
      */
     func dropSplitLinks() {
         traverseAll(node: self) { node, _ in
             node.insPrevID = nil
             node.insNextID = nil
+        }
+    }
+
+    /**
+     * `dropMergeStamps` clears the merge lineage on this node and every one of
+     * its descendants.
+     *
+     * Unlike ``dropSplitLinks()`` this is NOT safe to call on an arbitrary
+     * tree: a tree that really was merged carries the lineage as state, and
+     * dropping it would rewrite the document. It is for a *tree edit's*
+     * content, which the editing client always creates fresh for that one
+     * operation, so none of its nodes can be a merge product. A peer is free
+     * to stamp them anyway, and a declared-boundary walk would then follow
+     * `mergedFrom` off the freshly inserted node into an element the position
+     * never named. Clearing them costs nothing on conforming traffic — no
+     * producer sets them on edit content — so no replica sees a different
+     * tree for a change a client could legitimately have written.
+     * ``TreeEditOperation/reissueContentIDs(_:)`` clears the same three
+     * fields on the content an undo re-inserts, for the same reason.
+     */
+    func dropMergeStamps() {
+        traverseAll(node: self) { node, _ in
+            node.mergedFrom = nil
+            node.mergedAt = nil
+            node.mergedInto = nil
         }
     }
 
@@ -1109,40 +1142,6 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `styleSkipPredicate` builds the per-token skip checks shared by ``style(_:_:_:_:)``
-     * and ``removeStyle(_:_:_:_:)``: the End-token unknown-split-sibling exclusion and the
-     * §9.4 merged-anchor interloper filter for the range-end position.
-     *
-     * - Parameters:
-     *   - pos: The range-end position of the style operation.
-     *   - versionVector: The styling client's causal knowledge, or `nil` for a local edit.
-     * - Returns: A predicate that reports whether the given token must be skipped.
-     */
-    private func styleSkipPredicate(
-        _ pos: CRDTTreePos,
-        _ versionVector: VersionVector?,
-        _ recoveredInterloper: ((CRDTTreeNode) -> Bool)? = nil
-    ) throws -> (CRDTTreeNode, TokenType) -> Bool {
-        let anchorGuard = try self.mergedAnchorInterloperGuard(pos, versionVector)
-        return { node, tokenType in
-            // Skip styling via End token when the node has an unknown split
-            // sibling. The End token is in the range only because a concurrent
-            // split extended the range into the sibling.
-            if tokenType == .end, let versionVector, self.hasUnknownSplitSibling(node, versionVector) {
-                return true
-            }
-            // §9.4 from-side: a recovered traversal may only touch nodes the
-            // collapsed range lost, the positively identified interlopers.
-            if let recoveredInterloper, recoveredInterloper(node) == false {
-                return true
-            }
-            // §9.4: the node is in the range only because an unknown merge pulled
-            // the range-end anchor past it.
-            return anchorGuard?.isInterloper(node) ?? false
-        }
-    }
-
-    /**
      * `advancePastUnknownSplitSiblings` follows the `insNextID` chain of the
      * given node, advancing past element-type split siblings that the editing
      * client did not know about (not in `versionVector`).
@@ -1483,72 +1482,32 @@ class CRDTTree: CRDTElement {
         return (declaredFromParent, declaredFromParent.removedAt)
     }
 
-    /// `resolveStyleRange` resolves a style operation's range to its traversal endpoints.
-    ///
-    /// Shared by ``style(_:_:_:_:)`` and ``removeStyle(_:_:_:_:)``: it splits text at both ends and
-    /// advances past split siblings the editing client did not know about, so the range covers all
-    /// concurrent split products. `skipActorID` (the editing actor) stops the advance at the
-    /// editor's own split products, so a same-boundary empty run resolves here exactly as the split
-    /// loop in ``edit(_:_:_:_:_:_:)`` resolves it.
-    ///
-    /// - NOTE: upstream `tree.ts` used to run this advance in `style` only; as of #1375
-    ///   `removeStyle` runs the same §7.5 advance, on both range anchors, as `style` does.
-    ///
-    /// - Parameters:
-    ///   - range: The style range in CRDT positions.
-    ///   - editedAt: The ticket of the styling change.
-    ///   - versionVector: The styling client's causal knowledge, or `nil` for a local edit.
-    /// - Returns: The from/to parent and left-sibling nodes, plus the data-size delta the splits produced.
-    /// - Throws: Rethrows from ``findNodesAndSplitText(_:_:_:)``.
-    private func resolveStyleRange(
-        _ range: TreePosRange,
-        _ editedAt: TimeTicket,
-        _ versionVector: VersionVector?
-    ) throws -> (CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, DataSize) {
-        var diff = DataSize(data: 0, meta: 0)
-        let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
-        let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
-        diff.addDataSizes(others: fromDiff, toDiff)
-
-        let fromLeft = fromLeftRaw !== fromParent
-            ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector, skipActorID: editedAt.actorID)
-            : fromLeftRaw
-        let toLeft = toLeftRaw !== toParent
-            ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector, skipActorID: editedAt.actorID)
-            : toLeftRaw
-
-        return (fromParent, fromLeft, toParent, toLeft, diff)
-    }
-
+    /**
+     * `style` applies the given attributes of the given range.
+     *
+     * - Returns: A tuple of GC pairs, tree changes, data size delta, previous attribute values
+     *   captured from the first styled node (for undo reverse op), and keys of attributes that
+     *   did not previously exist on the first styled node (for undo reverse op).
+     */
     func style(
         _ range: TreePosRange,
         _ attributes: [String: String]?,
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector?
     ) throws -> ([GCPair], [TreeChange], DocSize, [String: String], [String]) {
-        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
-        var size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
-
-        let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
-        let traverseFromParent = recovery?.fromParent ?? fromParent
-        let traverseFromLeft = recovery?.fromLeft ?? fromLeft
-        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector, recovery?.isInterloper)
+        let (targets, diff) = try self.styleTargets(range.0, range.1, editedAt, versionVector)
+        var size = DocSize(live: diff, gc: DataSize(data: 0, meta: 0))
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
         var prevAttributes = [String: String]()
         var newAttrKeys = [String]()
-        var capturedPrev = false
-        try self.traverseInPosRange(traverseFromParent, traverseFromLeft, toParent, toLeft) { token, _ in
-            let (node, tokenType) = token
-            if node.canStyle(versionVector), let attributes {
-                if shouldSkipToken(node, tokenType) {
-                    return
-                }
 
+        if let attributes {
+            for (index, node) in targets.enumerated() {
                 // Capture previous attribute values from the first styled node
                 // for the reverse operation (undo).
-                if !capturedPrev {
+                if index == 0 {
                     for key in attributes.keys {
                         // A tombstoned (removed) attribute counts as absent, so the
                         // reverse op removes the key rather than restoring a stale value.
@@ -1558,81 +1517,30 @@ class CRDTTree: CRDTElement {
                             newAttrKeys.append(key)
                         }
                     }
-                    capturedPrev = true
                 }
 
-                let updatedAttrPairs = node.setAttrs(attributes, editedAt)
+                let writes = node.setAttrs(attributes, editedAt)
                 var affectedAttrs = [String: String]()
-                for write in updatedAttrPairs {
+                for write in writes {
                     if let key = write.installed?.key {
                         affectedAttrs[key] = attributes[key]
                     }
+                    accAttrWrite(write, node, !node.isRemoved, &pairs, &size)
                 }
-
-                let parentOfNode = node.parent!
-                let previousNode = node.prevSibling ?? node.parent!
 
                 // A tombstoned node is not part of the rendered document, and
                 // `toIndex` on one yields a zero-width range that means nothing
                 // to an editor. The text half makes the same exclusion.
-                if !affectedAttrs.isEmpty, !node.isRemoved {
-                    try changes.append(TreeChange(actor: editedAt.actorID,
-                                                  type: .style,
-                                                  from: self.toIndex(parentOfNode, previousNode),
-                                                  to: self.toIndex(node, node),
-                                                  fromPath: self.toPath(parentOfNode, previousNode),
-                                                  toPath: self.toPath(node, node),
-                                                  value: TreeChangeValue.attributes(affectedAttrs),
-                                                  splitLevel: 0) // dummy value.
+                if !affectedAttrs.isEmpty, !node.isRemoved, let changeRange = try self.styleChangeRange(node) {
+                    changes.append(TreeChange(actor: editedAt.actorID,
+                                              type: .style,
+                                              from: changeRange.from,
+                                              to: changeRange.to,
+                                              fromPath: changeRange.fromPath,
+                                              toPath: changeRange.toPath,
+                                              value: TreeChangeValue.attributes(affectedAttrs),
+                                              splitLevel: 0) // dummy value.
                     )
-                }
-
-                for write in updatedAttrPairs {
-                    accAttrWrite(write, node, !node.isRemoved, &pairs, &size)
-                }
-
-                // Propagate style to unknown split siblings so that a style
-                // operation whose range was determined before the split also
-                // covers the right part of the split node.
-                if tokenType == .start, let versionVector {
-                    var current = node
-                    let walker = InsNextWalker()
-                    _ = walker.visit(current)
-                    while let insNextID = current.insNextID {
-                        guard let next = self.findFloorNode(insNextID), !next.isText else {
-                            break
-                        }
-                        // Stop on a chain that loops back on itself; see `InsNextWalker`.
-                        guard walker.visit(next) else {
-                            break
-                        }
-                        if ticketKnown(versionVector, next.id.createdAt) {
-                            break
-                        }
-                        let siblingPairs = next.setAttrs(attributes, editedAt)
-                        var siblingAffectedAttrs = [String: String]()
-                        for write in siblingPairs {
-                            if let key = write.installed?.key {
-                                siblingAffectedAttrs[key] = attributes[key]
-                            }
-                        }
-                        if !siblingAffectedAttrs.isEmpty {
-                            let parentOfNext = next.parent!
-                            let previousNext = next.prevSibling ?? next.parent!
-                            try changes.append(TreeChange(actor: editedAt.actorID,
-                                                          type: .style,
-                                                          from: self.toIndex(parentOfNext, previousNext),
-                                                          to: self.toIndex(next, next),
-                                                          fromPath: self.toPath(parentOfNext, previousNext),
-                                                          toPath: self.toPath(next, next),
-                                                          value: TreeChangeValue.attributes(siblingAffectedAttrs),
-                                                          splitLevel: 0))
-                        }
-                        for write in siblingPairs {
-                            accAttrWrite(write, next, !next.isRemoved, &pairs, &size)
-                        }
-                        current = next
-                    }
                 }
             }
         }
@@ -1654,47 +1562,37 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DocSize, [String: String]) {
-        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
-        var size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
-
-        let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
-        let traverseFromParent = recovery?.fromParent ?? fromParent
-        let traverseFromLeft = recovery?.fromLeft ?? fromLeft
-        let shouldSkipToken = try self.styleSkipPredicate(range.1, versionVector, recovery?.isInterloper)
+        let (targets, diff) = try self.styleTargets(range.0, range.1, editedAt, versionVector)
+        var size = DocSize(live: diff, gc: DataSize(data: 0, meta: 0))
 
         var changes: [TreeChange] = []
         var pairs = [GCPair]()
-        let value = TreeChangeValue.attributesToRemove(attributesToRemove)
         var prevAttributes = [String: String]()
-        var capturedPrev = false
 
-        try self.traverseInPosRange(traverseFromParent, traverseFromLeft, toParent, toLeft) { token, _ in
-            let (node, tokenType) = token
-            if node.canStyle(versionVector), !attributesToRemove.isEmpty {
-                if shouldSkipToken(node, tokenType) {
-                    return
+        if !attributesToRemove.isEmpty {
+            for (index, node) in targets.enumerated() {
+                if node.attrs == nil {
+                    node.attrs = RHT()
                 }
 
                 // Capture previous attribute values from the first styled node
                 // for the reverse operation (undo).
-                if !capturedPrev {
+                if index == 0 {
                     for key in attributesToRemove where node.attrs?.has(key: key) == true {
                         if let existing = node.attrs?.getNodeByKey(key)?.value {
                             prevAttributes[key] = existing
                         }
                     }
-                    capturedPrev = true
                 }
 
-                if node.attrs == nil {
-                    node.attrs = RHT()
-                }
                 // `canStyle` admits a node removed concurrently with this change,
                 // so `nodeIsLive` is the third question `attrGCPair` asks.
                 let nodeIsLive = !node.isRemoved
+                var removedAny = false
                 for key in attributesToRemove {
                     var wasLive = node.attrs!.has(key: key)
                     let removal = node.attrs!.remove(key: key, executedAt: editedAt)
+                    removedAny = removedAny || !removal.gcNodes.isEmpty
                     applyValueDropped(removal, nodeIsLive: nodeIsLive, to: &size)
 
                     for rhtNode in removal.gcNodes {
@@ -1706,70 +1604,20 @@ class CRDTTree: CRDTElement {
                     }
                 }
 
-                let parentOfNode = node.parent!
-                let previousNode = node.prevSibling ?? node.parent!
-
-                // See `style`: a tombstoned node reports no change to editors.
-                if nodeIsLive {
-                    try changes.append(TreeChange(actor: editedAt.actorID,
-                                                  type: .removeStyle,
-                                                  from: self.toIndex(parentOfNode, previousNode),
-                                                  to: self.toIndex(node, node),
-                                                  fromPath: self.toPath(parentOfNode, previousNode),
-                                                  toPath: self.toPath(node, node),
-                                                  value: value,
-                                                  splitLevel: 0) // dummy value.
+                // See `style`: a tombstoned node reports no change to editors, and
+                // neither does a node that held none of the attributes -- the
+                // `style` half reports only what it actually wrote, so a removal
+                // that took nothing off is the same no-op and stays silent.
+                if nodeIsLive, removedAny, let changeRange = try self.styleChangeRange(node) {
+                    changes.append(TreeChange(actor: editedAt.actorID,
+                                              type: .removeStyle,
+                                              from: changeRange.from,
+                                              to: changeRange.to,
+                                              fromPath: changeRange.fromPath,
+                                              toPath: changeRange.toPath,
+                                              value: TreeChangeValue.attributesToRemove(attributesToRemove),
+                                              splitLevel: 0) // dummy value.
                     )
-                }
-
-                // Propagate remove-style to unknown split siblings so that a
-                // removeStyle operation whose range was determined before the
-                // split also covers the right part of the split node.
-                if tokenType == .start, let versionVector {
-                    var current = node
-                    let walker = InsNextWalker()
-                    _ = walker.visit(current)
-                    while let insNextID = current.insNextID {
-                        guard let next = self.findFloorNode(insNextID), !next.isText else {
-                            break
-                        }
-                        // Stop on a chain that loops back on itself; see `InsNextWalker`.
-                        guard walker.visit(next) else {
-                            break
-                        }
-                        if ticketKnown(versionVector, next.id.createdAt) {
-                            break
-                        }
-                        if next.attrs == nil {
-                            next.attrs = RHT()
-                        }
-                        var removedAny = false
-                        let nextIsLive = !next.isRemoved
-                        for key in attributesToRemove {
-                            var wasLive = next.attrs!.has(key: key)
-                            let removal = next.attrs!.remove(key: key, executedAt: editedAt)
-                            removedAny = removedAny || !removal.gcNodes.isEmpty
-                            applyValueDropped(removal, nodeIsLive: nextIsLive, to: &size)
-
-                            for rhtNode in removal.gcNodes {
-                                pairs.append(attrGCPair(next, rhtNode, wasLive, nextIsLive))
-                                wasLive = false
-                            }
-                        }
-                        if removedAny {
-                            let parentOfNext = next.parent!
-                            let previousNext = next.prevSibling ?? next.parent!
-                            try changes.append(TreeChange(actor: editedAt.actorID,
-                                                          type: .removeStyle,
-                                                          from: self.toIndex(parentOfNext, previousNext),
-                                                          to: self.toIndex(next, next),
-                                                          fromPath: self.toPath(parentOfNext, previousNext),
-                                                          toPath: self.toPath(next, next),
-                                                          value: TreeChangeValue.attributesToRemove(attributesToRemove),
-                                                          splitLevel: 0))
-                        }
-                        current = next
-                    }
                 }
             }
         }
@@ -2013,7 +1861,7 @@ class CRDTTree: CRDTElement {
         // 03-1. Propagate deletes to children moved by prior merges. When a
         // merge-source node is fully deleted (not a merge boundary), its former
         // children in the merge target should also be deleted.
-        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, mergeDest, toBeMergedNodes, editedAt))
+        pairs.append(contentsOf: self.propagateDeletesToMergedChildren(nodesToBeRemoved, mergeDest, toBeMergedNodes, editedAt, range))
 
         // 04. Split: split the element nodes for the given split level.
         //
@@ -2185,81 +2033,6 @@ class CRDTTree: CRDTElement {
         }
 
         return dest
-    }
-
-    /**
-     * `collectUnknownSplitSiblings` walks the `insNextID` chain from the given
-     * node and collects the split siblings (and their subtrees) whose creation
-     * the editor did not know about, so they can be cascade-deleted alongside
-     * the node being removed.
-     */
-    private func collectUnknownSplitSiblings(of node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
-        var result = [CRDTTreeNode]()
-        let walker = InsNextWalker()
-        _ = walker.visit(node)
-        var nextID = node.insNextID
-        // Stop on a chain that loops back on itself; see `InsNextWalker`. An
-        // unbounded walk here would also grow `result` without limit.
-        while let id = nextID, let next = self.findFloorNode(id), walker.visit(next) {
-            if !ticketKnown(versionVector, next.id.createdAt) {
-                result.append(next)
-                // Cascade through the full subtree, not just immediate children.
-                traverseAll(node: next) { descendant, _ in
-                    if descendant !== next {
-                        result.append(descendant)
-                    }
-                }
-            }
-            if next.insNextID == nil {
-                break
-            }
-            nextID = next.insNextID
-        }
-        return result
-    }
-
-    /**
-     * `propagateDeletesToMergedChildren` tombstones the children (and their
-     * descendants) that a prior merge moved out of each fully-deleted
-     * merge-source node into its merge target. Skips merge boundaries and the
-     * concurrent-merge case where `mergedInto` points back at `fromParent`. The
-     * moved children are recomputed from the merge target's children filtered by
-     * `mergedFrom`. Returns the GC pairs for the newly tombstoned nodes.
-     */
-    /// Skips when `mergedInto` points to the merge destination (concurrent
-    /// merge). The comparison is against the resolved `dest`, not `fromParent`:
-    /// the forwarding pointers set by ``applyMergeMoves(_:_:_:)`` point at the
-    /// flattened target, so a chained merge (`dest !== fromParent`) must
-    /// recognise a concurrent-merge boundary by `dest`.
-    private func propagateDeletesToMergedChildren(_ nodesToBeRemoved: [CRDTTreeNode], _ dest: CRDTTreeNode, _ toBeMergedNodes: [CRDTTreeNode], _ editedAt: TimeTicket) -> [GCPair] {
-        var pairs = [GCPair]()
-        for node in nodesToBeRemoved {
-            guard let mergedInto = node.mergedInto,
-                  !toBeMergedNodes.contains(where: { $0 === node }),
-                  mergedInto != dest.id,
-                  let mergeTarget = self.findFloorNode(mergedInto)
-            else {
-                continue
-            }
-            for targetChild in mergeTarget.innerChildren {
-                guard let childMergedFrom = targetChild.mergedFrom,
-                      childMergedFrom == node.id,
-                      targetChild.removedAt == nil
-                else {
-                    continue
-                }
-                if targetChild.remove(editedAt) {
-                    pairs.append(GCPair(parent: self, child: targetChild))
-                }
-                // Also tombstone descendants if the moved child is an element.
-                traverseAll(node: targetChild) { descendant, _ in
-                    if descendant !== targetChild, descendant.removedAt == nil, descendant.remove(editedAt) {
-                        pairs.append(GCPair(parent: self, child: descendant))
-                    }
-                }
-            }
-        }
-        return pairs
     }
 
     /// `editT` edits the given range with the given value.
@@ -3355,6 +3128,164 @@ private extension CRDTTree {
     }
 }
 
+/// Merge-boundary resolution for the `declaredBoundaries` fix (yorkie#2042),
+/// kept in an extension so the main ``CRDTTree`` body stays within the
+/// type-length budget.
+private extension CRDTTree {
+    /**
+     * `findMergeNode` returns the element whose id is exactly `id`, or `nil`.
+     * Unlike ``findFloorNode(_:)`` it refuses a floor-only match (a split
+     * product this replica does not hold) and a text node: a merge pointer
+     * names an element, so either would hand merge logic a node the pointer
+     * never named.
+     */
+    func findMergeNode(_ id: CRDTTreeNodeID?) -> CRDTTreeNode? {
+        guard let id, let node = self.findFloorNode(id), node.id == id, !node.isText else {
+            return nil
+        }
+        return node
+    }
+
+    /**
+     * `declaredBoundaries` returns the elements the edit's own positions named
+     * as boundaries: the element each position declared as its parent, and
+     * every ancestor of that element. A range stops at those rather than
+     * covering them — the edit asks to merge their remaining content away, not
+     * to delete it — so a concurrent merge that already moved their children
+     * where this edit would have put them did this edit's work rather than
+     * something it now has to undo.
+     *
+     * The declared parent is resolved with ``findMergeNode(_:)``, not a floor
+     * lookup: a floor lookup matches on `createdAt` alone, so a `parentID`
+     * naming a split product this replica does not hold would land on the
+     * offset-0 element and hand the skip to a node the position never named.
+     *
+     * The walk upward prefers `mergedFrom` over the physical parent: a prior
+     * merge moves a node under the merge target, so the parent no longer names
+     * the element that enclosed it when the position was declared. The set
+     * doubles as the seen set, guarding against a cycle in a client-supplied
+     * `mergedFrom` chain. Mirrors yorkie's `declaredBoundaries` (yorkie#2042).
+     *
+     * Node identity is tracked by ``ObjectIdentifier``, matching every other
+     * node set in this file — ``CRDTTreeNode`` is a reference type with no
+     * value-equality conformance.
+     */
+    func declaredBoundaries(_ positions: CRDTTreePos...) -> Set<ObjectIdentifier> {
+        var boundaries = Set<ObjectIdentifier>()
+        for pos in positions {
+            var current = self.findMergeNode(pos.parentID)
+            while let node = current, boundaries.contains(ObjectIdentifier(node)) == false {
+                boundaries.insert(ObjectIdentifier(node))
+                current = self.findMergeNode(node.mergedFrom) ?? node.parent
+            }
+        }
+        return boundaries
+    }
+
+    /**
+     * `collectUnknownSplitSiblings` walks the `insNextID` chain from the given
+     * node and collects the split siblings (and their subtrees) whose creation
+     * the editor did not know about, so they can be cascade-deleted alongside
+     * the node being removed.
+     */
+    func collectUnknownSplitSiblings(of node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
+        var result = [CRDTTreeNode]()
+        let walker = InsNextWalker()
+        _ = walker.visit(node)
+        var nextID = node.insNextID
+        // Stop on a chain that loops back on itself; see `InsNextWalker`. An
+        // unbounded walk here would also grow `result` without limit.
+        while let id = nextID, let next = self.findFloorNode(id), walker.visit(next) {
+            if !ticketKnown(versionVector, next.id.createdAt) {
+                result.append(next)
+                // Cascade through the full subtree, not just immediate children.
+                traverseAll(node: next) { descendant, _ in
+                    if descendant !== next {
+                        result.append(descendant)
+                    }
+                }
+            }
+            if next.insNextID == nil {
+                break
+            }
+            nextID = next.insNextID
+        }
+        return result
+    }
+
+    /**
+     * `propagateDeletesToMergedChildren` tombstones the children (and their
+     * descendants) that a prior merge moved out of each fully-deleted
+     * merge-source node into its merge target. Skips merge boundaries. The
+     * moved children are recomputed from the merge target's children filtered by
+     * `mergedFrom`. Returns the GC pairs for the newly tombstoned nodes.
+     */
+    /// Compares against the resolved `dest`, not `fromParent`: the forwarding
+    /// pointers set by ``applyMergeMoves(_:_:_:)`` point at the flattened
+    /// target, so a chained merge (`dest !== fromParent`) must recognise a
+    /// concurrent-merge boundary by `dest`.
+    ///
+    /// When `mergedInto` equals `dest`, the source stands for a merge this
+    /// edit itself asks for ONLY when one of the edit's own positions named
+    /// that source as a boundary (``declaredBoundaries(_:)``): the range then
+    /// stops at the source instead of covering it, and keeping its children is
+    /// what makes the two replicas agree. A source the range merely spans is a
+    /// plain delete of everything that was inside it, so its children are
+    /// tombstoned wherever a concurrent merge left them — this is the
+    /// `declaredBoundaries` fix (yorkie#2042, fixes #1331): the previous
+    /// unconditional skip on `mergedInto == dest.id` left those children alive
+    /// on this replica while a replica that applied the merge after the
+    /// delete tombstoned them, diverging the two documents.
+    ///
+    /// `declared` is resolved lazily and once per call, since most edits touch
+    /// no merge-source node at all.
+    func propagateDeletesToMergedChildren(
+        _ nodesToBeRemoved: [CRDTTreeNode],
+        _ dest: CRDTTreeNode,
+        _ toBeMergedNodes: [CRDTTreeNode],
+        _ editedAt: TimeTicket,
+        _ range: TreePosRange
+    ) -> [GCPair] {
+        var pairs = [GCPair]()
+        var declared: Set<ObjectIdentifier>?
+        for node in nodesToBeRemoved {
+            guard let mergedInto = node.mergedInto,
+                  !toBeMergedNodes.contains(where: { $0 === node })
+            else {
+                continue
+            }
+            if mergedInto == dest.id {
+                let resolvedDeclared = declared ?? self.declaredBoundaries(range.0, range.1)
+                declared = resolvedDeclared
+                if resolvedDeclared.contains(ObjectIdentifier(node)) {
+                    continue
+                }
+            }
+            guard let mergeTarget = self.findFloorNode(mergedInto) else {
+                continue
+            }
+            for targetChild in mergeTarget.innerChildren {
+                guard let childMergedFrom = targetChild.mergedFrom,
+                      childMergedFrom == node.id,
+                      targetChild.removedAt == nil
+                else {
+                    continue
+                }
+                if targetChild.remove(editedAt) {
+                    pairs.append(GCPair(parent: self, child: targetChild))
+                }
+                // Also tombstone descendants if the moved child is an element.
+                traverseAll(node: targetChild) { descendant, _ in
+                    if descendant !== targetChild, descendant.removedAt == nil, descendant.remove(editedAt) {
+                        pairs.append(GCPair(parent: self, child: descendant))
+                    }
+                }
+            }
+        }
+        return pairs
+    }
+}
+
 // MARK: - Pending GC pairs
 
 extension CRDTTree {
@@ -3386,5 +3317,577 @@ extension CRDTTree {
         let pairs = self.pendingGCPairs
         self.pendingGCPairs = []
         return pairs
+    }
+}
+
+/**
+ * `DeclaredLineage` answers, for one change, the two questions ``CRDTTree``'s
+ * style-targeting asks of every node it visits: is this node the element a
+ * position declared as its parent (or an ancestor of it), matched through the
+ * split lineage.
+ *
+ * Both questions used to be answered per node by walking the declared
+ * parent's whole current ancestry and, for each ancestor, its `insPrevID`
+ * chain — pointers a peer controls, so one style message over a wide range
+ * bought O(range x depth x chain) work, with a fresh cycle-guard set per
+ * step, on every replica that applied it. Nothing in those walks depends on
+ * the node being asked about, so they run once per change here: `covers` is
+ * then a set lookup, and `coversEitherWay`'s one remaining direction is
+ * memoized per node, so each node costs its own chain at most once.
+ */
+private struct DeclaredLineage {
+    /// Reports whether `node` is one of the declared ancestors, or a piece a
+    /// split cut off one of them.
+    let covers: (CRDTTreeNode) -> Bool
+    /// `covers` plus the opposite direction: also matches when a declared
+    /// ancestor is a piece a split cut off `node`.
+    let coversEitherWay: (CRDTTreeNode) -> Bool
+}
+
+/// The style-targeting rewrite (yorkie#2038, yorkie#2070; design doc section 9
+/// Port specification): a style's reached set comes from the change's own
+/// positions rather than from whatever the current tree happens to look like,
+/// so ``style(_:_:_:_:)`` and ``removeStyle(_:_:_:_:)`` resolve one shared set
+/// of targets instead of each re-deriving it. Kept in an extension so the main
+/// ``CRDTTree`` body stays within the type-length budget.
+///
+/// NOTE(cross-implementation): the set ``styleTargets(_:_:_:_:)`` returns is a
+/// replicated contract — every SDK and the server have to reach the same
+/// nodes for the same change. It mirrors yorkie's `styleTargets`; the rules
+/// are the "Port specification" in yorkie's docs/design/concurrent-merge-split.md.
+private extension CRDTTree {
+    /// `declaredParentOf` returns the element a position named as its parent,
+    /// or `nil` when this replica cannot resolve the position.
+    func declaredParentOf(_ pos: CRDTTreePos) -> CRDTTreeNode? {
+        guard let parent = self.findFloorNode(pos.parentID), self.findFloorNode(pos.leftSiblingID) != nil else {
+            return nil
+        }
+        return parent
+    }
+
+    /// `splitOriginsOf` walks back along `insPrevID` from `node`, feeding each
+    /// element it passes to `visit` and stopping when `visit` returns false.
+    /// Only `splitElement` sets `insPrevID` on an element, so the chain is
+    /// exactly the split lineage; the walker stops a crafted chain that loops
+    /// back on itself, and a text link cuts it.
+    func splitOriginsOf(_ node: CRDTTreeNode, _ visit: (CRDTTreeNode) -> Bool) {
+        let walker = InsNextWalker()
+        var current: CRDTTreeNode? = node
+        _ = walker.visit(node)
+        while let existing = current, visit(existing) {
+            guard let insPrevID = existing.insPrevID else {
+                return
+            }
+            guard let prev = self.findFloorNode(insPrevID), !prev.isText, walker.visit(prev) else {
+                return
+            }
+            current = prev
+        }
+    }
+
+    /// `declaredLineageOf` resolves, once for a change, everything
+    /// ``DeclaredLineage`` answers about the element a position declared as
+    /// its parent: the element's current ancestry, and the split lineage of
+    /// each ancestor.
+    func declaredLineageOf(_ declaredParent: CRDTTreeNode) -> DeclaredLineage {
+        // Every element a declared ancestor was split from. The union answers
+        // all the ancestors at once, and a chain already walked needs no
+        // second walk because the chain back from an element is fixed.
+        var ancestors = Set<ObjectIdentifier>()
+        var products = Set<ObjectIdentifier>()
+        var ancestor: CRDTTreeNode? = declaredParent
+        while let current = ancestor {
+            ancestors.insert(ObjectIdentifier(current))
+            self.splitOriginsOf(current) { origin in
+                let id = ObjectIdentifier(origin)
+                if products.contains(id) {
+                    return false
+                }
+                products.insert(id)
+                return true
+            }
+            ancestor = current.parent
+        }
+
+        // The opposite direction -- a declared ancestor is a piece split off
+        // the node being asked about -- cannot be precomputed, since it starts
+        // from that node. Memoize it instead: the answer for a node is the
+        // answer for every node whose chain runs through it, so one walk
+        // settles the whole prefix it passed.
+        var reversed = [ObjectIdentifier: Bool]()
+        func reaches(_ node: CRDTTreeNode) -> Bool {
+            let nodeID = ObjectIdentifier(node)
+            if let cached = reversed[nodeID] {
+                return cached
+            }
+            var walked = [ObjectIdentifier]()
+            var found = false
+            self.splitOriginsOf(node) { origin in
+                let originID = ObjectIdentifier(origin)
+                if ancestors.contains(originID) {
+                    found = true
+                    return false
+                }
+                if let memo = reversed[originID] {
+                    found = memo
+                    return false
+                }
+                walked.append(originID)
+                return true
+            }
+            for visited in walked {
+                reversed[visited] = found
+            }
+            return found
+        }
+
+        return DeclaredLineage(
+            covers: { products.contains(ObjectIdentifier($0)) },
+            coversEitherWay: { node in
+                products.contains(ObjectIdentifier(node)) || reaches(node)
+            }
+        )
+    }
+
+    /// `declaredLineage` is ``declaredLineageOf(_:)`` for the element `pos`
+    /// named as its parent, or `nil` when this replica cannot resolve the
+    /// position.
+    ///
+    /// `covers` on the result is "the change's range ended inside this node":
+    /// whether the node is the element the position named, or an ancestor of
+    /// it. The ancestry is the current one, and a concurrent split moves the
+    /// children after the split point into the new right half, so each
+    /// ancestor is matched through its split lineage: every product of
+    /// splitting the node stands for the node.
+    ///
+    /// `coversEitherWay` is the same question for the range-start position
+    /// (§9.6), matching in BOTH directions along the split lineage: a split
+    /// of the element the range began inside leaves the start anchor in
+    /// whichever half holds it, and both halves are the element the change
+    /// began inside. For the range-end side the extra matches would make a
+    /// guard that excludes nodes fail open, so that side uses `covers`.
+    func declaredLineage(_ pos: CRDTTreePos) -> DeclaredLineage? {
+        guard let declaredParent = self.declaredParentOf(pos) else {
+            return nil
+        }
+        return self.declaredLineageOf(declaredParent)
+    }
+
+    /// `declaredAncestryHas` walks the CURRENT ancestry of the element a
+    /// position named as its parent, up to the root, and reports whether any
+    /// of them matches.
+    func declaredAncestryHas(_ declaredParent: CRDTTreeNode, _ match: (CRDTTreeNode) -> Bool) -> Bool {
+        var current: CRDTTreeNode? = declaredParent
+        while let node = current {
+            if match(node) {
+                return true
+            }
+            current = node.parent
+        }
+        return false
+    }
+
+    /// `declaredAncestryRemoved` reports whether the element a position named
+    /// as its parent, or any ancestor of it, has been removed -- the only way
+    /// a range declared forwards can resolve backwards here.
+    func declaredAncestryRemoved(_ pos: CRDTTreePos) -> Bool {
+        guard let parent = self.declaredParentOf(pos) else {
+            return false
+        }
+        return self.declaredAncestryHas(parent) { $0.isRemoved }
+    }
+
+    /// `beginsAtOrBefore` reports whether the change's declared range-start
+    /// sits at or before `node`'s Start token in document order, both
+    /// measured with removed nodes included so a concurrent removal between
+    /// the two moves neither. A position that does not resolve answers no, as
+    /// Go's `beginsAtOrInside` does.
+    func beginsAtOrBefore(_ node: CRDTTreeNode, _ from: CRDTTreePos) -> Bool {
+        guard let nodeParent = node.parent else {
+            return false
+        }
+        do {
+            let (parent, left) = try from.toTreeNodePair(tree: self)
+            // A concurrent merge can move the left sibling out of the declared
+            // parent. Go's FindOffset fails there; findOffset here returns -1
+            // and toTreePos would resolve offset 0, so the case is refused
+            // explicitly.
+            if left !== parent, left.parent !== parent {
+                return false
+            }
+            let offset = try nodeParent.findOffset(node: node, includeRemoved: true)
+            let nodeIdx = try self.indexTree.indexOf(TreePos(node: nodeParent, offset: Int32(offset)), true)
+            let declaredIdx = try self.toIndex(parent, left, true)
+            return declaredIdx >= 0 && declaredIdx <= nodeIdx
+        } catch {
+            return false
+        }
+    }
+
+    /// `unknownSplitSiblings` returns the elements a split concurrent with
+    /// the change produced from `node`: its `insNextID` chain, stopped at the
+    /// first sibling the change already knew about. A style that covered
+    /// `node` covered these too, because the change resolved its range while
+    /// `node` was still one piece.
+    func unknownSplitSiblings(_ node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
+        var siblings = [CRDTTreeNode]()
+        let walker = InsNextWalker()
+        var current = node
+        _ = walker.visit(current)
+        while let insNextID = current.insNextID {
+            guard let next = self.findFloorNode(insNextID), !next.isText else {
+                break
+            }
+            // Stop on a chain that loops back on itself; see `InsNextWalker`.
+            guard walker.visit(next) else {
+                break
+            }
+            if ticketKnown(versionVector, next.id.createdAt) {
+                break
+            }
+            siblings.append(next)
+            current = next
+        }
+        return siblings
+    }
+
+    /// `splitFamilyOf` walks back along `insPrevID` from an element whose
+    /// creation the change did not know, collecting the products a
+    /// concurrent split made of a node it did know. It returns the family in
+    /// document order, that known node first, or an empty array when the
+    /// chain reaches no such node -- a node simply new to the change.
+    func splitFamilyOf(_ node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
+        var reversedFamily = [node]
+        let walker = InsNextWalker()
+        var current = node
+        _ = walker.visit(current)
+        while let insPrevID = current.insPrevID {
+            guard let prev = self.findFloorNode(insPrevID), !prev.isText, walker.visit(prev) else {
+                return []
+            }
+            reversedFamily.append(prev)
+            if prev.canStyle(versionVector) {
+                return reversedFamily.reversed()
+            }
+            current = prev
+        }
+        return []
+    }
+
+    /// `boundaryRangeCovers` reports whether the change declared a range that
+    /// covers at least one element, so that reconstructing its boundary
+    /// elements is repair rather than invention. A range whose two positions
+    /// are equal covers nothing on any replica. A range that resolves
+    /// backwards covers nothing here either; only a removal collapses a
+    /// range, so an inversion with a live declared ancestry on both ends is
+    /// the caller's own and gets nothing.
+    func boundaryRangeCovers(
+        _ range: TreePosRange,
+        _ fromAnchor: CRDTTreeNode,
+        _ fromLeft: CRDTTreeNode,
+        _ toAnchor: (parent: CRDTTreeNode, left: CRDTTreeNode)
+    ) throws -> Bool {
+        let (from, to) = range
+        if from == to {
+            return false
+        }
+        if try self.toIndex(fromAnchor, fromLeft) <= self.toIndex(toAnchor.parent, toAnchor.left) {
+            return true
+        }
+        return self.declaredAncestryRemoved(from) || self.declaredAncestryRemoved(to)
+    }
+
+    /// `boundaryElements` returns the elements the change reached through a
+    /// single token on the replica that issued it: the ancestors of the
+    /// range-start position, whose End tokens the range ran past, and the
+    /// ancestors of the range-end position, whose Start tokens it ran past --
+    /// each chain stopping below the common ancestor of the two.
+    ///
+    /// These come from the positions the change carries, which never move, so
+    /// every replica computes the same set whatever a concurrent merge did to
+    /// the index space.
+    func boundaryElements(_ from: CRDTTreePos, _ to: CRDTTreePos) -> [TreeToken<CRDTTreeNode>] {
+        guard let fromParent = self.declaredParentOf(from), let toParent = self.declaredParentOf(to) else {
+            return []
+        }
+
+        var fromAncestors = Set<ObjectIdentifier>()
+        var current: CRDTTreeNode? = fromParent
+        while let node = current {
+            fromAncestors.insert(ObjectIdentifier(node))
+            current = node.parent
+        }
+
+        // The common ancestor is the first ancestor of the range-end position
+        // that also sits above the range-start position.
+        var common: CRDTTreeNode?
+        var startTokens: [TreeToken<CRDTTreeNode>] = []
+        current = toParent
+        while let node = current {
+            if fromAncestors.contains(ObjectIdentifier(node)) {
+                common = node
+                break
+            }
+            startTokens.append((node, .start))
+            current = node.parent
+        }
+        guard let common else {
+            return []
+        }
+
+        var elements: [TreeToken<CRDTTreeNode>] = []
+        current = fromParent
+        while let node = current, node !== common {
+            elements.append((node, .end))
+            current = node.parent
+        }
+        return elements + startTokens
+    }
+
+    /// `styleSkipPredicate` builds the per-token skip checks shared by
+    /// ``style(_:_:_:_:)`` and ``removeStyle(_:_:_:_:)``, as two predicates
+    /// over the same state.
+    ///
+    /// `skipReached` answers "did the change reach this node at all": the
+    /// End-token unknown-split-sibling exclusion (§9.1), the §9.6 range-start
+    /// guard and the §9.4 merged-anchor interloper filter for the range-end
+    /// position. It is about the change, so it holds for every node a style
+    /// writes to, however that node was found.
+    ///
+    /// `skipToken` adds the one restriction that belongs to the index
+    /// traversal alone -- the §9.4 from-side recovery re-anchors the
+    /// traversal start over nodes the change never covered, so a recovered
+    /// traversal may touch only the interlopers the recovery positively
+    /// identified. Nodes derived from the change's own positions are not in
+    /// that widened span and answer to `skipReached` only.
+    ///
+    /// `beganInside` is the set of elements THIS replica's resolved range
+    /// begins inside -- the resolved from-parent and its ancestors, the only
+    /// elements a token traversal reaches through their End token alone.
+    func styleSkipPredicate(
+        _ from: CRDTTreePos,
+        _ to: CRDTTreePos,
+        _ fromParent: CRDTTreeNode,
+        _ versionVector: VersionVector?,
+        _ recoveredInterloper: ((CRDTTreeNode) -> Bool)?
+    ) throws -> (
+        skipToken: (TreeToken<CRDTTreeNode>) -> Bool,
+        skipReached: (TreeToken<CRDTTreeNode>) -> Bool,
+        declaredTo: DeclaredLineage?,
+        declaredFrom: DeclaredLineage?
+    ) {
+        let isVersionVectorEmpty = versionVector == nil || versionVector!.size() == 0
+        let anchorGuard = try self.mergedAnchorInterloperGuard(to, versionVector)
+        // Resolved once and handed back to `styleTargets`: the lineage walks
+        // are over peer-supplied pointers and depend only on the change's
+        // positions.
+        let declaredTo = self.declaredLineage(to)
+        let declaredFrom = self.declaredLineage(from)
+
+        var beganInside = Set<ObjectIdentifier>()
+        var current: CRDTTreeNode? = fromParent
+        while let node = current {
+            beganInside.insert(ObjectIdentifier(node))
+            current = node.parent
+        }
+
+        let skipReached: (TreeToken<CRDTTreeNode>) -> Bool = { token in
+            let (node, tokenType) = token
+            // §9.1: skip styling via the End token when the node has an
+            // unknown split sibling AND the change's range ended inside the
+            // node. Only then is the End token in the range solely because a
+            // concurrent split extended the range into the sibling. When the
+            // range ran past the node's end the End token was in it before
+            // any split existed.
+            if tokenType == .end,
+               !isVersionVectorEmpty,
+               let versionVector,
+               declaredTo?.covers(node) ?? true,
+               self.hasUnknownSplitSibling(node, versionVector)
+            {
+                return true
+            }
+            // §9.6, the mirror of §9.1 on the range-start side. This
+            // replica's range begins inside the node, so only its End token
+            // is in the range; the change reached it that way only if the
+            // change's own range-start position was declared inside it. A
+            // merge that removes a paragraph's opening tag moves its
+            // children, and the start anchor with them, into an element the
+            // change never entered.
+            if tokenType == .end,
+               !isVersionVectorEmpty,
+               beganInside.contains(ObjectIdentifier(node)),
+               let declaredFrom, declaredFrom.coversEitherWay(node) == false
+            {
+                return true
+            }
+            // §9.4: the node is in the range only because an unknown merge
+            // pulled the range-end anchor past it.
+            return anchorGuard?.isInterloper(node) ?? false
+        }
+
+        let skipToken: (TreeToken<CRDTTreeNode>) -> Bool = { token in
+            if skipReached(token) {
+                return true
+            }
+            // §9.4 from-side: a recovered traversal may only touch nodes the
+            // collapsed range lost, the positively identified interlopers.
+            if let recoveredInterloper, recoveredInterloper(token.0) == false {
+                return true
+            }
+            return false
+        }
+
+        return (skipToken, skipReached, declaredTo, declaredFrom)
+    }
+
+    /// `styleTargets` resolves the nodes a style or removeStyle applies to,
+    /// without repeats, along with the size the boundary text splits added to
+    /// live. Traversed nodes come in document order; boundary elements
+    /// recovered from the change's positions follow them, as in Go.
+    ///
+    /// The two operations are one range resolution asked to write two
+    /// different things, so the resolution lives here once. A node is
+    /// reported at most once even though a fully covered element is visited
+    /// on both its Start and End tokens; the second write was already a
+    /// no-op, since RHT rejects a ticket that is not after the one it holds.
+    func styleTargets(
+        _ from: CRDTTreePos,
+        _ to: CRDTTreePos,
+        _ editedAt: TimeTicket,
+        _ versionVector: VersionVector?
+    ) throws -> ([CRDTTreeNode], DataSize) {
+        var diff = DataSize(data: 0, meta: 0)
+        let ((resolvedFromParent, fromLeftRaw), diffFrom) = try self.findNodesAndSplitText(from, editedAt, .range)
+        let ((toParent, toLeftRaw), diffTo) = try self.findNodesAndSplitText(to, editedAt, .range)
+        diff.addDataSizes(others: diffFrom, diffTo)
+
+        // skipActorID for the same reason as edit's Phase 2: a same-boundary
+        // empty run has to resolve here the way the split loop resolves it.
+        let styleActorID = editedAt.actorID
+        var fromParent = resolvedFromParent
+        var fromLeft = fromLeftRaw !== fromParent
+            ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector, skipActorID: styleActorID)
+            : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent
+            ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector, skipActorID: styleActorID)
+            : toLeftRaw
+
+        let isVersionVectorEmpty = versionVector == nil || versionVector!.size() == 0
+        let recovery = try self.reversedFromAnchorRecovery(from, (fromParent, fromLeft, toParent, toLeft), versionVector)
+        if let recovery {
+            fromParent = recovery.fromParent
+            fromLeft = recovery.fromLeft
+        }
+        let (skipToken, skipReached, declaredTo, declaredFrom) = try self.styleSkipPredicate(
+            from, to, fromParent, versionVector, recovery?.isInterloper
+        )
+
+        var targets: [CRDTTreeNode] = []
+        var seen = Set<ObjectIdentifier>()
+        func add(_ node: CRDTTreeNode) {
+            let id = ObjectIdentifier(node)
+            if !seen.contains(id) {
+                seen.insert(id)
+                targets.append(node)
+            }
+        }
+
+        try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft) { token, _ in
+            let (node, tokenType) = token
+            // A fully covered element arrives twice, on its Start token and
+            // on its End token. Everything below depends only on the node, so
+            // the second visit would redo the lineage walks for nothing.
+            if seen.contains(ObjectIdentifier(node)) || skipToken(token) {
+                return
+            }
+
+            if node.canStyle(versionVector) {
+                add(node)
+                // Carry the style onto split products the change could not
+                // have known, so a range resolved before the split still
+                // covers the piece the split cut off. Which token reached the
+                // node does not decide this: a node the range covered whole
+                // arrives on its Start token, or on its End token alone when
+                // the range began inside it.
+                for sibling in self.unknownSplitSiblings(node, versionVector) {
+                    add(sibling)
+                }
+                return
+            }
+
+            // The change did not know this node was created, so it cannot
+            // have named it -- unless a concurrent split produced it from one
+            // the change did name. An End token the range genuinely ran past
+            // says the change styled that element while it was still one
+            // piece, so the whole split family carries the style, including
+            // the half the change knew and the traversal no longer reaches.
+            if tokenType == .end, !isVersionVectorEmpty, let declaredTo, declaredTo.covers(node) == false {
+                let family = self.splitFamilyOf(node, versionVector)
+                // The family is reached only through the node the change
+                // knew, which is the one the End-token guard judges. When
+                // that guard excludes it, re-adding the family would style
+                // the very node it skipped.
+                //
+                // The change must also have begun at or inside that node. A
+                // split of more than one level carries the right half into a
+                // new parent, past a range that began right after the known
+                // node, and its End token then enters the range with nothing
+                // to do with the change. A range that began BEFORE the known
+                // node covered it whole, however the traversal lost it, and
+                // keeps the closure. This is rule 2(c) of the Port
+                // specification in yorkie's concurrent-merge-split design doc
+                // (§9.2 Fix 27, yorkie#2070).
+                if let first = family.first,
+                   !skipToken((first, .end)),
+                   let declaredFrom,
+                   declaredFrom.coversEitherWay(first) || self.beginsAtOrBefore(first, from)
+                {
+                    for member in family {
+                        add(member)
+                    }
+                }
+            }
+        }
+
+        // Add back the boundary elements the change itself reached. Without a
+        // concurrent merge the traversal has already found every one of
+        // them; with one, they are the nodes the resolved range can no
+        // longer see.
+        if try self.boundaryRangeCovers((from, to), fromParent, fromLeft, (toParent, toLeft)) {
+            for token in self.boundaryElements(from, to) {
+                // The §9.4 interloper filters and the End-token split guard
+                // are about which nodes the change reached, not about how the
+                // traversal found them, so a boundary element answers to them
+                // too.
+                if !skipReached(token), token.0.canStyle(versionVector) {
+                    add(token.0)
+                }
+            }
+        }
+
+        return (targets, diff)
+    }
+
+    /// `styleChangeRange` returns the index and path range a style change on
+    /// the given node reports to editors, or `nil` when the node is not in
+    /// the document.
+    ///
+    /// The targets come from walks over ids -- split families, merge lineage
+    /// -- so one can be a node that is live by `isRemoved` but detached from
+    /// the tree, with no parent. `prevSibling` depends on a parent; a node
+    /// with no parent has no place in the rendered document to report
+    /// either, so the caller reports nothing.
+    func styleChangeRange(_ node: CRDTTreeNode) throws -> (from: Int, to: Int, fromPath: [Int], toPath: [Int])? {
+        guard let parent = node.parent else {
+            return nil
+        }
+        let previous = node.prevSibling ?? parent
+        return try (
+            from: self.toIndex(parent, previous),
+            to: self.toIndex(node, node),
+            fromPath: self.toPath(parent, previous),
+            toPath: self.toPath(node, node)
+        )
     }
 }

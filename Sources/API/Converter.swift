@@ -682,7 +682,7 @@ extension Converter {
                 let treeEdit = TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                                  fromPos: fromTreePos(pbTreeEditOperation.from),
                                                  toPos: fromTreePos(pbTreeEditOperation.to),
-                                                 contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
+                                                 contents: try fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
                                                  splitLevel: pbTreeEditOperation.splitLevel,
                                                  executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
                                                  isUndoOp: treeRestoreMode != nil,
@@ -1309,21 +1309,39 @@ extension Converter {
     /**
      * `fromTreeNodesWhenEdit` converts the given Protobuf format to model format.
      */
-    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNodes]) -> [CRDTTreeNode]? {
+    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNodes]) throws -> [CRDTTreeNode]? {
         guard pbTreeNodes.isEmpty == false else {
             return nil
         }
 
-        return pbTreeNodes.compactMap { pbTreeNode -> CRDTTreeNode? in
-            let root = try? fromTreeNodes(pbTreeNode.content)?.root
+        var treeNodes: [CRDTTreeNode] = []
+        for pbTreeNode in pbTreeNodes {
+            let root = try fromTreeNodes(pbTreeNode.content)?.root
+            // An entry whose content is empty decodes to no node at all, and
+            // neither keeping nor dropping it is safe. Keeping it puts a hole in
+            // the contents array that every later reader dereferences; dropping
+            // it changes what the operation means, since `CRDTTree.edit` reads
+            // an absent content list as "delete the range". Reject the pack at
+            // the boundary instead, the way every other malformed field in this
+            // decoder does.
+            guard let root else {
+                throw YorkieError(code: .errInvalidArgument, message: "tree edit content has an entry with no node")
+            }
             // Operation content is fully client-controlled and is always
-            // freshly created by the editing client, so it can never be a
-            // split product. Drop the split-sibling links the wire format
-            // carries anyway: the tree follows them as trusted structural
-            // pointers once `edit` registers these nodes in `nodeMapByID`.
-            root?.dropSplitLinks()
-            return root
+            // freshly created by the editing client, so it can never be a split
+            // product nor a merge product. Drop the split-sibling links AND the
+            // merge lineage the wire format carries anyway: the tree follows
+            // both as trusted structural pointers once `edit` registers these
+            // nodes in `nodeMapByID` — a stamped `mergedFrom` steers a
+            // declared-boundary walk off the inserted node into an element the
+            // position never named. No producer sets either on edit content, so
+            // conforming traffic decodes to the same tree as before.
+            root.dropSplitLinks()
+            root.dropMergeStamps()
+            treeNodes.append(root)
         }
+
+        return treeNodes
     }
 
     /**
@@ -1345,8 +1363,16 @@ extension Converter {
         
         for index in stride(from: rootIndex - 1, to: -1, by: -1) {
             let node = nodes[index]
-            let parent = depthTable[pbTreeNodes[index].depth - 1]
-            try parent?.prepend(contentsOf: [node])
+            // The depths come off the wire. A peer can send a node whose parent
+            // depth was never written, or name a text node as a parent; looking
+            // that miss up used to silently drop the node instead of raising.
+            // Reject the payload at the boundary instead, with the error every
+            // other malformed field here raises, so the caller sees a decode
+            // failure rather than a tree silently missing content.
+            guard let parent = depthTable[pbTreeNodes[index].depth - 1], parent.isText == false else {
+                throw YorkieError(code: .errInvalidArgument, message: "invalid tree node depth: \(pbTreeNodes[index].depth)")
+            }
+            try parent.prepend(contentsOf: [node])
             depthTable[pbTreeNodes[index].depth] = node
         }
         
