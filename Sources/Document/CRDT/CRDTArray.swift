@@ -64,18 +64,19 @@ class CRDTArray: CRDTContainer {
      *
      * Uses an LWW position register: the winning position is the one with the latest
      * `executedAt`. Returns the dead position node if an old position was displaced,
-     * or `nil` if the move lost the LWW race. The caller must register the returned
-     * node as a GC pair.
+     * or `nil` if the move lost the LWW race, together with the size the move added
+     * to the moved element. The caller must register the returned node as a GC pair
+     * and book the size via ``CRDTRoot/accMovedElement(_:_:)``.
      *
      * - Parameters:
      *   - createdAt: The `createdAt` of the element to move.
      *   - prevCreatedAt: The element after which to position the moved element.
      *   - executedAt: The operation execution time used for LWW comparison.
-     * - Returns: The displaced dead position node, or `nil`.
+     * - Returns: The displaced dead position node (or `nil`) and the moved element's size delta.
      * - Throws: ``YorkieError`` when the target or anchor element is not found.
      */
     @discardableResult
-    func moveAfter(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode? {
+    func moveAfter(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListMove {
         return try self.elements.moveAfter(createdAt: createdAt, prevCreatedAt: prevCreatedAt, executedAt: executedAt)
     }
 
@@ -114,6 +115,18 @@ class CRDTArray: CRDTContainer {
     func get(index: Int) throws -> CRDTElement {
         let node = try self.elements.getNode(index: index)
         return node.value
+    }
+
+    /**
+     * `getByID` returns the element of the given `createdAt`, unlike
+     * ``get(createdAt:)`` regardless of whether it has since been removed.
+     *
+     * Used to book a move's size against the moved element even when the move
+     * and a concurrent remove landed in the order that leaves the element
+     * tombstoned by the time the move is accounted for.
+     */
+    func getByID(createdAt: TimeTicket) -> CRDTElement? {
+        return try? self.elements.get(createdAt: createdAt)
     }
 
     /**

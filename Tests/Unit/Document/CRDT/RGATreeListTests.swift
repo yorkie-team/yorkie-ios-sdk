@@ -343,7 +343,7 @@ class RGATreeListTests: XCTestCase {
         // when — move the tail element (C) elsewhere; the old tail position node becomes
         // a bare/dead position node, and `last` keeps pointing at it (JS-faithful).
         let moveAt = TimeTicket(lamport: 4, delimiter: 0, actorID: actorId)
-        let deadNode = try target.moveAfter(createdAt: e3.createdAt, prevCreatedAt: e1.createdAt, executedAt: moveAt)
+        let deadNode = try target.moveAfter(createdAt: e3.createdAt, prevCreatedAt: e1.createdAt, executedAt: moveAt).deadNode
 
         // then — the physically last node is still the bare/dead position node left behind
         XCTAssertNotNil(deadNode)
@@ -409,7 +409,7 @@ class RGATreeListTests: XCTestCase {
         // op2 (lamport=6): move A after D  → would give [B, C, D, A]
         // Apply op2 first (out of order), then op1 which should lose.
         let move2 = TimeTicket(lamport: 6, delimiter: 0, actorID: actorId)
-        let deadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e4.createdAt, executedAt: move2)
+        let deadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e4.createdAt, executedAt: move2).deadNode
 
         // then — op2 wins: A moved after D → [B, C, D, A]
         XCTAssertNotNil(deadNode)
@@ -418,7 +418,7 @@ class RGATreeListTests: XCTestCase {
 
         // when — apply op1 (lamport=5 < lamport=6 of op2): must lose
         let move1 = TimeTicket(lamport: 5, delimiter: 0, actorID: actorId)
-        let losingDeadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e3.createdAt, executedAt: move1)
+        let losingDeadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e3.createdAt, executedAt: move1).deadNode
 
         // then — op1 loses LWW but still creates a bare dead position node for GC (JS-faithful).
         // List stays [B, C, D, A].
@@ -474,7 +474,7 @@ class RGATreeListTests: XCTestCase {
 
         // when — move A after C (executedAt=5): should win and return the dead position node
         let win = TimeTicket(lamport: 5, delimiter: 0, actorID: actorId)
-        let deadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e3.createdAt, executedAt: win)
+        let deadNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e3.createdAt, executedAt: win).deadNode
 
         // then — returns non-nil dead position node; position removed at is set
         XCTAssertNotNil(deadNode)
@@ -484,7 +484,7 @@ class RGATreeListTests: XCTestCase {
 
         // when — try to move A again with older executedAt=4 (should lose)
         let lose = TimeTicket(lamport: 4, delimiter: 0, actorID: actorId)
-        let losingNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e2.createdAt, executedAt: lose)
+        let losingNode = try target.moveAfter(createdAt: e1.createdAt, prevCreatedAt: e2.createdAt, executedAt: lose).deadNode
 
         // then — LWW loser still creates a bare dead position node for GC (JS-faithful).
         XCTAssertNotNil(losingNode)

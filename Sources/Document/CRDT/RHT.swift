@@ -51,7 +51,16 @@ class RHTNode: GCChild {
     }
 
     /**
-     * `getDataSize` returns the data size of the element
+     * `getDataSize` returns the data size of the element.
+     *
+     * A tombstone charges its key only. The value it still carries is dead
+     * weight: nothing reads it -- ``RHT/has(key:)``, ``RHT/toJSON()`` and
+     * ``RHT/toObject()`` all gate on `isRemoved` -- and charging it made the
+     * running `docSize` disagree with a rebuild of the same document, which
+     * replays the same removals. The value is left on the node rather than
+     * cleared so that what this SDK stores and serializes for a tombstone is
+     * byte-for-byte what it was, and what a peer sends us is kept verbatim: the
+     * convergence fix belongs in the accounting, not in the wire format.
      */
     func getDataSize() -> DataSize {
         // Charge the LOGICAL value in UTF-8 bytes, which is what the Go SDK stores
@@ -59,10 +68,36 @@ class RHTNode: GCChild {
         // `count` counted grapheme clusters where Go's `len()` counts UTF-8
         // bytes, so the same document had a different size allowance per SDK.
         .init(
-            data: (self.key.utf8.count + logicalAttrValue(self.value).utf8.count) * 2,
+            data: self.key.utf8.count * 2 + (self.isRemoved ? 0 : attrValueSize(self.value)),
             meta: timeTicketSize
         )
     }
+}
+
+/**
+ * `attrValueSize` returns the `DataSize.data` bytes an attribute value of the
+ * given stored form contributes, on the same terms as ``RHTNode/getDataSize()``.
+ */
+private func attrValueSize(_ stored: String) -> Int {
+    logicalAttrValue(stored).utf8.count * 2
+}
+
+/**
+ * `RHTRemoval` is what an ``RHT/remove(key:executedAt:)`` reports back.
+ */
+struct RHTRemoval {
+    /// The tombstones this removal made collectable.
+    var gcNodes: [RHTNode]
+
+    /**
+     * `valueDropped` is the size of the value the removal stopped charging for,
+     * which no node's `getDataSize` accounts for any more. The caller subtracts
+     * it from whichever side of the ledger was holding it: live for an
+     * attribute that was live on a live node, gc for one on a node that is
+     * itself a tombstone. Zero when the attribute was already a tombstone,
+     * since a tombstone's value was not being charged in the first place.
+     */
+    var valueDropped: DataSize
 }
 
 /**
@@ -134,11 +169,18 @@ class RHT {
 
     /**
      * `remove` removes the Element of the given key.
+     *
+     * The tombstone still STORES the value -- what goes on the wire is
+     * unchanged -- but stops being CHARGED for it, because
+     * ``RHTNode/getDataSize()`` skips a removed node's value.
+     * ``RHTRemoval/valueDropped`` is what the caller has to take back out of
+     * whichever side of the ledger was holding those bytes.
      */
     @discardableResult
-    func remove(key: String, executedAt: TimeTicket) -> [RHTNode] {
+    func remove(key: String, executedAt: TimeTicket) -> RHTRemoval {
         let prev = self.nodeMapByKey[key]
         var gcNodes = [RHTNode]()
+        var valueDropped = DataSize(data: 0, meta: 0)
 
         if prev == nil || executedAt.after(prev!.updatedAt) {
             if prev == nil {
@@ -147,12 +189,13 @@ class RHT {
                 self.nodeMapByKey[key] = node
 
                 gcNodes.append(node)
-                return gcNodes
+                return RHTRemoval(gcNodes: gcNodes, valueDropped: valueDropped)
             }
 
             let alreadyRemoved = prev!.isRemoved
             if !alreadyRemoved {
                 self.numberOfRemovedElement += 1
+                valueDropped.data = attrValueSize(prev!.value)
             }
 
             if alreadyRemoved {
@@ -163,10 +206,10 @@ class RHT {
             self.nodeMapByKey[key] = node
             gcNodes.append(node)
 
-            return gcNodes
+            return RHTRemoval(gcNodes: gcNodes, valueDropped: valueDropped)
         }
 
-        return gcNodes
+        return RHTRemoval(gcNodes: gcNodes, valueDropped: valueDropped)
     }
 
     /**

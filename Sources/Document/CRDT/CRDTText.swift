@@ -534,7 +534,10 @@ final class CRDTText: CRDTElement {
                 // so the NODE holding the attribute may itself be a tombstone --
                 // the third case `attrGCPair` asks about.
                 var attrWasLive = node.value.getAttrs().has(key: key)
-                for rhtNode in node.value.getAttrs().remove(key: key, executedAt: editedAt) {
+                let removal = node.value.getAttrs().remove(key: key, executedAt: editedAt)
+                applyValueDropped(removal, nodeIsLive: nodeIsLive, to: &size)
+
+                for rhtNode in removal.gcNodes {
                     pairs.append(attrGCPair(node.value, rhtNode, attrWasLive, nodeIsLive))
                     // Only the node that replaces the live value settles the live
                     // value's bytes; a second one in the same call is the

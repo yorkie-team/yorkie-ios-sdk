@@ -829,6 +829,21 @@ extension CRDTTreeNode: GCChild {
 }
 
 /**
+ * `applyValueDropped` subtracts the bytes an attribute removal dropped from
+ * whichever side of the ledger was holding them: live for a live attribute on
+ * a live node, gc for one on a node that is itself a tombstone. The tombstone
+ * itself is never charged for the value -- see ``RHTNode/getDataSize()`` --
+ * so those bytes simply leave the ledger rather than moving to gc.
+ */
+func applyValueDropped(_ removal: RHTRemoval, nodeIsLive: Bool, to size: inout DocSize) {
+    if nodeIsLive {
+        size.live.subDataSize(others: removal.valueDropped)
+    } else {
+        size.gc.subDataSize(others: removal.valueDropped)
+    }
+}
+
+/**
  * `attrGCPair` builds the GC pair for an RHT node a style edit turned into
  * garbage. `wasLive` says whether docSize.live was holding the value this node
  * replaces: only then does collecting it take a size out of live.
@@ -1640,7 +1655,7 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DocSize, [String: String]) {
         let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
-        let size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
+        var size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
 
         let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
         let traverseFromParent = recovery?.fromParent ?? fromParent
@@ -1679,8 +1694,10 @@ class CRDTTree: CRDTElement {
                 let nodeIsLive = !node.isRemoved
                 for key in attributesToRemove {
                     var wasLive = node.attrs!.has(key: key)
-                    let nodesToBeRemoved = node.attrs!.remove(key: key, executedAt: editedAt)
-                    for rhtNode in nodesToBeRemoved {
+                    let removal = node.attrs!.remove(key: key, executedAt: editedAt)
+                    applyValueDropped(removal, nodeIsLive: nodeIsLive, to: &size)
+
+                    for rhtNode in removal.gcNodes {
                         pairs.append(attrGCPair(node, rhtNode, wasLive, nodeIsLive))
                         // Only the node replacing the live value takes a size out of
                         // live; a second one in the same call is the tombstone it
@@ -1727,12 +1744,15 @@ class CRDTTree: CRDTElement {
                             next.attrs = RHT()
                         }
                         var removedAny = false
+                        let nextIsLive = !next.isRemoved
                         for key in attributesToRemove {
                             var wasLive = next.attrs!.has(key: key)
-                            let nodesToBeRemoved = next.attrs!.remove(key: key, executedAt: editedAt)
-                            removedAny = removedAny || !nodesToBeRemoved.isEmpty
-                            for rhtNode in nodesToBeRemoved {
-                                pairs.append(attrGCPair(next, rhtNode, wasLive, !next.isRemoved))
+                            let removal = next.attrs!.remove(key: key, executedAt: editedAt)
+                            removedAny = removedAny || !removal.gcNodes.isEmpty
+                            applyValueDropped(removal, nodeIsLive: nextIsLive, to: &size)
+
+                            for rhtNode in removal.gcNodes {
+                                pairs.append(attrGCPair(next, rhtNode, wasLive, nextIsLive))
                                 wasLive = false
                             }
                         }

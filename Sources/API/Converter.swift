@@ -1055,6 +1055,12 @@ extension Converter {
         guard let tree = try fromTreeNodes(pbTree.nodes, fromTimeTicket(pbTree.createdAt)) else {
             throw YorkieError(code: .errUnexpected, message: "Can't get root from PbJSONElement.Tree")
         }
+        // `toTree` writes both tickets and `CRDTElement.getMetaUsage` charges both,
+        // so dropping them here makes a tree restored from a snapshot smaller than
+        // the same tree before the restore -- one ticket per stamp. Every other
+        // `from*` restores them; this one did not.
+        tree.movedAt = pbTree.hasMovedAt ? fromTimeTicket(pbTree.movedAt) : nil
+        tree.removedAt = pbTree.hasRemovedAt ? fromTimeTicket(pbTree.removedAt) : nil
         return tree
     }
 

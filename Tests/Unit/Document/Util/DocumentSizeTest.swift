@@ -282,7 +282,12 @@ extension DocumentSizeTest {
         }
 
         await self.expectLive(with: .init(data: 10, meta: 168))
-        await self.expectGC(with: .init(data: 36, meta: 168))
+        // gc gains the tombstone's KEY only (`bold`, 4 chars, 8 bytes): a removed
+        // attribute holds no value, so the 8 bytes `true` was charging leave live
+        // without arriving in gc. This used to read 36 -- the value counted twice
+        // over, once in the tombstone and once in a rebuild it disagreed with
+        // (yorkie-js-sdk#1392).
+        await self.expectGC(with: .init(data: 28, meta: 168))
     }
 
     // gc test

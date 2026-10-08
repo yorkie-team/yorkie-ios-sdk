@@ -95,7 +95,15 @@ struct MoveOperation: Operation {
             throw YorkieError(code: .errUnexpected, message: "fail to get previousIndex")
         }
 
-        if let deadNode = try array.moveAfter(createdAt: self.createdAt, prevCreatedAt: self.previousCreatedAt, executedAt: self.executedAt) {
+        let result = try array.moveAfter(createdAt: self.createdAt, prevCreatedAt: self.previousCreatedAt, executedAt: self.executedAt)
+
+        // The `movedAt` stamp is part of the moved element's size; see
+        // `CRDTRoot.accMovedElement` for why it cannot simply go to live.
+        if let element = array.getByID(createdAt: self.createdAt) {
+            root.accMovedElement(element, result.movedDiff)
+        }
+
+        if let deadNode = result.deadNode {
             // See `JSONArray.registerMove`: a dead position node was never in live.
             root.registerGCPair(GCPair(parent: array.getRGATreeList(), child: deadNode, gcOnlySize: deadNode.getDataSize()))
         }

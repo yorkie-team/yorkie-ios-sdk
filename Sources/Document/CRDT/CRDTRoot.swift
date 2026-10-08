@@ -785,6 +785,37 @@ class CRDTRoot {
     func accGC(_ diff: DataSize) {
         self.docSize.gc.addDataSizes(others: diff)
     }
+
+    /**
+     * `accMovedElement` books the size a move added to the moved element.
+     *
+     * An element already tombstoned when it is moved -- a remove and a move of
+     * the same element, concurrent on two replicas, arrive in some order on each
+     * -- is not in live at all: its whole size was moved to gc when it was
+     * removed. Charging the ticket to live there would leave live permanently
+     * ahead of a rebuild, and gc permanently behind by the same amount, which is
+     * the drift in the delivery order where the remove lands first. The gc
+     * charge also has to be topped up so collection, which subtracts the
+     * element's CURRENT size, does not overshoot.
+     */
+    func accMovedElement(_ element: CRDTElement, _ diff: DataSize) {
+        let key = GCChargeKey(element: element)
+
+        if let charged = self.sizeInGC[key] {
+            // A zero charge is `release`'s marker for a subtree orphaned by a
+            // restore: neither side is holding it and neither takes the ticket.
+            // No real charge is zero -- every element carries a createdAt.
+            if charged.data == 0, charged.meta == 0 {
+                return
+            }
+
+            self.docSize.gc.addDataSizes(others: diff)
+            self.sizeInGC[key]?.addDataSizes(others: diff)
+            return
+        }
+
+        self.docSize.live.addDataSizes(others: diff)
+    }
 }
 
 extension CRDTRoot: CustomDebugStringConvertible {
