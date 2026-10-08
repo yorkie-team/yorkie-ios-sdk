@@ -297,4 +297,12 @@ class PrimitiveTests: XCTestCase {
         XCTAssertEqual(try Converter.valueFrom(.long, data: Data()), .long(0))
         XCTAssertEqual(try Converter.valueFrom(.date, data: Data([1])), .date(Date(timeIntervalSince1970: 0.001)))
     }
+
+    // A boolean reads any nonzero byte as true and an empty payload as false, as
+    // yorkie-js-sdk does; indexing the first byte trapped on an empty payload.
+    func test_reads_a_boolean_payload_as_yorkie_js_sdk_does() throws {
+        XCTAssertEqual(try Converter.valueFrom(.boolean, data: Data()), .boolean(false))
+        XCTAssertEqual(try Converter.valueFrom(.boolean, data: Data([2])), .boolean(true))
+        XCTAssertEqual(try Converter.valueFrom(.boolean, data: Data([0])), .boolean(false))
+    }
 }

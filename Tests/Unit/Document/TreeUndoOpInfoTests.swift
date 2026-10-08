@@ -183,4 +183,38 @@ final class TreeUndoOpInfoTests: XCTestCase {
         XCTAssertEqual(try xmlOf(replicaB), "<doc><p></p><p>cd</p></doc>")
         XCTAssertEqual(try xmlOf(replicaA), try xmlOf(replicaB))
     }
+
+    /// A local change whose operations ran but reported nothing an editor could
+    /// render -- a style over a text-only range, which `canStyle` skips --
+    /// still publishes its LocalChange, as yorkie-js-sdk does: it is queued and
+    /// consumes a clientSeq either way.
+    @MainActor
+    func test_publishes_a_local_change_whose_operations_report_nothing() throws {
+        // given
+        let doc = Document(key: "local-change-no-opinfo")
+        try doc.update { root, _ in
+            root.t = JSONTree(initialRoot: JSONTreeElementNode(
+                type: "doc",
+                children: [JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ab")])]
+            ))
+        }
+        var published = 0
+        var opInfos: [any OperationInfo] = []
+        doc.subscribe { event, _ in
+            guard let change = event as? LocalChangeEvent else {
+                return
+            }
+            published += 1
+            opInfos.append(contentsOf: change.value.operations)
+        }
+
+        // when
+        try doc.update { root, _ in
+            try (root.t as? JSONTree)?.style(2, 3, ["bold": true])
+        }
+
+        // then
+        XCTAssertEqual(published, 1, "the change was published")
+        XCTAssertTrue(opInfos.isEmpty, "with no position to report")
+    }
 }

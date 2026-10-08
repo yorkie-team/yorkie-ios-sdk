@@ -328,4 +328,18 @@ final class JSONDedupCounterTests: XCTestCase {
         XCTAssertTrue(try restored.restoreHLL(wellFormed))
         XCTAssertEqual(restored.value, 1)
     }
+
+    // A rejected HLL payload is dropped, and the counter keeps the value the peer
+    // sent alongside it, as yorkie-js-sdk does.
+    func test_keeps_the_wire_value_when_the_hll_payload_is_rejected() throws {
+        var pbCounter = PbJSONElement.Counter()
+        pbCounter.type = .integerDedupCnt
+        pbCounter.value = Primitive(value: .integer(7), createdAt: TimeTicket.initial).toBytes()
+        pbCounter.createdAt = Converter.toTimeTicket(TimeTicket.initial)
+        pbCounter.hllRegisters = Data([1])
+
+        let counter = try XCTUnwrap(Converter.fromCounter(pbCounter) as? CRDTCounter<Int32>)
+
+        XCTAssertEqual(counter.value, 7)
+    }
 }
