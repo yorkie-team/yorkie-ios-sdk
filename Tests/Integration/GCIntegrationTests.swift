@@ -1440,6 +1440,13 @@ class GCIntegrationTests: XCTestCase {
         try await client1.sync()
         try await client2.sync()
 
+        // The server answers a deactivate first and detaches client1 (dropping
+        // its version vector row) in the background, racing the client2 sync
+        // below: while the row is still on file the minimum vector does not
+        // cover client2's "c", the successor of the tombstone "b", so the
+        // successor barrier holds "b" back. yorkie-js-sdk deactivates with
+        // `synchronous: true`, but that fails on the memory backend CI runs, so
+        // this waits for the detach by syncing until the collection happens.
         try await client1.deactivate()
 
         let garbageLength1 = doc2.getGarbageLength()
@@ -1449,6 +1456,10 @@ class GCIntegrationTests: XCTestCase {
         XCTAssertEqual(getVersionVector1, 2)
 
         try await client2.sync()
+        for _ in 0 ..< 20 where doc2.getGarbageLength() != 0 {
+            try await Task.sleep(nanoseconds: 250_000_000)
+            try await client2.sync()
+        }
         let garbageLength2 = doc2.getGarbageLength()
         let getVersionVector2 = doc2.getVersionVector().size()
 
