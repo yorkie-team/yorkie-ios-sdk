@@ -578,16 +578,22 @@ final class TreeEditOperation: Operation {
         let path = try root.createPath(createdAt: self.parentCreatedAt)
         let edits = retombstoneChanges + restoreChanges
         let opInfos: [any OperationInfo] = edits.map { edit in
-            let value: [CRDTTreeNode] = {
+            // Prefer the snapshot taken when the edit was made (see
+            // `TreeVisibleEdit.snapshot`); converting now would read children
+            // a later span revived.
+            let value: [any JSONTreeNode] = {
+                if !edit.snapshot.isEmpty {
+                    return edit.snapshot
+                }
                 if case .nodes(let nodes) = edit.change.value {
-                    return nodes
+                    return nodes.compactMap { $0.toJSONTreeNode }
                 }
                 return []
             }()
             return TreeEditOpInfo(path: path,
                                   from: edit.change.from,
                                   to: edit.change.to,
-                                  value: value.compactMap { $0.toJSONTreeNode },
+                                  value: value,
                                   splitLevel: 0,
                                   fromPath: edit.change.fromPath,
                                   toPath: edit.change.toPath)

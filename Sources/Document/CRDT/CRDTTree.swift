@@ -79,6 +79,11 @@ struct TreeChange {
 struct TreeVisibleEdit {
     let change: TreeChange
     let insertedSize: Int
+    /// The inserted nodes as an editor sees them, captured when the edit was made.
+    /// A later span in the same restore can revive one of this node's children;
+    /// converting afterwards would embed that child here as well as report it on
+    /// its own, so a consumer replaying every edit would insert it twice.
+    var snapshot: [any JSONTreeNode] = []
 }
 
 /**
@@ -3369,7 +3374,7 @@ extension CRDTTree {
                                 splitLevel: 0)
         // The change reports a collapsed range, as every insertion does, so the
         // size it added is not readable from it; reconciliation needs it.
-        return TreeVisibleEdit(change: change, insertedSize: range.to - range.from)
+        return TreeVisibleEdit(change: change, insertedSize: range.to - range.from, snapshot: [node.toJSONTreeNode])
     }
 
     /**
