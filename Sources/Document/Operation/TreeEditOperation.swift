@@ -445,10 +445,13 @@ final class TreeEditOperation: Operation {
         }
 
         // For undo ops the stored integer indices may have been reconciled against remote edits;
-        // convert them back to positions on the current tree before editing.
+        // convert them back to positions on the current tree before editing. These are the
+        // document's own indexes, not the caller's: reconciliation and the edits since can move
+        // one inside a surrogate pair, so they resolve without the pair check that guards
+        // caller-supplied indexes.
         if self.isUndoOp, let fromIdx = self.fromIdx, let toIdx = self.toIdx {
-            self.fromPos = try tree.findPos(fromIdx)
-            self.toPos = try fromIdx == toIdx ? self.fromPos : (tree.findPos(toIdx))
+            self.fromPos = try tree.findPosUnchecked(fromIdx)
+            self.toPos = try fromIdx == toIdx ? self.fromPos : (tree.findPosUnchecked(toIdx))
         }
 
         // The tree drops content that reuses an ID it already holds, and reports the size of what it
@@ -612,7 +615,9 @@ final class TreeEditOperation: Operation {
     ///
     /// The reverse op stores both ``CRDTTreePos`` (for initial use) and integer indices (for
     /// reconciliation when remote edits arrive). At undo time the integer indices take precedence
-    /// and are converted to positions via `tree.findPos`.
+    /// and are converted to positions via `tree.findPosUnchecked` -- these are the document's own
+    /// indexes, not the caller's: reconciliation and the edits since can move one inside a
+    /// surrogate pair, so they resolve without the pair check that guards caller-supplied indexes.
     ///
     /// When `mergeLevel > 0`, the edit was a cross-boundary merge (it moved children by
     /// deleting element boundaries). The reverse of a merge is a split — not content
@@ -659,7 +664,7 @@ final class TreeEditOperation: Operation {
         // Its redo (i.e. the reverse of this reverse) should re-split at the merged position,
         // not re-insert the tombstoned boundary nodes as raw content.
         if let redoSplitLevel, redoSplitLevel > 0 {
-            let splitRedoFromPos = try tree.findPos(preEditFromIdx)
+            let splitRedoFromPos = try tree.findPosUnchecked(preEditFromIdx)
             let splitRedoOp = TreeEditOperation(
                 parentCreatedAt: self.parentCreatedAt,
                 fromPos: splitRedoFromPos,
@@ -679,7 +684,7 @@ final class TreeEditOperation: Operation {
         // A merge deletes element boundaries (e.g., </p><p>), moving children
         // into the target. The undo re-creates those boundaries via split.
         if mergeLevel > 0 {
-            let splitFromPos = try tree.findPos(preEditFromIdx)
+            let splitFromPos = try tree.findPosUnchecked(preEditFromIdx)
             let splitUndoOp = TreeEditOperation(
                 parentCreatedAt: self.parentCreatedAt,
                 fromPos: splitFromPos,
@@ -734,10 +739,13 @@ final class TreeEditOperation: Operation {
                 cloneAndDropPreTombstoned(node, preTombstoned)
             }
 
-        // Positions for the reverse range, computed on the post-edit tree from the pre-edit index.
-        let reverseFromPos = try tree.findPos(preEditFromIdx)
+        // Positions for the reverse range, computed on the post-edit tree from the pre-edit
+        // index. The reverse is built for remote changes too, from indexes on this replica's
+        // tree, so it skips the pair check: refusing one would refuse a remote change the
+        // caller never controlled.
+        let reverseFromPos = try tree.findPosUnchecked(preEditFromIdx)
         let reverseToPos = try insertedContentSize > 0
-            ? (tree.findPos(preEditFromIdx + insertedContentSize))
+            ? (tree.findPosUnchecked(preEditFromIdx + insertedContentSize))
             : reverseFromPos
 
         // executedAt is reassigned just before execution when Document.undo() is called.
@@ -791,8 +799,8 @@ final class TreeEditOperation: Operation {
             return nil
         }
 
-        let reverseFromPos = try tree.findPos(reverseFromIdx)
-        let reverseToPos = try tree.findPos(reverseToIdx)
+        let reverseFromPos = try tree.findPosUnchecked(reverseFromIdx)
+        let reverseToPos = try tree.findPosUnchecked(reverseToIdx)
 
         let boundaryDeletionOp = TreeEditOperation(
             parentCreatedAt: self.parentCreatedAt,

@@ -2420,9 +2420,56 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `findPos` finds the position of the given index in the tree.
+     * `findPos` finds the position of the given index in the tree. It rejects an index inside
+     * a UTF-16 surrogate pair.
      */
     func findPos(_ index: Int, _ preferText: Bool = true) throws -> CRDTTreePos {
+        let treePos = try self.indexTree.findTreePos(index, preferText)
+        if treePos.node.isText {
+            try self.validateUTF16Boundary(treePos)
+        }
+
+        return CRDTTreePos.fromTreePos(pos: treePos)
+    }
+
+    /**
+     * `validateUTF16Boundary` throws when the given text position splits a surrogate pair. At
+     * either end of the node it reads the neighbouring text node: converting a position back to
+     * an index splits text nodes with no operation, so a pair can sit in two nodes on this
+     * replica while it is one node on every other, and an index at that seam is still inside it.
+     */
+    private func validateUTF16Boundary(_ treePos: TreePos<CRDTTreeNode>) throws {
+        let node = treePos.node
+        let offset = Int(treePos.offset)
+        let value = node.value
+
+        var before: unichar? = (offset - 1 >= 0 && offset - 1 < value.length) ? value.character(at: offset - 1) : nil
+        var after: unichar? = (offset >= 0 && offset < value.length) ? value.character(at: offset) : nil
+        if offset == 0 {
+            if let prev = node.prevSibling, prev.isText, prev.value.length > 0 {
+                before = prev.value.character(at: prev.value.length - 1)
+            } else {
+                before = nil
+            }
+        }
+        if offset == value.length {
+            if let next = node.nextSibling, next.isText, next.value.length > 0 {
+                after = next.value.character(at: 0)
+            } else {
+                after = nil
+            }
+        }
+
+        try ensureUTF16Boundary(before, after)
+    }
+
+    /**
+     * `findPosUnchecked` is ``findPos(_:_:)`` without the surrogate pair check. It is for
+     * indexes the document computed itself, such as an undo range reconciled against a remote
+     * edit, which can land inside a pair through no fault of the caller. Refusing such an index
+     * would only drop the undo, so it resolves the way it did before the check existed.
+     */
+    func findPosUnchecked(_ index: Int, _ preferText: Bool = true) throws -> CRDTTreePos {
         let treePos = try self.indexTree.findTreePos(index, preferText)
 
         return CRDTTreePos.fromTreePos(pos: treePos)
@@ -2430,11 +2477,16 @@ class CRDTTree: CRDTElement {
 
     /**
      * `pathToPosRange` converts the given path of the node to the range of the position.
+     *
+     * The end index is derived here rather than supplied by the caller, so it goes through
+     * ``findPosUnchecked(_:_:)``: the caller named a node by path, and refusing the range
+     * because the index one past that node happens to land inside a surrogate pair would
+     * reject a request that is valid as given.
      */
     func pathToPosRange(_ path: [Int]) throws -> TreePosRange {
         let fromIdx = try self.pathToIndex(path)
 
-        return try (self.findPos(fromIdx), self.findPos(fromIdx + 1))
+        return try (self.findPos(fromIdx), self.findPosUnchecked(fromIdx + 1))
     }
 
     /**
@@ -2567,28 +2619,31 @@ class CRDTTree: CRDTElement {
     }
 
     /**
-     * `indexRangeToPosRange` returns the position range from the given index range.
+     * `indexRangeToPosRange` returns the position range from the given index range. It converts
+     * a selection, not an edit range, so it skips the surrogate pair check.
      */
     func indexRangeToPosRange(_ range: (Int, Int)) throws -> TreePosRange {
-        let fromPos = try self.findPos(range.0)
+        let fromPos = try self.findPosUnchecked(range.0)
         if range.0 == range.1 {
             return (fromPos, fromPos)
         }
 
-        return try (fromPos, self.findPos(range.1))
+        return try (fromPos, self.findPosUnchecked(range.1))
     }
 
     /**
-     * `indexRangeToPosStructRange` converts the integer index range into the Tree position range structure.
+     * `indexRangeToPosStructRange` converts the integer index range into the Tree position
+     * range structure. Like ``indexRangeToPosRange(_:)``, it is for selections and skips the
+     * surrogate pair check.
      */
     func indexRangeToPosStructRange(_ range: (Int, Int)) throws -> TreePosStructRange {
         let (fromIdx, toIdx) = range
-        let fromPos = try self.findPos(fromIdx).toStruct
+        let fromPos = try self.findPosUnchecked(fromIdx).toStruct
         if fromIdx == toIdx {
             return (fromPos, fromPos)
         }
 
-        return try (fromPos, self.findPos(toIdx).toStruct)
+        return try (fromPos, self.findPosUnchecked(toIdx).toStruct)
     }
 
     /**

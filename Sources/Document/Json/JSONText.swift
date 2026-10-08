@@ -59,6 +59,10 @@ public class JSONText {
 
     /**
      * `edit` edits this text with the given content.
+     *
+     * An index inside a UTF-16 surrogate pair throws ``YorkieError`` with code
+     * `errInvalidArgument`, logged and surfaced here as a `nil` return -- and so does content
+     * holding a lone half of one.
      */
     @discardableResult
     public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: String, _ attributes: Codable? = nil) -> (Int, Int)? {
@@ -85,7 +89,7 @@ public class JSONText {
             throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
-        let range = try text.indexRangeToPosRange(fromIdx, toIdx)
+        let range = try text.createRange(fromIdx, toIdx, content)
 
         Logger.debug("EDIT: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) c:\(content)")
 
@@ -140,6 +144,9 @@ public class JSONText {
 
     /**
      * `setStyle` styles this text with the given attributes.
+     *
+     * An index inside a UTF-16 surrogate pair throws ``YorkieError`` with code
+     * `errInvalidArgument`, logged and surfaced here as a `false` return.
      */
     @discardableResult
     public func setStyle(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) -> Bool {
@@ -161,7 +168,7 @@ public class JSONText {
             throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
         }
 
-        let range = try text.indexRangeToPosRange(fromIdx, toIdx)
+        let range = try text.createRange(fromIdx, toIdx)
 
         Logger.debug("STYL: f:\(fromIdx)->\(range.0.toTestString), t:\(toIdx)->\(range.1.toTestString) a:\(attributes)")
 
@@ -285,6 +292,9 @@ public class JSONText {
     /**
      * `createRangeForTest` returns pair of RGATreeSplitNodePos of the given indexes
      * for testing purpose.
+     *
+     * Unlike ``CRDTText/createRange(_:_:_:)``, it does not reject an index inside a surrogate
+     * pair.
      */
     func createRangeForTest(_ fromIdx: Int, _ toIdx: Int) -> RGATreeSplitPosRange? {
         guard self.context != nil, let text else {

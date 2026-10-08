@@ -565,6 +565,91 @@ final class CRDTText: CRDTElement {
     }
 
     /**
+     * `createRange` returns the position range of the given index range for a local edit or
+     * style. Unlike ``indexRangeToPosRange(_:_:)``, it rejects an index that splits a UTF-16
+     * surrogate pair.
+     *
+     * `content` is given for an edit and omitted for a style. It is checked for lone
+     * surrogates: storing one diverges across SDKs on its own, and the half then pairs with
+     * whatever code unit it is stored next to, which would turn the index at that seam into
+     * one `validateUTF16Boundary` refuses for the lifetime of the text. A peer running an SDK
+     * without this check can still send such content -- the guard is a local-edit contract,
+     * not a trust boundary -- but nothing a client of this SDK does can create it.
+     */
+    func createRange(_ fromIdx: Int, _ toIdx: Int, _ content: String? = nil) throws -> RGATreeSplitPosRange {
+        if let content, !content.isEmpty {
+            try ensureNoLoneSurrogate(content)
+        }
+
+        let range = try self.indexRangeToPosRange(fromIdx, toIdx)
+        try self.validateUTF16Boundary(range.0)
+        if fromIdx != toIdx {
+            try self.validateUTF16Boundary(range.1)
+        }
+
+        return range
+    }
+
+    /**
+     * `indexedContent` returns the text the given node contributes to the index: empty for a
+     * tombstone, whose text the index no longer counts (and empty for the head node, which
+     * never holds content).
+     */
+    private func indexedContent(_ node: RGATreeSplitNode<CRDTTextValue>) -> NSString {
+        node.isRemoved ? "" : node.value.content
+    }
+
+    /**
+     * `neighborContent` returns the content of the nearest node on the given side that still
+     * contributes text, or an empty string when there is none.
+     */
+    private func neighborContent(
+        _ node: RGATreeSplitNode<CRDTTextValue>,
+        _ step: (RGATreeSplitNode<CRDTTextValue>) -> RGATreeSplitNode<CRDTTextValue>?
+    ) -> NSString {
+        var current = step(node)
+        while let candidate = current {
+            let content = self.indexedContent(candidate)
+            if content.length > 0 {
+                return content
+            }
+            current = step(candidate)
+        }
+
+        return ""
+    }
+
+    /**
+     * `validateUTF16Boundary` throws when the given position splits a surrogate pair. At
+     * either end of the node it reads the neighbouring node: an edit or a style carrying a
+     * mid-pair offset splits the node there, so a pair can sit in two nodes on this replica
+     * while it is one node on every other, and an index at that seam is still inside it.
+     * ``RGATreeSplit/indexToPos(_:)`` resolves a seam to the node on its left, so the
+     * `offset == content.length` side is the one an index normally reaches.
+     */
+    private func validateUTF16Boundary(_ pos: RGATreeSplitPos) throws {
+        guard let node = self.rgaTreeSplit.findNode(pos.id) else {
+            return
+        }
+
+        let offset = Int(pos.relativeOffset)
+        let content = self.indexedContent(node)
+
+        var before: unichar? = (offset - 1 >= 0 && offset - 1 < content.length) ? content.character(at: offset - 1) : nil
+        var after: unichar? = (offset >= 0 && offset < content.length) ? content.character(at: offset) : nil
+        if offset == 0 {
+            let prevContent = self.neighborContent(node) { $0.prev }
+            before = prevContent.length > 0 ? prevContent.character(at: prevContent.length - 1) : nil
+        }
+        if offset == content.length {
+            let nextContent = self.neighborContent(node) { $0.next }
+            after = nextContent.length > 0 ? nextContent.character(at: 0) : nil
+        }
+
+        try ensureUTF16Boundary(before, after)
+    }
+
+    /**
      * `length` returns size of RGATreeList.
      */
     var length: Int {
