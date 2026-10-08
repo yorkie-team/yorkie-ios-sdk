@@ -232,73 +232,31 @@ final class TreeHistoryOpInfoPositionsTests: XCTestCase {
         }
     }
 
-    /// CONFIRMED IOS DIVERGENCE FROM JS: restoring a multi-node subtree (an
-    /// element plus its text child) in one change reports the PARENT's
-    /// `TreeEditOpInfo.value` with the child already embedded, even though
-    /// the child is ALSO reported in its own separate `TreeEditOpInfo` right
-    /// after it -- so a consumer that applies every OpInfo literally (as this
-    /// file's `TreeHistoryFollower`, or any real editor binding, does) inserts
-    /// the child's content twice.
-    ///
-    /// Root cause: `CRDTTree.makeInsertionChange`
-    /// (Sources/Document/Crdt/CRDTTree.swift:3357-3372) stores a LIVE
-    /// `CRDTTreeNode` reference (`value: .nodes([node])`), not a snapshot.
-    /// `TreeEditOperation.executeIdentityPreservingEdit`'s opInfo construction
-    /// (Sources/Document/Operation/TreeEditOperation.swift:579-594) converts
-    /// every queued node to a `JSONTreeNode` only AFTER the whole
-    /// retombstone+restore loop has run (`CRDTTree.restore`,
-    /// Sources/Document/Crdt/CRDTTree.swift:3134-3211) -- by which point every
-    /// span's `unremove()` has already executed. `CRDTTreeNode.toJSONTreeNode`
-    /// (Sources/Document/Json/JSONTree.swift:41-53) recurses into
-    /// `node.children`, which filters on `isRemoved` AT CONVERSION TIME
-    /// (`IndexTreeNode.children`, Sources/Util/IndexTree.swift:300-306) -- so
-    /// by the time the PARENT's queued node is finally converted, a child
-    /// revived by a LATER span in the same change already reads as live and
-    /// is pulled into the parent's snapshot.
-    ///
-    /// JS does not have this hole: `CRDTTree.restore`'s `revived` closure
-    /// calls `makeInsertionChange`, which calls `toTreeNode(node)` EAGERLY,
-    /// inside the per-span loop (`packages/sdk/src/document/crdt/tree.ts`,
-    /// `restore`/`makeInsertionChange`) -- so the parent's snapshot is taken
-    /// before the child span runs, while `node.children` (same
-    /// filter-on-`isRemoved` semantics, `index_tree.ts:333-338`) is still
-    /// empty. iOS defers the snapshot; JS does not.
+    /// Restoring a multi-node subtree by identity reports the parent without
+    /// the children a later span revives: the parent is snapshotted when its
+    /// edit is made, as yorkie-js-sdk does, so a consumer replaying every
+    /// OpInfo does not insert a child twice.
     @MainActor
     func test_reports_where_undo_and_redo_of_insert_element_landed() throws {
-        try XCTExpectFailure("""
-        iOS bug: redo restores "<p>cd</p>" by identity (the identity-preserving         restore path), and the parent <p>'s TreeEditOpInfo wrongly embeds the         already-revived "cd" text child a second time. See the doc comment on         this test for the full root-cause trace.
-        """) {
-            try self.assertUndoAndRedoLanded(initial: [para("ab")]) { tree in
-                _ = try tree.editByPath([1], [1], para("cd"))
-            }
+        try self.assertUndoAndRedoLanded(initial: [para("ab")]) { tree in
+            _ = try tree.editByPath([1], [1], para("cd"))
         }
     }
 
-    /// See the divergence documented on
-    /// `test_reports_where_undo_and_redo_of_insert_element_landed`: undoing
-    /// this deletion restores "<p>cd</p>" by identity, and the parent's
-    /// OpInfo embeds the child a second time.
-    @MainActor
-    func test_reports_where_undo_and_redo_of_delete_element_landed() throws {
-        try XCTExpectFailure("""
-        iOS bug: undo restores "<p>cd</p>" by identity, and the parent <p>'s         TreeEditOpInfo wrongly embeds the already-revived "cd" text child a         second time (CRDTTree.swift:3357-3372, TreeEditOperation.swift:579-594).
-        """) {
-            try self.assertUndoAndRedoLanded(initial: [para("ab"), para("cd")]) { tree in
-                _ = try tree.editByPath([0], [1])
-            }
-        }
-    }
-
-    /// See the divergence documented on
+    /// Undoing this deletion restores "<p>cd</p>" by identity; see
     /// `test_reports_where_undo_and_redo_of_insert_element_landed`.
     @MainActor
+    func test_reports_where_undo_and_redo_of_delete_element_landed() throws {
+        try self.assertUndoAndRedoLanded(initial: [para("ab"), para("cd")]) { tree in
+            _ = try tree.editByPath([0], [1])
+        }
+    }
+
+    /// See `test_reports_where_undo_and_redo_of_insert_element_landed`.
+    @MainActor
     func test_reports_where_undo_and_redo_of_delete_two_elements_landed() throws {
-        try XCTExpectFailure("""
-        iOS bug: undo restores both deleted paragraphs by identity, and each         restored parent <p>'s TreeEditOpInfo wrongly embeds its already-revived         text child a second time (CRDTTree.swift:3357-3372,         TreeEditOperation.swift:579-594).
-        """) {
-            try self.assertUndoAndRedoLanded(initial: [para("ab"), para("cd"), para("ef")]) { tree in
-                _ = try tree.editByPath([0], [2])
-            }
+        try self.assertUndoAndRedoLanded(initial: [para("ab"), para("cd"), para("ef")]) { tree in
+            _ = try tree.editByPath([0], [2])
         }
     }
 
@@ -382,26 +340,19 @@ final class TreeHistoryOpInfoPositionsTests: XCTestCase {
         m1.isCapturingUndoRedo = false
         try crossSync(d1, d2)
 
-        // then -- the real documents converge correctly; only the reported
-        // OpInfo diverges from JS.
+        // then -- the documents converge, and the reported OpInfo replays to
+        // the same document.
         XCTAssertEqual(try xmlOf(d2), "<doc><p>ab</p><p>cd</p></doc>")
 
-        try XCTExpectFailure("""
-        iOS bug: the restored parent <p>'s TreeEditOpInfo wrongly embeds the \
-        already-revived "cd" text child a second time, so a consumer that \
-        replays every OpInfo (as this mirror does) renders "cdcd" instead of \
-        "cd" (CRDTTree.swift:3357-3372, TreeEditOperation.swift:579-594).
-        """) {
-            XCTAssertEqual(try m1.xml(), try xmlOf(d1))
-            XCTAssertEqual(try m2.xml(), try xmlOf(d2))
-            XCTAssertEqual(m1.undoRedoInfos.map(\.fromPath), [[1], [1, 0]])
-            XCTAssertEqual(
-                m1.undoRedoInfos.map { describe($0.value) },
-                [
-                    describe([JSONTreeElementNode(type: "p", children: [])]),
-                    describe([JSONTreeTextNode(value: "cd")])
-                ]
-            )
-        }
+        XCTAssertEqual(try m1.xml(), try xmlOf(d1))
+        XCTAssertEqual(try m2.xml(), try xmlOf(d2))
+        XCTAssertEqual(m1.undoRedoInfos.map(\.fromPath), [[1], [1, 0]])
+        XCTAssertEqual(
+            m1.undoRedoInfos.map { describe($0.value) },
+            [
+                describe([JSONTreeElementNode(type: "p", children: [])]),
+                describe([JSONTreeTextNode(value: "cd")])
+            ]
+        )
     }
 }
