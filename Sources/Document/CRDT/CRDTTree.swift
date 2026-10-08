@@ -405,6 +405,25 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
+     * `dropSplitLinks` clears the split-sibling links on this node and every
+     * one of its descendants.
+     *
+     * `insPrevID`/`insNextID` name positions in a split chain and only
+     * `splitElement` may create them. A node arriving as operation content is
+     * freshly created by the editing client, so it can never legitimately be a
+     * split product — but the wire format carries the fields regardless, and
+     * the chain walks that read them treat them as trusted structural
+     * pointers. Drop them on the way in rather than let a peer hand the tree a
+     * chain of its choosing.
+     */
+    func dropSplitLinks() {
+        traverseAll(node: self) { node, _ in
+            node.insPrevID = nil
+            node.insNextID = nil
+        }
+    }
+
+    /**
      * `isRemoved` returns whether the node is removed or not.
      */
     var isRemoved: Bool {
@@ -868,6 +887,32 @@ func accAttrWrite(_ write: RHTWrite, _ parent: GCParent, _ nodeIsLive: Bool, _ p
 }
 
 /**
+ * `InsNextWalker` bounds a walk of an `insNextID` chain.
+ *
+ * `insNextID` is a structural pointer that only `splitElement` is supposed to
+ * set, but it also arrives verbatim from client-supplied bytes, so a chain
+ * that loops back on itself would spin the applying task forever. Every
+ * chain walk runs through one of these.
+ */
+private final class InsNextWalker {
+    private var seen = Set<ObjectIdentifier>()
+
+    /**
+     * `visit` records `node` and reports whether this walk had not already
+     * passed through it. A false result means the chain is cyclic; stop
+     * following it.
+     */
+    func visit(_ node: CRDTTreeNode) -> Bool {
+        let id = ObjectIdentifier(node)
+        if self.seen.contains(id) {
+            return false
+        }
+        self.seen.insert(id)
+        return true
+    }
+}
+
+/**
  * `CRDTTree` is a CRDT implementation of a tree.
  */
 class CRDTTree: CRDTElement {
@@ -1098,8 +1143,15 @@ class CRDTTree: CRDTElement {
         }
 
         var current = node
+        let walker = InsNextWalker()
+        _ = walker.visit(current)
         while let insNextID = current.insNextID {
             guard let next = self.findFloorNode(insNextID), !next.isText else {
+                break
+            }
+
+            // Stop on a chain that loops back on itself; see `InsNextWalker`.
+            guard walker.visit(next) else {
                 break
             }
 
@@ -1119,6 +1171,16 @@ class CRDTTree: CRDTElement {
             }
 
             if let knownLamport = versionVector.get(actorID), knownLamport >= next.id.createdAt.lamport {
+                break
+            }
+
+            // Empty unknown siblings standing right before our own product are
+            // concurrent splits of the same boundary, ordered ahead of ours by
+            // `orderSameBoundarySplit`. They are not content the editor meant
+            // to keep on its left; a replica that applied them later
+            // re-parented them after the boundary (§7.4), so stay in front of
+            // them here as well.
+            if let skipActorID, self.emptyRunReachesActor(next, skipActorID, versionVector) {
                 break
             }
 
@@ -1410,7 +1472,12 @@ class CRDTTree: CRDTElement {
     ///
     /// Shared by ``style(_:_:_:_:)`` and ``removeStyle(_:_:_:_:)``: it splits text at both ends and
     /// advances past split siblings the editing client did not know about, so the range covers all
-    /// concurrent split products.
+    /// concurrent split products. `skipActorID` (the editing actor) stops the advance at the
+    /// editor's own split products, so a same-boundary empty run resolves here exactly as the split
+    /// loop in ``edit(_:_:_:_:_:_:)`` resolves it.
+    ///
+    /// - NOTE: upstream `tree.ts` used to run this advance in `style` only; as of #1375
+    ///   `removeStyle` runs the same §7.5 advance, on both range anchors, as `style` does.
     ///
     /// - Parameters:
     ///   - range: The style range in CRDT positions.
@@ -1421,26 +1488,19 @@ class CRDTTree: CRDTElement {
     private func resolveStyleRange(
         _ range: TreePosRange,
         _ editedAt: TimeTicket,
-        _ versionVector: VersionVector?,
-        advanceSplitSiblings: Bool = true
+        _ versionVector: VersionVector?
     ) throws -> (CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, CRDTTreeNode, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt, .range)
         let ((toParent, toLeftRaw), toDiff) = try self.findNodesAndSplitText(range.1, editedAt, .range)
         diff.addDataSizes(others: fromDiff, toDiff)
 
-        // NOTE: only `style` advances past unknown split siblings. `removeStyle`
-        // uses the raw anchors, matching upstream `tree.ts`, where the advance
-        // appears in `style` and `edit` but never in `removeStyle`. Sharing this
-        // helper without the switch silently extended the advance to
-        // `removeStyle` and made an iOS replica traverse a different node set
-        // than JS/Android for the same remote operation.
-        guard advanceSplitSiblings else {
-            return (fromParent, fromLeftRaw, toParent, toLeftRaw, diff)
-        }
-
-        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
-        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
+        let fromLeft = fromLeftRaw !== fromParent
+            ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector, skipActorID: editedAt.actorID)
+            : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent
+            ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector, skipActorID: editedAt.actorID)
+            : toLeftRaw
 
         return (fromParent, fromLeft, toParent, toLeft, diff)
     }
@@ -1521,8 +1581,14 @@ class CRDTTree: CRDTElement {
                 // covers the right part of the split node.
                 if tokenType == .start, let versionVector {
                     var current = node
+                    let walker = InsNextWalker()
+                    _ = walker.visit(current)
                     while let insNextID = current.insNextID {
                         guard let next = self.findFloorNode(insNextID), !next.isText else {
+                            break
+                        }
+                        // Stop on a chain that loops back on itself; see `InsNextWalker`.
+                        guard walker.visit(next) else {
                             break
                         }
                         if ticketKnown(versionVector, next.id.createdAt) {
@@ -1573,8 +1639,7 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ versionVector: VersionVector? = nil
     ) throws -> ([GCPair], [TreeChange], DocSize, [String: String]) {
-        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector,
-                                                                                             advanceSplitSiblings: false)
+        let (fromParent, fromLeft, toParent, toLeft, rangeDiff) = try self.resolveStyleRange(range, editedAt, versionVector)
         let size = DocSize(live: rangeDiff, gc: DataSize(data: 0, meta: 0))
 
         let recovery = try self.reversedFromAnchorRecovery(range.0, (fromParent, fromLeft, toParent, toLeft), versionVector)
@@ -1645,8 +1710,14 @@ class CRDTTree: CRDTElement {
                 // split also covers the right part of the split node.
                 if tokenType == .start, let versionVector {
                     var current = node
+                    let walker = InsNextWalker()
+                    _ = walker.visit(current)
                     while let insNextID = current.insNextID {
                         guard let next = self.findFloorNode(insNextID), !next.isText else {
+                            break
+                        }
+                        // Stop on a chain that loops back on itself; see `InsNextWalker`.
+                        guard walker.visit(next) else {
                             break
                         }
                         if ticketKnown(versionVector, next.id.createdAt) {
@@ -1722,12 +1793,17 @@ class CRDTTree: CRDTElement {
             }
 
             let rawOffset = left !== parent ? try parent.findOffset(node: left, includeRemoved: true) + 1 : 0
+            // §7.8 Same-Boundary Split Order: order concurrent splits of one
+            // boundary by ticket, newest first, so the products of a split at
+            // the end of `parent` land in the same node on every replica
+            // rather than in arrival order.
+            let (target, splitOffset) = self.orderSameBoundarySplit(parent, Int32(rawOffset), editedAt, versionVector)
             // The metadata the new element adds belongs in docSize.live, the
             // same as every other `split` caller books it. Dropping it here left
             // live without the elements a split mints, so a split and the merge
             // that undoes it did not cancel out and the live size walked down by
             // a ticket per cycle, without bound.
-            let (_, splitDiff) = try parent.split(self, Int32(rawOffset), issueTimeTicket(), versionVector)
+            let (_, splitDiff) = try target.split(self, splitOffset, issueTimeTicket(), versionVector)
             diff.addDataSizes(others: splitDiff)
             left = parent
             parent = nextParent
@@ -1756,8 +1832,14 @@ class CRDTTree: CRDTElement {
             return (fromParent, fromLeft)
         }
         var current = fromLeft
+        let walker = InsNextWalker()
+        _ = walker.visit(current)
         while let insNextID = current.insNextID {
             guard let next = self.findFloorNode(insNextID), !next.isText else {
+                break
+            }
+            // Stop on a chain that loops back on itself; see `InsNextWalker`.
+            guard walker.visit(next) else {
                 break
             }
             if let nextParent = next.parent, nextParent === toParent {
@@ -1803,8 +1885,16 @@ class CRDTTree: CRDTElement {
         // past siblings the editor could not have seen so that the range
         // starts/ends after all concurrent split products. Skip when
         // leftNode == parent (leftmost child position).
-        let fromLeft = fromLeftRaw !== fromParent ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector) : fromLeftRaw
-        let toLeft = toLeftRaw !== toParent ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector) : toLeftRaw
+        //
+        // §7.7: pass the editing actor so a same-boundary empty run resolves
+        // here exactly as the split loop resolves it; without it the two
+        // sides would place the same boundary differently.
+        let fromLeft = fromLeftRaw !== fromParent
+            ? self.advancePastUnknownSplitSiblings(fromLeftRaw, versionVector, skipActorID: editedAt.actorID)
+            : fromLeftRaw
+        let toLeft = toLeftRaw !== toParent
+            ? self.advancePastUnknownSplitSiblings(toLeftRaw, versionVector, skipActorID: editedAt.actorID)
+            : toLeftRaw
 
         // Phase 3: Range Narrowing — narrow the traversal range when fromLeft and
         // toLeft straddle a concurrent element split. The original
@@ -2085,8 +2175,12 @@ class CRDTTree: CRDTElement {
      */
     private func collectUnknownSplitSiblings(of node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
         var result = [CRDTTreeNode]()
+        let walker = InsNextWalker()
+        _ = walker.visit(node)
         var nextID = node.insNextID
-        while let id = nextID, let next = self.findFloorNode(id) {
+        // Stop on a chain that loops back on itself; see `InsNextWalker`. An
+        // unbounded walk here would also grow `result` without limit.
+        while let id = nextID, let next = self.findFloorNode(id), walker.visit(next) {
             if !ticketKnown(versionVector, next.id.createdAt) {
                 result.append(next)
                 // Cascade through the full subtree, not just immediate children.
@@ -2564,6 +2658,147 @@ class CRDTTree: CRDTElement {
 
         let prev = siblings[offset - 1]
         return (prev, prev.isText ? .text : .end)
+    }
+}
+
+/// §7.8 Same-Boundary Split Order: the pieces of ``orderSameBoundarySplit(_:_:_:_:)``
+/// that decide which node a split at the end of a boundary actually splits, so
+/// concurrent splits of one node at one boundary land in the same place on
+/// every replica. Kept in its own extension (private members of ``CRDTTree``
+/// remain visible across extensions in this file) so the primary type
+/// declaration stays under SwiftLint's `type_body_length` limit.
+extension CRDTTree {
+    /**
+     * `emptyRunReachesActor` reports whether the `insNextID` chain starting at
+     * `node` runs through empty, unknown element split siblings only and then
+     * reaches a node created by `actorID`.
+     */
+    private func emptyRunReachesActor(_ node: CRDTTreeNode, _ actorID: String, _ versionVector: VersionVector) -> Bool {
+        let walker = InsNextWalker()
+        var current: CRDTTreeNode? = node
+        while let cur = current, !cur.isText, walker.visit(cur) {
+            let createdAt = cur.id.createdAt
+            if createdAt.actorID == actorID {
+                return cur !== node
+            }
+
+            let knownLamport = versionVector.get(createdAt.actorID)
+            if cur.innerChildren.isEmpty == false || (knownLamport != nil && knownLamport! >= createdAt.lamport) {
+                return false
+            }
+
+            current = cur.insNextID.flatMap { self.findFloorNode($0) }
+        }
+
+        return false
+    }
+
+    /**
+     * `orderSameBoundarySplit` decides which node a split at `offset` of
+     * `parent` actually splits, so that concurrent splits of one node at one
+     * boundary land in the same order on every replica.
+     *
+     * `splitElement` places its product directly after the node it splits.
+     * When a concurrent split of the same boundary has already been applied,
+     * that puts the products in arrival order, which differs per replica. The
+     * XML still matches (all but the last product are empty) but
+     * position-based operations that follow do not.
+     *
+     * Order them by ticket instead, newest first, as RGA orders concurrent
+     * inserts after the same node: skip the unknown split siblings with a
+     * newer ticket and split the last of them at its start. The right half
+     * lives in that sibling on this replica, so it moves into our product
+     * exactly as it would have moved out of `parent` on a replica that
+     * applied us first.
+     */
+    private func orderSameBoundarySplit(
+        _ parent: CRDTTreeNode,
+        _ offset: Int32,
+        _ editedAt: TimeTicket,
+        _ versionVector: VersionVector?
+    ) -> (CRDTTreeNode, Int32) {
+        // A concurrent split of the same boundary took everything to the
+        // right of it, so only a split at the end of `parent` can be one.
+        guard let versionVector, offset == Int32(parent.innerChildren.count) else {
+            return (parent, offset)
+        }
+
+        var target = parent
+        let walker = InsNextWalker()
+        _ = walker.visit(target)
+        while let insNextID = target.insNextID {
+            guard let next = self.findFloorNode(insNextID), !next.isText, next.parent != nil else {
+                break
+            }
+
+            // Stop on a chain that loops back on itself; see `InsNextWalker`.
+            guard walker.visit(next) else {
+                break
+            }
+
+            // The sibling has to belong to target's own split family. The
+            // strict parent-equality check §7.5 uses is too strong here — at
+            // a multi-level split the sibling may already sit under the next
+            // level's product — but dropping it entirely would let an
+            // insNextID that did not come from `splitElement` redirect this
+            // split onto an arbitrary element elsewhere in the tree.
+            guard self.sharesSplitFamilyParent(target, next) else {
+                break
+            }
+
+            // Splitting a tombstoned sibling would make our product born
+            // tombstoned, which a replica that applied us before the
+            // concurrent split never does. Fall back to splitting parent, as
+            // that replica did, rather than diverge on liveness.
+            if next.isRemoved {
+                break
+            }
+
+            let createdAt = next.id.createdAt
+            if createdAt.actorID == editedAt.actorID {
+                break
+            }
+            if let knownLamport = versionVector.get(createdAt.actorID), knownLamport >= createdAt.lamport {
+                break
+            }
+            if !createdAt.after(editedAt) {
+                break
+            }
+
+            target = next
+        }
+
+        return target === parent ? (parent, offset) : (target, 0)
+    }
+
+    /**
+     * `sharesSplitFamilyParent` reports whether `next` sits under `node`'s
+     * parent, or under a split product of that parent. A multi-level split
+     * moves a sibling under the next level's product, so the two parents
+     * legitimately differ — but only within one split family. Anything beyond
+     * that is not a split sibling of `node`, whatever its `insNextID` claims.
+     */
+    private func sharesSplitFamilyParent(_ node: CRDTTreeNode, _ next: CRDTTreeNode) -> Bool {
+        guard let nodeParent = node.parent, next.parent != nil else {
+            return false
+        }
+        if nodeParent === next.parent {
+            return true
+        }
+
+        let walker = InsNextWalker()
+        var current: CRDTTreeNode? = nodeParent
+        while let cur = current, walker.visit(cur) {
+            if cur === next.parent {
+                return true
+            }
+            guard let insNextID = cur.insNextID else {
+                return false
+            }
+            current = self.findFloorNode(insNextID)
+        }
+
+        return false
     }
 }
 

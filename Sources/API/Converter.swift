@@ -312,15 +312,21 @@ extension Converter {
             if  pbElementSimple.value.isEmpty {
                 return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
             } else {
-                return try Self.fromObject(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonObject)
+                let object = try Self.fromObject(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonObject)
+                // A Set/Add/ArraySet payload is client-supplied and freshly
+                // created, so none of the trees it may carry can legitimately
+                // be a split product. Drop the split-sibling links the wire
+                // format carries anyway.
+                return dropSplitLinksInElement(object)
             }
         case .jsonArray:
             if pbElementSimple.value.isEmpty {
                 return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
             } else {
-                return try Self.fromArray(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonArray)
+                let array = try Self.fromArray(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonArray)
+                return dropSplitLinksInElement(array)
             }
-            
+
         case .text:
             return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
@@ -343,7 +349,7 @@ extension Converter {
 
             return CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .tree:
-            return try bytesToTree(bytes: pbElementSimple.value)
+            return dropSplitLinksInElement(try bytesToTree(bytes: pbElementSimple.value))
         default:
             throw YorkieError(code: .errUnimplemented, message: "unimplemented element: \(pbElementSimple)")
         }
@@ -1301,8 +1307,17 @@ extension Converter {
         guard pbTreeNodes.isEmpty == false else {
             return nil
         }
-        
-        return pbTreeNodes.compactMap { try? fromTreeNodes($0.content)?.root }
+
+        return pbTreeNodes.compactMap { pbTreeNode -> CRDTTreeNode? in
+            let root = try? fromTreeNodes(pbTreeNode.content)?.root
+            // Operation content is fully client-controlled and is always
+            // freshly created by the editing client, so it can never be a
+            // split product. Drop the split-sibling links the wire format
+            // carries anyway: the tree follows them as trusted structural
+            // pointers once `edit` registers these nodes in `nodeMapByID`.
+            root?.dropSplitLinks()
+            return root
+        }
     }
 
     /**

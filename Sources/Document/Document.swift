@@ -413,6 +413,21 @@ public class Document: Attachable {
             let ticket = context.issueTimeTicket
             op.executedAt = ticket
 
+            // A Set/Add/ArraySet reverse carries a deepcopy of the value it
+            // restores, and that copy keeps the split-sibling links of the
+            // tree it was taken from. Every other replica decodes this same
+            // operation through `dropSplitLinksInElement`, so without this
+            // the replica that ran the undo is the only one left holding the
+            // links, and the two disagree from the next same-boundary split
+            // on.
+            if let setOp = op as? SetOperation {
+                dropSplitLinksInElement(setOp.value)
+            } else if let addOp = op as? AddOperation {
+                dropSplitLinksInElement(addOp.value)
+            } else if let arraySetOp = op as? ArraySetOperation {
+                dropSplitLinksInElement(arraySetOp.getValue())
+            }
+
             // NOTE: in undo/redo, both ArraySet and Add may act as updates that restore an
             // element, which receives a new createdAt. Reconcile the history accordingly.
             if let arraySet = op as? ArraySetOperation {
