@@ -204,4 +204,82 @@ class PrimitiveTests: XCTestCase {
         }
         XCTAssertEqual(minValue, minInt64)
     }
+
+    // MARK: - Parity guard for yorkie-js-sdk#1422
+
+    // Ported from yorkie-js-sdk v0.7.22 primitive_test.ts.
+    //
+    // #1422 ("Read a double without writing to the buffer it shares") fixed a bug where
+    // `Primitive.valueFromBytes` copied a double's payload to offset 0 of the *underlying*
+    // `ArrayBuffer` and read it back from there, writing through to whatever else shared
+    // that buffer — a snapshot decodes as one buffer handed out as views, so reading a
+    // double out of a document could overwrite another field's bytes.
+    //
+    // `Converter.valueFrom(_:data:)` cannot have that defect: it only reads
+    // (`withUnsafeBytes { $0.load(as:) }`, never `withUnsafeMutableBytes`), and unlike JS's
+    // `bytes.buffer` — which discards a typed array's `byteOffset` and always points at the
+    // start of the underlying buffer — `Data.withUnsafeBytes` is always relative to that
+    // `Data` value's own window, even when the `Data` is a slice of a larger shared buffer.
+    // So there is no source change to port; these tests pin the round-trip behaviour that
+    // makes iOS immune.
+    //
+    // The short-payload tests from the same JS commit ("reads a double/long/date payload
+    // shorter than eight bytes instead of throwing") are NOT ported: `UnsafeRawBufferPointer
+    // .load(as:)` traps when the buffer is shorter than the type's stride, so a truncated
+    // payload crashes on iOS rather than reading as zero-padded. That is a real, separate gap
+    // from the shared-buffer bug this commit fixes — flagged in the port report, not fixed
+    // here, since fixing it is not part of this change.
+
+    func test_reads_a_double_out_of_a_shared_buffer_without_writing_to_it() throws {
+        // given — two double values packed into one shared buffer, mirroring how a decoded
+        // snapshot hands each field a slice of a single underlying buffer
+        let firstValue = 3.14
+        let secondValue = 2.71
+        var sharedBuffer = withUnsafeBytes(of: firstValue.bitPattern.littleEndian) { Data($0) }
+        sharedBuffer.append(withUnsafeBytes(of: secondValue.bitPattern.littleEndian) { Data($0) })
+        let untouchedPrefix = Data(sharedBuffer.prefix(8))
+
+        // when — decode the SECOND field, which the old JS bug would have copied into offset
+        // 0 of the underlying buffer, i.e. into the first field's bytes
+        let secondFieldStart = sharedBuffer.index(sharedBuffer.startIndex, offsetBy: 8)
+        let secondSlice = sharedBuffer[secondFieldStart...]
+        let decoded = try Converter.valueFrom(.double, data: secondSlice)
+
+        // then — the decoded value is correct and the first field's bytes are untouched
+        guard case .double(let value) = decoded else {
+            return XCTFail("expected .double")
+        }
+        XCTAssertEqual(value, secondValue)
+        XCTAssertEqual(Data(sharedBuffer.prefix(8)), untouchedPrefix)
+    }
+
+    func test_reads_the_first_eight_bytes_of_a_longer_double_payload() throws {
+        // given — a double payload with trailing bytes a peer might include
+        var data = withUnsafeBytes(of: Double(3.14).bitPattern.littleEndian) { Data($0) }
+        data.append(contentsOf: [0xFF, 0xFF, 0xFF, 0xFF])
+
+        // when
+        let decoded = try Converter.valueFrom(.double, data: data)
+
+        // then
+        guard case .double(let value) = decoded else {
+            return XCTFail("expected .double")
+        }
+        XCTAssertEqual(value, 3.14)
+    }
+
+    func test_bytes_value_is_independent_of_the_shared_buffer_it_was_read_from() throws {
+        // given
+        var shared = Data([1, 2, 3, 4])
+        let decoded = try Converter.valueFrom(.bytes, data: shared)
+
+        // when — mutate the original buffer after decoding
+        shared[0] = 9
+
+        // then — the decoded value is unaffected, because `Data` is copy-on-write
+        guard case .bytes(let value) = decoded else {
+            return XCTFail("expected .bytes")
+        }
+        XCTAssertEqual(Array(value), [1, 2, 3, 4])
+    }
 }
