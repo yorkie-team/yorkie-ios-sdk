@@ -22,33 +22,33 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ### Added
 
-- Warn when offline persistence is used without a client key in PR_URL_PLACEHOLDER
-- Report where Tree undo and redo landed in their OpInfo in PR_URL_PLACEHOLDER
-- Let a document choose its undo/redo depth (`DocumentOptions.maxUndoDepth`, default 50; a value below 1 falls back to the default) in PR_URL_PLACEHOLDER
+- Warn when offline persistence is used without a client key in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Report where Tree undo and redo landed in their OpInfo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Let a document choose its undo/redo depth (`DocumentOptions.maxUndoDepth`, default 50; a value below 1 falls back to the default) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
 
 ### Changed
 
-- Name the change and operation that cannot be applied in PR_URL_PLACEHOLDER
-- Sync the protos with Go and harden crafted tree payloads in PR_URL_PLACEHOLDER
-- Reject indexes that split a UTF-16 surrogate pair in PR_URL_PLACEHOLDER
+- Name the change and operation that cannot be applied in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Sync the protos with Go and harden crafted tree payloads in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Reject indexes that split a UTF-16 surrogate pair in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
 
 ### Fixed
 
-- Order concurrent splits of one boundary by ticket in PR_URL_PLACEHOLDER
-- Make docSize agree with a rebuild (issue #1383, part 3) in PR_URL_PLACEHOLDER
-- Guard empty-text anchors and reset the clone on failed applies in PR_URL_PLACEHOLDER
-- Fix clientSeq rewind, leaked sizeInGC record, tombstone removedAt in PR_URL_PLACEHOLDER
-- Burn the lamport when a change's root pass throws in PR_URL_PLACEHOLDER
-- Fix losing ElementRHT values against tombstones in PR_URL_PLACEHOLDER
-- Drop snapshots in push-only mode but keep the push ack in PR_URL_PLACEHOLDER
-- Take a push-only response as a push ack only, so GC does not purge tombstones unpulled changes anchor on in PR_URL_PLACEHOLDER
-- Port three tree convergence fixes from the Go SDK in PR_URL_PLACEHOLDER
-- Port three GC correctness fixes from the Go SDK in PR_URL_PLACEHOLDER
-- Read a double without writing to the buffer it shares, and read a short fixed-width or boolean payload as JS does instead of crashing; a dedup counter keeps its wire value when its HLL payload is rejected in PR_URL_PLACEHOLDER
-- Re-point operations at the elements a redo split re-creates in PR_URL_PLACEHOLDER
-- Read Text.normalizePos from the index tree instead of the chain in PR_URL_PLACEHOLDER
-- Make `setActor` overridable through an `Operation` existential, so a TreeEdit operation re-stamps its split tickets in PR_URL_PLACEHOLDER
-- Snapshot a restored Tree node for its OpInfo when the edit is made, so a restored subtree reports each node once in PR_URL_PLACEHOLDER
+- Order concurrent splits of one boundary by ticket in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Make docSize agree with a rebuild (issue #1383, part 3) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Guard empty-text anchors and reset the clone on failed applies in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Fix clientSeq rewind, leaked sizeInGC record, tombstone removedAt in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Burn the lamport when a change's root pass throws in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Fix losing ElementRHT values against tombstones in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Drop snapshots in push-only mode but keep the push ack in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Take a push-only response as a push ack only, so GC does not purge tombstones unpulled changes anchor on in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Port three tree convergence fixes from the Go SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Port three GC correctness fixes from the Go SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Read a double without writing to the buffer it shares, and read a short fixed-width or boolean payload as JS does instead of crashing; a dedup counter keeps its wire value when its HLL payload is rejected in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Re-point operations at the elements a redo split re-creates in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Read Text.normalizePos from the index tree instead of the chain in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Make `setActor` overridable through an `Operation` existential, so a TreeEdit operation re-stamps its split tickets in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Snapshot a restored Tree node for its OpInfo when the edit is made, so a restored subtree reports each node once in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
 
 ## [v0.7.23] - 2026-10-01
 
