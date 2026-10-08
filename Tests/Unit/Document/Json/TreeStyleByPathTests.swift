@@ -322,4 +322,55 @@ final class TreeStyleByPathTests: XCTestCase {
         let xml = (doc.getRoot().t as? JSONTree)?.toXML()
         XCTAssertEqual(xml, "<doc><p color=\"red\">a</p><p color=\"red\">b</p></doc>")
     }
+
+    // MARK: - Backwards range
+
+    /// Mirrors yorkie-js-sdk b69169c0
+    /// (`packages/sdk/test/unit/document/tree_style_reached_set_test.ts`,
+    /// describe `Tree style by path`, "rejects a backwards range", #1404): a
+    /// backwards range reaches nothing through the index form, which rejects
+    /// it up front; the path form does the same instead of resolving it into
+    /// a range the boundary elements would have to judge.
+    @MainActor
+    func test_rejects_a_backwards_range_for_style_by_path() throws {
+        // given
+        let doc = Document(key: "tree-style-path-backwards-range")
+
+        try doc.update { root, _ in
+            root.t = JSONTree(initialRoot:
+                JSONTreeElementNode(type: "r", children: [
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ab")]),
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")])
+                ])
+            )
+        }
+
+        // when / then — both styleByPath and removeStyleByPath reject the
+        // backwards range up front.
+        XCTAssertThrowsError(
+            try doc.update { root, _ in
+                try (root.t as? JSONTree)?.styleByPath([1, 0], [0, 1], ["b": "x"])
+            }
+        ) { error in
+            let yorkieError = error as? YorkieError
+            XCTAssertEqual(yorkieError?.code, .errInvalidArgument)
+            XCTAssertEqual(yorkieError?.message, "from should be less than or equal to to")
+        }
+        XCTAssertThrowsError(
+            try doc.update { root, _ in
+                try (root.t as? JSONTree)?.removeStyleByPath([1, 0], [0, 1], ["b"])
+            }
+        ) { error in
+            let yorkieError = error as? YorkieError
+            XCTAssertEqual(yorkieError?.code, .errInvalidArgument)
+            XCTAssertEqual(yorkieError?.message, "from should be less than or equal to to")
+        }
+
+        // and — the forward form of the same range still styles both paragraphs.
+        try doc.update { root, _ in
+            try (root.t as? JSONTree)?.styleByPath([0, 0], [1, 0], ["b": "x"])
+        }
+        let xml = (doc.getRoot().t as? JSONTree)?.toXML()
+        XCTAssertEqual(xml, "<r><p b=\"x\">ab</p><p b=\"x\">cd</p></r>")
+    }
 }
