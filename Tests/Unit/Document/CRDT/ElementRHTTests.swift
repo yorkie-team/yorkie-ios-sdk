@@ -290,4 +290,37 @@ class ElementRHTTests: XCTestCase {
 
         XCTAssertEqual(removedAts(decoded), want)
     }
+
+    // MARK: - Losing value against a tombstoned occupant (ported from element_rht_test.ts, yorkie-js-sdk#1398)
+
+    /// Before the fix, the losing branch also required the occupant to be live
+    /// (`node!.isRemoved == false`). Once the occupant itself was a tombstone, neither branch of
+    /// `set` ran for a losing incoming value: it stayed live in `nodeMapByCreatedAt`, never
+    /// installed under the key and never collected, so iteration and `get(key:)` disagreed and
+    /// replicas diverged permanently (yorkie-js-sdk#1376).
+    func test_removes_a_losing_value_when_the_occupant_is_a_tombstone() throws {
+        // given — a winner is set under "key" and then removed, leaving the occupant a tombstone.
+        let rht = ElementRHT()
+
+        let winnerTicket = TimeTicket(lamport: 6, delimiter: 0, actorID: "actorA")
+        let winner = Primitive(value: .string("v2"), createdAt: winnerTicket)
+        rht.set(key: "key", value: winner, executedAt: winnerTicket)
+
+        let removedAt = TimeTicket(lamport: 7, delimiter: 0, actorID: "actorA")
+        try rht.delete(createdAt: winnerTicket, executedAt: removedAt)
+        XCTAssertTrue(winner.isRemoved)
+
+        // when — a live value that sorts before the tombstoned occupant loses the LWW conflict.
+        let loserTicket = TimeTicket(lamport: 5, delimiter: 0, actorID: "actorB")
+        let loser = Primitive(value: .string("v3"), createdAt: loserTicket)
+        rht.set(key: "key", value: loser, executedAt: loserTicket)
+
+        // then — the loser must be marked removed even though the occupant was already a tombstone.
+        XCTAssertTrue(loser.isRemoved, "the losing value should be removed")
+        XCTAssertFalse(rht.has(key: "key"))
+
+        let obj = CRDTObject(createdAt: TimeTicket.initial, memberNodes: rht)
+        XCTAssertEqual(obj.keys, [])
+        XCTAssertEqual(obj.toSortedJSON(), "{}")
+    }
 }
