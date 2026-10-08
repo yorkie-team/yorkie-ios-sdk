@@ -68,6 +68,32 @@ private func filterChildren(_ node: CRDTTreeNode, _ preTombstoned: Set<String>) 
     node.innerChildren = kept
 }
 
+/// `mergedAwayIDs` returns the ids of the elements a merge removed, innermost first -- the order a
+/// split re-creating them issues tickets in, since it splits from the innermost level out.
+///
+/// `mergedNodes` is the merge-boundary set ``CRDTTree/edit(_:_:_:_:_:_:)`` reports, NOT every node
+/// the edit tombstoned: the split reversing the merge re-creates exactly one element per boundary
+/// it crossed, so anything else in the removed set -- a whole element deleted inside the range, a
+/// cascade-deleted descendant, a node already tombstoned -- would shift the positional pairing
+/// with the split's tickets and bind an unrelated element to one of them.
+private func mergedAwayIDs(_ mergedNodes: [CRDTTreeNode]) -> [CRDTTreeNodeID] {
+    func depth(of node: CRDTTreeNode) -> Int {
+        var depth = 0
+        var current = node.parent
+        while let parent = current {
+            depth += 1
+            current = parent.parent
+        }
+        return depth
+    }
+
+    return mergedNodes
+        .filter { $0.isText == false }
+        .map { (node: $0, depth: depth(of: $0)) }
+        .sorted { $0.depth > $1.depth }
+        .map { $0.node.id }
+}
+
 /// `TreeEditOperation` is an operation representing Tree editing.
 ///
 /// It is a `class` (reference type) because undo/redo mutates its range in place — at undo
@@ -131,6 +157,27 @@ final class TreeEditOperation: Operation {
     /// neither side depends on the other's allocation staying in step. Empty for a change written
     /// before the field existed, which falls back to the reconstruction.
     private var splitTickets: [TimeTicket] = []
+    /// `replacedIDs` is set on a split that re-creates elements a merge removed -- the redo of a
+    /// split, or the undo of a merge. It names those elements, innermost first, in the order the
+    /// split mints their replacements. The replacements get new ids (see ``setSplitTickets(_:)``),
+    /// so whoever runs this split re-points every recorded operation at them. Local to the replica
+    /// that recorded it; never encoded.
+    private(set) var replacedIDs: [CRDTTreeNodeID] = []
+    /// How many of ``splitTickets`` the current execution has handed to the tree -- fewer than
+    /// `splitLevel` when the split loop ran out of ancestors, and zero before it starts. Doubles as
+    /// the index reported to ``splitTicketConsumedHandler``.
+    private var consumedSplitTickets = 0
+    /// What the last execution's split re-created, as `(removed element, its replacement)` pairs.
+    /// See ``getSplitRecreatedIDs()``.
+    private var splitRecreatedIDs: [(CRDTTreeNodeID, CRDTTreeNodeID)] = []
+    /// Notified as each recorded split ticket is handed to the tree, with its index in
+    /// ``splitTickets``. A split stops as soon as it runs out of ancestors, so how many elements it
+    /// really mints is only knowable from inside the split -- and re-pointing anything at a ticket
+    /// the split never consumed would leave it naming a node that was never created. Undo/redo
+    /// registers a handler here so the re-pointing happens per minted element, while the operations
+    /// that follow in the same change are still waiting to run. Local to the replica that
+    /// registered it; never encoded, and never copied to another operation.
+    private var splitTicketConsumedHandler: ((Int) -> Void)?
 
     init(parentCreatedAt: TimeTicket,
          fromPos: CRDTTreePos,
@@ -172,10 +219,15 @@ final class TreeEditOperation: Operation {
     /// design, which is what makes concurrent undos of one deletion converge rather than duplicate.
     ///
     /// - Parameter issueTimeTicket: Issues the next ticket of the change the undo creates.
+    /// - Returns: The `(old, new)` pairs it minted, so the caller can re-point whatever else was
+    ///   recorded against the old ids -- the same reconciliation a split's re-created elements need
+    ///   (``getReplacedIDs()``).
     /// - Throws: ``YorkieError`` with code `errRefused` when this operation also splits.
-    func reissueContentIDs(_ issueTimeTicket: @escaping () -> TimeTicket) throws {
+    @discardableResult
+    func reissueContentIDs(_ issueTimeTicket: @escaping () -> TimeTicket) throws -> [(CRDTTreeNodeID, CRDTTreeNodeID)] {
+        var reissued: [(CRDTTreeNodeID, CRDTTreeNodeID)] = []
         guard let contents = self.contents, self.restoreMode == nil else {
-            return
+            return reissued
         }
 
         // The tickets taken here start at `executedAt.delimiter + 1` and run one per node, while
@@ -189,7 +241,9 @@ final class TreeEditOperation: Operation {
 
         for content in contents {
             traverseAll(node: content) { node, _ in
+                let prev = node.id
                 node.id = CRDTTreeNodeID(createdAt: issueTimeTicket(), offset: 0)
+                reissued.append((prev, node.id))
                 // A fresh identity has to be fresh in every field that names a node. The copy came
                 // from `deepcopy`, which carries the split chain and the merge lineage of the node it
                 // copied: left in place they would splice this node into a chain it never belonged
@@ -201,6 +255,8 @@ final class TreeEditOperation: Operation {
                 node.mergedInto = nil
             }
         }
+
+        return reissued
     }
 
     /// `makeSplitTicketIssuer` returns the closure ``CRDTTree/edit(_:_:_:_:_:_:)`` uses to issue
@@ -220,16 +276,21 @@ final class TreeEditOperation: Operation {
     /// - Parameter editedAt: The ticket this operation executes at.
     /// - Returns: A closure returning the next split ticket on each call.
     private func makeSplitTicketIssuer(_ editedAt: TimeTicket) -> () -> TimeTicket {
-        var issued = 0
         // The base is captured once and advanced one delimiter per issued ticket, so successive
         // tickets in a multi-level split are consecutive. Reading the base back off the last issued
         // ticket instead would re-add the content count on every call.
         var delimiter = editedAt.delimiter + UInt32(self.contents?.count ?? 0)
+        self.consumedSplitTickets = 0
         return {
-            if issued < self.splitTickets.count {
-                let ticket = self.splitTickets[issued]
-                issued += 1
-                return ticket
+            if self.consumedSplitTickets < self.splitTickets.count {
+                let index = self.consumedSplitTickets
+                self.consumedSplitTickets += 1
+                // Reported as the ticket leaves, not after the split returns: the caller re-points
+                // the rest of the change at the element this ticket identifies, and that has to be
+                // in place before those operations run. `split` always inserts the node it clones
+                // under the ticket it took, so a consumed ticket is an element that exists.
+                self.splitTicketConsumedHandler?(index)
+                return self.splitTickets[index]
             }
             delimiter += 1
             return TimeTicket(lamport: editedAt.lamport, delimiter: delimiter, actorID: editedAt.actorID)
@@ -252,6 +313,83 @@ final class TreeEditOperation: Operation {
     /// - Parameter tickets: The tickets in issue order.
     func setSplitTickets(_ tickets: [TimeTicket]) {
         self.splitTickets = tickets
+    }
+
+    /// `getReplacedIDs` returns the ids of the elements this split re-creates, innermost first.
+    /// Empty unless this operation is the redo of a split or the undo of a merge.
+    func getReplacedIDs() -> [CRDTTreeNodeID] {
+        self.replacedIDs
+    }
+
+    /// `reconcileNodeID` points this operation at `curr` wherever it named `prev`: its range, and
+    /// the restore spans an identity-preserving undo carries. See
+    /// ``TreeStyleOperation/reconcileNodeID(prev:curr:)``.
+    func reconcileNodeID(prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) {
+        self.fromPos = self.fromPos.replaceNodeID(prev: prev, curr: curr)
+        self.toPos = self.toPos.replaceNodeID(prev: prev, curr: curr)
+
+        // `span.id` too, not just the anchors: it is the identity `restore` and `retombstone` look
+        // the node up by, and the one they RECREATE the node under when garbage collection has
+        // purged it (``CRDTTree/restore(_:_:)``). Left naming the element the split has just
+        // re-minted under a new ticket, an identity restore would revive nothing and recreate a
+        // duplicate under the stale id.
+        func reconcileSpans(_ spans: [TreeRestoreSpan]?) -> [TreeRestoreSpan]? {
+            spans?.map { span in
+                TreeRestoreSpan(
+                    id: replaceTreeNodeID(span.id, prev: prev, curr: curr),
+                    nodeType: span.nodeType,
+                    isText: span.isText,
+                    length: span.length,
+                    value: span.value,
+                    attrs: span.attrs,
+                    parentID: span.parentID.map { replaceTreeNodeID($0, prev: prev, curr: curr) },
+                    leftSiblingID: span.leftSiblingID.map { replaceTreeNodeID($0, prev: prev, curr: curr) },
+                    rightSiblingID: span.rightSiblingID.map { replaceTreeNodeID($0, prev: prev, curr: curr) }
+                )
+            }
+        }
+
+        self.restoreSpans = reconcileSpans(self.restoreSpans)
+        self.retombstoneSpans = reconcileSpans(self.retombstoneSpans)
+        self.replacedIDs = self.replacedIDs.map { replaceTreeNodeID($0, prev: prev, curr: curr) }
+    }
+
+    /// `onSplitTicketConsumed` registers `handler`, called with the index of each recorded split
+    /// ticket as the split takes it -- i.e. once per element the split really mints, and never for
+    /// a level it stopped short of. The operation is executed twice per undo/redo (clone, then
+    /// root), so the handler is called twice for the same index and has to be idempotent. Pass
+    /// `nil` to clear it once both executions are done: the handler closes over the undo/redo
+    /// entry, which the operation must not keep alive -- and must never re-point again from a later
+    /// execution. See ``splitTicketConsumedHandler``.
+    func onSplitTicketConsumed(_ handler: ((Int) -> Void)? = nil) {
+        self.splitTicketConsumedHandler = handler
+    }
+
+    /// `getSplitRecreatedIDs` returns the `(removed element, its replacement)` pairs the LAST
+    /// execution's split produced -- the elements a merge had taken away and that this split
+    /// re-created under new ids. Reset at every execution, so after a change has been applied it
+    /// describes the root pass.
+    ///
+    /// Unlike ``getReplacedIDs()`` this is derived from the tree the split ran on, not from the
+    /// reverse op this replica recorded, so it is available for a PEER's split too: the operation
+    /// on the wire says which tickets the split minted, never what they replace.
+    func getSplitRecreatedIDs() -> [(CRDTTreeNodeID, CRDTTreeNodeID)] {
+        self.splitRecreatedIDs
+    }
+
+    /// `getConsumedSplitTicketCount` returns how many of the recorded split tickets the LAST
+    /// execution handed to the tree -- how many elements that execution really minted. Fewer than
+    /// `splitLevel` when the split loop ran out of ancestors, and zero when this operation never
+    /// ran.
+    ///
+    /// The count is reset at the start of every execution, so after an undo/redo has applied the
+    /// change it describes the root pass, not the clone pass that ran first. The two can disagree:
+    /// the clone and the root are separate trees, and a remote change applied between the clone's
+    /// last sync and now can leave the split with a different number of ancestors to cross. The
+    /// handler above fires per execution and cannot tell which; anything that must reflect what the
+    /// ROOT tree actually minted has to check this after the fact.
+    func getConsumedSplitTicketCount() -> Int {
+        self.consumedSplitTickets
     }
 
     /// `setActor` sets the given actor to this operation and to the tickets its split issued.
@@ -317,7 +455,7 @@ final class TreeEditOperation: Operation {
         // accepted. The reverse operation and the undo stack both read that size rather than the
         // content this operation carried: a range covering content the tree refused would delete a
         // neighbour on redo.
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize, splitSize) = try tree.edit(
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize, splitSize, mergedNodes, splitRecreatedIDs) = try tree.edit(
             (self.fromPos, self.toPos),
             self.contents?.compactMap { $0.deepcopy() },
             self.splitLevel,
@@ -333,6 +471,9 @@ final class TreeEditOperation: Operation {
         self.lastToIdx = preEditFromIdx + removedSize
         self.insertedContentSize = insertedContentSize
         self.splitSize = splitSize
+        // What this execution's split re-created -- see `getSplitRecreatedIDs`. Reset on every
+        // execution, so after undo/redo has applied the change this describes the root pass.
+        self.splitRecreatedIDs = splitRecreatedIDs
 
         // Build the reverse op for undo.
         // A pure split (splitLevel > 0, no content inserted, no nodes removed) gets a
@@ -343,7 +484,7 @@ final class TreeEditOperation: Operation {
             && removedNodes.isEmpty
         let reverseOp: Operation?
         if self.splitLevel == 0 {
-            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, preTombstoned: preTombstoned, mergeLevel: mergeLevel, removedSpans: removedSpans, insertedSpans: insertedSpans)
+            reverseOp = try self.toReverseOperation(tree, removedNodes, preEditFromIdx, preTombstoned: preTombstoned, mergeLevel: mergeLevel, removedSpans: removedSpans, insertedSpans: insertedSpans, mergedNodes: mergedNodes)
         } else if isPureSplit {
             reverseOp = try self.toSplitReverseOperation(tree, preEditFromIdx, splitSize)
         } else {
@@ -490,7 +631,7 @@ final class TreeEditOperation: Operation {
     ///   - mergeLevel: The number of element boundaries merged by this edit. When greater than
     ///     zero the reverse op is a split rather than a content reinsertion.
     /// - Returns: The reverse ``TreeEditOperation``, or `nil` when the edit was a no-op.
-    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, preTombstoned: Set<String> = [], mergeLevel: Int = 0, removedSpans: [TreeRestoreSpan] = [], insertedSpans: [TreeRestoreSpan] = []) throws -> Operation? {
+    private func toReverseOperation(_ tree: CRDTTree, _ removedNodes: [CRDTTreeNode], _ preEditFromIdx: Int, preTombstoned: Set<String> = [], mergeLevel: Int = 0, removedSpans: [TreeRestoreSpan] = [], insertedSpans: [TreeRestoreSpan] = [], mergedNodes: [CRDTTreeNode] = []) throws -> Operation? {
         // Identity-preserving reverse: reverse an edit by reviving the nodes it
         // removed (`restoreSpans`) AND re-removing the nodes it inserted
         // (`retombstoneSpans`), both by ORIGINAL identity instead of
@@ -530,6 +671,7 @@ final class TreeEditOperation: Operation {
                 fromIdx: preEditFromIdx,
                 toIdx: preEditFromIdx
             )
+            splitRedoOp.replacedIDs = mergedAwayIDs(mergedNodes)
             return splitRedoOp
         }
 
@@ -549,6 +691,7 @@ final class TreeEditOperation: Operation {
                 fromIdx: preEditFromIdx,
                 toIdx: preEditFromIdx
             )
+            splitUndoOp.replacedIDs = mergedAwayIDs(mergedNodes)
             return splitUndoOp
         }
 

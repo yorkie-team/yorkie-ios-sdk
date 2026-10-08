@@ -179,6 +179,34 @@ final class History: @unchecked Sendable {
         }
     }
 
+    /**
+     * `reconcileTreeNodeID` re-points the tree edits and tree styles in both stacks that target the
+     * tree `parentCreatedAt` names, from `prev` to `curr`. Used when a split re-creates an element
+     * under a new id, the tree counterpart of ``reconcileCreatedAt(prevCreatedAt:currCreatedAt:)``.
+     *
+     * Scoped to one tree element, like ``reconcileTextEdit(parentCreatedAt:rangeFrom:rangeTo:contentLength:)``
+     * and ``reconcileTreeEdit(parentCreatedAt:rangeFrom:rangeTo:contentSize:)``: a node id is only
+     * unique within its own tree, and the pairs reach here from a peer's change as well as this
+     * replica's own, so an unscoped sweep would let one tree's split re-point entries recorded
+     * against a different tree.
+     */
+    func reconcileTreeNodeID(parentCreatedAt: TimeTicket, prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) {
+        // NOTE: iterating copies of the stacks is intentional and harmless — `TreeEditOperation` and
+        // `TreeStyleOperation` are classes, so `reconcileNodeID` mutates the stored instance through
+        // its reference.
+        for stack in [self.undoStack, self.redoStack] {
+            for ops in stack {
+                for case .operation(let op) in ops {
+                    if let treeEdit = op as? TreeEditOperation, treeEdit.parentCreatedAt == parentCreatedAt {
+                        treeEdit.reconcileNodeID(prev: prev, curr: curr)
+                    } else if let treeStyle = op as? TreeStyleOperation, treeStyle.parentCreatedAt == parentCreatedAt {
+                        treeStyle.reconcileNodeID(prev: prev, curr: curr)
+                    }
+                }
+            }
+        }
+    }
+
     private func replaceCreatedAt(in stack: inout [[HistoryOperation]], prevCreatedAt: TimeTicket, currCreatedAt: TimeTicket) {
         for stackIndex in stack.indices {
             for opIndex in stack[stackIndex].indices {

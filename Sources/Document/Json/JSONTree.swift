@@ -659,7 +659,7 @@ public class JSONTree {
         // operation can carry them: every other replica then uses them instead of reconstructing them
         // from the operation, which it cannot do correctly once content has descendants.
         var splitTickets = [TimeTicket]()
-        let (_, pairs, diff, _, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
+        let (_, pairs, diff, _, _, _, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
             let issued = context.issueTimeTicket
             splitTickets.append(issued)
             return issued

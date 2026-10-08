@@ -353,6 +353,23 @@ public class Document: Attachable {
             }
         }
 
+        // A plain local split can re-create an element a merge took away, too (a peer merged two
+        // blocks and this user splits them again), and the stacks may still name the merged-away
+        // element. Re-point them the way `applyChangeInternal` does for a peer's split and
+        // `executeUndoRedoInternal` for an undo/redo one, before this change's own reverse is
+        // pushed.
+        for op in executionResult.operations {
+            if let treeEdit = op as? TreeEditOperation {
+                for (prevID, currID) in treeEdit.getSplitRecreatedIDs() {
+                    self.internalHistory.reconcileTreeNodeID(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        prev: prevID,
+                        curr: currID
+                    )
+                }
+            }
+        }
+
         self.localChanges.append(change)
         self.onLocalChange?()
         if !executionResult.reverseOps.isEmpty {
@@ -501,9 +518,14 @@ public class Document: Attachable {
 
         let clone = self.cloned
         let context = ChangeContext(prevID: self.changeID, root: clone.root)
+        let treeRepointer = UndoRedoTreeNodeIDRepointer(ops: ops)
+        // Detach the handlers whether or not either pass below succeeds, so a later execution of
+        // these operations cannot re-point anything and the closures do not keep the popped entry
+        // alive.
+        defer { treeRepointer.detachHandlers() }
 
         // Apply the reverse operations into the context to generate a change.
-        for historyOp in ops {
+        for (opIndex, historyOp) in ops.enumerated() {
             // NOTE: presence reverse ops are not yet supported (deferred).
             guard case .operation(var op) = historyOp else {
                 continue
@@ -541,25 +563,14 @@ public class Document: Attachable {
                 // A reverse that re-inserts a copy of removed nodes carries their original ids;
                 // inserting them again would leave two nodes under one id. Restore-mode reverses
                 // revive by identity and keep theirs.
-                try treeEdit.reissueContentIDs { context.issueTimeTicket }
-
-                // A split reverse — the undo of a merge, or the redo of a split — mints one
-                // element per split level, and each needs a ticket this loop does not otherwise
-                // issue: `op.executedAt` above is exactly one ticket per operation. Left without
-                // them, `TreeEditOperation.execute` falls back to reconstructing them by counting
-                // delimiters up from its own `executedAt`, which runs straight over the ticket the
-                // NEXT operation in this same entry is about to be issued on the next loop
-                // iteration — landing two LIVE elements under one id, on every replica and on the
-                // server, since the change carries both operations. Issuing and recording them
-                // here, before the loop moves on, is what stops any replica reconstructing them.
                 //
-                // One per level is an upper bound, not an exact count: the split stops early when
-                // it reaches the root. A ticket nobody consumes only advances the delimiter, while
-                // one short would silently reopen the fallback. Mirrors yorkie's `executeUndoRedo`.
-                let level = treeEdit.splitLevel
-                if level > 0 {
-                    treeEdit.setSplitTickets((0 ..< level).map { _ in context.issueTimeTicket })
-                }
+                // A split reverse — the undo of a merge, or the redo of a split — re-creates
+                // elements a merge removed under brand-new ids, and anything recorded against the
+                // old ones — the rest of this entry and both history stacks — has to follow before
+                // garbage collection purges them (yorkie-js-sdk#1426). `prepare` issues this
+                // operation's split tickets too, one per level: an upper bound, not an exact count,
+                // since the split stops early when it reaches the root.
+                try treeRepointer.prepare(treeEdit, opIndex: opIndex, context: context)
             }
 
             context.push(operation: op)
@@ -584,6 +595,12 @@ public class Document: Attachable {
         let opInfos = executionResult.opInfos
         let executedOperations = executionResult.operations
         let reverseOps = executionResult.reverseOps
+
+        // Now that the operations have run, re-point the history stacks at the ids this entry
+        // actually minted. Deferred to here because the new reverse ops are built from the
+        // executed state, so they already carry the new ids and must not be pushed before this
+        // runs.
+        treeRepointer.reconcile(into: self.internalHistory, executedOperations: executedOperations)
 
         if !reverseOps.isEmpty {
             if isUndo {
@@ -1266,6 +1283,24 @@ public class Document: Attachable {
                 )
             }
             if let treeEdit = op as? TreeEditOperation {
+                // A split re-creates the elements a merge took away, under brand-new ids -- see
+                // `CRDTTree.mergeSourceOf`. That happens whoever sent the split: `executeUndoRedo`
+                // re-points this replica's stacks when the split is its own, and here when it
+                // arrives from a peer. Left un-re-pointed, an entry still naming the element the
+                // peer replaced addresses a node garbage collection will purge, and the change it
+                // eventually pushes is rejected on every replica (yorkie-js-sdk#1425).
+                //
+                // Done before the index reconciliation below and before the event is published, for
+                // the same reason the undo/redo path defers to after execution: the pairs are only
+                // known once the split has run.
+                for (prevID, currID) in treeEdit.getSplitRecreatedIDs() {
+                    self.internalHistory.reconcileTreeNodeID(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        prev: prevID,
+                        curr: currID
+                    )
+                }
+
                 // One reconciliation per range the op actually changed, in the
                 // order it changed them: an identity-preserving
                 // restore/retombstone revives or re-removes several nodes at
@@ -1886,5 +1921,130 @@ public class Document: Attachable {
         self.docID = state.docID
         self.clone = nil
         self.clearHistory()
+    }
+}
+
+/// Tree node ids one undo/redo entry re-mints, and what they replace, collected while the
+/// entry's change is built and reconciled against the history stacks only once the operations
+/// have run. Kept as a reference type (rather than an inout accumulator) because
+/// ``TreeEditOperation/onSplitTicketConsumed(_:)``'s handler is `@escaping` and has to mutate
+/// the same accumulator the registering call captured.
+///
+/// File-scoped rather than nested in ``Document`` to keep nesting depth and `Document`'s own
+/// type-body length within this project's SwiftLint limits; it is otherwise private to
+/// `Document.executeUndoRedoInternal(isUndo:)`, the only caller.
+///
+/// See the "careful part" write-up ported from yorkie-js-sdk#1426: the clone pass and the root
+/// pass can consume a different number of a split's tickets, so a pair is only real once the
+/// root pass confirms it, and both `reissueContentIDs` and the tree-derived
+/// ``TreeEditOperation/getSplitRecreatedIDs()`` signal are needed — neither subsumes the other.
+private final class UndoRedoTreeNodeIDRepointer {
+    private struct Pending {
+        let op: TreeEditOperation
+        let prev: CRDTTreeNodeID
+        let curr: CRDTTreeNodeID
+        /// `-1` for a re-issued content id, minted unconditionally; otherwise the index into
+        /// `op`'s split tickets, checked against
+        /// ``TreeEditOperation/getConsumedSplitTicketCount()`` once the root pass has run.
+        let ticketIndex: Int
+    }
+
+    private let ops: [HistoryOperation]
+    private var pending: [Pending] = []
+    private var splitOps: [TreeEditOperation] = []
+
+    init(ops: [HistoryOperation]) {
+        self.ops = ops
+    }
+
+    /// Re-points the operations that follow `opIndex` in this entry from `prev` to `curr`.
+    private func repointRest(after opIndex: Int, prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) {
+        for later in self.ops[(opIndex + 1)...] {
+            guard case .operation(let laterOp) = later else { continue }
+            if let treeEdit = laterOp as? TreeEditOperation {
+                treeEdit.reconcileNodeID(prev: prev, curr: curr)
+            } else if let treeStyle = laterOp as? TreeStyleOperation {
+                treeStyle.reconcileNodeID(prev: prev, curr: curr)
+            }
+        }
+    }
+
+    /// Reissues `treeEdit`'s content ids (a restore-mode reverse never splits, so this always
+    /// runs first) and, for a splitting reverse, registers the per-ticket re-pointing hook --
+    /// see ``TreeEditOperation/onSplitTicketConsumed(_:)``.
+    func prepare(_ treeEdit: TreeEditOperation, opIndex: Int, context: ChangeContext) throws {
+        for (prev, curr) in try treeEdit.reissueContentIDs({ context.issueTimeTicket }) {
+            self.repointRest(after: opIndex, prev: prev, curr: curr)
+            self.pending.append(Pending(op: treeEdit, prev: prev, curr: curr, ticketIndex: -1))
+        }
+
+        let level = treeEdit.splitLevel
+        guard level > 0 else { return }
+
+        treeEdit.setSplitTickets((0 ..< level).map { _ in context.issueTimeTicket })
+        treeEdit.onSplitTicketConsumed { [weak self] ticketIndex in
+            guard let self else { return }
+            // Read through the operation rather than off a captured array: an earlier
+            // re-point in this same entry may have replaced `replacedIDs` wholesale
+            // (`reconcileNodeID`).
+            let replacedIDs = treeEdit.getReplacedIDs()
+            guard ticketIndex < replacedIDs.count else { return }
+            let prev = replacedIDs[ticketIndex]
+            let curr = CRDTTreeNodeID(createdAt: treeEdit.getSplitTickets()[ticketIndex], offset: 0)
+            // Called once per execution, and the change is executed twice (clone, then
+            // root). `repointRest` no longer finds `prev` the second time, but the pending
+            // entry would be a duplicate.
+            guard !self.pending.contains(where: { $0.op === treeEdit && $0.prev == prev }) else { return }
+            self.repointRest(after: opIndex, prev: prev, curr: curr)
+            self.pending.append(Pending(op: treeEdit, prev: prev, curr: curr, ticketIndex: ticketIndex))
+        }
+        self.splitOps.append(treeEdit)
+    }
+
+    /// Detaches every registered hook so a later execution of these operations cannot
+    /// re-point anything and the closures do not keep this popped entry alive.
+    func detachHandlers() {
+        for splitOp in self.splitOps {
+            splitOp.onSplitTicketConsumed(nil)
+        }
+    }
+
+    /// Re-points the history stacks at the ids this entry actually minted, now that the
+    /// operations have run.
+    ///
+    /// Two things can still make a collected pair false, and both are only knowable now.
+    /// `Change.execute` skips an operation whose target element was removed during undo/redo,
+    /// so it minted nothing at all. And a pair is collected as the split takes its ticket on
+    /// WHICHEVER execution runs first -- the clone -- while the stacks have to follow the
+    /// root: the clone and the root are separate trees, so a split that crossed a level in
+    /// the clone can stop short of it in the root, leaving a pair naming a ticket no node in
+    /// the root ever received. Checked against what the root pass reports consuming
+    /// (reset per execution, so it describes the root pass here). Re-issued content ids carry
+    /// `-1`: those are minted unconditionally, once, up front.
+    ///
+    /// And then what the TREE says the split re-created, the same signal the local `update()`
+    /// and remote `applyChangeInternal` paths re-point from. The pairs above come from the
+    /// reverse op, which names the merge IT reverses; the split as executed can reverse one
+    /// this entry never knew about -- a peer merged two blocks while the undo sat on the
+    /// stack, and the redo of an unrelated split separates them again. Neither signal
+    /// subsumes the other, so both are applied, in that order; a pair the other already
+    /// handled sweeps nothing and costs nothing.
+    func reconcile(into history: History, executedOperations: [Operation]) {
+        for entry in self.pending {
+            guard executedOperations.contains(where: { ($0 as? TreeEditOperation) === entry.op }) else {
+                continue
+            }
+            if entry.ticketIndex >= 0, entry.ticketIndex >= entry.op.getConsumedSplitTicketCount() {
+                continue
+            }
+            history.reconcileTreeNodeID(parentCreatedAt: entry.op.parentCreatedAt, prev: entry.prev, curr: entry.curr)
+        }
+
+        for op in executedOperations {
+            guard let treeEdit = op as? TreeEditOperation else { continue }
+            for (prev, curr) in treeEdit.getSplitRecreatedIDs() {
+                history.reconcileTreeNodeID(parentCreatedAt: treeEdit.parentCreatedAt, prev: prev, curr: curr)
+            }
+        }
     }
 }

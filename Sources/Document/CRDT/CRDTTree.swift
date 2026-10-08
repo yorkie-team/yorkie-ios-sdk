@@ -165,6 +165,34 @@ extension CRDTTreePos {
     var toStruct: CRDTTreePosStruct {
         CRDTTreePosStruct(parentID: self.parentID.toStruct, leftSiblingID: self.leftSiblingID.toStruct)
     }
+
+    /// `replaceNodeID` returns this position with `prev` replaced by `curr` wherever it names the
+    /// parent or the left sibling, or this position itself when it names neither.
+    func replaceNodeID(prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) -> CRDTTreePos {
+        let parentID = replaceTreeNodeID(self.parentID, prev: prev, curr: curr)
+        let leftSiblingID = replaceTreeNodeID(self.leftSiblingID, prev: prev, curr: curr)
+
+        if parentID == self.parentID, leftSiblingID == self.leftSiblingID {
+            return self
+        }
+        return CRDTTreePos(parentID: parentID, leftSiblingID: leftSiblingID)
+    }
+}
+
+/// `replaceTreeNodeID` returns `id` re-pointed from the node `prev` names to the node `curr` names,
+/// or `id` itself when it names a different node.
+///
+/// The match is on the creation ticket alone, and the offset is carried over rather than taken from
+/// `curr`: a node id names a node by its creation ticket, while the offset says WHERE in that node
+/// the reference lands -- the child index when a position names an element as its left sibling
+/// (``CRDTTreePos/fromTreePos(pos:)``), the character offset inside a text node. Comparing the
+/// offset too, as ``CRDTTreeNodeID``'s `==` does, would miss every reference that is not to the
+/// node's own head.
+func replaceTreeNodeID(_ id: CRDTTreeNodeID, prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) -> CRDTTreeNodeID {
+    guard id.createdAt == prev.createdAt else {
+        return id
+    }
+    return CRDTTreeNodeID(createdAt: curr.createdAt, offset: id.offset)
 }
 
 /**
@@ -1081,6 +1109,59 @@ class CRDTTree: CRDTElement {
         return target
     }
 
+    /// `mergeSourceOf` returns the id of the removed element whose children a split has just taken
+    /// back, or `nil` when the split re-creates nothing.
+    ///
+    /// A merge moves a boundary element's children into the merge target and tombstones the
+    /// element, stamping each moved child with `mergedFrom` naming it. Reversing that merge is a
+    /// split, which mints a BRAND-NEW element -- it cannot revive the tombstone, whose id belongs
+    /// to a change every replica already applied -- and moves the stamped children into it. So a
+    /// split product holding children stamped for a removed element is the replacement for that
+    /// element, and anything recorded against the element has to follow (yorkie-js-sdk#1425).
+    ///
+    /// Derived from the tree rather than carried on the operation because a peer has to reach the
+    /// same conclusion from the change alone: the operation encodes only the split's tickets, never
+    /// what they replace.
+    ///
+    /// Narrow on purpose. A split that merely happens to cut through a merge target keeps some of
+    /// the source's children on the left, and its product is a new sibling rather than the
+    /// source's stand-in -- re-pointing at it would move references onto a node holding only part
+    /// of what they named. Only a split that takes the source's children back WHOLE reverses the
+    /// merge, so `splitTarget` is checked for leftovers.
+    ///
+    /// - Parameters:
+    ///   - splitNode: The node an element split just minted.
+    ///   - splitTarget: The node that was split, after the split ran.
+    /// - Returns: The id of the removed element `splitNode` replaces, or `nil`.
+    private func mergeSourceOf(splitNode: CRDTTreeNode, splitTarget: CRDTTreeNode) -> CRDTTreeNodeID? {
+        func stampedFor(_ node: CRDTTreeNode, _ id: CRDTTreeNodeID) -> Bool {
+            node.innerChildren.contains { child in
+                guard let mergedFrom = child.mergedFrom else { return false }
+                return mergedFrom.createdAt == id.createdAt
+            }
+        }
+
+        for child in splitNode.innerChildren {
+            guard let mergedFrom = child.mergedFrom else { continue }
+            // The product carries its own `mergedFrom` copied off the node it split (deep-copy); a
+            // child stamped for that same element was merged in one level up and is not what this
+            // split re-created.
+            if let splitNodeMergedFrom = splitNode.mergedFrom, mergedFrom.createdAt == splitNodeMergedFrom.createdAt {
+                continue
+            }
+            guard let source = self.findFloorNode(mergedFrom),
+                  source.isRemoved,
+                  source.id.createdAt == mergedFrom.createdAt,
+                  !stampedFor(splitTarget, source.id)
+            else {
+                continue
+            }
+            return source.id
+        }
+
+        return nil
+    }
+
     /**
      * `mergedAnchorInterloperGuard` prepares the §9.4 per-node filter for a style
      * range whose end position was declared inside a parent that a merge unknown
@@ -1644,8 +1725,12 @@ class CRDTTree: CRDTElement {
      * advancing past concurrent split siblings at each level (§7.5/§7.7) and
      * skipping the current operation's own split products.
      */
-    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws -> DataSize {
+    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws -> (DataSize, [(CRDTTreeNodeID, CRDTTreeNodeID)]) {
         var diff = DataSize(data: 0, meta: 0)
+        // The `(removed element, its replacement)` pairs this split produced -- see
+        // ``mergeSourceOf(splitNode:splitTarget:)``. Reported so a replica applying the split, its
+        // own or a peer's, can re-point whatever it recorded against the removed one.
+        var splitRecreatedIDs: [(CRDTTreeNodeID, CRDTTreeNodeID)] = []
         var splitCount: Int32 = 0
         var parent = from.parent
         var left: CRDTTreeNode = from.left
@@ -1683,13 +1768,16 @@ class CRDTTree: CRDTElement {
             // live without the elements a split mints, so a split and the merge
             // that undoes it did not cancel out and the live size walked down by
             // a ticket per cycle, without bound.
-            let (_, splitDiff) = try target.split(self, splitOffset, issueTimeTicket(), versionVector)
+            let (splitNode, splitDiff) = try target.split(self, splitOffset, issueTimeTicket(), versionVector)
             diff.addDataSizes(others: splitDiff)
+            if let splitNode, let recreated = self.mergeSourceOf(splitNode: splitNode, splitTarget: target) {
+                splitRecreatedIDs.append((recreated, splitNode.id))
+            }
             left = parent
             parent = nextParent
             splitCount += 1
         }
-        return diff
+        return (diff, splitRecreatedIDs)
     }
 
     /// `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
@@ -1752,7 +1840,10 @@ class CRDTTree: CRDTElement {
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket,
         _ versionVector: VersionVector? = nil
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int) {
+    ) throws -> (
+        [TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int,
+        [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)]
+    ) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
         let ((fromParent, fromLeftRaw), fromDiff) = try self.findNodesAndSplitText(range.0, editedAt)
@@ -1884,9 +1975,14 @@ class CRDTTree: CRDTElement {
         // 2 * splitLevel, so a split whose product is born tombstoned, or one the
         // tree has no room for, reports the growth it really produced.
         let sizeBeforeSplit = self.size
+        // The `(removed element, its replacement)` pairs this split produced — see
+        // `mergeSourceOf`. Reported so a replica applying the split, its own or a peer's, can
+        // re-point whatever it recorded against the removed one.
+        var splitRecreatedIDs: [(CRDTTreeNodeID, CRDTTreeNodeID)] = []
         if splitLevel > 0 {
-            let splitDiff = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
+            let (splitDiff, recreatedIDs) = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
             diff.addDataSizes(others: splitDiff)
+            splitRecreatedIDs = recreatedIDs
 
             changes.append(TreeChange(actor: editedAt.actorID,
                                       type: .content,
@@ -1901,70 +1997,15 @@ class CRDTTree: CRDTElement {
         let splitSize = self.size - sizeBeforeSplit
 
         // 05. Insert: insert the given nodes at the given position.
-        //
-        // The identity check runs here rather than on entry: resolving the range
-        // above splits text nodes, and a split can create the very ID a content
-        // node carries. Checking before that would let the copy through and leave
-        // two nodes under one ID. `insertedContentSize` is measured now, while the
-        // content is still detached — inserting under a removed parent tombstones
-        // it and shrinks what its size reads back as.
-        let contents = contents.map { self.dropDuplicateContents($0, editedAt) }
-        let insertedContentSize = contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
-
-        if let contents, contents.isEmpty == false {
-            // §9.4: When the insert position was declared inside a parent that a
-            // concurrent merge removed, the content physically lands in the merge
-            // target. Stamp it as merged-from the declared parent so it stays
-            // distinguishable from nodes that were never inside that parent —
-            // style-range resolution and merge-delete propagation key on this.
-            let (intendedParent, intendedMergedAt) = try self.intendedMergeStamp(range.0, fromParent)
-
-            var aliveContents = [CRDTTreeNode]()
-            var leftInChildren = fromLeft // tree
-
-            for content in contents {
-                // 05-1. insert the content nodes to the tree.
-                if leftInChildren === fromParent {
-                    // 05-1-1. when there's no leftSibling, then insert content into very fromt of parent's children List
-                    try fromParent.insertAt(content, 0)
-                } else {
-                    // 05-1-2. insert after leftSibling
-                    try fromParent.insertAfter(content, leftInChildren)
-                }
-
-                if let intendedParent {
-                    content.mergedFrom = intendedParent.id
-                    content.mergedAt = intendedMergedAt
-                }
-
-                leftInChildren = content
-                traverseAll(node: content) { node, _ in
-                    // if insertion happens during concurrent editing and parent node has been removed,
-                    // make new nodes as tombstone immediately
-                    if fromParent.isRemoved {
-                        node.remove(editedAt)
-
-                        pairs.append(GCPair(parent: self, child: node))
-                    } else {
-                        diff.addDataSizes(others: node.getDataSize())
-                    }
-
-                    self.registerNode(node)
-
-                    // Capture this inserted node's identity span for
-                    // identity-preserving insert undo/redo.
-                    insertedSpans.append(self.makeRestoreSpan(node))
-                }
-
-                if !content.isRemoved {
-                    aliveContents.append(content)
-                }
-            }
-
-            if aliveContents.isEmpty == false {
-                self.recordInsertedContent(&changes, aliveContents, fromIdx, fromPath, editedAt)
-            }
-        }
+        let insertResult = try self.applyInsertPhase(
+            contents,
+            at: TreeEditInsertSite(fromParent: fromParent, fromLeft: fromLeft, range: range, editedAt: editedAt, fromIdx: fromIdx, fromPath: fromPath),
+            changes: &changes
+        )
+        let insertedContentSize = insertResult.size
+        diff.addDataSizes(others: insertResult.diff)
+        pairs.append(contentsOf: insertResult.pairs)
+        insertedSpans.append(contentsOf: insertResult.insertedSpans)
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
         // Identity-preserving restore only covers plain deletions. If this edit
@@ -1978,7 +2019,122 @@ class CRDTTree: CRDTElement {
         // subtree top-down (a child's recreate resolves its parent by identity).
         let outRemoved = spansComplete ? removedSpans : []
         let outInserted = spansComplete ? Array(insertedSpans.reversed()) : []
-        return (changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize, splitSize)
+        // The merge-boundary elements this edit removed — the ones whose children it moved into
+        // the merge target, and so the ones a split reversing it has to re-create. A strict subset
+        // of `nodesToBeRemoved`, which also holds whole elements deleted inside the range, their
+        // cascade-deleted descendants and nodes already tombstoned.
+        return (
+            changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize, splitSize,
+            toBeMergedNodes, splitRecreatedIDs
+        )
+    }
+
+    /// Bundles `edit`'s step-05 inputs into one value so ``applyInsertPhase(_:at:)`` stays within
+    /// this project's parameter-count limit.
+    private struct TreeEditInsertSite {
+        let fromParent: CRDTTreeNode
+        let fromLeft: CRDTTreeNode
+        let range: TreePosRange
+        let editedAt: TimeTicket
+        let fromIdx: Int
+        let fromPath: [Int]
+    }
+
+    /// What ``applyInsertPhase(_:at:changes:)`` produced: the visible-index size the tree
+    /// accepted, and everything else the caller folds into its own running `edit` state. `changes`
+    /// is not here: `recordInsertedContent` merges into whatever change step 04 (the split) already
+    /// appended when they share one `from`, so it has to see -- and mutate -- the full cumulative
+    /// list, not a fresh one of its own.
+    private struct TreeEditInsertResult {
+        let size: Int
+        let diff: DataSize
+        let pairs: [GCPair]
+        let insertedSpans: [TreeRestoreSpan]
+    }
+
+    /// `applyInsertPhase` performs `edit`'s step 05: insert the given nodes at `site`. Extracted
+    /// from `edit` -- a straight code move, no behavior change -- to keep that method under this
+    /// project's function-length limit, and returning most of its effect rather than taking
+    /// `inout` accumulators for it to stay under its parameter-count limit (bundling them into one
+    /// `inout` would not help either: `traverseAll`'s callback below is `@escaping`, which cannot
+    /// capture an `inout` parameter even though it only ever runs synchronously here).
+    ///
+    /// The identity check runs here rather than on entry: resolving the range in `edit` splits
+    /// text nodes, and a split can create the very ID a content node carries. Checking before that
+    /// would let the copy through and leave two nodes under one ID. The returned size is measured
+    /// while the content is still detached -- inserting under a removed parent tombstones it and
+    /// shrinks what its size reads back as.
+    ///
+    /// - Parameters:
+    ///   - contents: The nodes to insert, already deep-copied for this edit.
+    ///   - site: Where and when the insert runs.
+    ///   - changes: The `edit` call's cumulative changes so far; appended to in place.
+    /// - Returns: The visible-index size the tree actually accepted, and the state to fold in.
+    private func applyInsertPhase(_ contents: [CRDTTreeNode]?, at site: TreeEditInsertSite, changes: inout [TreeChange]) throws -> TreeEditInsertResult {
+        let contents = contents.map { self.dropDuplicateContents($0, site.editedAt) }
+        let insertedContentSize = contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
+
+        guard let contents, contents.isEmpty == false else {
+            return TreeEditInsertResult(size: insertedContentSize, diff: DataSize(data: 0, meta: 0), pairs: [], insertedSpans: [])
+        }
+
+        // §9.4: When the insert position was declared inside a parent that a
+        // concurrent merge removed, the content physically lands in the merge
+        // target. Stamp it as merged-from the declared parent so it stays
+        // distinguishable from nodes that were never inside that parent —
+        // style-range resolution and merge-delete propagation key on this.
+        let (intendedParent, intendedMergedAt) = try self.intendedMergeStamp(site.range.0, site.fromParent)
+
+        var aliveContents = [CRDTTreeNode]()
+        var leftInChildren = site.fromLeft // tree
+        var diff = DataSize(data: 0, meta: 0)
+        var pairs = [GCPair]()
+        var insertedSpans = [TreeRestoreSpan]()
+
+        for content in contents {
+            // 05-1. insert the content nodes to the tree.
+            if leftInChildren === site.fromParent {
+                // 05-1-1. when there's no leftSibling, then insert content into very fromt of parent's children List
+                try site.fromParent.insertAt(content, 0)
+            } else {
+                // 05-1-2. insert after leftSibling
+                try site.fromParent.insertAfter(content, leftInChildren)
+            }
+
+            if let intendedParent {
+                content.mergedFrom = intendedParent.id
+                content.mergedAt = intendedMergedAt
+            }
+
+            leftInChildren = content
+            traverseAll(node: content) { node, _ in
+                // if insertion happens during concurrent editing and parent node has been removed,
+                // make new nodes as tombstone immediately
+                if site.fromParent.isRemoved {
+                    node.remove(site.editedAt)
+
+                    pairs.append(GCPair(parent: self, child: node))
+                } else {
+                    diff.addDataSizes(others: node.getDataSize())
+                }
+
+                self.registerNode(node)
+
+                // Capture this inserted node's identity span for
+                // identity-preserving insert undo/redo.
+                insertedSpans.append(self.makeRestoreSpan(node))
+            }
+
+            if !content.isRemoved {
+                aliveContents.append(content)
+            }
+        }
+
+        if aliveContents.isEmpty == false {
+            self.recordInsertedContent(&changes, aliveContents, site.fromIdx, site.fromPath, site.editedAt)
+        }
+
+        return TreeEditInsertResult(size: insertedContentSize, diff: diff, pairs: pairs, insertedSpans: insertedSpans)
     }
 
     /**
@@ -2056,7 +2212,10 @@ class CRDTTree: CRDTElement {
         _ splitLevel: Int32,
         _ editedAt: TimeTicket,
         _ issueTimeTicket: () -> TimeTicket
-    ) throws -> ([TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int) {
+    ) throws -> (
+        [TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int,
+        [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)]
+    ) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
         return try self.edit(
