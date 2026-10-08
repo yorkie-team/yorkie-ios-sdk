@@ -625,22 +625,34 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     /**
      * `normalizePos` converts a local position `(id, rel)` into a single absolute offset
      * measured from the head `(0:0)` of the physical chain.
+     *
+     * The offset is the live length of every node before the floor node of `id`, plus `rel`.
+     * It used to be summed over the `prev` chain; it is now read from `treeByIndex`, which
+     * holds the same sum: every node on the chain is in it, in chain order, weighted by its
+     * live length (a tombstone stays in with weight zero; only `purge` takes a node out, and
+     * `purge` unlinks it from the chain too). Every edit execution calls this, so a linear
+     * walk here made typing a document quadratic.
+     *
+     * This is a one-to-one port of the Go implementation (yorkie#2107), and the result is the
+     * chain walk's result for every input, including a floor lookup that lands on an earlier
+     * piece: `rel` is added in the id space of the floor node, not resolved through the
+     * absolute id. Resolution stays the same on purpose -- `Document.applyChange` reconciles
+     * the undo stacks against these offsets, so they must agree with what every other replica,
+     * Go included, computes.
      */
     func normalizePos(_ pos: RGATreeSplitPos) throws -> RGATreeSplitPos {
         guard let node = self.findFloorNode(pos.id) else {
             throw YorkieError(code: .errInvalidArgument, message: "the node of the given id should be found: \(pos.id.toTestString)")
         }
 
-        var total = Int(pos.relativeOffset)
-        var curr = node
-        var prev = node.prev
-        while let prevNode = prev {
-            total += prevNode.length
-            curr = prevNode
-            prev = prevNode.prev
+        // A node `findFloorNode` returns is always in `treeByIndex` (see above), so `indexOf`
+        // cannot answer -1 here.
+        let index = self.treeByIndex.indexOf(node)
+        guard index >= 0 else {
+            throw YorkieError(code: .errInvalidArgument, message: "the node of the given id should be indexed: \(pos.id.toTestString)")
         }
 
-        return RGATreeSplitPos(curr.id, Int32(total))
+        return RGATreeSplitPos(self.head.id, Int32(index) + pos.relativeOffset)
     }
 
     /**
