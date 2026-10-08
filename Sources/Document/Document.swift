@@ -48,10 +48,30 @@ public struct DocumentOptions {
      */
     var disablePresence: Bool
 
-    public init(disableGC: Bool, enableDevtools: Bool = false, disablePresence: Bool = false) {
+    /// How many changes ``Document/history`` can step back through on `undo`, and likewise
+    /// how many it can step forward through on `redo`. Each ``Document/update(_:_:)`` that
+    /// changes the document is one entry; the oldest is dropped once a stack is full.
+    /// Defaults to `maxUndoRedoStackDepth` (50).
+    ///
+    /// Diverges from yorkie-js-sdk: JS throws `ErrInvalidArgument` for a `maxUndoDepth` below
+    /// 1 (or non-integer, which Swift's `Int` cannot represent in the first place). Keeping
+    /// ``Document/init(key:opts:)`` non-throwing is an explicit library-discipline choice —
+    /// adding a throw there would be a breaking change for every existing call site — so a
+    /// value below 1 here is silently treated as the default instead of rejected.
+    var maxUndoDepth: Int
+
+    public init(
+        disableGC: Bool,
+        enableDevtools: Bool = false,
+        disablePresence: Bool = false,
+        // `50`, matching `maxUndoRedoStackDepth` (History.swift) -- an internal `let` cannot be
+        // referenced from a public init's default argument.
+        maxUndoDepth: Int = 50
+    ) {
         self.disableGC = disableGC
         self.enableDevtools = enableDevtools
         self.disablePresence = disablePresence
+        self.maxUndoDepth = maxUndoDepth
     }
 }
 
@@ -142,8 +162,10 @@ public class Document: Attachable {
     /// attach records it.
     private var docID: DocumentID = ""
 
-    /// Stores the undo/redo history of this document.
-    private let internalHistory = History()
+    /// Stores the undo/redo history of this document. Depth comes from
+    /// ``DocumentOptions/maxUndoDepth``, falling back to `maxUndoRedoStackDepth` for a value
+    /// below 1.
+    private let internalHistory: History
     /// Whether an `update` is in progress. Undo/redo is not allowed during an update.
     private var isUpdating = false
 
@@ -182,6 +204,7 @@ public class Document: Attachable {
         self.disablePresence = opts.disablePresence
         self.enableDevtools = opts.enableDevtools
         self.maxSizeLimit = 0
+        self.internalHistory = History(maxDepth: opts.maxUndoDepth >= 1 ? opts.maxUndoDepth : maxUndoRedoStackDepth)
     }
 
     /**

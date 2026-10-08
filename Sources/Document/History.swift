@@ -26,16 +26,34 @@ enum HistoryOperation {
 }
 
 /**
- * `maxUndoRedoStackDepth` is the maximum depth of the undo/redo stack.
+ * `maxUndoRedoStackDepth` is the default maximum depth of the undo/redo stack. A document can
+ * override it with ``DocumentOptions/maxUndoDepth``.
  */
 let maxUndoRedoStackDepth = 50
 
 /**
  * `History` stores the undo/redo history of a ``Document``.
+ *
+ * `@unchecked Sendable`: every access is already serialized through the `@MainActor`
+ * ``Document`` that owns it exclusively; this only lets ``Document``'s `nonisolated init`
+ * assign a depth-configured instance without the compiler requiring actor isolation to do so.
  */
-final class History {
+final class History: @unchecked Sendable {
     private var undoStack: [[HistoryOperation]] = []
     private var redoStack: [[HistoryOperation]] = []
+    private let maxDepth: Int
+
+    init(maxDepth: Int = maxUndoRedoStackDepth) {
+        self.maxDepth = maxDepth
+    }
+
+    /**
+     * `getMaxDepth` returns how many entries each of the undo and redo stacks keeps before
+     * dropping the oldest.
+     */
+    func getMaxDepth() -> Int {
+        self.maxDepth
+    }
 
     /**
      * `hasUndo` returns whether there are undo operations.
@@ -55,7 +73,7 @@ final class History {
      * `pushUndo` pushes the reverse operations of a change to the undo stack.
      */
     func pushUndo(_ undoOps: [HistoryOperation]) {
-        if self.undoStack.count >= maxUndoRedoStackDepth {
+        if self.undoStack.count >= self.maxDepth {
             self.undoStack.removeFirst()
         }
         self.undoStack.append(undoOps)
@@ -72,7 +90,7 @@ final class History {
      * `pushRedo` pushes the reverse operations of a change to the redo stack.
      */
     func pushRedo(_ redoOps: [HistoryOperation]) {
-        if self.redoStack.count >= maxUndoRedoStackDepth {
+        if self.redoStack.count >= self.maxDepth {
             self.redoStack.removeFirst()
         }
         self.redoStack.append(redoOps)
