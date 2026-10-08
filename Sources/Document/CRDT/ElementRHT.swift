@@ -100,24 +100,21 @@ class ElementRHT {
             }
             self.nodeMapByKey[key] = newNode
             value.setMovedAt(executedAt)
-        } else if node!.isRemoved == false, value.isRemoved == false {
-            // The new node loses the LWW conflict — mark it as removed so it does not appear as a
-            // duplicate in `ownKeys` iteration over `nodeMapByCreatedAt`.
+        } else if value.isRemoved == false {
+            // A live incoming value that loses the LWW conflict must be marked removed even when
+            // the occupant is already a tombstone (yorkie-js-sdk#1398, fixing yorkie-js-sdk#1376):
+            // previously this branch also required `node!.isRemoved == false`, so when the
+            // occupant was already removed neither branch ran -- the loser was left live in
+            // `nodeMapByCreatedAt`, never installed under the key and never collected, so
+            // iteration and `get(key:)` disagreed and replicas diverged permanently.
             //
-            // Gated on the incoming value too (yorkie-js-sdk#1377): a decoded tombstone that
+            // Still gated on the incoming value (yorkie-js-sdk#1377): a decoded tombstone that
             // loses is already removed and already skipped by `ownKeys`, so the marking has
             // nothing to do -- but `CRDTElement.remove` accepts any later ticket, so ungated it
             // is not a no-op. It would bump the tombstone's `removedAt` from the ticket of the
             // removal that actually happened to the occupant's `positionedAt`, making GC on this
             // replica wait on the wrong ticket, and its re-serialized snapshots and `docSize.gc`
             // disagree with replicas that never reloaded.
-            //
-            // NOTE(yorkie-js-sdk#1376): when the occupant is ALREADY a tombstone and the
-            // incoming value loses, neither branch runs -- the value is left live in
-            // `nodeMapByCreatedAt`, never installed under the key and never collected, so
-            // iteration and `get(key:)` disagree and replicas diverge permanently. Kept
-            // identical to `element_rht.ts` on purpose: fixing it here alone would diverge
-            // from the other SDKs on a path they all have to agree on.
             value.remove(node!.value.getPositionedAt())
         }
 
