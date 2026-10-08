@@ -206,4 +206,88 @@ class ElementRHTTests: XCTestCase {
         XCTAssertNotNil(winner)
         XCTAssertEqual(winner?.toJSON(), "\"first\"", "get(key:) must return the winner's value")
     }
+
+    // MARK: - Losing tombstone removedAt (ported from element_rht_order_test.ts, yorkie-js-sdk#1395)
+
+    /// The two members one key carries after Set → Set → undo: a live member restored by
+    /// undo (`createdAt` T1, `movedAt` T5) and a tombstone (`createdAt` T3, `removedAt` T4)
+    /// that sorts between them, so it loses the LWW conflict against the live occupant.
+    private func losingTombstoneMembers() -> (live: Primitive, tomb: Primitive, removedAt: TimeTicket) {
+        let actorA = "actorA"
+        let actorB = "actorB"
+        let t1 = TimeTicket(lamport: 1, delimiter: 0, actorID: actorA)
+        let t3 = TimeTicket(lamport: 3, delimiter: 0, actorID: actorB)
+        let t4 = TimeTicket(lamport: 4, delimiter: 0, actorID: actorB)
+        let t5 = TimeTicket(lamport: 5, delimiter: 0, actorID: actorA)
+
+        let live = Primitive(value: .string("kept"), createdAt: t1)
+        live.setMovedAt(t5)
+        let tomb = Primitive(value: .string("displaced"), createdAt: t3)
+        tomb.remove(t4)
+        return (live, tomb, t4)
+    }
+
+    /// The losing branch used to mark the incoming value removed unconditionally, so it does
+    /// not appear as a duplicate in `ownKeys` iteration. A value that arrives already removed
+    /// is already skipped there -- the marking has nothing to do -- but `CRDTElement.remove`
+    /// accepts any later ticket, so ungated it is not a no-op: it moves the tombstone's
+    /// `removedAt` off the ticket of the removal that actually happened and onto the
+    /// occupant's `positionedAt`. `converter`'s snapshot decode replays every member through
+    /// this same `set`, so this is the shape it hits on every load (yorkie-js-sdk#1377).
+    func test_leaves_a_losing_tombstone_removedAt_alone() throws {
+        for order in [[0, 1], [1, 0]] {
+            let target = ElementRHT()
+            let (live, tomb, expectedRemovedAt) = self.losingTombstoneMembers()
+            let elems: [CRDTElement] = [live, tomb]
+
+            for idx in order {
+                target.set(key: "frame", value: elems[idx], executedAt: elems[idx].getPositionedAt())
+            }
+
+            XCTAssertTrue(tomb.isRemoved, "order \(order): tombstone revived")
+            XCTAssertEqual(tomb.removedAt, expectedRemovedAt,
+                           "order \(order): removedAt moved from its own removal ticket to the occupant's positionedAt")
+        }
+    }
+
+    /// A snapshot round-trip must be a fixpoint on the tombstones it carries. `Converter.fromObject`
+    /// replays every decoded member through `ElementRHT.set`, and a tombstone that sorts after the
+    /// live occupant takes the losing branch -- which used to bump its `removedAt` to the
+    /// occupant's `positionedAt`. The document then measured differently depending on whether it
+    /// had been through a snapshot load (yorkie-js-sdk#1377).
+    func test_preserves_each_tombstone_removedAt_across_a_decode() throws {
+        // createdAt(live) < createdAt(tomb) < removedAt(tomb) < movedAt(live): the tombstone
+        // loses to the undo-restored occupant, and its own removal is strictly older than the
+        // ticket that restored the occupant. An undo whose reverse `Set` both removes and
+        // restores under one ticket leaves `removedAt == movedAt`, where the bump is invisible.
+        // Actor IDs must be the wire's 24-hex form: anything else decodes back as the initial
+        // actor and the comparison passes on a technicality.
+        let actorA = "000000000000000000000001"
+        let actorB = "000000000000000000000002"
+        let live = Primitive(value: .string("kept"), createdAt: TimeTicket(lamport: 1, delimiter: 0, actorID: actorA))
+        let tomb = Primitive(value: .string("displaced"), createdAt: TimeTicket(lamport: 3, delimiter: 0, actorID: actorB))
+        tomb.remove(TimeTicket(lamport: 4, delimiter: 0, actorID: actorB))
+        live.setMovedAt(TimeTicket(lamport: 5, delimiter: 0, actorID: actorA))
+        let rht = ElementRHT()
+        rht.set(key: "frame", value: live, executedAt: live.getPositionedAt())
+        rht.set(key: "frame", value: tomb, executedAt: tomb.getPositionedAt())
+        let root = CRDTObject(createdAt: TimeTicket.initial, memberNodes: rht)
+
+        func removedAts(_ obj: CRDTObject) -> [String: TimeTicket?] {
+            var out: [String: TimeTicket?] = [:]
+            for node in obj.rht {
+                out[node.value.createdAt.toIDString] = node.value.removedAt
+            }
+            return out
+        }
+
+        let want = removedAts(root)
+        XCTAssertTrue(want.values.contains { $0 != nil }, "the key must carry a tombstone for this to test anything")
+
+        let pbObject = Converter.toObject(root)
+        let bytes = try pbObject.serializedData()
+        let decoded = try Converter.fromObject(PbJSONElement(serializedBytes: bytes).jsonObject)
+
+        XCTAssertEqual(removedAts(decoded), want)
+    }
 }
