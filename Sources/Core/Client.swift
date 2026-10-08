@@ -95,6 +95,30 @@ public struct ClientOptions {
     /**
      * `key` is the client key. It is used to identify the client.
      * If not set, a random key is generated.
+     *
+     * That random default is minted per ``Client`` instance, so it differs on every launch.
+     * **Offline persistence requires a stable key**: the server derives the actor stamped
+     * into every change from the project and this key, and it also scopes the ``store``
+     * keys (`apiKey/clientKey/docKey`). A new key therefore does not address the previous
+     * launch's entries at all -- the restore finds nothing, the un-pushed edits are lost
+     * *silently* (no `LocalChangesDropped` event: the actor-mismatch guard in
+     * ``Document/restoreFromBytes(_:)`` only fires when the *same* store key is reached
+     * under a different actor), and the previous namespace is orphaned with nothing to
+     * reclaim it.
+     *
+     * An app setting ``store`` must therefore pass a key it persists itself and reuses on
+     * the next launch. Make it an **opaque random value the app mints once** -- a UUID kept
+     * in the Keychain, say -- scoped to the signed-in user and cleared on sign-out. Do
+     * **not** derive it from a user id, a device id, an email, or anything else guessable or
+     * shared:
+     *
+     * - The key is an identifier, not a credential. It is sent verbatim in the activate
+     *   request and nothing proves the caller owns it, so a guessable key lets another
+     *   client of the same project activate under the same derived actor and attribute
+     *   changes to it.
+     * - A key shared between users of one device gives them one store namespace, whose
+     *   bytes attach restores locally before the attach RPC -- one user's un-pushed edits
+     *   would surface in the next user's session ahead of any server authorization.
      */
     var key: String?
 
@@ -145,6 +169,15 @@ public struct ClientOptions {
     /// When set, the client writes ``Document/toBytes()`` after every local change and
     /// restores from the store on the next attach, so changes made offline are re-pushed.
     /// Leaving it `nil` keeps the previous behaviour: nothing is persisted.
+    ///
+    /// You **must** also set ``key`` to an opaque random value the app mints once and
+    /// reuses across launches. Both the store keys and the actor recovery is keyed by are
+    /// derived from it, and the default is a fresh random key per ``Client``, so leaving it
+    /// unset means every restart silently loses every un-pushed change and orphans the
+    /// previous launch's entries. This cannot be defaulted correctly -- only the app knows
+    /// what identity should outlive the process -- so the client warns rather than guessing.
+    /// See ``key`` for why the value must not be a user id, a device id, or anything else
+    /// guessable or shared between users of one device.
     public var store: DocStore?
 
     /// The guard that keeps two sessions from resuming the same persisted document.
@@ -184,6 +217,29 @@ enum DefaultBroadcastOptions {
     static let maxRetries: Int = .max
     static let initialRetryInterval: Double = 1000 // milliseconds
     static let maxBackoff: Double = 20000 // milliseconds
+}
+
+/// Percent-encodes the separator (and the escape character itself) so a namespace component
+/// cannot forge one.
+///
+/// Without this, ``namespaceOf(_:_:_:)`` is not injective: `apiKey` and the client key are
+/// taken verbatim from ``ClientOptions``, and a document key is caller-supplied, so a
+/// component containing `/` could produce the same joined string as a different
+/// (apiKey, clientKey, docKey) triple -- two distinct identities sharing one store namespace
+/// and one session lock. Escaping `%` first keeps the encoding reversible and collision-free.
+private func escapeNamespacePart(_ part: String) -> String {
+    part.replacingOccurrences(of: "%", with: "%25")
+        .replacingOccurrences(of: "/", with: "%2F")
+}
+
+/// Builds the `apiKey/clientKey/docKey` identity namespace used for both the store key and
+/// the single-active-session lock name.
+///
+/// Each component is escaped via ``escapeNamespacePart(_:)``, so the mapping from identity to
+/// namespace is one-to-one: distinct identities can never address the same persisted envelope
+/// or block each other's session lock.
+private func namespaceOf(_ apiKey: String, _ clientKey: String, _ docKey: String) -> String {
+    "\(escapeNamespacePart(apiKey))/\(escapeNamespacePart(clientKey))/\(escapeNamespacePart(docKey))"
 }
 
 /**
@@ -298,6 +354,25 @@ public class Client {
         self.store = options.store
         self.sessionLock = options.sessionLock
         self.apiKey = options.apiKey ?? ""
+
+        // NOTE(yorkie-js-sdk#1402): a store with no caller-supplied key cannot survive a
+        // restart, by construction. `self.key` just defaulted to a fresh UUID when
+        // `options.key` was nil, and that key scopes both the store keys (``storeKey(_:)``)
+        // and the actor the server derives -- so the next launch addresses a namespace of
+        // its own: it restores nothing and orphans what this one persists, silently, since
+        // the actor-mismatch guard in ``Document/restoreFromBytes(_:)`` only fires when the
+        // *same* store key is reached under a different actor. Neither option is wrong
+        // alone, so warn where they meet rather than deeper in the restore path, where the
+        // report would read as an unexplained actor mismatch.
+        if self.store != nil, options.key == nil {
+            Logger.warning(
+                "[PS] c:\"\(self.key)\" offline persistence needs a stable clientKey: `store` is set but " +
+                    "`key` is not, so a random one was generated for this instance. The next launch " +
+                    "addresses a different namespace, silently restoring nothing and stranding what this " +
+                    "one persists. Pass `key` as an opaque random value your app mints once and persists " +
+                    "across launches -- not a user id, an email, or a device id."
+            )
+        }
     }
 
     /**
@@ -2103,13 +2178,17 @@ struct DocumentPersistState {
 /// are not part of the public API.
 extension Client {
     /// Returns the store key under which `docKey` is persisted.
+    ///
+    /// Scoped by `apiKey/clientKey/docKey` through ``namespaceOf(_:_:_:)``, so the scoping is
+    /// injective: a store shared across identities (different apiKey/clientKey) cannot
+    /// collide on the bare docKey and hand one identity another's persisted envelope.
     func storeKey(_ docKey: String) -> String {
-        "\(self.apiKey)/\(self.key)/\(docKey)"
+        namespaceOf(self.apiKey, self.key, docKey)
     }
 
     /// Returns the session lease name guarding `docKey` for this client.
     func sessionLockName(_ docKey: String) -> String {
-        "yorkie-session:\(self.apiKey)/\(self.key)/\(docKey)"
+        "yorkie-session:" + namespaceOf(self.apiKey, self.key, docKey)
     }
 
     /// Drops a document's stale persisted state and re-stamps it with this client's actor.
