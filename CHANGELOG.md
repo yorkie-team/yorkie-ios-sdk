@@ -6,6 +6,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.24] - 2026-10-08
+
+> Requires a Yorkie server v0.7.24 or later: the protos are synced with Go (new schema-only fields: `ChangePack.capabilities`, `restore_mode` on Set/Add/ArraySet, `revived_at` on every element, `channel_session_ttl`), and several tree and GC fixes mirror the server's.
+
+> **Behavioural change — `Document.update` surfaces a failed root pass.** When applying a local change to the root threw, the error was swallowed (`try?`) and the change ID advanced anyway. It now throws, as the JS SDK does, and the burned lamport is never reissued.
+
+> **Behavioural change — UTF-16 surrogate pairs.** `JSONText` and `JSONTree` edit and style calls reject an index that splits a surrogate pair (`errInvalidArgument`). `JSONTree` methods throw; `JSONText.edit`/`setStyle` keep their non-throwing style and return `nil`/`false`. Tree `toXML` now quotes every attribute value (`bold="true"`) and escapes keys and values.
+
+> **Behavioural change — GC waits one more round.** A tombstone whose successor another replica may still anchor on is kept until the next collection (the successor barrier), so `garbageLength` can read one higher right after a sync.
+
+> **Storage note.** The offline-persistence store key and session-lock name now escape `/` and `%` in the API key, client key and document key, so two identities can no longer collide. Documents stored under a key containing those characters are not found after upgrading.
+
+### Added
+
+- Warn when offline persistence is used without a client key in PR_URL_PLACEHOLDER
+- Report where Tree undo and redo landed in their OpInfo in PR_URL_PLACEHOLDER
+- Let a document choose its undo/redo depth (`DocumentOptions.maxUndoDepth`, default 50; a value below 1 falls back to the default) in PR_URL_PLACEHOLDER
+
+### Changed
+
+- Name the change and operation that cannot be applied in PR_URL_PLACEHOLDER
+- Sync the protos with Go and harden crafted tree payloads in PR_URL_PLACEHOLDER
+- Reject indexes that split a UTF-16 surrogate pair in PR_URL_PLACEHOLDER
+
+### Fixed
+
+- Order concurrent splits of one boundary by ticket in PR_URL_PLACEHOLDER
+- Make docSize agree with a rebuild (issue #1383, part 3) in PR_URL_PLACEHOLDER
+- Guard empty-text anchors and reset the clone on failed applies in PR_URL_PLACEHOLDER
+- Fix clientSeq rewind, leaked sizeInGC record, tombstone removedAt in PR_URL_PLACEHOLDER
+- Burn the lamport when a change's root pass throws in PR_URL_PLACEHOLDER
+- Fix losing ElementRHT values against tombstones in PR_URL_PLACEHOLDER
+- Drop snapshots in push-only mode but keep the push ack in PR_URL_PLACEHOLDER
+- Take a push-only response as a push ack only, so GC does not purge tombstones unpulled changes anchor on in PR_URL_PLACEHOLDER
+- Port three tree convergence fixes from the Go SDK in PR_URL_PLACEHOLDER
+- Port three GC correctness fixes from the Go SDK in PR_URL_PLACEHOLDER
+- Read a double without writing to the buffer it shares, and read a short fixed-width payload as zero-padded instead of crashing in PR_URL_PLACEHOLDER
+- Re-point operations at the elements a redo split re-creates in PR_URL_PLACEHOLDER
+- Read Text.normalizePos from the index tree instead of the chain in PR_URL_PLACEHOLDER
+- Make `setActor` overridable through an `Operation` existential, so a TreeEdit operation re-stamps its split tickets in PR_URL_PLACEHOLDER
+- Snapshot a restored Tree node for its OpInfo when the edit is made, so a restored subtree reports each node once in PR_URL_PLACEHOLDER
+
 ## [v0.7.23] - 2026-10-01
 
 > Requires a Yorkie server v0.7.23 or later: six of these mirror [yorkie v0.7.23](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.23) one for one, because the defects were in shared CRDT logic.
