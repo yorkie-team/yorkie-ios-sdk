@@ -564,6 +564,83 @@ final class StyleTombstoneTests: XCTestCase {
         )
     }
 
+    /// Port of Go `TestRecreateCarriesAttributeTombstones`. Restoring a
+    /// PURGED tree node recreates it from the span, whose attributes are a
+    /// deep copy of the original RHT -- tombstones included, because a
+    /// recreated node has to resolve a concurrent style the way a replica
+    /// that never lost it would. Each copied tombstone is a fresh piece of
+    /// garbage no removal path produced, and `getDataSize` excludes it, so
+    /// without a registration it sits in the RHT forever: uncounted and
+    /// unpurgeable.
+    @MainActor
+    func test_books_the_attribute_tombstones_a_recreated_node_carries() throws {
+        // given
+        let doc = Document(key: "d")
+        doc.setActor(actorA1)
+        try doc.update { root, _ in
+            root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "doc", children: [
+                JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ab")])
+            ]))
+        }
+        // Style then undo it -> the reverse is a removeStyle, which tombstones
+        // the attribute on <p>.
+        try doc.update { root, _ in try (root.t as? JSONTree)?.style(0, 4, ["bbbb": "vvvv"]) }
+        try doc.undo()
+
+        // when -- remove the <p>, purge it, then undo the removal so it is
+        // RECREATED.
+        try doc.update { root, _ in _ = try (root.t as? JSONTree)?.edit(0, 4) }
+        let actor = try XCTUnwrap(doc.actorID)
+        _ = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [actor]))
+        try doc.undo()
+
+        // then
+        let tree = try XCTUnwrap(doc.getRoot().t as? JSONTree)
+        XCTAssertEqual(tree.toXML(), "<doc><p>ab</p></doc>")
+
+        let rebuilt = try rebuiltRoot(doc)
+        XCTAssertEqual(doc.getDocSize().live, rebuilt.getDocSize().live, "live")
+        XCTAssertEqual(doc.getDocSize().gc, rebuilt.getDocSize().gc, "gc")
+        XCTAssertEqual(doc.getGarbageLength(), rebuilt.garbageLength, "garbage")
+
+        // and -- it is collectable, not just counted.
+        _ = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [actor]))
+        XCTAssertEqual(doc.getGarbageLength(), 0)
+        XCTAssertEqual(doc.getDocSize().gc, DataSize(data: 0, meta: 0))
+    }
+
+    /// The text half of the same hole. `RGATreeSplit.restore` recreates a
+    /// purged piece through `CRDTTextValue.substring`, which deep-copies the
+    /// RHT with its tombstones just as a split does, so the copies need the
+    /// same booking.
+    @MainActor
+    func test_books_the_attribute_tombstones_a_recreated_text_piece_carries() throws {
+        // given
+        let doc = seededTextDoc()
+        try doc.update { root, _ in
+            root.t = JSONText()
+            _ = (root.t as? JSONText)?.edit(0, 0, "abcd")
+        }
+        // Style then undo it -> the reverse is a removeStyle, which tombstones
+        // the attribute on the piece.
+        try doc.update { root, _ in _ = (root.t as? JSONText)?.setStyle(0, 4, ["bbbb": "vvvv"]) }
+        try doc.undo()
+
+        // when -- remove the text, purge it, then undo the removal so it is
+        // RECREATED.
+        try doc.update { root, _ in _ = (root.t as? JSONText)?.edit(0, 4, "") }
+        let actor = try XCTUnwrap(doc.actorID)
+        _ = doc.garbageCollect(minSyncedVersionVector: maxVectorOf(actors: [actor]))
+        try doc.undo()
+
+        // then
+        let text = try XCTUnwrap(doc.getRootObject().get(key: "t") as? CRDTText)
+        XCTAssertEqual(text.toString, "abcd")
+        XCTAssertEqual(try nodeAttrs(doc), ["\"abcd\" [bbbb=vvvv*]"])
+
+        try assertLedgerExact(doc, "after the recreate", actors: [actor])
+    }
+
     /// A style range that opens on a tombstone: the reverse operation's
     /// prior values must come from the first LIVE node, not from the dead
     /// run the user had already deleted. Capturing from the tombstone made
