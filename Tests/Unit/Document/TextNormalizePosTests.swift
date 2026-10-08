@@ -316,6 +316,10 @@ final class TextNormalizePosTests: XCTestCase {
     /// flip the verdict.
     @MainActor
     func test_keeps_typing_cost_from_growing_quadratically_with_document_length() throws {
+        // A wall-clock ratio is not stable on shared CI runners, so this runs only
+        // when asked for; the two fuzz tests above pin correctness on every run.
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["YORKIE_PERF_TESTS"] == "1",
+                          "set YORKIE_PERF_TESTS=1 to run the normalizePos timing check")
         func typingElapsed(_ size: Int) throws -> TimeInterval {
             let doc = Document(key: "normalize-pos-cost-\(size)")
             try doc.update { root, _ in
