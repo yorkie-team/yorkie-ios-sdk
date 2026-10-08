@@ -1188,7 +1188,12 @@ class GCIntegrationTests: XCTestCase {
         len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
         len = doc2.getGarbageLength()
-        XCTAssertEqual(len, 0)
+        // "b" and "c" meet the GC condition, but one of them is still held by
+        // the successor barrier: purging it would move the stopping point of
+        // a forward skip that doc2's concurrent insert still depends on. It
+        // drains on the next round (see "successor barrier drains within one
+        // round").
+        XCTAssertEqual(len, 1)
 
         try await client1.sync()
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1196,10 +1201,11 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.getActorID()!, lamport: 5)
         ])
 
+        // One tombstone each is still held by the successor barrier; see above.
         len = doc1.getGarbageLength()
-        XCTAssertEqual(len, 0)
+        XCTAssertEqual(len, 1)
         len = doc2.getGarbageLength()
-        XCTAssertEqual(len, 0)
+        XCTAssertEqual(len, 1)
 
         try await client1.deactivate()
         try await client2.deactivate()
@@ -1355,7 +1361,9 @@ class GCIntegrationTests: XCTestCase {
         len = doc1.getGarbageLength()
         XCTAssertEqual(len, 2)
         len = doc2.getGarbageLength()
-        XCTAssertEqual(len, 0)
+        // One is held by the successor barrier for a round; see
+        // "concurrent garbage collection test".
+        XCTAssertEqual(len, 1)
 
         try await client1.sync()
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1363,10 +1371,11 @@ class GCIntegrationTests: XCTestCase {
             ActorData(actor: client2.getActorID()!, lamport: 6)
         ])
 
+        // doc2 still holds one behind the successor barrier.
         len = doc1.getGarbageLength()
         XCTAssertEqual(len, 0)
         len = doc2.getGarbageLength()
-        XCTAssertEqual(len, 0)
+        XCTAssertEqual(len, 1)
 
         try await client1.deactivate()
         try await client2.deactivate()
@@ -1544,7 +1553,9 @@ class GCIntegrationTests: XCTestCase {
         let doc2Garbage3 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage3, 2)
-        XCTAssertEqual(doc2Garbage3, 0)
+        // One is held by the successor barrier for a round; see
+        // "concurrent garbage collection test".
+        XCTAssertEqual(doc2Garbage3, 1)
 
         try await client1.sync()
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1683,7 +1694,9 @@ class GCIntegrationTests: XCTestCase {
         let doc2Garbage3 = doc2.getGarbageLength()
 
         XCTAssertEqual(doc1Garbage3, 2)
-        XCTAssertEqual(doc2Garbage3, 0)
+        // One is held by the successor barrier for a round; see
+        // "concurrent garbage collection test".
+        XCTAssertEqual(doc2Garbage3, 1)
 
         try await client1.sync()
         await assertTrue(versionVector: doc1.getVersionVector(), actorDatas: [
@@ -1891,8 +1904,10 @@ class GCIntegrationTests: XCTestCase {
         let len5 = doc1.getGarbageLength()
         XCTAssertEqual(len5, 0)
 
+        // One tombstone is still held by the successor barrier for a round;
+        // see "concurrent garbage collection test".
         let len6 = doc2.getGarbageLength()
-        XCTAssertEqual(len6, 0)
+        XCTAssertEqual(len6, 1)
 
         try await client1.deactivate()
         try await client2.deactivate()
@@ -2017,6 +2032,153 @@ class GCIntegrationTests: XCTestCase {
         try await client3.deactivate()
         try await client2.deactivate()
         try await client1.deactivate()
+    }
+
+    // Port of Go TestGarbageCollectionBarrierDrainsWithinOneRound. The
+    // successor barrier delays a purge when the node that would become a
+    // forward skip's new stopping point is not yet causally stable, which is
+    // why "concurrent garbage collection test" above expects one retained
+    // tombstone where it used to expect none. A delay is acceptable; a leak is
+    // not. So this replays the same sequence and then keeps syncing with no
+    // further edits: retention has to reach zero and the replicas have to
+    // agree.
+    @MainActor
+    func test_successor_barrier_drains_within_one_round() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
+
+        try doc1.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+            (root.t as? JSONText)?.edit(1, 1, "b")
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "sets text")
+        try await client1.sync()
+        try await client2.sync()
+
+        // doc2 inserts next to what doc1 is about to delete. The tombstone
+        // doc1 leaves is what stops the forward skip doc2's concurrent insert
+        // is positioned by.
+        try doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "insert c")
+        try doc1.update({ root, _ in
+            (root.t as? JSONText)?.edit(1, 3, "")
+        }, "delete bc")
+        try await client1.sync()
+        try await client2.sync()
+
+        try doc2.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "1")
+        }, "insert 1")
+        try await client2.sync()
+        try await client1.sync()
+
+        // Where "concurrent garbage collection test" stops: one tombstone
+        // each, held back.
+        XCTAssertEqual(doc1.getGarbageLength(), 1)
+        XCTAssertEqual(doc2.getGarbageLength(), 1)
+
+        // One more round with no edits at all has to drain it.
+        try await client1.sync()
+        try await client2.sync()
+        XCTAssertEqual(doc1.getGarbageLength(), 0, "the barrier must delay, not prevent")
+        XCTAssertEqual(doc2.getGarbageLength(), 0, "the barrier must delay, not prevent")
+
+        // Further rounds must not resurrect anything.
+        for _ in 0 ..< 3 {
+            try await client1.sync()
+            try await client2.sync()
+            XCTAssertEqual(doc1.getGarbageLength(), 0)
+            XCTAssertEqual(doc2.getGarbageLength(), 0)
+        }
+
+        XCTAssertEqual(doc1.toJSON(), doc2.toJSON())
+        XCTAssertEqual(doc1.toJSON(), "{\"t\":[{\"val\":\"a\"},{\"val\":\"c\"},{\"val\":\"1\"}]}")
+
+        try await client1.deactivate()
+        try await client2.deactivate()
+    }
+
+    // A barrier ticket is authored by whoever created the successor node, not
+    // by the remover, so that author may have left the document by the time
+    // the purge is due. This pins that the author leaving does not make the
+    // barrier unsatisfiable. The min version vector the server returns always
+    // includes the collecting client's own vector, and a client holding the
+    // successor node has applied its author's change, so the author's actor
+    // is always present in it; dropping the author's row only removes a lower
+    // bound.
+    @MainActor
+    func test_successor_barrier_drains_after_the_successor_author_detaches() async throws {
+        let docKey = "\(Date().timeIntervalSince1970)-\(self.description)".toDocKey
+
+        let doc1 = Document(key: docKey)
+        let doc2 = Document(key: docKey)
+        let doc3 = Document(key: docKey)
+
+        let client1 = Client(rpcAddress)
+        let client2 = Client(rpcAddress)
+        let client3 = Client(rpcAddress)
+
+        try await client1.activate()
+        try await client2.activate()
+        try await client3.activate()
+
+        try await client1.attach(doc1, [:], .manual)
+        try await client2.attach(doc2, [:], .manual)
+        try await client3.attach(doc3, [:], .manual)
+
+        try doc1.update({ root, _ in
+            root.t = JSONText()
+            (root.t as? JSONText)?.edit(0, 0, "a")
+            (root.t as? JSONText)?.edit(1, 1, "b")
+            (root.t as? JSONText)?.edit(2, 2, "c")
+        }, "sets text")
+        try await client1.sync()
+        try await client2.sync()
+        try await client3.sync()
+
+        // doc3 inserts "X" right behind "b" while doc1 deletes "b": "X"
+        // becomes the successor of the tombstone, so its ticket is client3's.
+        try doc3.update({ root, _ in
+            (root.t as? JSONText)?.edit(2, 2, "X")
+        }, "insert X")
+        try doc1.update({ root, _ in
+            (root.t as? JSONText)?.edit(1, 2, "")
+        }, "delete b")
+        try await client1.sync()
+        try await client2.sync()
+        try await client3.sync()
+        try await client1.sync()
+        XCTAssertEqual(doc1.toJSON(), "{\"t\":[{\"val\":\"a\"},{\"val\":\"X\"},{\"val\":\"c\"}]}")
+
+        // doc3 leaves; its row is removed from the server.
+        try await client3.detach(doc3)
+
+        // No further edits. The purge may be held back while doc2 has not
+        // seen "X", but it has to drain once doc2 catches up, although "X"'s
+        // author has gone.
+        for _ in 0 ..< 3 {
+            try await client2.sync()
+            try await client1.sync()
+        }
+        XCTAssertEqual(doc1.getGarbageLength(), 0, "doc1 retained the tombstone")
+        XCTAssertEqual(doc2.getGarbageLength(), 0, "doc2 retained the tombstone")
+        XCTAssertEqual(doc1.toJSON(), doc2.toJSON())
+
+        try await client1.deactivate()
+        try await client2.deactivate()
     }
 }
 
