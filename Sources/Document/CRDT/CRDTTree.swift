@@ -70,6 +70,18 @@ struct TreeChange {
 }
 
 /**
+ * `TreeVisibleEdit` is a content change an identity-preserving restore or
+ * retombstone made, paired with the visible size it inserted (zero for a
+ * deletion). The change alone does not carry that size -- an insertion
+ * reports a collapsed range -- and undo-stack reconciliation cannot shift the
+ * pending indices without it.
+ */
+struct TreeVisibleEdit {
+    let change: TreeChange
+    let insertedSize: Int
+}
+
+/**
  * `CRDTTreePos` represent a position in the tree. It is used to identify a
  * position in the tree. It is composed of the parent ID and the left sibling
  * ID. If there's no left sibling in parent's children, then left sibling is
@@ -2725,12 +2737,21 @@ extension CRDTTree {
      *     straddler (the caller registers them BEFORE unregistering the
      *     un-tombstoned ones);
      *   - `diff`: the metadata overhead of splitting live straddlers (the caller
-     *     `acc`s it to Live).
+     *     `acc`s it to Live);
+     *   - `edits`: one insertion per node that became visible, in the order it
+     *     did. Each is measured right after its node comes back, so applying
+     *     them one after another reproduces the result.
      */
-    func restore(_ spans: [TreeRestoreSpan]) throws -> ([CRDTTreeNode], [CRDTTreeNode], [GCPair], DataSize) {
+    func restore(_ spans: [TreeRestoreSpan], _ editedAt: TimeTicket) throws -> ([CRDTTreeNode], [CRDTTreeNode], [GCPair], DataSize, [TreeVisibleEdit]) {
         var untombstoned = [CRDTTreeNode]()
         var recreated = [CRDTTreeNode]()
         var diff = DataSize(data: 0, meta: 0)
+        var changes = [TreeVisibleEdit]()
+        let revived: (CRDTTreeNode) -> Void = { [unowned self] node in
+            if let change = self.makeInsertionChange(node, editedAt) {
+                changes.append(change)
+            }
+        }
 
         for span in spans {
             if !span.isText {
@@ -2738,11 +2759,13 @@ extension CRDTTree {
                     if node.isRemoved {
                         node.unremove()
                         untombstoned.append(node)
+                        revived(node)
                     }
                     continue
                 }
                 if let created = try self.recreateFromSpan(span, span.id.offset, span.length) {
                     recreated.append(created)
+                    revived(created)
                 }
                 continue
             }
@@ -2771,6 +2794,7 @@ extension CRDTTree {
                     if target.isRemoved {
                         target.unremove()
                         untombstoned.append(target)
+                        revived(target)
                     }
                     cursor = overlapEnd
                     if overlapEnd >= pieceEnd {
@@ -2780,6 +2804,7 @@ extension CRDTTree {
                     let gapEnd = Swift.min(pieceStart, end)
                     if let created = try self.recreateFromSpan(span, cursor, gapEnd - cursor) {
                         recreated.append(created)
+                        revived(created)
                     }
                     cursor = gapEnd
                 }
@@ -2792,7 +2817,7 @@ extension CRDTTree {
         // was itself a split-born piece is walked gc -> live correctly (mirrors the
         // Text path).
         let pairs = self.drainPendingGCPairs()
-        return (untombstoned, recreated, pairs, diff)
+        return (untombstoned, recreated, pairs, diff, changes)
     }
 
     /**
@@ -2844,12 +2869,14 @@ extension CRDTTree {
      * is re-removed (symmetric with ``restore(_:)``'s isolate, so undo/redo stay
      * mirror images and segmentation stays convergent).
      *
-     * - Returns: the GC pairs for the newly tombstoned nodes, and the live-split
-     *   metadata overhead.
+     * - Returns: the GC pairs for the newly tombstoned nodes, the live-split
+     *   metadata overhead, and one deletion per visible node it removed, each
+     *   measured right before the removal so they apply one after another.
      */
-    func retombstone(_ spans: [TreeRestoreSpan], _ executedAt: TimeTicket) throws -> ([GCPair], DataSize) {
+    func retombstone(_ spans: [TreeRestoreSpan], _ executedAt: TimeTicket) throws -> ([GCPair], DataSize, [TreeVisibleEdit]) {
         var pairs = [GCPair]()
         var diff = DataSize(data: 0, meta: 0)
+        var changes = [TreeVisibleEdit]()
         for span in spans {
             let start = span.id.offset
             let end = start + Swift.max(span.length, 1)
@@ -2872,12 +2899,87 @@ extension CRDTTree {
                     let to = Swift.min(piece.id.offset + Int32(piece.size), end)
                     target = try self.isolateTextRange(piece, from, to, &diff)
                 }
+                // Measure while `target` is still visible.
+                let range = self.visibleRangeOf(target)
                 if target.remove(executedAt) {
                     pairs.append(GCPair(parent: self, child: target))
+                    if let range {
+                        let change = TreeChange(actor: executedAt.actorID,
+                                                type: .content,
+                                                from: range.from,
+                                                to: range.to,
+                                                fromPath: range.fromPath,
+                                                toPath: range.toPath,
+                                                value: nil,
+                                                splitLevel: 0)
+                        changes.append(TreeVisibleEdit(change: change, insertedSize: 0))
+                    }
                 }
             }
         }
-        return (pairs, diff)
+        return (pairs, diff, changes)
+    }
+
+    /**
+     * `visibleRangeOf` returns the index range `node` covers and its paths, or
+     * `nil` when it or one of its ancestors is removed and so takes no room in
+     * the index.
+     */
+    private func visibleRangeOf(_ node: CRDTTreeNode) -> (from: Int, to: Int, fromPath: [Int], toPath: [Int])? {
+        var current: CRDTTreeNode? = node
+        while let ancestor = current {
+            if ancestor.isRemoved {
+                return nil
+            }
+            current = ancestor.parent
+        }
+        guard let parent = node.parent else {
+            return nil
+        }
+
+        // `toIndex`/`indexToPath` throw on a tree they cannot walk (`invalid
+        // pos`, `out of index range`). Both run here off spans that, for a
+        // remote pack, arrived from the wire: a throw there would abort
+        // applying the whole pack, wedging the document for every replica that
+        // receives it. Reporting the range is a courtesy to subscribers, not
+        // part of convergence -- the CRDT state is already settled by the time
+        // this measures -- so a tree this cannot measure degrades to "no
+        // position reported", exactly as a node under a removed ancestor does
+        // above.
+        do {
+            let to = try self.toIndex(parent, node)
+            guard to >= 0 else {
+                return nil
+            }
+            let from = to - node.paddedSize
+            return try (from, to, self.indexToPath(from), self.indexToPath(to))
+        } catch {
+            Logger.error("[TR] failed to measure restored node", error: error)
+            return nil
+        }
+    }
+
+    /**
+     * `makeInsertionChange` describes `node` becoming visible as an insertion
+     * at its current position. A node still hidden under a removed ancestor
+     * produces nothing.
+     */
+    private func makeInsertionChange(_ node: CRDTTreeNode, _ editedAt: TimeTicket) -> TreeVisibleEdit? {
+        guard let range = self.visibleRangeOf(node) else {
+            return nil
+        }
+
+        let change = TreeChange(actor: editedAt.actorID,
+                                type: .content,
+                                from: range.from,
+                                to: range.from,
+                                fromPath: range.fromPath,
+                                toPath: range.fromPath,
+                                value: .nodes([node]),
+                                splitLevel: 0)
+        // The change reports a collapsed range, as every insertion does, so the
+        // size it added is not readable from it; reconciliation needs it.
+        return TreeVisibleEdit(change: change, insertedSize: range.to - range.from)
     }
 
     /**

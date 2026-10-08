@@ -528,7 +528,15 @@ public class Document: Attachable {
         // task the hook starts cannot run until it returns. Not worth depending on.
         self.onLocalChange?()
 
-        if !opInfos.isEmpty {
+        // Gated on the operations that RAN, not on the `OpInfo`s they
+        // produced, for the same reason as the skip above: an undo can run
+        // and show nothing (a reverse style on a node a peer removed, a Tree
+        // restore whose nodes all land under a removed ancestor), and the
+        // change is still queued above and still consumes a `clientSeq`. The
+        // event still has to reach subscribers -- an editor binding that
+        // counts changes, or offline persistence reading `localChanges` --
+        // even when there is nothing in it to render.
+        if !executedOperations.isEmpty {
             let changeInfo = ChangeInfo(message: change.message ?? "",
                                         operations: opInfos,
                                         actorID: actorID,
@@ -1171,13 +1179,19 @@ public class Document: Attachable {
                 )
             }
             if let treeEdit = op as? TreeEditOperation {
-                let (from, to) = treeEdit.normalizePos()
-                self.internalHistory.reconcileTreeEdit(
-                    parentCreatedAt: treeEdit.parentCreatedAt,
-                    rangeFrom: from,
-                    rangeTo: to,
-                    contentSize: treeEdit.getContentSize()
-                )
+                // One reconciliation per range the op actually changed, in the
+                // order it changed them: an identity-preserving
+                // restore/retombstone revives or re-removes several nodes at
+                // positions its stored indices never describe, and each
+                // measurement is relative to the one before it.
+                for (from, to, contentSize) in treeEdit.getExecutedRanges() {
+                    self.internalHistory.reconcileTreeEdit(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        rangeFrom: from,
+                        rangeTo: to,
+                        contentSize: contentSize
+                    )
+                }
             }
         }
 
