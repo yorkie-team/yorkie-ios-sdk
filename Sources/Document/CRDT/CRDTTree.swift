@@ -472,27 +472,67 @@ final class CRDTTreeNode: IndexTreeNode {
     }
 
     /**
-     * `dropMergeStamps` clears the merge lineage on this node and every one of
-     * its descendants.
+     * `dropEngineOnlyLinks` clears the engine-only links on this node and
+     * every one of its descendants: the split-sibling chain and the merge
+     * lineage. The operation-content counterpart of ``dropSplitLinks()``.
      *
      * Unlike ``dropSplitLinks()`` this is NOT safe to call on an arbitrary
-     * tree: a tree that really was merged carries the lineage as state, and
-     * dropping it would rewrite the document. It is for a *tree edit's*
-     * content, which the editing client always creates fresh for that one
-     * operation, so none of its nodes can be a merge product. A peer is free
-     * to stamp them anyway, and a declared-boundary walk would then follow
-     * `mergedFrom` off the freshly inserted node into an element the position
-     * never named. Clearing them costs nothing on conforming traffic — no
-     * producer sets them on edit content — so no replica sees a different
-     * tree for a change a client could legitimately have written.
-     * ``TreeEditOperation/reissueContentIDs(_:)`` clears the same three
-     * fields on the content an undo re-inserts, for the same reason.
+     * tree: a tree that really was merged, or really was split, carries the
+     * lineage as state, and dropping it would rewrite the document. It is for
+     * a *tree edit's* content, which the editing client always creates fresh
+     * for that one operation, so none of its nodes can legitimately be a
+     * split product or a merge product. A peer is free to stamp them anyway,
+     * and a declared-boundary walk would then follow `mergedFrom` off the
+     * freshly inserted node into an element the position never named.
+     * Clearing them costs nothing on conforming traffic — no producer sets
+     * them on edit content — so no replica sees a different tree for a change
+     * a client could legitimately have written.
+     * ``TreeEditOperation/reissueContentIDs(_:)`` clears the same five fields
+     * on the content an undo re-inserts, for the same reason.
      */
-    func dropMergeStamps() {
+    func dropEngineOnlyLinks() {
         traverseAll(node: self) { node, _ in
+            node.insPrevID = nil
+            node.insNextID = nil
             node.mergedFrom = nil
             node.mergedAt = nil
             node.mergedInto = nil
+        }
+    }
+
+    /**
+     * `clearTombstones` clears the tombstone on this node and every one of
+     * its descendants, restoring the sizes a decoded tombstone suppressed.
+     *
+     * Like the engine-only links, `removedAt` is carried by the wire format
+     * on every tree node, yet operation content can never legitimately hold
+     * it: a TreeEdit's content is freshly created by the editing client, so a
+     * node arriving tombstoned is a crafted one. Left in place, `edit` would
+     * count it into the live data size and register no GC pair for it under
+     * a live parent, while `isRemoved` would hide it from every later edit.
+     *
+     * Cleared via ``unremove()`` so each node's size is given back to its
+     * ancestors. `traverseAll` is post-order, so a child is revived before
+     * its parent, and the parent's own size already includes the child when
+     * the parent hands it further up.
+     *
+     * A node's attribute table carries tombstones of its own, and those are
+     * deliberately NOT cleared here. Unlike `removedAt` on the node, a
+     * removed RHT entry on content can be genuine: the undo copy-reinsert
+     * path re-sends a deep copy of nodes a real `removeStyle` tombstoned, and
+     * it has to, or the reinserted node would stop rejecting the stale
+     * styles the original rejects. Stripping them on decode would also make
+     * this replica disagree with every other producer of the same bytes —
+     * an older SDK, the Go SDK, and the snapshot the server rebuilds from
+     * this very operation — which is divergence, not hardening. A crafted
+     * one is instead made harmless the way every other decode path already
+     * makes it harmless: the TreeEdit insert phase books it into gc through
+     * ``getGCPairs()``, the same routing the snapshot and the Set/Add
+     * element payload take.
+     */
+    func clearTombstones() {
+        traverseAll(node: self) { node, _ in
+            node.unremove()
         }
     }
 
@@ -536,12 +576,21 @@ final class CRDTTreeNode: IndexTreeNode {
      * `unremove` clears the tombstone of this node (identity-preserving
      * restore). Mirrors ``remove(_:)``'s ancestor-size bookkeeping so the node
      * becomes visible again in place.
+     *
+     * The forwarding pointer goes with the tombstone: both writers of
+     * `mergedInto` (the merge in ``CRDTTree/applyMergeMoves(_:_:_:)`` and
+     * `rebuildMergeState`) only ever set it on a source that is already
+     * removed, so a live node holding one is a pointer a snapshot-loading
+     * replica would not rebuild. `CRDTTree.restore`'s `dissolveMerge` drops
+     * the matching `mergedFrom` stamps on the children the merge moved, so
+     * nothing is left for a later re-remove to derive it from either.
      */
     func unremove() {
         guard self.removedAt != nil else {
             return
         }
         self.removedAt = nil
+        self.mergedInto = nil
         // `updateAncestorsSize` signs the delta by the node's own `isRemoved`,
         // which is now false, so this adds the size back.
         self.updateAncestorsSize()
@@ -1055,19 +1104,48 @@ class CRDTTree: CRDTElement {
      * falls back to the source's `removedAt` — an approximation that may be
      * wrong if the source was later overwritten by a concurrent delete, but it
      * is the best available without the persisted merge ticket.
+     *
+     * Resolved through ``findMergeNode(_:)``, not ``findFloorNode(_:)``:
+     * `mergedFrom` is client-supplied on an element payload (Set/Add/
+     * ArraySet), so the source it names has to be the node it names exactly,
+     * and an element.
      */
     private func rebuildMergeState() {
         self.indexTree.traverseAll { node, _ in
             guard let mergedFrom = node.mergedFrom, let parent = node.parent else {
                 return
             }
-            guard let src = self.findFloorNode(mergedFrom) else {
+            guard let src = self.findMergeNode(mergedFrom) else {
+                return
+            }
+
+            // A merge moves children under an element parent, so a child
+            // sitting under a text node cannot be one a merge moved. Only a
+            // snapshot is guaranteed well-formed here: an element payload
+            // passes through this same reader and keeps its `mergedFrom`,
+            // because the reverse of a Remove legitimately carries the
+            // merges the tree really underwent. Deriving a forwarding
+            // pointer at a text node from a crafted one would hand a later
+            // insert a parent that can hold no children.
+            if parent.isText {
+                return
+            }
+
+            // A merge only ever names a source the merge itself removed: the
+            // boundary element is tombstoned before its children are moved,
+            // so a live element is never a merge source. `mergedFrom` is
+            // client-supplied on an element payload, so without this check a
+            // crafted one plants a forwarding pointer on a live, unrelated
+            // element — arming the §1.1 position redirect and the §6.2
+            // delete cascade to fire on that element's own live children the
+            // moment some later, innocent edit removes it.
+            guard src.removedAt != nil else {
                 return
             }
 
             // Back-compat: older snapshots lack mergedAt on moved children.
-            if node.mergedAt == nil, let removedAt = src.removedAt {
-                node.mergedAt = removedAt
+            if node.mergedAt == nil {
+                node.mergedAt = src.removedAt
             }
 
             if src.mergedInto == nil {
@@ -1095,18 +1173,65 @@ class CRDTTree: CRDTElement {
      * this P->Q), the children must flow to that parent's final destination so
      * the merge chain stays flat (P->R, not P->Q) and both replicas converge.
      * The seen set guards against cycles from a concurrent mutual merge.
+     *
+     * Each link is resolved through ``findMergeNode(_:)``, not
+     * ``findFloorNode(_:)``: a text node or a floor-only match cuts the
+     * chain. `mergedInto` is derived from the `mergedFrom` an element
+     * payload keeps, so a crafted one can name either, and the merge hands
+     * what this returns straight to `moveChild`.
      */
     private func resolveMergeTarget(_ node: CRDTTreeNode) -> CRDTTreeNode {
         var target = node
         var seen: Set<ObjectIdentifier> = [ObjectIdentifier(target)]
         while target.isRemoved, let mergedInto = target.mergedInto {
-            guard let next = self.findFloorNode(mergedInto), !seen.contains(ObjectIdentifier(next)) else {
+            guard let next = self.findMergeNode(mergedInto), !seen.contains(ObjectIdentifier(next)) else {
                 break
             }
             seen.insert(ObjectIdentifier(next))
             target = next
         }
         return target
+    }
+
+    /**
+     * `resolveMergeTargetForTest` exposes ``resolveMergeTarget(_:)`` for testing.
+     */
+    func resolveMergeTargetForTest(_ node: CRDTTreeNode) -> CRDTTreeNode {
+        self.resolveMergeTarget(node)
+    }
+
+    /**
+     * `dissolveMerge` erases the merge lineage a node about to be revived leaves behind: the
+     * forwarding pointer on the source and the `mergedFrom`/`mergedAt` stamps on the children that
+     * merge moved into the destination.
+     *
+     * `mergedInto` is derivable only for a source that is already a tombstone — `rebuildMergeState`
+     * and the merge in ``applyMergeMoves(_:_:_:)`` both require it — so a revived source that kept
+     * either half of the lineage makes the replica running the undo disagree with one loading a
+     * snapshot: keeping `mergedInto` gives the undoing replica a pointer the snapshot no longer
+     * rebuilds, and keeping the children's `mergedFrom` lets the snapshot rebuild one the moment a
+     * redo tombstones the source again. Clearing both leaves nothing either path can derive, in
+     * either direction.
+     *
+     * The destination is resolved through ``findMergeNode(_:)`` for the same reason the merge-delete
+     * cascade does: `mergedInto` is derived from a `mergedFrom` an element payload may carry, so only
+     * an exact element match names a node the pointer really meant. The source's own pointer is
+     * dropped regardless of whether that lookup succeeds — it is the half that is never persisted.
+     */
+    private func dissolveMerge(_ src: CRDTTreeNode) {
+        guard let mergedInto = src.mergedInto else {
+            return
+        }
+        let dest = self.findMergeNode(mergedInto)
+        src.mergedInto = nil
+        guard let dest else {
+            return
+        }
+
+        for child in dest.innerChildren where child.mergedFrom == src.id {
+            child.mergedFrom = nil
+            child.mergedAt = nil
+        }
     }
 
     /// `mergeSourceOf` returns the id of the removed element whose children a split has just taken
@@ -1451,7 +1576,15 @@ class CRDTTree: CRDTElement {
             if boundary == .range, let tombstoneParent = realParent.parent {
                 return ((tombstoneParent, realParent), diff)
             }
-            if let mergeTarget = self.findFloorNode(mergedInto), !mergeTarget.isRemoved {
+            // `findMergeNode`, not `findFloorNode`: a text node is never a
+            // merge destination, and neither is a node the pointer merely
+            // floors onto. The pointer can come from a client --
+            // `mergedInto` is derived from the `mergedFrom` an element
+            // payload keeps -- and returning it as the insertion parent
+            // would fail every later edit that resolves through this
+            // tombstone, on every replica. Falling through to the normal
+            // path treats the crafted lineage as the absent one it is.
+            if let mergeTarget = self.findMergeNode(mergedInto), !mergeTarget.isRemoved {
                 let allChildren = mergeTarget.innerChildren
                 for (index, targetChild) in allChildren.enumerated() {
                     guard let childMergedFrom = targetChild.mergedFrom, childMergedFrom == realParent.id else {
@@ -2013,6 +2146,7 @@ class CRDTTree: CRDTElement {
         // captured spans don't fully describe the deletion → signal the op layer
         // (empty spans) to keep the copy-reinsert reverse.
         let spansComplete = mergeLevel == 0 && pairs.count == deletePairCount
+        pairs.append(contentsOf: insertResult.contentAttrPairs)
 
         // `traverseAll` is post-order (children before parent), so reverse to get
         // parent-before-child — the order `restore` needs to recreate a purged
@@ -2050,6 +2184,11 @@ class CRDTTree: CRDTElement {
         let diff: DataSize
         let pairs: [GCPair]
         let insertedSpans: [TreeRestoreSpan]
+        /// Attribute tombstones ridden in on the inserted content, held aside from `pairs`: `edit`
+        /// reads `pairs.count` as "did anything beyond the plain deletes produce garbage" to decide
+        /// `spansComplete`, and these say nothing about whether the captured spans describe the
+        /// deletion. `edit` appends them to its own `pairs` only after that count is taken.
+        let contentAttrPairs: [GCPair]
     }
 
     /// `applyInsertPhase` performs `edit`'s step 05: insert the given nodes at `site`. Extracted
@@ -2075,7 +2214,7 @@ class CRDTTree: CRDTElement {
         let insertedContentSize = contents?.reduce(0) { $0 + $1.paddedSize } ?? 0
 
         guard let contents, contents.isEmpty == false else {
-            return TreeEditInsertResult(size: insertedContentSize, diff: DataSize(data: 0, meta: 0), pairs: [], insertedSpans: [])
+            return TreeEditInsertResult(size: insertedContentSize, diff: DataSize(data: 0, meta: 0), pairs: [], insertedSpans: [], contentAttrPairs: [])
         }
 
         // §9.4: When the insert position was declared inside a parent that a
@@ -2089,6 +2228,7 @@ class CRDTTree: CRDTElement {
         var leftInChildren = site.fromLeft // tree
         var diff = DataSize(data: 0, meta: 0)
         var pairs = [GCPair]()
+        var contentAttrPairs = [GCPair]()
         var insertedSpans = [TreeRestoreSpan]()
 
         for content in contents {
@@ -2113,12 +2253,33 @@ class CRDTTree: CRDTElement {
                 if site.fromParent.isRemoved {
                     node.remove(site.editedAt)
 
-                    pairs.append(GCPair(parent: self, child: node))
+                    // The node is born dead: this branch adds nothing to `diff`, so its bytes never
+                    // entered docSize.live. A pair without `gcOnlySize` would debit live for them
+                    // anyway, driving live below the tree's real size until purge. Register the
+                    // post-`remove` size (tombstone ticket included) so gc is charged exactly what
+                    // `purge` later gives back, and leave live untouched -- the same routing the
+                    // attribute tombstones below use.
+                    pairs.append(GCPair(parent: self, child: node, gcOnlySize: node.getDataSize()))
                 } else {
                     diff.addDataSizes(others: node.getDataSize())
                 }
 
                 self.registerNode(node)
+
+                // NOTE: Content can arrive carrying attribute tombstones. The undo copy-reinsert
+                // path legitimately produces them -- it re-sends a deep copy of nodes a
+                // `removeStyle` tombstoned, tombstones included, so the reinserted node keeps
+                // rejecting the stale styles the original rejects -- and a crafted payload can
+                // invent them, since the decoder keeps `isRemoved` verbatim on an RHT entry. Either
+                // way they are garbage this insert created in this tree: no removal path ran for
+                // them here, so without this nothing would ever collect them.
+                //
+                // `getDataSize` skips removed attributes, so these bytes never entered live and
+                // `getGCPairs()`'s `gcOnlySize` sends them straight to docSize.gc, which purge gives
+                // back. This is the same routing a split, a snapshot load and a Set/Add element
+                // payload already use; the pair map keys on the parent's identity, so a clone
+                // wearing the original's RHTNode ids is a distinct pair, not a cancellation.
+                contentAttrPairs.append(contentsOf: node.getGCPairs())
 
                 // Capture this inserted node's identity span for
                 // identity-preserving insert undo/redo.
@@ -2134,7 +2295,7 @@ class CRDTTree: CRDTElement {
             self.recordInsertedContent(&changes, aliveContents, site.fromIdx, site.fromPath, site.editedAt)
         }
 
-        return TreeEditInsertResult(size: insertedContentSize, diff: diff, pairs: pairs, insertedSpans: insertedSpans)
+        return TreeEditInsertResult(size: insertedContentSize, diff: diff, pairs: pairs, insertedSpans: insertedSpans, contentAttrPairs: contentAttrPairs)
     }
 
     /**
@@ -2195,7 +2356,22 @@ class CRDTTree: CRDTElement {
             // child of its own (e.g. an intermediate that only relayed another
             // source's children) is left unset on both paths, keeping runtime and
             // snapshot consistent.
-            if let mergedFrom = node.mergedFrom, let src = self.findFloorNode(mergedFrom) {
+            //
+            // Resolved through `findMergeNode` for the same reason
+            // `rebuildMergeState` resolves it there: `mergedFrom` is stamped
+            // here only when the node carries none, so a node that arrived on
+            // an element payload keeps the client's value, and this is where
+            // that value is read again long after the decode that first saw
+            // it.
+            //
+            // The source must also already be a tombstone, the same
+            // requirement `rebuildMergeState` enforces: a boundary element is
+            // removed above before its children move here, so a live element
+            // named by a client-supplied `mergedFrom` is not a source this
+            // merge created. Checking it on only one of the two paths would
+            // make a loaded snapshot disagree with the replica that applied
+            // the op.
+            if let mergedFrom = node.mergedFrom, let src = self.findMergeNode(mergedFrom), src.removedAt != nil {
                 src.mergedInto = dest.id
             }
         }
@@ -2916,6 +3092,7 @@ extension CRDTTree {
             if !span.isText {
                 if let node = self.findFloorNode(span.id), node.id == span.id {
                     if node.isRemoved {
+                        self.dissolveMerge(node)
                         node.unremove()
                         untombstoned.append(node)
                         revived(node)
@@ -3564,7 +3741,11 @@ private extension CRDTTree {
                     continue
                 }
             }
-            guard let mergeTarget = self.findFloorNode(mergedInto) else {
+            // The destination has to be the node `mergedInto` names exactly,
+            // and an element: this loop tombstones that node's children, so a
+            // floor lookup landing on a neighbour is the cascade reaching
+            // live nodes no merge ever moved.
+            guard let mergeTarget = self.findMergeNode(mergedInto) else {
                 continue
             }
             for targetChild in mergeTarget.innerChildren {

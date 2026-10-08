@@ -220,6 +220,11 @@ public struct Yorkie_V1_WatchRequest: Sendable {
 
   public var clientID: String = String()
 
+  /// resources lists what the stream delivers. It must hold between 1 and 100
+  /// descriptors, and the server must recognize every one of them: a request
+  /// naming a resource the server cannot subscribe to is rejected whole rather
+  /// than served in part, so a client never watches fewer resources than it
+  /// asked for without being told.
   public var resources: [Yorkie_V1_ResourceDescriptor] = []
 
   /// actor_id is the stable actor the client stamps into its changes. When set,

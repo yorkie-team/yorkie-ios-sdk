@@ -43,6 +43,20 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
 /// RestoreMode selects the identity-preserving path. RESTORE_MODE_UNSPECIFIED
 /// means an ordinary edit (no restore semantics), keeping forward edits
 /// unchanged on the wire.
+///
+/// For elements it selects between reviving the element already in the tree and
+/// inserting a copy of it. The copy is what undo does today, and because a
+/// deep copy keeps every descendant's created_at, it puts a second live element
+/// under ids the document is indexed by. Reviving needs a replicated liveness
+/// register -- removed_at paired with revived_at on each element -- so that
+/// every replica resolves a remove/revive race the same way, with a tie going
+/// to the removal as the shipped remove register already does.
+///
+/// The branch cannot be chosen from local state. A replica that collected
+/// between the removal and the undo has purged the tombstone, and one that
+/// joined from a later snapshot never had it, so "revive if a tombstone is
+/// present" is a function of local collection timing and the same change log
+/// would produce different documents. That is why the branch is on the wire.
 public enum Yorkie_V1_RestoreMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -280,6 +294,18 @@ public struct Yorkie_V1_ChangePack: Sendable {
 
   public var epoch: Int64 = 0
 
+  /// capabilities is the negotiation channel for wire features a peer may not
+  /// understand. A server sets it on the pack it returns to advertise what it
+  /// supports; a client must treat absence as "unsupported" rather than as
+  /// "unknown", because a server that predates a feature cannot say so.
+  ///
+  /// It exists because a server does not store the bytes a client sent: it
+  /// re-encodes from its own domain model, so a field it does not know is
+  /// dropped from the stored change log and the push still succeeds. Without a
+  /// handshake a client cannot tell that its restore was silently downgraded to
+  /// an ordinary insert. Measured against a pinned v0.7.20 server.
+  public var capabilities: [String] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -505,6 +531,11 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    public var restoreMode: Yorkie_V1_RestoreMode {
+      get {_storage._restoreMode}
+      set {_uniqueStorage()._restoreMode = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -552,6 +583,11 @@ public struct Yorkie_V1_Operation: Sendable {
     public var hasExecutedAt: Bool {_storage._executedAt != nil}
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
+
+    public var restoreMode: Yorkie_V1_RestoreMode {
+      get {_storage._restoreMode}
+      set {_uniqueStorage()._restoreMode = newValue}
+    }
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1039,6 +1075,11 @@ public struct Yorkie_V1_Operation: Sendable {
     /// Clears the value of `executedAt`. Subsequent reads from it will return its default value.
     public mutating func clearExecutedAt() {_uniqueStorage()._executedAt = nil}
 
+    public var restoreMode: Yorkie_V1_RestoreMode {
+      get {_storage._restoreMode}
+      set {_uniqueStorage()._restoreMode = newValue}
+    }
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1195,6 +1236,17 @@ public struct Yorkie_V1_JSONElement: Sendable {
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
+    /// revived_at is the revive half of the liveness register. See the comment
+    /// on RestoreMode for why an element needs one.
+    public var revivedAt: Yorkie_V1_TimeTicket {
+      get {_revivedAt ?? Yorkie_V1_TimeTicket()}
+      set {_revivedAt = newValue}
+    }
+    /// Returns true if `revivedAt` has been explicitly set.
+    public var hasRevivedAt: Bool {self._revivedAt != nil}
+    /// Clears the value of `revivedAt`. Subsequent reads from it will return its default value.
+    public mutating func clearRevivedAt() {self._revivedAt = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1202,6 +1254,7 @@ public struct Yorkie_V1_JSONElement: Sendable {
     fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
+    fileprivate var _revivedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public struct JSONArray: Sendable {
@@ -1238,6 +1291,15 @@ public struct Yorkie_V1_JSONElement: Sendable {
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
+    public var revivedAt: Yorkie_V1_TimeTicket {
+      get {_revivedAt ?? Yorkie_V1_TimeTicket()}
+      set {_revivedAt = newValue}
+    }
+    /// Returns true if `revivedAt` has been explicitly set.
+    public var hasRevivedAt: Bool {self._revivedAt != nil}
+    /// Clears the value of `revivedAt`. Subsequent reads from it will return its default value.
+    public mutating func clearRevivedAt() {self._revivedAt = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1245,6 +1307,7 @@ public struct Yorkie_V1_JSONElement: Sendable {
     fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
+    fileprivate var _revivedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public struct Primitive: Sendable {
@@ -1283,6 +1346,15 @@ public struct Yorkie_V1_JSONElement: Sendable {
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
+    public var revivedAt: Yorkie_V1_TimeTicket {
+      get {_revivedAt ?? Yorkie_V1_TimeTicket()}
+      set {_revivedAt = newValue}
+    }
+    /// Returns true if `revivedAt` has been explicitly set.
+    public var hasRevivedAt: Bool {self._revivedAt != nil}
+    /// Clears the value of `revivedAt`. Subsequent reads from it will return its default value.
+    public mutating func clearRevivedAt() {self._revivedAt = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1290,6 +1362,7 @@ public struct Yorkie_V1_JSONElement: Sendable {
     fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
+    fileprivate var _revivedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public struct Text: Sendable {
@@ -1326,6 +1399,15 @@ public struct Yorkie_V1_JSONElement: Sendable {
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
+    public var revivedAt: Yorkie_V1_TimeTicket {
+      get {_revivedAt ?? Yorkie_V1_TimeTicket()}
+      set {_revivedAt = newValue}
+    }
+    /// Returns true if `revivedAt` has been explicitly set.
+    public var hasRevivedAt: Bool {self._revivedAt != nil}
+    /// Clears the value of `revivedAt`. Subsequent reads from it will return its default value.
+    public mutating func clearRevivedAt() {self._revivedAt = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1333,6 +1415,7 @@ public struct Yorkie_V1_JSONElement: Sendable {
     fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
+    fileprivate var _revivedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public struct Counter: Sendable {
@@ -1373,6 +1456,15 @@ public struct Yorkie_V1_JSONElement: Sendable {
 
     public var hllRegisters: Data = Data()
 
+    public var revivedAt: Yorkie_V1_TimeTicket {
+      get {_revivedAt ?? Yorkie_V1_TimeTicket()}
+      set {_revivedAt = newValue}
+    }
+    /// Returns true if `revivedAt` has been explicitly set.
+    public var hasRevivedAt: Bool {self._revivedAt != nil}
+    /// Clears the value of `revivedAt`. Subsequent reads from it will return its default value.
+    public mutating func clearRevivedAt() {self._revivedAt = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1380,6 +1472,7 @@ public struct Yorkie_V1_JSONElement: Sendable {
     fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
+    fileprivate var _revivedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public struct Tree: Sendable {
@@ -1416,6 +1509,15 @@ public struct Yorkie_V1_JSONElement: Sendable {
     /// Clears the value of `removedAt`. Subsequent reads from it will return its default value.
     public mutating func clearRemovedAt() {self._removedAt = nil}
 
+    public var revivedAt: Yorkie_V1_TimeTicket {
+      get {_revivedAt ?? Yorkie_V1_TimeTicket()}
+      set {_revivedAt = newValue}
+    }
+    /// Returns true if `revivedAt` has been explicitly set.
+    public var hasRevivedAt: Bool {self._revivedAt != nil}
+    /// Clears the value of `revivedAt`. Subsequent reads from it will return its default value.
+    public mutating func clearRevivedAt() {self._revivedAt = nil}
+
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
@@ -1423,6 +1525,7 @@ public struct Yorkie_V1_JSONElement: Sendable {
     fileprivate var _createdAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _movedAt: Yorkie_V1_TimeTicket? = nil
     fileprivate var _removedAt: Yorkie_V1_TimeTicket? = nil
+    fileprivate var _revivedAt: Yorkie_V1_TimeTicket? = nil
   }
 
   public init() {}
@@ -1676,7 +1779,8 @@ public struct Yorkie_V1_TreeNode: @unchecked Sendable {
   /// merged_at records the immutable ticket of the merge operation.
   /// Stored alongside merged_from because the source parent's removed_at
   /// may be overwritten by later LWW tombstones and thus cannot serve as
-  /// the merge-time causal boundary for SplitElement.
+  /// the merge-time causal boundary for SplitElement. See
+  /// docs/design/concurrent-merge-split.md for details.
   public var mergedAt: Yorkie_V1_TimeTicket {
     get {_storage._mergedAt ?? Yorkie_V1_TimeTicket()}
     set {_uniqueStorage()._mergedAt = newValue}
@@ -1942,6 +2046,11 @@ public struct Yorkie_V1_Project: @unchecked Sendable {
     set {_uniqueStorage()._autoRevisionEnabled = newValue}
   }
 
+  public var channelSessionTtl: String {
+    get {_storage._channelSessionTtl}
+    set {_uniqueStorage()._channelSessionTtl = newValue}
+  }
+
   public var allowedOrigins: [String] {
     get {_storage._allowedOrigins}
     set {_uniqueStorage()._allowedOrigins = newValue}
@@ -2179,6 +2288,15 @@ public struct Yorkie_V1_UpdatableProjectFields: @unchecked Sendable {
   public var hasAutoRevisionEnabled: Bool {_storage._autoRevisionEnabled != nil}
   /// Clears the value of `autoRevisionEnabled`. Subsequent reads from it will return its default value.
   public mutating func clearAutoRevisionEnabled() {_uniqueStorage()._autoRevisionEnabled = nil}
+
+  public var channelSessionTtl: SwiftProtobuf.Google_Protobuf_StringValue {
+    get {_storage._channelSessionTtl ?? SwiftProtobuf.Google_Protobuf_StringValue()}
+    set {_uniqueStorage()._channelSessionTtl = newValue}
+  }
+  /// Returns true if `channelSessionTtl` has been explicitly set.
+  public var hasChannelSessionTtl: Bool {_storage._channelSessionTtl != nil}
+  /// Clears the value of `channelSessionTtl`. Subsequent reads from it will return its default value.
+  public mutating func clearChannelSessionTtl() {_uniqueStorage()._channelSessionTtl = nil}
 
   public var allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins {
     get {_storage._allowedOrigins ?? Yorkie_V1_UpdatableProjectFields.AllowedOrigins()}
@@ -2851,7 +2969,7 @@ extension Yorkie_V1_Snapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChangePack"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_key\0\u{1}checkpoint\0\u{1}snapshot\0\u{1}changes\0\u{3}min_synced_ticket\0\u{3}is_removed\0\u{3}version_vector\0\u{1}epoch\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}document_key\0\u{1}checkpoint\0\u{1}snapshot\0\u{1}changes\0\u{3}min_synced_ticket\0\u{3}is_removed\0\u{3}version_vector\0\u{1}epoch\0\u{1}capabilities\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2867,6 +2985,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 6: try { try decoder.decodeSingularBoolField(value: &self.isRemoved) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._versionVector) }()
       case 8: try { try decoder.decodeSingularInt64Field(value: &self.epoch) }()
+      case 9: try { try decoder.decodeRepeatedStringField(value: &self.capabilities) }()
       default: break
       }
     }
@@ -2901,6 +3020,9 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if self.epoch != 0 {
       try visitor.visitSingularInt64Field(value: self.epoch, fieldNumber: 8)
     }
+    if !self.capabilities.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.capabilities, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -2913,6 +3035,7 @@ extension Yorkie_V1_ChangePack: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.isRemoved != rhs.isRemoved {return false}
     if lhs._versionVector != rhs._versionVector {return false}
     if lhs.epoch != rhs.epoch {return false}
+    if lhs.capabilities != rhs.capabilities {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -3256,13 +3379,14 @@ extension Yorkie_V1_Operation: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".Set"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}key\0\u{1}value\0\u{3}executed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{1}key\0\u{1}value\0\u{3}executed_at\0\u{3}restore_mode\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
     var _key: String = String()
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _restoreMode: Yorkie_V1_RestoreMode = .unspecified
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3277,6 +3401,7 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
       _key = source._key
       _value = source._value
       _executedAt = source._executedAt
+      _restoreMode = source._restoreMode
     }
   }
 
@@ -3299,6 +3424,7 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
         case 2: try { try decoder.decodeSingularStringField(value: &_storage._key) }()
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._restoreMode) }()
         default: break
         }
       }
@@ -3323,6 +3449,9 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       } }()
+      if _storage._restoreMode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._restoreMode, fieldNumber: 5)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3336,6 +3465,7 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._key != rhs_storage._key {return false}
         if _storage._value != rhs_storage._value {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._restoreMode != rhs_storage._restoreMode {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -3347,13 +3477,14 @@ extension Yorkie_V1_Operation.Set: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".Add"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{3}prev_created_at\0\u{1}value\0\u{3}executed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{3}prev_created_at\0\u{1}value\0\u{3}executed_at\0\u{3}restore_mode\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
     var _prevCreatedAt: Yorkie_V1_TimeTicket? = nil
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _restoreMode: Yorkie_V1_RestoreMode = .unspecified
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -3368,6 +3499,7 @@ extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._Message
       _prevCreatedAt = source._prevCreatedAt
       _value = source._value
       _executedAt = source._executedAt
+      _restoreMode = source._restoreMode
     }
   }
 
@@ -3390,6 +3522,7 @@ extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._Message
         case 2: try { try decoder.decodeSingularMessageField(value: &_storage._prevCreatedAt) }()
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._restoreMode) }()
         default: break
         }
       }
@@ -3414,6 +3547,9 @@ extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._Message
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       } }()
+      if _storage._restoreMode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._restoreMode, fieldNumber: 5)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3427,6 +3563,7 @@ extension Yorkie_V1_Operation.Add: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._prevCreatedAt != rhs_storage._prevCreatedAt {return false}
         if _storage._value != rhs_storage._value {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._restoreMode != rhs_storage._restoreMode {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -4119,13 +4256,14 @@ extension Yorkie_V1_Operation.TreeStyle: SwiftProtobuf.Message, SwiftProtobuf._M
 
 extension Yorkie_V1_Operation.ArraySet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_Operation.protoMessageName + ".ArraySet"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{3}created_at\0\u{1}value\0\u{3}executed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}parent_created_at\0\u{3}created_at\0\u{1}value\0\u{3}executed_at\0\u{3}restore_mode\0")
 
   fileprivate class _StorageClass {
     var _parentCreatedAt: Yorkie_V1_TimeTicket? = nil
     var _createdAt: Yorkie_V1_TimeTicket? = nil
     var _value: Yorkie_V1_JSONElementSimple? = nil
     var _executedAt: Yorkie_V1_TimeTicket? = nil
+    var _restoreMode: Yorkie_V1_RestoreMode = .unspecified
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -4140,6 +4278,7 @@ extension Yorkie_V1_Operation.ArraySet: SwiftProtobuf.Message, SwiftProtobuf._Me
       _createdAt = source._createdAt
       _value = source._value
       _executedAt = source._executedAt
+      _restoreMode = source._restoreMode
     }
   }
 
@@ -4162,6 +4301,7 @@ extension Yorkie_V1_Operation.ArraySet: SwiftProtobuf.Message, SwiftProtobuf._Me
         case 2: try { try decoder.decodeSingularMessageField(value: &_storage._createdAt) }()
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._executedAt) }()
+        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._restoreMode) }()
         default: break
         }
       }
@@ -4186,6 +4326,9 @@ extension Yorkie_V1_Operation.ArraySet: SwiftProtobuf.Message, SwiftProtobuf._Me
       try { if let v = _storage._executedAt {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       } }()
+      if _storage._restoreMode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._restoreMode, fieldNumber: 5)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4199,6 +4342,7 @@ extension Yorkie_V1_Operation.ArraySet: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._value != rhs_storage._value {return false}
         if _storage._executedAt != rhs_storage._executedAt {return false}
+        if _storage._restoreMode != rhs_storage._restoreMode {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -4399,7 +4543,7 @@ extension Yorkie_V1_JSONElement: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
 
 extension Yorkie_V1_JSONElement.JSONObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".JSONObject"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{3}revived_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4411,6 +4555,7 @@ extension Yorkie_V1_JSONElement.JSONObject: SwiftProtobuf.Message, SwiftProtobuf
       case 2: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._revivedAt) }()
       default: break
       }
     }
@@ -4432,6 +4577,9 @@ extension Yorkie_V1_JSONElement.JSONObject: SwiftProtobuf.Message, SwiftProtobuf
     } }()
     try { if let v = self._removedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._revivedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4441,6 +4589,7 @@ extension Yorkie_V1_JSONElement.JSONObject: SwiftProtobuf.Message, SwiftProtobuf
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
+    if lhs._revivedAt != rhs._revivedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4448,7 +4597,7 @@ extension Yorkie_V1_JSONElement.JSONObject: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_JSONElement.JSONArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".JSONArray"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{3}revived_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4460,6 +4609,7 @@ extension Yorkie_V1_JSONElement.JSONArray: SwiftProtobuf.Message, SwiftProtobuf.
       case 2: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._revivedAt) }()
       default: break
       }
     }
@@ -4482,6 +4632,9 @@ extension Yorkie_V1_JSONElement.JSONArray: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._removedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._revivedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4490,6 +4643,7 @@ extension Yorkie_V1_JSONElement.JSONArray: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
+    if lhs._revivedAt != rhs._revivedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4497,7 +4651,7 @@ extension Yorkie_V1_JSONElement.JSONArray: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_JSONElement.Primitive: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".Primitive"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}value\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}value\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{3}revived_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4510,6 +4664,7 @@ extension Yorkie_V1_JSONElement.Primitive: SwiftProtobuf.Message, SwiftProtobuf.
       case 3: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._revivedAt) }()
       default: break
       }
     }
@@ -4535,6 +4690,9 @@ extension Yorkie_V1_JSONElement.Primitive: SwiftProtobuf.Message, SwiftProtobuf.
     try { if let v = self._removedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
+    try { if let v = self._revivedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4544,6 +4702,7 @@ extension Yorkie_V1_JSONElement.Primitive: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
+    if lhs._revivedAt != rhs._revivedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4551,7 +4710,7 @@ extension Yorkie_V1_JSONElement.Primitive: SwiftProtobuf.Message, SwiftProtobuf.
 
 extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".Text"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{3}revived_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4563,6 +4722,7 @@ extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 2: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._revivedAt) }()
       default: break
       }
     }
@@ -4585,6 +4745,9 @@ extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._Mess
     try { if let v = self._removedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._revivedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4593,6 +4756,7 @@ extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
+    if lhs._revivedAt != rhs._revivedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4600,7 +4764,7 @@ extension Yorkie_V1_JSONElement.Text: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".Counter"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}value\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{4}\u{2}hll_registers\0\u{c}\u{6}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}value\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{4}\u{2}hll_registers\0\u{3}revived_at\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4614,6 +4778,7 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
       case 4: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
       case 7: try { try decoder.decodeSingularBytesField(value: &self.hllRegisters) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._revivedAt) }()
       default: break
       }
     }
@@ -4642,6 +4807,9 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
     if !self.hllRegisters.isEmpty {
       try visitor.visitSingularBytesField(value: self.hllRegisters, fieldNumber: 7)
     }
+    try { if let v = self._revivedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4652,6 +4820,7 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
     if lhs.hllRegisters != rhs.hllRegisters {return false}
+    if lhs._revivedAt != rhs._revivedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -4659,7 +4828,7 @@ extension Yorkie_V1_JSONElement.Counter: SwiftProtobuf.Message, SwiftProtobuf._M
 
 extension Yorkie_V1_JSONElement.Tree: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Yorkie_V1_JSONElement.protoMessageName + ".Tree"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}nodes\0\u{3}created_at\0\u{3}moved_at\0\u{3}removed_at\0\u{3}revived_at\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4671,6 +4840,7 @@ extension Yorkie_V1_JSONElement.Tree: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 2: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._movedAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._revivedAt) }()
       default: break
       }
     }
@@ -4693,6 +4863,9 @@ extension Yorkie_V1_JSONElement.Tree: SwiftProtobuf.Message, SwiftProtobuf._Mess
     try { if let v = self._removedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
+    try { if let v = self._revivedAt {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4701,6 +4874,7 @@ extension Yorkie_V1_JSONElement.Tree: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._movedAt != rhs._movedAt {return false}
     if lhs._removedAt != rhs._removedAt {return false}
+    if lhs._revivedAt != rhs._revivedAt {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5331,7 +5505,7 @@ extension Yorkie_V1_Member: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
 
 extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".Project"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}public_key\0\u{3}secret_key\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}created_at\0\u{3}updated_at\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0\u{3}auto_revision_enabled\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}public_key\0\u{3}secret_key\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}created_at\0\u{3}updated_at\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0\u{3}auto_revision_enabled\0\u{3}channel_session_ttl\0")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -5358,6 +5532,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _maxSizePerDocument: Int32 = 0
     var _removeOnDetach: Bool = false
     var _autoRevisionEnabled: Bool = false
+    var _channelSessionTtl: String = String()
     var _allowedOrigins: [String] = []
     var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
     var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
@@ -5395,6 +5570,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       _maxSizePerDocument = source._maxSizePerDocument
       _removeOnDetach = source._removeOnDetach
       _autoRevisionEnabled = source._autoRevisionEnabled
+      _channelSessionTtl = source._channelSessionTtl
       _allowedOrigins = source._allowedOrigins
       _createdAt = source._createdAt
       _updatedAt = source._updatedAt
@@ -5443,6 +5619,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         case 25: try { try decoder.decodeSingularInt64Field(value: &_storage._snapshotThreshold) }()
         case 26: try { try decoder.decodeSingularInt64Field(value: &_storage._snapshotInterval) }()
         case 27: try { try decoder.decodeSingularBoolField(value: &_storage._autoRevisionEnabled) }()
+        case 28: try { try decoder.decodeSingularStringField(value: &_storage._channelSessionTtl) }()
         default: break
         }
       }
@@ -5536,6 +5713,9 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       if _storage._autoRevisionEnabled != false {
         try visitor.visitSingularBoolField(value: _storage._autoRevisionEnabled, fieldNumber: 27)
       }
+      if !_storage._channelSessionTtl.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._channelSessionTtl, fieldNumber: 28)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5569,6 +5749,7 @@ extension Yorkie_V1_Project: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
         if _storage._removeOnDetach != rhs_storage._removeOnDetach {return false}
         if _storage._autoRevisionEnabled != rhs_storage._autoRevisionEnabled {return false}
+        if _storage._channelSessionTtl != rhs_storage._channelSessionTtl {return false}
         if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
         if _storage._createdAt != rhs_storage._createdAt {return false}
         if _storage._updatedAt != rhs_storage._updatedAt {return false}
@@ -5618,7 +5799,7 @@ extension Yorkie_V1_MetricPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
 
 extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdatableProjectFields"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0\u{3}auto_revision_enabled\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{3}auth_webhook_url\0\u{3}auth_webhook_methods\0\u{3}event_webhook_url\0\u{3}event_webhook_events\0\u{3}client_deactivate_threshold\0\u{3}max_subscribers_per_document\0\u{3}max_attachments_per_document\0\u{3}allowed_origins\0\u{3}max_size_per_document\0\u{3}remove_on_detach\0\u{3}auth_webhook_max_retries\0\u{3}auth_webhook_min_wait_interval\0\u{3}auth_webhook_max_wait_interval\0\u{3}auth_webhook_request_timeout\0\u{3}event_webhook_max_retries\0\u{3}event_webhook_min_wait_interval\0\u{3}event_webhook_max_wait_interval\0\u{3}event_webhook_request_timeout\0\u{3}snapshot_threshold\0\u{3}snapshot_interval\0\u{3}auto_revision_enabled\0\u{3}channel_session_ttl\0")
 
   fileprivate class _StorageClass {
     var _name: SwiftProtobuf.Google_Protobuf_StringValue? = nil
@@ -5642,6 +5823,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
     var _maxSizePerDocument: SwiftProtobuf.Google_Protobuf_Int32Value? = nil
     var _removeOnDetach: SwiftProtobuf.Google_Protobuf_BoolValue? = nil
     var _autoRevisionEnabled: SwiftProtobuf.Google_Protobuf_BoolValue? = nil
+    var _channelSessionTtl: SwiftProtobuf.Google_Protobuf_StringValue? = nil
     var _allowedOrigins: Yorkie_V1_UpdatableProjectFields.AllowedOrigins? = nil
 
       // This property is used as the initial default value for new instances of the type.
@@ -5674,6 +5856,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
       _maxSizePerDocument = source._maxSizePerDocument
       _removeOnDetach = source._removeOnDetach
       _autoRevisionEnabled = source._autoRevisionEnabled
+      _channelSessionTtl = source._channelSessionTtl
       _allowedOrigins = source._allowedOrigins
     }
   }
@@ -5715,6 +5898,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._snapshotThreshold) }()
         case 21: try { try decoder.decodeSingularMessageField(value: &_storage._snapshotInterval) }()
         case 22: try { try decoder.decodeSingularMessageField(value: &_storage._autoRevisionEnabled) }()
+        case 23: try { try decoder.decodeSingularMessageField(value: &_storage._channelSessionTtl) }()
         default: break
         }
       }
@@ -5793,6 +5977,9 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
       try { if let v = _storage._autoRevisionEnabled {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 22)
       } }()
+      try { if let v = _storage._channelSessionTtl {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5823,6 +6010,7 @@ extension Yorkie_V1_UpdatableProjectFields: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._maxSizePerDocument != rhs_storage._maxSizePerDocument {return false}
         if _storage._removeOnDetach != rhs_storage._removeOnDetach {return false}
         if _storage._autoRevisionEnabled != rhs_storage._autoRevisionEnabled {return false}
+        if _storage._channelSessionTtl != rhs_storage._channelSessionTtl {return false}
         if _storage._allowedOrigins != rhs_storage._allowedOrigins {return false}
         return true
       }
