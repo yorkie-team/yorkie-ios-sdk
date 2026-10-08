@@ -204,6 +204,9 @@ public class Document: Attachable {
         self.disablePresence = opts.disablePresence
         self.enableDevtools = opts.enableDevtools
         self.maxSizeLimit = 0
+        if opts.maxUndoDepth < 1 {
+            Logger.warning("maxUndoDepth must be a positive integer: \(opts.maxUndoDepth); using \(maxUndoRedoStackDepth)")
+        }
         self.internalHistory = History(maxDepth: opts.maxUndoDepth >= 1 ? opts.maxUndoDepth : maxUndoRedoStackDepth)
     }
 
@@ -371,7 +374,6 @@ public class Document: Attachable {
         }
 
         self.localChanges.append(change)
-        self.onLocalChange?()
         if !executionResult.reverseOps.isEmpty {
             self.internalHistory.pushUndo(executionResult.reverseOps)
         }
@@ -380,10 +382,18 @@ public class Document: Attachable {
             self.internalHistory.clearRedo()
         }
         self.changeID = context.getNextID()
+        // After the change id advances, as in yorkie-js-sdk and the undo/redo
+        // path, so a persist driven off this hook never serializes a pending
+        // change whose id has not moved.
+        self.onLocalChange?()
 
         // 03. Publish the document change event.
-        // NOTE(chacha912): Check opInfos, which represent the actually executed operations.
-        if !opInfos.isEmpty {
+        // Gated on the operations that RAN, not on the OpInfos they produced, as
+        // in yorkie-js-sdk and `executeUndoRedoInternal`: an operation can mutate
+        // CRDT state, and the change still consumes a clientSeq, without yielding
+        // anything an editor could render (a style over text only, a removeStyle
+        // of an absent key).
+        if !executionResult.operations.isEmpty {
             let changeInfo = ChangeInfo(message: change.message ?? "",
                                         operations: opInfos,
                                         actorID: actorID,

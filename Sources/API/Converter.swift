@@ -41,7 +41,10 @@ enum Converter {
         case .null:
             return .null
         case .boolean:
-            return .boolean(data[0] == 1)
+            // Any nonzero byte is true and an empty payload is false, as in
+            // yorkie-js-sdk (`bytes[0] ? true : false`); indexing `data[0]`
+            // trapped on an empty payload.
+            return .boolean((data.first ?? 0) != 0)
         case .integer:
             let result = Int32(littleEndian: loadZeroPadded(data))
             return .integer(result)
@@ -1033,11 +1036,18 @@ extension Converter {
     static func fromCounter(_ pbCounter: PbJSONElement.Counter) throws -> CRDTElement {
         switch pbCounter.type {
         case .integerDedupCnt:
-            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: fromTimeTicket(pbCounter.createdAt))
+            // Start from the value on the wire, as yorkie-js-sdk does, so a
+            // rejected HLL payload below leaves the counter at what the peer sent
+            // rather than at zero.
+            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: fromTimeTicket(pbCounter.createdAt),
+                                             value: Int32(littleEndian: loadZeroPadded(pbCounter.value)))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
             counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
-            if !pbCounter.hllRegisters.isEmpty {
-                try counter.restoreHLL(pbCounter.hllRegisters)
+            // A rejected payload is logged and dropped rather than thrown on:
+            // snapshot decode has no handler, so throwing would stop this client
+            // from opening the document over one peer's malformed counter.
+            if !pbCounter.hllRegisters.isEmpty, try !counter.restoreHLL(pbCounter.hllRegisters) {
+                Logger.warning("discarding malformed HLL registers for counter \(counter.createdAt.toTestString): \(pbCounter.hllRegisters.count) bytes")
             }
             return counter
         case .integerCnt:

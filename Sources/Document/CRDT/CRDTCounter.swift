@@ -52,9 +52,9 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
     /// - Parameters:
     ///   - dedup: Pass `true` to create a dedup counter.
     ///   - createdAt: Creation timestamp.
-    init(dedupWithCreatedAt createdAt: TimeTicket) where T == Int32 {
+    init(dedupWithCreatedAt createdAt: TimeTicket, value: Int32 = 0) where T == Int32 {
         self.createdAt = createdAt
-        self.value = 0
+        self.value = value
         self.isDedup = true
         self.hll = HLL()
     }
