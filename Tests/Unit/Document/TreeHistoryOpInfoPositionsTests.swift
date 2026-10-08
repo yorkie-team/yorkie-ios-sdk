@@ -308,16 +308,10 @@ final class TreeHistoryOpInfoPositionsTests: XCTestCase {
     /// element first, then its children -- two separate `TreeEditOpInfo`s, in
     /// that order, not one that names both in a single call.
     ///
-    /// CONFIRMED IOS DIVERGENCE FROM JS: the underlying CRDT document
-    /// converges correctly on both replicas either way (the `xmlOf(d2)`
-    /// assertion below passes) -- only the REPORTED `TreeEditOpInfo` for the
-    /// restored parent is wrong. See the root-cause trace on
-    /// `test_reports_where_undo_and_redo_of_insert_element_landed`: the
-    /// parent's op should carry `value: [{ type: 'p', children: [] }]` (its
-    /// child is reported separately, right after), but iOS's deferred
-    /// node-to-`JSONTreeNode` conversion lets the child's own revival leak
-    /// into the parent's snapshot, so a consumer that replays every OpInfo
-    /// literally (`TreeHistoryFollower`, below) ends up with "cdcd".
+    /// The parent's OpInfo carries `{ type: 'p', children: [] }`: it is
+    /// snapshotted when its own edit is made, so the child revived right after
+    /// it does not leak in, and a consumer replaying every OpInfo literally
+    /// does not insert "cd" twice.
     @MainActor
     func test_reports_a_restored_subtree_parent_first_then_its_children() throws {
         // given

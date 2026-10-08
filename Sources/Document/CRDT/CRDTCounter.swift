@@ -71,12 +71,16 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
 
     func deepcopy() -> CRDTElement {
         if self.isDedup, let counter = self as? CRDTCounter<Int32> {
-            let copy = CRDTCounter<Int32>(dedupWithCreatedAt: self.createdAt)
+            let copy = CRDTCounter<Int32>(dedupWithCreatedAt: self.createdAt, value: counter.value)
             copy.movedAt = self.movedAt
             copy.removedAt = self.removedAt
             if let bytes = counter.hllBytes() {
                 do {
                     try copy.restoreHLL(bytes)
+                    // `restoreHLL` derives the value from the registers, which can
+                    // differ from the source's: a counter decoded with a rejected
+                    // HLL payload keeps its wire value over empty registers.
+                    copy.value = counter.value
                 } catch {
                     // hllBytes() always returns a valid 16384-byte payload, so this
                     // should never happen; log loudly rather than silently dropping

@@ -342,4 +342,20 @@ final class JSONDedupCounterTests: XCTestCase {
 
         XCTAssertEqual(counter.value, 7)
     }
+
+    // The wire value survives a deepcopy too: `Document` reads its root through
+    // a clone, and `restoreHLL` alone would re-derive zero from the empty
+    // registers a rejected payload leaves.
+    func test_keeps_the_wire_value_across_a_deepcopy() throws {
+        var pbCounter = PbJSONElement.Counter()
+        pbCounter.type = .integerDedupCnt
+        pbCounter.value = Primitive(value: .integer(7), createdAt: TimeTicket.initial).toBytes()
+        pbCounter.createdAt = Converter.toTimeTicket(TimeTicket.initial)
+        pbCounter.hllRegisters = Data([1])
+        let counter = try XCTUnwrap(Converter.fromCounter(pbCounter) as? CRDTCounter<Int32>)
+
+        let copy = try XCTUnwrap(counter.deepcopy() as? CRDTCounter<Int32>)
+
+        XCTAssertEqual(copy.value, 7)
+    }
 }
