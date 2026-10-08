@@ -3277,10 +3277,30 @@ extension CRDTTree {
      * which floor-resolves to the leftmost fragment — the true right neighbour.
      */
     private func leftAnchorID(_ sibling: CRDTTreeNode) -> CRDTTreeNodeID {
-        guard sibling.isText else {
+        // A text node with no characters has no last character to anchor on, and
+        // `offset + size - 1` would put the anchor one code unit before the
+        // node's own start -- offset -1 for a node at offset 0. A local edit
+        // cannot create one (the public edit API never builds an empty text
+        // node), but a remote peer's contents are decoded without that check.
+        // The node's own id floor-resolves to the same node.
+        guard sibling.isText, sibling.size > 0 else {
             return sibling.id
         }
         return CRDTTreeNodeID(createdAt: sibling.id.createdAt, offset: sibling.id.offset + Int32(sibling.size) - 1)
+    }
+
+    /**
+     * `leftAnchorIDForTest` exposes ``leftAnchorID(_:)`` for testing.
+     */
+    func leftAnchorIDForTest(_ sibling: CRDTTreeNode) -> CRDTTreeNodeID {
+        self.leftAnchorID(sibling)
+    }
+
+    /**
+     * `emptyRunReachesActorForTest` exposes ``emptyRunReachesActor(_:_:_:)`` for testing.
+     */
+    func emptyRunReachesActorForTest(_ node: CRDTTreeNode, _ actorID: String, _ versionVector: VersionVector) -> Bool {
+        self.emptyRunReachesActor(node, actorID, versionVector)
     }
 }
 

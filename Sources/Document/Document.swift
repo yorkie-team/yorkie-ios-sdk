@@ -374,6 +374,13 @@ public class Document: Attachable {
     }
 
     /**
+     * `pushUndoForTest` pushes operations onto the undo stack for testing.
+     */
+    func pushUndoForTest(_ ops: [HistoryOperation]) {
+        self.internalHistory.pushUndo(ops)
+    }
+
+    /**
      * `clearHistory` flushes the undo and redo stacks.
      *
      * Used internally when a snapshot replaces local state, and exposed so callers can drop
@@ -392,6 +399,23 @@ public class Document: Attachable {
             throw YorkieError(code: .errRefused, message: "\(isUndo ? "Undo" : "Redo") is not allowed during an update")
         }
 
+        // NOTE: The refusal above must not drop the clone: an updater is holding
+        // a proxy over it, and `update` reads it again after the updater returns.
+        do {
+            try self.executeUndoRedoInternal(isUndo: isUndo)
+        } catch {
+            // A partially executed undo/redo leaves the clone ahead of the root;
+            // drop it so the next access rebuilds it from the root.
+            self.clone = nil
+            throw error
+        }
+    }
+
+    /**
+     * `executeUndoRedoInternal` pops the history entry and applies it to the
+     * clone and the root.
+     */
+    private func executeUndoRedoInternal(isUndo: Bool) throws {
         guard let ops = isUndo ? self.internalHistory.popUndo() : self.internalHistory.popRedo() else {
             return
         }
@@ -998,84 +1022,8 @@ public class Document: Attachable {
 
         Logger.trace(changes.map { "\($0.id.toTestString)\t\($0.toTestString)" }.joined(separator: "\n"))
 
-        let clone = self.cloned
-
         for change in changes {
-            try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
-
-            var changeInfo: ChangeInfo?
-
-            guard let actorID = change.id.getActorID() else {
-                throw YorkieError(code: .errUnexpected, message: "ActorID is null")
-            }
-
-            // Capture prev state before execute updates this.presences.
-            let prev: PrevPresenceState? = change.presenceChange != nil ? PrevPresenceState(
-                hadPresence: self.presences[actorID] != nil,
-                wasOnline: self.onlineClients.contains(actorID),
-                presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
-            ) : nil
-
-            let executionResult = try change.execute(root: self.root, presences: &self.presences, source: source)
-            let opInfos = executionResult.opInfos
-
-            // NOTE: when a text edit is applied, reconcile the ranges of any edit operations
-            // sitting on the undo/redo stacks so later undo/redo lands at the correct position.
-            for op in executionResult.operations {
-                if let edit = op as? EditOperation {
-                    let (from, to) = try edit.normalizePos(self.root)
-                    self.internalHistory.reconcileTextEdit(
-                        parentCreatedAt: edit.parentCreatedAt,
-                        rangeFrom: from,
-                        rangeTo: to,
-                        contentLength: (edit.content as NSString).length
-                    )
-                }
-                if let treeEdit = op as? TreeEditOperation {
-                    let (from, to) = treeEdit.normalizePos()
-                    self.internalHistory.reconcileTreeEdit(
-                        parentCreatedAt: treeEdit.parentCreatedAt,
-                        rangeFrom: from,
-                        rangeTo: to,
-                        contentSize: treeEdit.getContentSize()
-                    )
-                }
-            }
-
-            // Opt-out (disableGC) documents advance only the lamport clock and do
-            // not merge remote actors' version vectors, keeping each subsequent
-            // local Change's VV at O(1). See ``setDisableGC(_:)``.
-            self.changeID = self.disableGC
-                ? self.changeID.syncLamport(with: change.id)
-                : self.changeID.syncClocks(with: change.id)
-
-            if change.hasOperations {
-                changeInfo = ChangeInfo(message: change.message ?? "",
-                                        operations: opInfos,
-                                        actorID: actorID,
-                                        clientSeq: change.id.getClientSeq(),
-                                        serverSeq: change.id.getServerSeq())
-            }
-
-            // DocEvent should be emitted synchronously with applying changes.
-            // This is because 3rd party model should be synced with the Document
-            // after RemoteChange event is emitted. If the event is emitted
-            // asynchronously, the model can be changed and breaking consistency.
-            if let info = changeInfo {
-                let remoteChangeEvent = RemoteChangeEvent(value: info)
-                self.publish(remoteChangeEvent)
-            }
-
-            if let prev, change.presenceChange != nil {
-                // Remove the client from onlineClients when presence is cleared,
-                // mirroring the JS handling of PresenceChangeType.Clear.
-                if case .clear = change.presenceChange {
-                    self.removeOnlineClient(actorID)
-                }
-                if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: source) {
-                    self.publish(presenceEvent)
-                }
-            }
+            try self.applyChange(change, source: source)
         }
 
         Logger.debug(
@@ -1085,6 +1033,104 @@ public class Document: Attachable {
             removeds:\(self.root.garbageElementSetSize)
             """
         )
+    }
+
+    /**
+     * `applyChange` applies the given change into this document.
+     */
+    private func applyChange(_ change: Change, source: OpSource) throws {
+        do {
+            try self.applyChangeInternal(change, source: source)
+        } catch {
+            // NOTE: `Change.execute` does not roll back, so a change that fails
+            // partway leaves the clone and the root holding different prefixes of
+            // it. Drop the clone so the next access rebuilds it from the root, the
+            // way `update` does on failure.
+            self.clone = nil
+            throw error
+        }
+    }
+
+    /**
+     * `applyChangeInternal` applies the given change into the clone and the root.
+     */
+    private func applyChangeInternal(_ change: Change, source: OpSource) throws {
+        let clone = self.cloned
+        try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
+
+        var changeInfo: ChangeInfo?
+
+        guard let actorID = change.id.getActorID() else {
+            throw YorkieError(code: .errUnexpected, message: "ActorID is null")
+        }
+
+        // Capture prev state before execute updates this.presences.
+        let prev: PrevPresenceState? = change.presenceChange != nil ? PrevPresenceState(
+            hadPresence: self.presences[actorID] != nil,
+            wasOnline: self.onlineClients.contains(actorID),
+            presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+        ) : nil
+
+        let executionResult = try change.execute(root: self.root, presences: &self.presences, source: source)
+        let opInfos = executionResult.opInfos
+
+        // NOTE: when a text edit is applied, reconcile the ranges of any edit operations
+        // sitting on the undo/redo stacks so later undo/redo lands at the correct position.
+        for op in executionResult.operations {
+            if let edit = op as? EditOperation {
+                let (from, to) = try edit.normalizePos(self.root)
+                self.internalHistory.reconcileTextEdit(
+                    parentCreatedAt: edit.parentCreatedAt,
+                    rangeFrom: from,
+                    rangeTo: to,
+                    contentLength: (edit.content as NSString).length
+                )
+            }
+            if let treeEdit = op as? TreeEditOperation {
+                let (from, to) = treeEdit.normalizePos()
+                self.internalHistory.reconcileTreeEdit(
+                    parentCreatedAt: treeEdit.parentCreatedAt,
+                    rangeFrom: from,
+                    rangeTo: to,
+                    contentSize: treeEdit.getContentSize()
+                )
+            }
+        }
+
+        // Opt-out (disableGC) documents advance only the lamport clock and do
+        // not merge remote actors' version vectors, keeping each subsequent
+        // local Change's VV at O(1). See ``setDisableGC(_:)``.
+        self.changeID = self.disableGC
+            ? self.changeID.syncLamport(with: change.id)
+            : self.changeID.syncClocks(with: change.id)
+
+        if change.hasOperations {
+            changeInfo = ChangeInfo(message: change.message ?? "",
+                                    operations: opInfos,
+                                    actorID: actorID,
+                                    clientSeq: change.id.getClientSeq(),
+                                    serverSeq: change.id.getServerSeq())
+        }
+
+        // DocEvent should be emitted synchronously with applying changes.
+        // This is because 3rd party model should be synced with the Document
+        // after RemoteChange event is emitted. If the event is emitted
+        // asynchronously, the model can be changed and breaking consistency.
+        if let info = changeInfo {
+            let remoteChangeEvent = RemoteChangeEvent(value: info)
+            self.publish(remoteChangeEvent)
+        }
+
+        if let prev, change.presenceChange != nil {
+            // Remove the client from onlineClients when presence is cleared,
+            // mirroring the JS handling of PresenceChangeType.Clear.
+            if case .clear = change.presenceChange {
+                self.removeOnlineClient(actorID)
+            }
+            if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: source) {
+                self.publish(presenceEvent)
+            }
+        }
     }
 
     /**
