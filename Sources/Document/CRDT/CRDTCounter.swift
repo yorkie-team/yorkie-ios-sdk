@@ -198,18 +198,26 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
     /// Restores the HLL state from the given serialised bytes and recomputes
     /// the counter value.
     ///
+    /// A malformed payload (wrong length, or an out-of-range register) is
+    /// refused and leaves the counter unchanged; see ``HLL/restore(_:)``.
+    ///
     /// - Parameter data: Serialised register bytes from ``hllBytes()``.
-    /// - Throws: ``YorkieError`` when not in dedup mode, or when the byte
-    ///   count does not match the expected register count.
-    func restoreHLL(_ data: Data) throws where T == Int32 {
+    /// - Returns: `true` when the payload was applied.
+    /// - Throws: ``YorkieError`` when not in dedup mode.
+    @discardableResult
+    func restoreHLL(_ data: Data) throws -> Bool where T == Int32 {
         guard self.isDedup else {
             throw YorkieError(
                 code: .errInvalidArgument,
                 message: "restoreHLL called on a non-dedup counter"
             )
         }
-        if self.hll == nil { self.hll = HLL() }
-        try self.hll!.restore([UInt8](data))
-        self.value = Int32(self.hll!.count())
+        let hll = self.hll ?? HLL()
+        guard hll.restore([UInt8](data)) else {
+            return false
+        }
+        self.hll = hll
+        self.value = Int32(hll.count())
+        return true
     }
 }

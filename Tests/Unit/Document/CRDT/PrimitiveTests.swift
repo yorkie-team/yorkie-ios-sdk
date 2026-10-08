@@ -282,4 +282,19 @@ class PrimitiveTests: XCTestCase {
         }
         XCTAssertEqual(Array(value), [1, 2, 3, 4])
     }
+
+    // A remote payload can arrive truncated; the bytes it does not carry read as
+    // zero instead of trapping. The payload is the low half of the smallest
+    // double, which no other padding would produce.
+    func test_reads_a_double_payload_shorter_than_eight_bytes_instead_of_throwing() throws {
+        let value = try Converter.valueFrom(.double, data: Data([1, 0, 0, 0]))
+
+        XCTAssertEqual(value, .double(Double.leastNonzeroMagnitude))
+    }
+
+    func test_reads_long_and_date_payloads_shorter_than_eight_bytes_instead_of_throwing() throws {
+        XCTAssertEqual(try Converter.valueFrom(.long, data: Data([2, 1])), .long(258))
+        XCTAssertEqual(try Converter.valueFrom(.long, data: Data()), .long(0))
+        XCTAssertEqual(try Converter.valueFrom(.date, data: Data([1])), .date(Date(timeIntervalSince1970: 0.001)))
+    }
 }

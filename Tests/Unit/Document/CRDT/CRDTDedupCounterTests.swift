@@ -295,4 +295,37 @@ final class JSONDedupCounterTests: XCTestCase {
         // then
         XCTAssertNil(counter.id, "id must be nil before the counter is added to a document")
     }
+
+    // MARK: - Malformed payloads (yorkie-js-sdk#1422)
+
+    func test_can_read_a_long_counter_payload_shorter_than_eight_bytes() throws {
+        XCTAssertEqual(try Converter.countValueFrom(.longCnt, data: Data([5])) as? Int64, 5)
+        XCTAssertEqual(try Converter.countValueFrom(.longCnt, data: Data()) as? Int64, 0)
+    }
+
+    // A non-empty `hllRegisters` is whatever a peer put on the wire, and the
+    // counter's value is derived from it, so a wrong-length or out-of-range
+    // payload is refused rather than clamped -- and refused without throwing,
+    // since one bad counter would otherwise stop a snapshot decode.
+    func test_refuses_a_malformed_hll_register_payload_without_throwing() throws {
+        let counter = CRDTCounter<Int32>(dedupWithCreatedAt: TimeTicket.initial)
+        try counter.increaseDedup(Primitive(value: .integer(1), createdAt: TimeTicket.initial), actor: "actor-a")
+        let wellFormed = try XCTUnwrap(counter.hllBytes())
+        XCTAssertEqual(counter.value, 1)
+
+        let malformed = [
+            Data(repeating: 3, count: 20000),
+            Data([1]),
+            Data(repeating: 0xFF, count: wellFormed.count)
+        ]
+        for data in malformed {
+            XCTAssertFalse(try counter.restoreHLL(data))
+            XCTAssertEqual(counter.hllBytes(), wellFormed)
+            XCTAssertEqual(counter.value, 1)
+        }
+
+        let restored = CRDTCounter<Int32>(dedupWithCreatedAt: TimeTicket.initial)
+        XCTAssertTrue(try restored.restoreHLL(wellFormed))
+        XCTAssertEqual(restored.value, 1)
+    }
 }

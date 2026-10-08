@@ -16,6 +16,21 @@
 
 import Foundation
 
+/**
+ * `loadZeroPadded` reads the first `MemoryLayout<T>.size` bytes of `data`, in
+ * storage order, as a fixed-width integer. The payload comes off the wire, so
+ * its length is whatever a peer sent: bytes it does not carry read as zero, as
+ * in yorkie-js-sdk, instead of trapping in `load(as:)` and taking the whole
+ * snapshot or change decode down with it. Extra bytes are ignored.
+ */
+func loadZeroPadded<T: FixedWidthInteger>(_ data: Data) -> T {
+    var value = T.zero
+    withUnsafeMutableBytes(of: &value) { buffer in
+        _ = data.prefix(MemoryLayout<T>.size).copyBytes(to: buffer)
+    }
+    return value
+}
+
 enum Converter {
 
     /**
@@ -28,10 +43,10 @@ enum Converter {
         case .boolean:
             return .boolean(data[0] == 1)
         case .integer:
-            let result = Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
+            let result = Int32(littleEndian: loadZeroPadded(data))
             return .integer(result)
         case .double:
-            let result = Double(bitPattern: UInt64(littleEndian: data.withUnsafeBytes { $0.load(as: UInt64.self) }))
+            let result = Double(bitPattern: UInt64(littleEndian: loadZeroPadded(data)))
             return .double(result)
         case .string:
             guard let stringValue = String(data: data, encoding: .utf8) else {
@@ -39,12 +54,12 @@ enum Converter {
             }
             return .string(stringValue)
         case .long:
-            let result = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
+            let result = Int64(littleEndian: loadZeroPadded(data))
             return .long(result)
         case .bytes:
             return .bytes(data)
         case .date:
-            let milliseconds = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
+            let milliseconds = Int64(littleEndian: loadZeroPadded(data))
             return .date(Date(timeIntervalSince1970: TimeInterval(Double(milliseconds) / 1000)))
         default:
             throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
@@ -54,9 +69,9 @@ enum Converter {
     static func countValueFrom(_ valueType: PbValueType, data: Data) throws -> any YorkieCountable {
         switch valueType {
         case .integerCnt, .integerDedupCnt:
-            return Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
+            return Int32(littleEndian: loadZeroPadded(data))
         case .longCnt:
-            return Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
+            return Int64(littleEndian: loadZeroPadded(data))
         default:
             throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
         }
