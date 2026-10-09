@@ -295,4 +295,67 @@ final class JSONDedupCounterTests: XCTestCase {
         // then
         XCTAssertNil(counter.id, "id must be nil before the counter is added to a document")
     }
+
+    // MARK: - Malformed payloads (yorkie-js-sdk#1422)
+
+    func test_can_read_a_long_counter_payload_shorter_than_eight_bytes() throws {
+        XCTAssertEqual(try Converter.countValueFrom(.longCnt, data: Data([5])) as? Int64, 5)
+        XCTAssertEqual(try Converter.countValueFrom(.longCnt, data: Data()) as? Int64, 0)
+    }
+
+    // A non-empty `hllRegisters` is whatever a peer put on the wire, and the
+    // counter's value is derived from it, so a wrong-length or out-of-range
+    // payload is refused rather than clamped -- and refused without throwing,
+    // since one bad counter would otherwise stop a snapshot decode.
+    func test_refuses_a_malformed_hll_register_payload_without_throwing() throws {
+        let counter = CRDTCounter<Int32>(dedupWithCreatedAt: TimeTicket.initial)
+        try counter.increaseDedup(Primitive(value: .integer(1), createdAt: TimeTicket.initial), actor: "actor-a")
+        let wellFormed = try XCTUnwrap(counter.hllBytes())
+        XCTAssertEqual(counter.value, 1)
+
+        let malformed = [
+            Data(repeating: 3, count: 20000),
+            Data([1]),
+            Data(repeating: 0xFF, count: wellFormed.count)
+        ]
+        for data in malformed {
+            XCTAssertFalse(try counter.restoreHLL(data))
+            XCTAssertEqual(counter.hllBytes(), wellFormed)
+            XCTAssertEqual(counter.value, 1)
+        }
+
+        let restored = CRDTCounter<Int32>(dedupWithCreatedAt: TimeTicket.initial)
+        XCTAssertTrue(try restored.restoreHLL(wellFormed))
+        XCTAssertEqual(restored.value, 1)
+    }
+
+    // A rejected HLL payload is dropped, and the counter keeps the value the peer
+    // sent alongside it, as yorkie-js-sdk does.
+    func test_keeps_the_wire_value_when_the_hll_payload_is_rejected() throws {
+        var pbCounter = PbJSONElement.Counter()
+        pbCounter.type = .integerDedupCnt
+        pbCounter.value = Primitive(value: .integer(7), createdAt: TimeTicket.initial).toBytes()
+        pbCounter.createdAt = Converter.toTimeTicket(TimeTicket.initial)
+        pbCounter.hllRegisters = Data([1])
+
+        let counter = try XCTUnwrap(Converter.fromCounter(pbCounter) as? CRDTCounter<Int32>)
+
+        XCTAssertEqual(counter.value, 7)
+    }
+
+    // The wire value survives a deepcopy too: `Document` reads its root through
+    // a clone, and `restoreHLL` alone would re-derive zero from the empty
+    // registers a rejected payload leaves.
+    func test_keeps_the_wire_value_across_a_deepcopy() throws {
+        var pbCounter = PbJSONElement.Counter()
+        pbCounter.type = .integerDedupCnt
+        pbCounter.value = Primitive(value: .integer(7), createdAt: TimeTicket.initial).toBytes()
+        pbCounter.createdAt = Converter.toTimeTicket(TimeTicket.initial)
+        pbCounter.hllRegisters = Data([1])
+        let counter = try XCTUnwrap(Converter.fromCounter(pbCounter) as? CRDTCounter<Int32>)
+
+        let copy = try XCTUnwrap(counter.deepcopy() as? CRDTCounter<Int32>)
+
+        XCTAssertEqual(copy.value, 7)
+    }
 }

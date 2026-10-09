@@ -81,7 +81,7 @@ extension DocumentSizeTest {
         try root.append(contentsOf: [para])
         try para.append(contentsOf: [CRDTTreeNode(id: .initial, type: "text", value: "helloworld")])
 
-        XCTAssertEqual(root.toXML, "<r><p bold=true>helloworld</p></r>")
+        XCTAssertEqual(root.toXML, "<r><p bold=\"true\">helloworld</p></r>")
 
         // split text node
         guard let left = para.children.first else { fatalError() }
@@ -91,8 +91,8 @@ extension DocumentSizeTest {
         // split element node
         let (rightElem, diffElem) = try para.splitElement(1, .initial)
         XCTAssertEqual(diffElem, .init(data: 0, meta: 24))
-        XCTAssertEqual(rightElem!.toXML, "<p bold=true>world</p>")
-        XCTAssertEqual(para.toXML, "<p bold=true>hello</p>")
+        XCTAssertEqual(rightElem!.toXML, "<p bold=\"true\">world</p>")
+        XCTAssertEqual(para.toXML, "<p bold=\"true\">hello</p>")
     }
 
     func test_if_primitive_type_has_correct_live_size() async throws {
@@ -269,7 +269,7 @@ extension DocumentSizeTest {
             try (root.t as? JSONTree)?.style(0, 7, ["bold": true])
 
             let xml = (root.t as? JSONTree)?.toXML()
-            XCTAssertEqual(xml, "<doc><p bold=true>world</p></doc>")
+            XCTAssertEqual(xml, "<doc><p bold=\"true\">world</p></doc>")
         }
 
         await self.expectLive(with: .init(data: 26, meta: 192))
@@ -282,7 +282,12 @@ extension DocumentSizeTest {
         }
 
         await self.expectLive(with: .init(data: 10, meta: 168))
-        await self.expectGC(with: .init(data: 36, meta: 168))
+        // gc gains the tombstone's KEY only (`bold`, 4 chars, 8 bytes): a removed
+        // attribute holds no value, so the 8 bytes `true` was charging leave live
+        // without arriving in gc. This used to read 36 -- the value counted twice
+        // over, once in the tombstone and once in a rebuild it disagreed with
+        // (yorkie-js-sdk#1392).
+        await self.expectGC(with: .init(data: 28, meta: 168))
     }
 
     // gc test

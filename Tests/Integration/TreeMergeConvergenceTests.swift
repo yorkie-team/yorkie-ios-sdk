@@ -123,6 +123,54 @@ final class TreeOverlappingMergeConvergenceTests: XCTestCase {
             XCTAssertEqual((d2.getRoot().t as? JSONTree)?.toXML(), /* html */ "<r><p>ade</p></r>")
         }
     }
+
+    // Ported from yorkie-js-sdk v0.7.24: Tree.edit(concurrent overlapping range)
+    // — "Can converge an unwrap with a concurrent delete of the same paragraph"
+    // (yorkie-js-sdk#1404, yorkie#2042 "declaredBoundaries"; fixes #1331).
+    //
+    // d1 unwraps p1 (deletes just its open tag, hoisting "ab" into r — a
+    // merge whose destination is r). d2 deletes p1 outright, content and all,
+    // and ALSO unwraps p2 into r (its own end position lands exactly on p2's
+    // open tag). Both ops resolve to the SAME destination (r).
+    //
+    // When d1 applies d2's op, d1's p1 is already a merge source into r (from
+    // d1's own unwrap) with "ab" sitting in r. d2's own positions never named
+    // p1 as a boundary — they span clean over it on the way to unwrapping
+    // p2 — so d2's intent was "p1 and its content are gone", not "stop at
+    // p1's boundary". Before this fix, `mergedInto == dest.id` was skipped
+    // unconditionally, so d1 kept "ab" and diverged from d2's `<r>cd</r>`.
+    // The `declaredBoundaries` check now looks at d2's OWN declared range
+    // (not just the coincidence that both ops share a destination), so "ab"
+    // is cascade-deleted on d1 too.
+    @MainActor
+    func test_can_converge_an_unwrap_with_a_concurrent_delete_of_the_same_paragraph() async throws {
+        try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
+            // given — 0 <r> 1 <p> 2 a 3 b 4 </p> 5 <p> 6 c 7 d 8 </p> </r>
+            try d1.update { root, _ in
+                root.t = JSONTree(initialRoot: JSONTreeElementNode(type: "r", children: [
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ab")]),
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "cd")])
+                ]))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // when — d1 unwraps p1 (deletes only its open tag), d2 deletes p1
+            // whole and unwraps p2 in the same stroke.
+            try d1.update { root, _ in try (root.t as? JSONTree)?.edit(0, 1) }
+            try d2.update { root, _ in try (root.t as? JSONTree)?.edit(0, 5) }
+            // The merge appends moved children to the end of the destination.
+            XCTAssertEqual((d1.getRoot().t as? JSONTree)?.toXML(), /* html */ "<r><p>cd</p>ab</r>")
+            XCTAssertEqual((d2.getRoot().t as? JSONTree)?.toXML(), /* html */ "<r>cd</r>")
+
+            // then — both converge, with "ab" gone on both replicas
+            try await c1.sync()
+            try await c2.sync()
+            try await c1.sync()
+            XCTAssertEqual((d1.getRoot().t as? JSONTree)?.toXML(), /* html */ "<r>cd</r>")
+            XCTAssertEqual((d2.getRoot().t as? JSONTree)?.toXML(), /* html */ "<r>cd</r>")
+        }
+    }
 }
 
 // MARK: - Contained range

@@ -6,6 +6,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.24] - 2026-10-08
+
+> Requires a Yorkie server v0.7.24 or later: the protos are synced with Go (new schema-only fields: `ChangePack.capabilities`, `restore_mode` on Set/Add/ArraySet, `revived_at` on every element, `channel_session_ttl`), and several tree and GC fixes mirror the server's.
+
+> **Behavioural change — `Document.update` surfaces a failed root pass.** When applying a local change to the root threw, the error was swallowed (`try?`) and the change ID advanced anyway. It now throws, as the JS SDK does, and the burned lamport is never reissued.
+
+> **Behavioural change — UTF-16 surrogate pairs.** `JSONText` and `JSONTree` edit and style calls reject an index that splits a surrogate pair (`errInvalidArgument`). `JSONTree` methods throw; `JSONText.edit`/`setStyle` keep their non-throwing style and return `nil`/`false`. Tree `toXML` now quotes every attribute value (`bold="true"`) and escapes keys and values.
+
+> **Behavioural change — GC waits for the successor.** A tombstone is kept until the node after it is causally stable (the successor barrier), so `garbageLength` can stay higher for a while after a sync.
+
+> **Behavioural change — events and errors.** A local change or undo/redo now publishes its `LocalChangeEvent` whenever an operation ran, even when it reports no position (a style over text only, a remove of an absent attribute), as the JS SDK does. A remote change that cannot be applied now surfaces as `errChangeApplyFailed`, naming the document, the change and the operation, with the original error's code and message.
+
+> **Storage note.** The offline-persistence store key and session-lock name now escape `/` and `%` in the API key, client key and document key, so two identities can no longer collide. Documents stored under a key containing those characters are not found after upgrading.
+
+### Added
+
+- Warn when offline persistence is used without a client key in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Report where Tree undo and redo landed in their OpInfo in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Let a document choose its undo/redo depth (`DocumentOptions.maxUndoDepth`, default 50; a value below 1 falls back to the default) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+
+### Changed
+
+- Name the change and operation that cannot be applied in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Sync the protos with Go and harden crafted tree payloads in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Reject indexes that split a UTF-16 surrogate pair in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+
+### Fixed
+
+- Order concurrent splits of one boundary by ticket in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Make docSize agree with a rebuild (issue #1383, part 3) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Guard empty-text anchors and reset the clone on failed applies in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Fix clientSeq rewind, leaked sizeInGC record, tombstone removedAt in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Burn the lamport when a change's root pass throws in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Fix losing ElementRHT values against tombstones in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Drop snapshots in push-only mode but keep the push ack in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Take a push-only response as a push ack only, so GC does not purge tombstones unpulled changes anchor on in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Port three tree convergence fixes from the Go SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Port three GC correctness fixes from the Go SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Read a double without writing to the buffer it shares, and read a short fixed-width or boolean payload as JS does instead of crashing; a dedup counter keeps its wire value when its HLL payload is rejected in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Re-point operations at the elements a redo split re-creates in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Read Text.normalizePos from the index tree instead of the chain in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Make `setActor` overridable through an `Operation` existential, so a TreeEdit operation re-stamps its split tickets in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+- Snapshot a restored Tree node for its OpInfo when the edit is made, so a restored subtree reports each node once in https://github.com/yorkie-team/yorkie-ios-sdk/pull/278
+
 ## [v0.7.23] - 2026-10-01
 
 > Requires a Yorkie server v0.7.23 or later: six of these mirror [yorkie v0.7.23](https://github.com/yorkie-team/yorkie/releases/tag/v0.7.23) one for one, because the defects were in shared CRDT logic.

@@ -361,11 +361,19 @@ public class JSONArray: CustomDebugStringConvertible {
     /// clone's is what ``Document/update(_:_:)`` measures against `maxSizeLimit`. Every move
     /// entry point goes through this, so the four public move APIs cannot drift apart again.
     private func registerMove(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws {
-        if let deadNode = try self.target.moveAfter(
+        let result = try self.target.moveAfter(
             createdAt: createdAt,
             prevCreatedAt: prevCreatedAt,
             executedAt: executedAt
-        ) {
+        )
+
+        // The `movedAt` stamp is part of the moved element's size; see
+        // `CRDTRoot.accMovedElement` for why it cannot simply go to live.
+        if let element = self.target.getByID(createdAt: createdAt) {
+            self.context.accMovedElement(element, result.movedDiff)
+        }
+
+        if let deadNode = result.deadNode {
             // A dead position node holds no element, so `getDataSize` never counted
             // it into live -- `gcOnlySize` says "add to gc, take nothing out of live".
             self.context.registerGCPair(GCPair(parent: self.target.getRGATreeList(), child: deadNode, gcOnlySize: deadNode.getDataSize()))

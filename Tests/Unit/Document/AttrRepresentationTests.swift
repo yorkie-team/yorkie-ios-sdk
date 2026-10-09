@@ -170,6 +170,69 @@ final class AttrRepresentationTests: XCTestCase {
         XCTAssertTrue(sorted.contains("\"color\":\"red\""))
     }
 
+    /// Mirrors JS: "cannot forge JSON structure through a text attribute".
+    @MainActor
+    func test_cannot_forge_json_structure_through_a_text_attribute() throws {
+        // given
+        let doc = Document(key: "test-doc")
+        try doc.update { root, _ in
+            root.k = JSONText()
+            _ = (root.k as? JSONText)?.edit(0, 0, "abcdefghij")
+        }
+
+        // when
+        try styleRawOnText(doc, key: "evil", raw: "[\"x\",\"y\"]")
+
+        // then
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(doc.toJSON().utf8)) as? [String: Any])
+        let first = try XCTUnwrap((parsed["k"] as? [[String: Any]])?.first)
+        XCTAssertEqual((first["attrs"] as? [String: Any])?["evil"] as? [String], ["x", "y"])
+    }
+
+    /// Mirrors JS: "cannot break JSON parsing through an object-valued text attribute".
+    @MainActor
+    func test_cannot_break_json_parsing_through_an_object_valued_text_attribute() throws {
+        // given
+        let doc = Document(key: "test-doc")
+        try doc.update { root, _ in
+            root.k = JSONText()
+            _ = (root.k as? JSONText)?.edit(0, 0, "abcdefghij")
+        }
+
+        // when
+        try styleRawOnText(doc, key: "evil", raw: "{\"val\":\"forged\"}")
+
+        // then
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(doc.toJSON().utf8)) as? [String: Any])
+        let first = try XCTUnwrap((parsed["k"] as? [[String: Any]])?.first)
+        XCTAssertEqual(((first["attrs"] as? [String: Any])?["evil"] as? [String: String]), ["val": "forged"])
+        XCTAssertEqual(first["val"] as? String, "abcdefghij", "the real value is untouched")
+    }
+
+    /// Mirrors JS: "cannot forge XML structure through a tree attribute". `toXML`
+    /// builds markup by concatenation, so a peer-written value holding `"` or `<`
+    /// must be escaped rather than forge an attribute or element.
+    @MainActor
+    func test_cannot_forge_xml_structure_through_a_tree_attribute() throws {
+        // given
+        let doc = Document(key: "test-doc")
+        try doc.update { root, _ in
+            root.t = JSONTree(initialRoot: JSONTreeElementNode(
+                type: "doc",
+                children: [
+                    JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: "ab")])
+                ]
+            ))
+        }
+
+        // when
+        try styleRawOnTree(doc, key: "color", raw: "red\" onload=\"<script>")
+
+        // then
+        let tree = try XCTUnwrap(doc.getRootObject().get(key: "t") as? CRDTTree)
+        XCTAssertEqual(tree.toXML(), "<doc><p color=\"red&quot; onload=&quot;&lt;script&gt;\">ab</p></doc>")
+    }
+
     @MainActor
     func test_reads_back_as_the_string_the_peer_wrote_not_as_a_dropped_key() throws {
         // given

@@ -21,6 +21,14 @@ public protocol JSONTreeNode: Equatable {
     var toJSONString: String { get }
 }
 
+/// `comparePath` compares two paths of equal length in document order.
+private func comparePath(_ lhs: [Int], _ rhs: [Int]) -> Int {
+    for index in 0 ..< lhs.count where lhs[index] != rhs[index] {
+        return lhs[index] - rhs[index]
+    }
+    return 0
+}
+
 struct TreeChangeWithPath {
     let actor: ActorID
     let type: TreeChangeType
@@ -211,12 +219,16 @@ func createCRDTTreeNode(context: ChangeContext, content: any JSONTreeNode) throw
 }
 
 /**
- * `validateTextNode` ensures that a text node has a non-empty string value.
+ * `validateTextNode` ensures that a text node has a non-empty string value that does not carry
+ * a lone half of a UTF-16 surrogate pair. The index guard in ``CRDTTree/findPos(_:_:)`` refuses
+ * to split a pair; this is the other half of the same contract, since a stored lone half pairs
+ * with the code unit next to it and makes the index at that seam permanently unusable.
  */
 func validateTextNode(_ textNode: JSONTreeTextNode) throws {
     if textNode.value.length == 0 {
         throw YorkieError(code: .errInvalidArgument, message: "text node cannot have empty value")
     }
+    try ensureNoLoneSurrogate(textNode.value as String)
 }
 
 /**
@@ -332,6 +344,9 @@ public class JSONTree {
 
     /**
      * `splitByPath` splits the tree by the given path.
+     *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
      */
     public func splitByPath(_ path: [Int]) throws {
         guard self.context != nil, let tree = self.tree else {
@@ -404,6 +419,9 @@ public class JSONTree {
 
     /**
      * `styleByPath` sets the attributes to the elements of the given path.
+     *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
      */
     public func styleByPath(_ path: [Int], _ attributes: Codable) throws {
         try self.styleByPathInternal(path, StringValueTypeDictionary.stringifyAttributes(attributes))
@@ -430,6 +448,9 @@ public class JSONTree {
     /**
      * `styleByPath` sets the attributes to the elements in the given path range.
      *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
+     *
      * The range form takes three arguments: `(fromPath, toPath, attributes)`. Calling
      * ``styleByPath(_:_:)-`` with two arrays (e.g. `styleByPath([0], [1])`) resolves to the
      * single-path overload (since `[Int]` is `Codable`) and styles `[0]` with `[1]` as attributes —
@@ -455,6 +476,12 @@ public class JSONTree {
             throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
 
+        // Same contract as the index form: a range given backwards is a caller
+        // error, not an empty range.
+        if comparePath(fromPath, toPath) > 0 {
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
+        }
+
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
 
@@ -463,6 +490,9 @@ public class JSONTree {
 
     /**
      * `style` sets the attributes to the elements of the given range.
+     *
+     * An index inside a UTF-16 surrogate pair throws ``YorkieError`` with code
+     * `errInvalidArgument`.
      */
     public func style(_ fromIdx: Int, _ toIdx: Int, _ attributes: Codable) throws {
         try self.styleByIndexInternal(fromIdx, toIdx, StringValueTypeDictionary.stringifyAttributes(attributes))
@@ -516,6 +546,9 @@ public class JSONTree {
 
     /**
      * `remoteStyleByPath` removes the attributes to the elements of the given path.
+     *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
      */
     public func removeStyleByPath(_ path: [Int], _ attributesToRemove: [String]) throws {
         guard let tree else {
@@ -533,6 +566,9 @@ public class JSONTree {
 
     /**
      * `removeStyleByPath` removes the attributes of the elements in the given path range.
+     *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
      */
     public func removeStyleByPath(_ fromPath: [Int], _ toPath: [Int], _ attributesToRemove: [String]) throws {
         guard let tree else {
@@ -546,6 +582,12 @@ public class JSONTree {
             throw YorkieError(code: .errInvalidArgument, message: "path should not be empty")
         }
 
+        // Same contract as the index form: a range given backwards is a caller
+        // error, not an empty range.
+        if comparePath(fromPath, toPath) > 0 {
+            throw YorkieError(code: .errInvalidArgument, message: "from should be less than or equal to to")
+        }
+
         let fromPos = try tree.pathToPos(fromPath)
         let toPos = try tree.pathToPos(toPath)
 
@@ -554,6 +596,9 @@ public class JSONTree {
 
     /**
      * `removeStyle` removes the attributes to the elements of the given range.
+     *
+     * An index inside a UTF-16 surrogate pair throws ``YorkieError`` with code
+     * `errInvalidArgument`.
      */
     public func removeStyle(_ fromIdx: Int, _ toIdx: Int, _ attributesToRemove: [String]) throws {
         guard let tree else {
@@ -639,7 +684,7 @@ public class JSONTree {
         // operation can carry them: every other replica then uses them instead of reconstructing them
         // from the operation, which it cannot do correctly once content has descendants.
         var splitTickets = [TimeTicket]()
-        let (_, pairs, diff, _, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
+        let (_, pairs, diff, _, _, _, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), crdtNodes?.compactMap { $0.deepcopy() }, splitLevel, ticket, {
             let issued = context.issueTimeTicket
             splitTickets.append(issued)
             return issued
@@ -666,6 +711,9 @@ public class JSONTree {
 
     /**
      * `editByPath` edits this tree with the given node and path.
+     *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
      */
     @discardableResult
     public func editByPath(_ fromPath: [Int], _ toPath: [Int], _ content: (any JSONTreeNode)? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
@@ -674,6 +722,9 @@ public class JSONTree {
 
     /**
      * `editBulkByPath` edits this tree with the given node and path.
+     *
+     * A path whose text offset falls inside a UTF-16 surrogate pair throws ``YorkieError``
+     * with code `errInvalidArgument`.
      */
     @discardableResult
     public func editBulkByPath(_ fromPath: [Int], _ toPath: [Int], _ contents: [any JSONTreeNode]? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
@@ -697,6 +748,9 @@ public class JSONTree {
 
     /**
      * `edit` edits this tree with the given node.
+     *
+     * An index inside a UTF-16 surrogate pair throws ``YorkieError`` with code
+     * `errInvalidArgument`.
      */
     @discardableResult
     public func edit(_ fromIdx: Int, _ toIdx: Int, _ content: (any JSONTreeNode)? = nil, _ splitLevel: Int32 = 0) throws -> Bool {
@@ -705,6 +759,9 @@ public class JSONTree {
 
     /**
      * `editBulk` edits this tree with the given node.
+     *
+     * An index inside a UTF-16 surrogate pair throws ``YorkieError`` with code
+     * `errInvalidArgument`.
      */
     @discardableResult
     public func editBulk(_ fromIdx: Int, _ toIdx: Int, _ contents: [any JSONTreeNode]? = nil, _ splitLevel: Int32 = 0) throws -> Bool {

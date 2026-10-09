@@ -277,7 +277,7 @@ final class CRDTTreeEditTests: XCTestCase {
         let sizeBefore = tree.size
         let fromPos = try tree.findPos(0)
         let toPos = try tree.findPos(4)
-        let (_, _, _, removedNodes, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), nil, 0, timeT(), timeT, nil)
+        let (_, _, _, removedNodes, _, _, _, _, _, _, _, _, _) = try tree.edit((fromPos, toPos), nil, 0, timeT(), timeT, nil)
 
         XCTAssertEqual(removedNodes.count, 2, "both the <p> and its text child are removed")
         let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
@@ -705,13 +705,13 @@ final class CRDTTreeSplitTests: XCTestCase {
             timeT(),
             timeT
         )
-        XCTAssertEqual(tree.toXML(), "<root><p bold=true>helloworld</p></root>")
+        XCTAssertEqual(tree.toXML(), "<root><p bold=\"true\">helloworld</p></root>")
 
         // when — split at position 6 (after "hello"), splitLevel 1
         try tree.editT((6, 6), nil, 1, timeT(), timeT)
 
         // then — both siblings carry bold="true"
-        XCTAssertEqual(tree.toXML(), "<root><p bold=true>hello</p><p bold=true>world</p></root>")
+        XCTAssertEqual(tree.toXML(), "<root><p bold=\"true\">hello</p><p bold=\"true\">world</p></root>")
     }
 }
 

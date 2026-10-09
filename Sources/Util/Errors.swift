@@ -119,6 +119,15 @@ struct YorkieError: Error, CustomStringConvertible {
         // server (e.g. reclaimed via TTL). The client clears its local session id and
         // re-attaches transparently on the next first-call RefreshChannel.
         case errSessionNotFound = "ErrSessionNotFound"
+
+        // ErrChangeApplyFailed is returned when a change pulled from the server cannot be
+        // applied to the document. The checkpoint only advances once a pack's changes have
+        // been applied, so a change that throws leaves it where it was and the server
+        // redelivers the same pack forever; this code names that condition so it is
+        // diagnosable instead of surfacing as whatever the failing operation happened to
+        // throw. Local edits (``Document/update(_:_:)``) and undo/redo are not wrapped: the
+        // caller that asked for them matches on the original code.
+        case errChangeApplyFailed = "ErrChangeApplyFailed"
     }
 }
 

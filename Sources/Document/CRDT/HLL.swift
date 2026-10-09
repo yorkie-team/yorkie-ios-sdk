@@ -19,6 +19,9 @@ import Foundation
 // HyperLogLog precision and register count.
 private let hllPrecision = 14
 private let hllRegisterCount = 1 << hllPrecision // 16384
+/// The largest value `add` can write into a register: the run of leading zeros
+/// in the 50 hash bits below the index, plus one.
+private let maxRegisterValue = UInt8(64 - hllPrecision + 1)
 
 // xxhash64 constants (64-bit, matching Go's cespare/xxhash/v2 and JS implementation).
 private let prime64x1: UInt64 = 0x9E37_79B1_85EB_CA87
@@ -89,17 +92,21 @@ class HLL {
 
     /// Restores the HLL registers from a byte array.
     ///
+    /// The bytes are whatever a peer put on the wire, so a payload of the wrong
+    /// length, or carrying a register value no ``add(_:)`` could have written, is
+    /// refused rather than clamped, and the registers are left unchanged.
+    /// Refusing by throwing is no good either: snapshot decode has no handler,
+    /// so one bad counter would stop the client from opening the document.
+    ///
     /// - Parameter data: The byte array to restore from.
-    /// - Throws: ``YorkieError`` with code ``YorkieErrorCode/errInvalidArgument``
-    ///   when the data length does not match the register count.
-    func restore(_ data: [UInt8]) throws {
-        guard data.count == hllRegisterCount else {
-            throw YorkieError(
-                code: .errInvalidArgument,
-                message: "invalid HLL register payload: got \(data.count) bytes, want \(hllRegisterCount)"
-            )
+    /// - Returns: `true` when the payload was applied.
+    @discardableResult
+    func restore(_ data: [UInt8]) -> Bool {
+        guard data.count == hllRegisterCount, data.allSatisfy({ $0 <= maxRegisterValue }) else {
+            return false
         }
         self.registers = data
+        return true
     }
 }
 

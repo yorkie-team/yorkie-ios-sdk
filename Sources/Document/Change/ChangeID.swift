@@ -164,6 +164,19 @@ struct ChangeID {
     }
 
     /**
+     * `setClientSeq` sets the given client sequence, leaving the logical clocks alone. The
+     * counter and the clocks are independent positions: the counter names this client's
+     * changes to the server, while the clocks order operations against other actors.
+     */
+    func setClientSeq(_ clientSeq: UInt32) -> ChangeID {
+        ChangeID(clientSeq: clientSeq,
+                 lamport: self.lamport,
+                 actor: self.actor,
+                 versionVector: self.versionVector,
+                 serverSeq: self.serverSeq)
+    }
+
+    /**
      * `setActor` sets the given actor.
      */
     func setActor(_ actorID: ActorID) -> ChangeID {

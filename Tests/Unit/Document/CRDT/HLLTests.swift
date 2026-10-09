@@ -194,33 +194,26 @@ final class HLLTests: XCTestCase {
         XCTAssertEqual(bytes.count, 16384)
     }
 
-    func test_restore_wrong_length_throws() {
+    // yorkie-js-sdk#1422: a malformed payload is refused, not thrown, and the
+    // registers are left as they were.
+    func test_restore_wrong_length_is_refused() {
         // given
         let hll = HLL()
-        let badBytes: [UInt8] = [0, 1, 2] // too short
+        _ = hll.add(value: "a")
+        let before = hll.toBytes()
 
         // when / then
-        XCTAssertThrowsError(try hll.restore(badBytes)) { error in
-            guard let yorkieError = error as? YorkieError else {
-                XCTFail("expected YorkieError but got \(error)")
-                return
-            }
-            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
-        }
+        XCTAssertFalse(hll.restore([0, 1, 2])) // too short
+        XCTAssertEqual(hll.toBytes(), before)
     }
 
-    func test_restore_empty_payload_throws() {
+    func test_restore_empty_payload_is_refused() {
         // given
         let hll = HLL()
 
         // when / then
-        XCTAssertThrowsError(try hll.restore([])) { error in
-            guard let yorkieError = error as? YorkieError else {
-                XCTFail("expected YorkieError but got \(error)")
-                return
-            }
-            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
-        }
+        XCTAssertFalse(hll.restore([]))
+        XCTAssertEqual(hll.toBytes().count, 16384)
     }
 
     // MARK: - add is stable for known inputs

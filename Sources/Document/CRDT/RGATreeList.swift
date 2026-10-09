@@ -46,6 +46,19 @@ final class RGATreeListElementEntry {
 
 // MARK: - RGATreeListNode
 
+/// What an ``RGATreeList/moveAfter(createdAt:prevCreatedAt:executedAt:)`` reports back.
+struct RGATreeListMove {
+    /// The position node the move abandoned, for GC registration. `nil` when the
+    /// move was discarded by LWW and its position node already existed.
+    var deadNode: RGATreeListNode?
+
+    /// The size the move added to the MOVED ELEMENT -- one ticket for the
+    /// `movedAt` stamp, and only the first time it is stamped. It is not the
+    /// dead position node's size: that node was never in live, and the caller
+    /// books it through a `gcOnlySize` pair instead.
+    var movedDiff: DataSize
+}
+
 /// A node of ``RGATreeList``.
 ///
 /// Each node represents a *position slot* in the list, not necessarily a live element.
@@ -384,14 +397,15 @@ class RGATreeList {
     // MARK: moveAfter — LWW position register
 
     /// Moves the element identified by `createdAt` to after `prevCreatedAt`, returning
-    /// the dead position node that must be registered as a GC pair.
+    /// the dead position node that must be registered as a GC pair, and the size the
+    /// move added to the element itself.
     ///
     /// Faithful port of the yorkie-js-sdk v0.7.6 `moveAfter` algorithm:
     /// - **LWW winner**: Creates a new position node at `prevCreatedAt`, wires up the entry,
     ///   kills the old position node (sets `positionRemovedAt`), and returns it for GC.
     /// - **LWW loser**: Creates a bare dead position node at `prevCreatedAt` (no entry,
     ///   `positionRemovedAt = executedAt`), refreshes its index weight, and returns it for GC.
-    ///   Returns `nil` only when the node was already processed (idempotency check).
+    ///   Returns a `nil` dead node only when the node was already processed (idempotency check).
     ///
     /// No cascade re-linking is performed — that is not in the JS specification.
     ///
@@ -399,10 +413,10 @@ class RGATreeList {
     ///   - createdAt: The `createdAt` of the element to move (element identity).
     ///   - prevCreatedAt: The POSITION node key after which to insert (position identity).
     ///   - executedAt: The operation's execution time, used as the LWW clock.
-    /// - Returns: The dead position node (GC target), or `nil` if already processed.
+    /// - Returns: The dead position node (GC target) and the moved element's size delta.
     /// - Throws: ``YorkieError`` when the target element or previous position cannot be found.
     @discardableResult
-    func moveAfter(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode? {
+    func moveAfter(createdAt: TimeTicket, prevCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListMove {
         guard let entry = self.elementMapByCreatedAt[createdAt] else {
             throw YorkieError(code: .errInvalidArgument, message: "can't find the given element: \(createdAt)")
         }
@@ -413,7 +427,7 @@ class RGATreeList {
 
         // Idempotency: if a node with this executedAt was already created, skip entirely.
         if self.nodeMapByPositionCreatedAt[executedAt] != nil {
-            return nil
+            return RGATreeListMove(deadNode: nil, movedDiff: DataSize(data: 0, meta: 0))
         }
 
         // LWW loser path — this move was superseded by a later move of the same element.
@@ -422,8 +436,14 @@ class RGATreeList {
             let deadPosNode = try self.insertPositionAfter(prevPositionCreatedAt: prevCreatedAt, executedAt: executedAt)
             deadPosNode.markDead(at: executedAt)
             self.nodeMapByIndex.updateWeight(deadPosNode.indexNode)
-            return deadPosNode
+            return RGATreeListMove(deadNode: deadPosNode, movedDiff: DataSize(data: 0, meta: 0))
         }
+
+        // `setMovedAt` below makes `getMetaUsage` count one more ticket, but only
+        // the first time: a re-move overwrites a ticket already charged, and
+        // charging it again would walk `docSize` up without bound on a list the
+        // user reorders repeatedly.
+        let firstStamp = entry.element.movedAt == nil
 
         // LWW winner path.
         // Build the new position node carrying the actual element value (not a placeholder),
@@ -457,7 +477,10 @@ class RGATreeList {
         // newPosNode insertion above already advanced `last` in the only case
         // JS does (when the anchor was `last`).
 
-        return oldPosNode
+        return RGATreeListMove(
+            deadNode: oldPosNode,
+            movedDiff: DataSize(data: 0, meta: firstStamp ? timeTicketSize : 0)
+        )
     }
 
     // MARK: Snapshot restore helpers
@@ -519,7 +542,7 @@ class RGATreeList {
     /// (``MoveOperation`` does it via ``CRDTArray/moveAfter(createdAt:prevCreatedAt:executedAt:)``).
     @discardableResult
     func move(createdAt: TimeTicket, afterCreatedAt: TimeTicket, executedAt: TimeTicket) throws -> RGATreeListNode? {
-        return try self.moveAfter(createdAt: createdAt, prevCreatedAt: afterCreatedAt, executedAt: executedAt)
+        return try self.moveAfter(createdAt: createdAt, prevCreatedAt: afterCreatedAt, executedAt: executedAt).deadNode
     }
 
     // MARK: Element access
@@ -749,6 +772,38 @@ extension RGATreeList: GCParent {
     func purge(node: any GCChild) {
         guard let posNode = node as? RGATreeListNode else { return }
         self.purgeDeadPosition(positionCreatedAt: posNode.positionCreatedAt)
+    }
+
+    /// `purgeBarrierAt` implements `GCParent.purgeBarrierAt` for a dead
+    /// position node a move left behind: the ticket that must be covered
+    /// before it may be unlinked is the one `findNextBeforeExecutedAt` would
+    /// read in its place.
+    func purgeBarrierAt(node: any GCChild) -> TimeTicket? {
+        guard let posNode = node as? RGATreeListNode else { return nil }
+        return Self.successorBarrierAt(posNode)
+    }
+}
+
+extension RGATreeList {
+    /// `purgeBarrierAt` is the element-side form: the ticket that must be
+    /// covered before the given element may be purged is the one
+    /// `findNextBeforeExecutedAt` would read in its place, found through the
+    /// position node currently holding it.
+    func purgeBarrierAt(element: CRDTElement) -> TimeTicket? {
+        // Same identity guard as `purge`: an entry now holding a different
+        // element is not this element's position, and `purge` declines anyway.
+        guard let entry = self.elementMapByCreatedAt[element.createdAt], entry.element === element else {
+            return nil
+        }
+        return Self.successorBarrierAt(entry.positionNode)
+    }
+
+    /// Returns the positioning ticket of the node that would take over as
+    /// `findNextBeforeExecutedAt`'s stopping point once the given node is
+    /// unlinked. `nil` at the tail: with nothing behind it, unlinking cannot
+    /// send an insert past anything.
+    private static func successorBarrierAt(_ node: RGATreeListNode) -> TimeTicket? {
+        return node.next?.positionedAt
     }
 }
 

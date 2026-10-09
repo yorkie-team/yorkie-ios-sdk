@@ -51,6 +51,12 @@ public enum SyncMode {
 
     /**
      * `realtimePushonly` mode indicates that only local changes are automatically pushed.
+     *
+     * The reply to a push-only request is taken as a push ack only: its client-seq
+     * acknowledgement and pack metadata, never remote state and never its version vector.
+     * Garbage-collecting with that vector would purge tombstones that remote changes this
+     * document has not pulled yet may anchor on, leaving them unapplicable once it resumes
+     * pulling.
      */
     case realtimePushOnly
 
@@ -95,6 +101,30 @@ public struct ClientOptions {
     /**
      * `key` is the client key. It is used to identify the client.
      * If not set, a random key is generated.
+     *
+     * That random default is minted per ``Client`` instance, so it differs on every launch.
+     * **Offline persistence requires a stable key**: the server derives the actor stamped
+     * into every change from the project and this key, and it also scopes the ``store``
+     * keys (`apiKey/clientKey/docKey`). A new key therefore does not address the previous
+     * launch's entries at all -- the restore finds nothing, the un-pushed edits are lost
+     * *silently* (no `LocalChangesDropped` event: the actor-mismatch guard in
+     * ``Document/restoreFromBytes(_:)`` only fires when the *same* store key is reached
+     * under a different actor), and the previous namespace is orphaned with nothing to
+     * reclaim it.
+     *
+     * An app setting ``store`` must therefore pass a key it persists itself and reuses on
+     * the next launch. Make it an **opaque random value the app mints once** -- a UUID kept
+     * in the Keychain, say -- scoped to the signed-in user and cleared on sign-out. Do
+     * **not** derive it from a user id, a device id, an email, or anything else guessable or
+     * shared:
+     *
+     * - The key is an identifier, not a credential. It is sent verbatim in the activate
+     *   request and nothing proves the caller owns it, so a guessable key lets another
+     *   client of the same project activate under the same derived actor and attribute
+     *   changes to it.
+     * - A key shared between users of one device gives them one store namespace, whose
+     *   bytes attach restores locally before the attach RPC -- one user's un-pushed edits
+     *   would surface in the next user's session ahead of any server authorization.
      */
     var key: String?
 
@@ -145,6 +175,15 @@ public struct ClientOptions {
     /// When set, the client writes ``Document/toBytes()`` after every local change and
     /// restores from the store on the next attach, so changes made offline are re-pushed.
     /// Leaving it `nil` keeps the previous behaviour: nothing is persisted.
+    ///
+    /// You **must** also set ``key`` to an opaque random value the app mints once and
+    /// reuses across launches. Both the store keys and the actor recovery is keyed by are
+    /// derived from it, and the default is a fresh random key per ``Client``, so leaving it
+    /// unset means every restart silently loses every un-pushed change and orphans the
+    /// previous launch's entries. This cannot be defaulted correctly -- only the app knows
+    /// what identity should outlive the process -- so the client warns rather than guessing.
+    /// See ``key`` for why the value must not be a user id, a device id, or anything else
+    /// guessable or shared between users of one device.
     public var store: DocStore?
 
     /// The guard that keeps two sessions from resuming the same persisted document.
@@ -184,6 +223,29 @@ enum DefaultBroadcastOptions {
     static let maxRetries: Int = .max
     static let initialRetryInterval: Double = 1000 // milliseconds
     static let maxBackoff: Double = 20000 // milliseconds
+}
+
+/// Percent-encodes the separator (and the escape character itself) so a namespace component
+/// cannot forge one.
+///
+/// Without this, ``namespaceOf(_:_:_:)`` is not injective: `apiKey` and the client key are
+/// taken verbatim from ``ClientOptions``, and a document key is caller-supplied, so a
+/// component containing `/` could produce the same joined string as a different
+/// (apiKey, clientKey, docKey) triple -- two distinct identities sharing one store namespace
+/// and one session lock. Escaping `%` first keeps the encoding reversible and collision-free.
+private func escapeNamespacePart(_ part: String) -> String {
+    part.replacingOccurrences(of: "%", with: "%25")
+        .replacingOccurrences(of: "/", with: "%2F")
+}
+
+/// Builds the `apiKey/clientKey/docKey` identity namespace used for both the store key and
+/// the single-active-session lock name.
+///
+/// Each component is escaped via ``escapeNamespacePart(_:)``, so the mapping from identity to
+/// namespace is one-to-one: distinct identities can never address the same persisted envelope
+/// or block each other's session lock.
+private func namespaceOf(_ apiKey: String, _ clientKey: String, _ docKey: String) -> String {
+    "\(escapeNamespacePart(apiKey))/\(escapeNamespacePart(clientKey))/\(escapeNamespacePart(docKey))"
 }
 
 /**
@@ -298,6 +360,25 @@ public class Client {
         self.store = options.store
         self.sessionLock = options.sessionLock
         self.apiKey = options.apiKey ?? ""
+
+        // NOTE(yorkie-js-sdk#1402): a store with no caller-supplied key cannot survive a
+        // restart, by construction. `self.key` just defaulted to a fresh UUID when
+        // `options.key` was nil, and that key scopes both the store keys (``storeKey(_:)``)
+        // and the actor the server derives -- so the next launch addresses a namespace of
+        // its own: it restores nothing and orphans what this one persists, silently, since
+        // the actor-mismatch guard in ``Document/restoreFromBytes(_:)`` only fires when the
+        // *same* store key is reached under a different actor. Neither option is wrong
+        // alone, so warn where they meet rather than deeper in the restore path, where the
+        // report would read as an unexplained actor mismatch.
+        if self.store != nil, options.key == nil {
+            Logger.warning(
+                "[PS] c:\"\(self.key)\" offline persistence needs a stable clientKey: `store` is set but " +
+                    "`key` is not, so a random one was generated for this instance. The next launch " +
+                    "addresses a different namespace, silently restoring nothing and stranding what this " +
+                    "one persists. Pass `key` as an opaque random value your app mints once and persists " +
+                    "across launches -- not a user id, an email, or a device id."
+            )
+        }
     }
 
     /**
@@ -1443,10 +1524,11 @@ public class Client {
         let doc = attachment.resource
         let requestPack = doc.createChangePack()
         let localSize = requestPack.getChangeSize()
+        let pushOnly = syncMode == .realtimePushOnly
 
         pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.resourceID
-        pushPullRequest.pushOnly = syncMode == .realtimePushOnly
+        pushPullRequest.pushOnly = pushOnly
         pushPullRequest.disableGc = attachment.disableGC
 
         do {
@@ -1460,20 +1542,52 @@ public class Client {
 
             let responsePack = try Converter.fromChangePack(message.changePack)
 
-            // NOTE(chacha912, hackerwins): If syncLoop already executed with
-            // PushPull, ignore the response when the syncMode is PushOnly.
-            if responsePack.hasChanges() && (attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff) {
-                return doc
-            }
+            // NOTE(chacha912, hackerwins): An explicit sync(doc) still pulls while the
+            // document is in PushOnly or SyncOff, e.g. after syncLoop already ran PushPull.
+            // Drop any remote state it brings back, a snapshot included: the server seq stays
+            // put, so the skipped state is pulled again once realtime sync resumes. The push
+            // itself did land, so still take the client seq ack rather than push the same
+            // changes again, along with the pack's metadata (compaction epoch, removal flag),
+            // which describes the document rather than the content being skipped.
+            //
+            // The response to a push-only request is a push ack as well, even when it carries
+            // no changes: the server still attaches the minimum version vector, and applying
+            // that would garbage-collect tombstones while the changes anchored on them are
+            // precisely what this document has not pulled yet. Those changes arrive on the
+            // first full pull after the pause and are applied before that pull's vector
+            // collects anything; collecting here instead leaves the document unable to apply
+            // them ("cannot find node"), stuck on a pack the server redelivers forever. Judged
+            // by the mode the request was sent in (`pushOnly`), not the mode now
+            // (`attachment.syncMode`): the mode can change while the request is in flight, and
+            // it is the request that decided whether anything was pulled.
+            //
+            // The pack's content does not enter the decision. A reply with neither changes nor
+            // a snapshot still carries the version vector, and an explicit `sync(doc)` sends
+            // PushPull regardless of the attachment mode, so keying on content would let that
+            // empty reply reach garbage collection on a document that is paused mid-composition
+            // -- the very collection this guard exists to prevent. While a document is in
+            // PushOnly/SyncOff, nothing of the reply but the push ack is taken.
+            let dropsRemoteState = pushOnly ||
+                attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff
 
-            try doc.applyChangePack(responsePack)
+            if dropsRemoteState {
+                doc.acknowledgePushedChanges(responsePack)
+            } else {
+                try doc.applyChangePack(responsePack)
+            }
             attachment.updateHeartbeatTime()
 
-            // Record the post-sync header. A push that is merely acked, pulling nothing,
-            // advances the checkpoint and drains the pushed changes from `localChanges`
-            // without appending one — so the local-change hook never fires and the stored
-            // header would stay behind until the next edit. A resume from that state
-            // re-pushes a change the server has already applied.
+            // Whether the response actually moved the root. A dropped pack does not: it only
+            // takes the push ack, which leaves the document exactly where the pure push-ack
+            // branch below expects it.
+            let movedRoot = !dropsRemoteState && (responsePack.hasChanges() || responsePack.hasSnapshot())
+
+            // Record the post-sync header. A push that is merely acked, pulling nothing (or a
+            // pulled pack dropped because the document is in PushOnly/SyncOff), advances the
+            // checkpoint and drains the pushed changes from `localChanges` without appending
+            // one — so the local-change hook never fires and the stored header would stay
+            // behind until the next edit. A resume from that state re-pushes a change the
+            // server has already applied.
             //
             // The header only, not a snapshot: an online client syncs constantly, and
             // re-snapshotting per sync is exactly the cost the incremental store exists to
@@ -1484,7 +1598,7 @@ public class Client {
             // free — and on the attachment persisting at all, so a sync cannot write over an
             // envelope this session failed to read and deliberately left alone.
             if self.store != nil, self.getDocumentAttachment(docKey)?.persistsToStore == true {
-                if responsePack.hasChanges() || responsePack.hasSnapshot() {
+                if movedRoot {
                     // The response moved the root, and the append log holds *local* changes
                     // only -- nothing in it carries remote content. Writing the header alone
                     // would advance the persisted `serverSeq` past a root the store never
@@ -1497,7 +1611,8 @@ public class Client {
                     // avoid it and is the natural follow-up.
                     self.enqueueSnapshotPersist(doc)
                 } else {
-                    // A pure push-ack: the root did not move, so the cheap header write is
+                    // A pure push-ack (nothing pulled, or a pulled pack dropped in
+                    // PushOnly/SyncOff): the root did not move, so the cheap header write is
                     // sufficient -- unless the log cannot back the checkpoint, which
                     // `enqueueMetaPersist` decides at write time and repairs with a snapshot.
                     // The decision belongs there rather than here: an append queued before
@@ -2088,13 +2203,17 @@ struct DocumentPersistState {
 /// are not part of the public API.
 extension Client {
     /// Returns the store key under which `docKey` is persisted.
+    ///
+    /// Scoped by `apiKey/clientKey/docKey` through ``namespaceOf(_:_:_:)``, so the scoping is
+    /// injective: a store shared across identities (different apiKey/clientKey) cannot
+    /// collide on the bare docKey and hand one identity another's persisted envelope.
     func storeKey(_ docKey: String) -> String {
-        "\(self.apiKey)/\(self.key)/\(docKey)"
+        namespaceOf(self.apiKey, self.key, docKey)
     }
 
     /// Returns the session lease name guarding `docKey` for this client.
     func sessionLockName(_ docKey: String) -> String {
-        "yorkie-session:\(self.apiKey)/\(self.key)/\(docKey)"
+        "yorkie-session:" + namespaceOf(self.apiKey, self.key, docKey)
     }
 
     /// Drops a document's stale persisted state and re-stamps it with this client's actor.
@@ -2345,8 +2464,20 @@ extension Client {
         // un-pushed edits inside it, because one log entry was bad. A corrupt log says
         // nothing about the snapshot, so every failure below falls into the same
         // discontinuity repair: keep the snapshot, drop the log, say what was lost.
+        //
+        // The document's own counter joins the max, because it is the highest `clientSeq`
+        // this client has MINTED -- and a minted sequence is never replayable, whether the
+        // snapshot contains it or it was lost. It normally ties the other two (the counter
+        // equals the last pending entry, or the checkpoint when the queue is empty), so it
+        // only leads for a base a prior run of ``discardAppendedLog(for:snapshot:store:dropped:ackedWatermark:)``
+        // rewrote: that repair persists the snapshot with the acked counter carried forward,
+        // deliberately ahead of the snapshot's own checkpoint. Without it, the next edit
+        // appended after such a repair starts above `watermark + 1` and the contiguity guard
+        // below discards it (yorkie-js-sdk#1377).
         let carried = (try? doc.getPendingChangesAfter(0)) ?? []
-        let snapshotWatermark = Swift.max(carried.last?.clientSeq ?? 0, doc.checkpoint.getClientSeq())
+        let snapshotWatermark = Swift.max(carried.last?.clientSeq ?? 0,
+                                          doc.checkpoint.getClientSeq(),
+                                          doc.changeID.getClientSeq())
 
         if let meta = stored.meta {
             do {
@@ -2362,7 +2493,12 @@ extension Client {
                 // those would duplicate them.
                 let lostEntries = stored.changes.filter { $0.clientSeq > snapshotWatermark }
                 let lost = (try? Converter.fromChanges(lostEntries.map { try PbChange(serializedBytes: $0.bytes) })) ?? []
-                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost)
+                // Meta never applied, so `doc`'s checkpoint is still exactly the snapshot's own --
+                // the same position `snapshotWatermark` already reflects. Handing it over as the
+                // acked watermark makes the repair's counter carry a no-op here, which is correct:
+                // there is no acked header position beyond the snapshot to carry forward.
+                await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store, dropped: lost,
+                                              ackedWatermark: doc.checkpoint.getClientSeq())
                 return
             }
         }
@@ -2386,8 +2522,9 @@ extension Client {
         // again (yorkie-js-sdk#1355).
         //
         // Read after the header is applied, so it is the header's counter rather than the
-        // snapshot's. With no header this reduces to the checkpoint comparison, since a
-        // `toBytes` envelope's counter never leads the pending changes it carries.
+        // snapshot's. With no header this cannot trip: the snapshot's own counter is already
+        // folded into `snapshotWatermark` above, so `headerWatermark` never leads the
+        // watermark the log is measured against.
         let headerWatermark = Swift.max(ackedWatermark, doc.changeID.getClientSeq())
         let lastReplayable = fresh.last?.clientSeq ?? snapshotWatermark
         let backsTheHeader = lastReplayable >= headerWatermark
@@ -2417,7 +2554,7 @@ extension Client {
             Logger.warning("[Store] persisted change log for \(doc.getKey()) is not replayable from clientSeq " +
                 "\(snapshotWatermark &+ 1); keeping the snapshot")
             await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
-                                          dropped: droppedChanges ?? [])
+                                          dropped: droppedChanges ?? [], ackedWatermark: ackedWatermark)
             return
         }
 
@@ -2429,7 +2566,7 @@ extension Client {
             Logger.warning("[Store] replaying the change log for \(doc.getKey()) failed (\(error)); " +
                 "keeping the snapshot")
             await self.discardAppendedLog(for: doc, snapshot: snapshot, store: store,
-                                          dropped: droppedChanges ?? [])
+                                          dropped: droppedChanges ?? [], ackedWatermark: ackedWatermark)
         }
     }
 
@@ -2439,10 +2576,19 @@ extension Client {
     /// and the event exists to say so. Routing it through the generic restore failure would
     /// hand the app the snapshot's pending changes (often none), call it an actor mismatch,
     /// and delete a snapshot that restored perfectly well.
+    ///
+    /// - Parameters:
+    ///   - doc: The document to repair.
+    ///   - snapshot: The snapshot bytes to re-restore from.
+    ///   - store: The configured store.
+    ///   - dropped: The appended changes the repair is discarding, reported on the event.
+    ///   - ackedWatermark: The header's acked checkpoint, read before this repair undid it --
+    ///     the position to carry the `clientSeq` counter forward to.
     private func discardAppendedLog(for doc: Document,
                                     snapshot: Data,
                                     store: DocStore,
-                                    dropped: [Change]) async
+                                    dropped: [Change],
+                                    ackedWatermark: UInt32) async
     {
         doc.publishLocalChangesDroppedEvent(reason: .logDiscontinuity, changes: dropped)
 
@@ -2450,22 +2596,52 @@ extension Client {
         // leave the document claiming content its root does not have -- and the server would
         // never resend it. Re-restoring from the snapshot bytes returns checkpoint, changeID
         // and epoch to what the snapshot itself carries, which the server *can* resume from.
+        var rebased = snapshot
         do {
             try doc.restoreFromBytes(snapshot)
+
+            // ...except the counter, which is not a claim about content. The header's
+            // *checkpoint* names sequences the server has already taken, and the snapshot's
+            // counter can be below it: a snapshot at counter 3 under a header that acked 7.
+            // Minting 4..7 again gets them skipped as duplicates on push, and the next ack --
+            // whose clientSeq covers them -- drops them from the pending queue as pushed. New
+            // edits lost with no event, which is the one outcome this whole repair exists to
+            // avoid.
+            //
+            // The acked checkpoint, not the header's counter. The server validates continuity
+            // from the position it holds, so the next change has to be its clientSeq plus
+            // one; the counter can lead that (an edit minted while a sync was in flight), and
+            // it is exactly the entry that lead came from that the log has lost. Resuming at
+            // the counter would mint past the server's position and wedge every later push on
+            // `ErrInvalidClientSeq` (yorkie-js-sdk#1377).
+            doc.advanceClientSeqTo(ackedWatermark)
+
+            // Rewrite the base from the *repaired* document, which clears the log with it.
+            // Re-serializing rather than writing `snapshot` straight back is what makes the
+            // counter correction survive: `saveSnapshot` drops the meta blob that held the
+            // acked position, and the original envelope's change id still carries the
+            // snapshot's pre-ack counter -- so persisting it would reproduce this very repair
+            // (and its silent clientSeq reuse) on the next reload.
+            //
+            // Re-serializing cannot smuggle the rejected header back in. `restoreFromBytes`
+            // just above returned root, presences, checkpoint, epoch, docID and the pending
+            // queue to what the snapshot carries, so `toBytes` re-emits that same envelope;
+            // the counter is the one field that differs, and advancing it is the whole point.
+            rebased = try doc.toBytes()
         } catch {
             // The document is now half-replayed under a header the log cannot back, while the
             // store is about to be re-based to the snapshot. Nothing here can put it right, so
             // say so loudly rather than leave the two silently disagreeing until the next
-            // attach re-reads the store.
+            // attach re-reads the store. `rebased` still holds the original snapshot bytes --
+            // whichever step failed, `doc`'s in-memory state cannot be trusted enough to
+            // re-serialize, so the store is re-based to what is known good instead.
             Logger.error("[Store] could not re-restore \(doc.getKey()) from its snapshot after discarding the " +
                 "change log (\(error)); the in-memory document may disagree with the store until it is reattached")
         }
 
-        // Rewrite the base from those same bytes, which clears the log with it. Writing them
-        // back costs no serialization, and re-serializing here would have baked the rejected
-        // header into the new base. Removing the entry instead would discard a snapshot that
-        // restored perfectly well.
-        try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: snapshot)
+        // Removing the entry instead of rewriting it would discard a snapshot that restored
+        // perfectly well.
+        try? await store.saveSnapshot(docKey: self.storeKey(doc.getKey()), bytes: rebased)
     }
 
     /// Drops everything offline persistence held for a document that is no longer attached.

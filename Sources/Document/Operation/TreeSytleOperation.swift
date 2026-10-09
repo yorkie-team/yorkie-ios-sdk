@@ -27,11 +27,11 @@ class TreeStyleOperation: Operation {
     /**
      * `fromPos` returns the start point of the editing range.
      */
-    let fromPos: CRDTTreePos
+    private(set) var fromPos: CRDTTreePos
     /**
      * `toPos` returns the end point of the editing range.
      */
-    let toPos: CRDTTreePos
+    private(set) var toPos: CRDTTreePos
     /**
      * `attributes` returns the content of Edit.
      */
@@ -170,6 +170,14 @@ class TreeStyleOperation: Operation {
         }
 
         return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
+    /// `reconcileNodeID` points this operation at `curr` wherever it named `prev`. An undo or redo
+    /// that re-splits an element mints the element under a new id; an operation that was recorded
+    /// against the old one would otherwise address a node that may no longer exist.
+    func reconcileNodeID(prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) {
+        self.fromPos = self.fromPos.replaceNodeID(prev: prev, curr: curr)
+        self.toPos = self.toPos.replaceNodeID(prev: prev, curr: curr)
     }
 
     /**

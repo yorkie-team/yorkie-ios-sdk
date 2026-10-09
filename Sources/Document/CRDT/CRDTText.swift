@@ -138,11 +138,12 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
             for (key, value) in attrs.sorted(by: { $0.key < $1.key }) {
                 // A peer that stores values raw writes ones that do not parse as
                 // JSON; quote those as strings rather than emitting invalid JSON.
-                if value.value.toJSONObject is String {
-                    data.append("\"\(key)\":\(convertToJSONString(logicalAttrValue(value.value)))")
-                } else {
-                    data.append("\"\(key)\":\(value.value)")
-                }
+                // A non-string is re-encoded, never interpolated, and the key
+                // is escaped: a peer-chosen attribute must not be able to forge
+                // structure in `Document.toJSON`.
+                let parsed = value.value.toJSONObject
+                let encoded = parsed is String ? convertToJSONString(logicalAttrValue(value.value)) : convertToJSONString(parsed)
+                data.append("\(convertToJSONString(key)):\(encoded)")
             }
 
             attrsString = "\"attrs\":{\(data.joined(separator: ","))},"
@@ -173,18 +174,11 @@ public final class CRDTTextValue: RGATreeSplitValue, CustomStringConvertible {
     }
 
     /**
-     * `getRemovedAttrs` reports the tombstoned attributes this value holds,
-     * which a split has just duplicated from its source. The copy is new garbage
-     * under a new parent with no registration of its own -- the original's pair
-     * names the original's parent -- so without this it could never be
-     * collected.
-     */
-    func getRemovedAttrs() -> [RHTNode] {
-        self.attributes.filter { $0.removedAt != nil }
-    }
-
-    /**
      * `getGCPairs` returns the pairs of GC.
+     *
+     * Also satisfies `RGATreeSplitValue.getGCPairs`, through which
+     * `RGATreeSplit.bookCopiedAttrTombstones` reaches this value's tombstoned
+     * attributes whenever a split or a restore duplicates them into a copy.
      */
     func getGCPairs() -> [GCPair] {
         var pairs = [GCPair]()
@@ -534,7 +528,10 @@ final class CRDTText: CRDTElement {
                 // so the NODE holding the attribute may itself be a tombstone --
                 // the third case `attrGCPair` asks about.
                 var attrWasLive = node.value.getAttrs().has(key: key)
-                for rhtNode in node.value.getAttrs().remove(key: key, executedAt: editedAt) {
+                let removal = node.value.getAttrs().remove(key: key, executedAt: editedAt)
+                applyValueDropped(removal, nodeIsLive: nodeIsLive, to: &size)
+
+                for rhtNode in removal.gcNodes {
                     pairs.append(attrGCPair(node.value, rhtNode, attrWasLive, nodeIsLive))
                     // Only the node that replaces the live value settles the live
                     // value's bytes; a second one in the same call is the
@@ -566,6 +563,91 @@ final class CRDTText: CRDTElement {
         }
 
         return try (fromPos, self.rgaTreeSplit.indexToPos(toIdx))
+    }
+
+    /**
+     * `createRange` returns the position range of the given index range for a local edit or
+     * style. Unlike ``indexRangeToPosRange(_:_:)``, it rejects an index that splits a UTF-16
+     * surrogate pair.
+     *
+     * `content` is given for an edit and omitted for a style. It is checked for lone
+     * surrogates: storing one diverges across SDKs on its own, and the half then pairs with
+     * whatever code unit it is stored next to, which would turn the index at that seam into
+     * one `validateUTF16Boundary` refuses for the lifetime of the text. A peer running an SDK
+     * without this check can still send such content -- the guard is a local-edit contract,
+     * not a trust boundary -- but nothing a client of this SDK does can create it.
+     */
+    func createRange(_ fromIdx: Int, _ toIdx: Int, _ content: String? = nil) throws -> RGATreeSplitPosRange {
+        if let content, !content.isEmpty {
+            try ensureNoLoneSurrogate(content)
+        }
+
+        let range = try self.indexRangeToPosRange(fromIdx, toIdx)
+        try self.validateUTF16Boundary(range.0)
+        if fromIdx != toIdx {
+            try self.validateUTF16Boundary(range.1)
+        }
+
+        return range
+    }
+
+    /**
+     * `indexedContent` returns the text the given node contributes to the index: empty for a
+     * tombstone, whose text the index no longer counts (and empty for the head node, which
+     * never holds content).
+     */
+    private func indexedContent(_ node: RGATreeSplitNode<CRDTTextValue>) -> NSString {
+        node.isRemoved ? "" : node.value.content
+    }
+
+    /**
+     * `neighborContent` returns the content of the nearest node on the given side that still
+     * contributes text, or an empty string when there is none.
+     */
+    private func neighborContent(
+        _ node: RGATreeSplitNode<CRDTTextValue>,
+        _ step: (RGATreeSplitNode<CRDTTextValue>) -> RGATreeSplitNode<CRDTTextValue>?
+    ) -> NSString {
+        var current = step(node)
+        while let candidate = current {
+            let content = self.indexedContent(candidate)
+            if content.length > 0 {
+                return content
+            }
+            current = step(candidate)
+        }
+
+        return ""
+    }
+
+    /**
+     * `validateUTF16Boundary` throws when the given position splits a surrogate pair. At
+     * either end of the node it reads the neighbouring node: an edit or a style carrying a
+     * mid-pair offset splits the node there, so a pair can sit in two nodes on this replica
+     * while it is one node on every other, and an index at that seam is still inside it.
+     * ``RGATreeSplit/indexToPos(_:)`` resolves a seam to the node on its left, so the
+     * `offset == content.length` side is the one an index normally reaches.
+     */
+    private func validateUTF16Boundary(_ pos: RGATreeSplitPos) throws {
+        guard let node = self.rgaTreeSplit.findNode(pos.id) else {
+            return
+        }
+
+        let offset = Int(pos.relativeOffset)
+        let content = self.indexedContent(node)
+
+        var before: unichar? = (offset - 1 >= 0 && offset - 1 < content.length) ? content.character(at: offset - 1) : nil
+        var after: unichar? = (offset >= 0 && offset < content.length) ? content.character(at: offset) : nil
+        if offset == 0 {
+            let prevContent = self.neighborContent(node) { $0.prev }
+            before = prevContent.length > 0 ? prevContent.character(at: prevContent.length - 1) : nil
+        }
+        if offset == content.length {
+            let nextContent = self.neighborContent(node) { $0.next }
+            after = nextContent.length > 0 ? nextContent.character(at: 0) : nil
+        }
+
+        try ensureUTF16Boundary(before, after)
     }
 
     /**

@@ -48,10 +48,30 @@ public struct DocumentOptions {
      */
     var disablePresence: Bool
 
-    public init(disableGC: Bool, enableDevtools: Bool = false, disablePresence: Bool = false) {
+    /// How many changes ``Document/history`` can step back through on `undo`, and likewise
+    /// how many it can step forward through on `redo`. Each ``Document/update(_:_:)`` that
+    /// changes the document is one entry; the oldest is dropped once a stack is full.
+    /// Defaults to `maxUndoRedoStackDepth` (50).
+    ///
+    /// Diverges from yorkie-js-sdk: JS throws `ErrInvalidArgument` for a `maxUndoDepth` below
+    /// 1 (or non-integer, which Swift's `Int` cannot represent in the first place). Keeping
+    /// ``Document/init(key:opts:)`` non-throwing is an explicit library-discipline choice —
+    /// adding a throw there would be a breaking change for every existing call site — so a
+    /// value below 1 here is silently treated as the default instead of rejected.
+    var maxUndoDepth: Int
+
+    public init(
+        disableGC: Bool,
+        enableDevtools: Bool = false,
+        disablePresence: Bool = false,
+        // `50`, matching `maxUndoRedoStackDepth` (History.swift) -- an internal `let` cannot be
+        // referenced from a public init's default argument.
+        maxUndoDepth: Int = 50
+    ) {
         self.disableGC = disableGC
         self.enableDevtools = enableDevtools
         self.disablePresence = disablePresence
+        self.maxUndoDepth = maxUndoDepth
     }
 }
 
@@ -142,8 +162,10 @@ public class Document: Attachable {
     /// attach records it.
     private var docID: DocumentID = ""
 
-    /// Stores the undo/redo history of this document.
-    private let internalHistory = History()
+    /// Stores the undo/redo history of this document. Depth comes from
+    /// ``DocumentOptions/maxUndoDepth``, falling back to `maxUndoRedoStackDepth` for a value
+    /// below 1.
+    private let internalHistory: History
     /// Whether an `update` is in progress. Undo/redo is not allowed during an update.
     private var isUpdating = false
 
@@ -182,6 +204,10 @@ public class Document: Attachable {
         self.disablePresence = opts.disablePresence
         self.enableDevtools = opts.enableDevtools
         self.maxSizeLimit = 0
+        if opts.maxUndoDepth < 1 {
+            Logger.warning("maxUndoDepth must be a positive integer: \(opts.maxUndoDepth); using \(maxUndoRedoStackDepth)")
+        }
+        self.internalHistory = History(maxDepth: opts.maxUndoDepth >= 1 ? opts.maxUndoDepth : maxUndoRedoStackDepth)
     }
 
     /**
@@ -274,61 +300,137 @@ public class Document: Attachable {
         }
 
         // 02. Update the root object and presences from changes.
-        if context.hasChange {
-            Logger.trace("trying to update a local change: \(self.toJSON())")
+        try self.commitLocalChange(context: context, actorID: actorID)
+    }
 
-            let prev = PrevPresenceState(
-                hadPresence: self.presences[actorID] != nil,
-                wasOnline: self.status == .attached,
-                presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
-            )
+    /**
+     * `commitLocalChange` executes the operations and presence change accumulated on `context`
+     * against the real root, records the resulting ``Change``, and publishes its events.
+     * A no-op when `context` carries neither.
+     *
+     * Factored out of ``update(_:_:)`` so ``updateWithOperationForTest(_:presence:)`` can drive
+     * a root-pass throw with a controlled ``Operation``, bypassing the updater/proxy path:
+     * Swift has no prototype to patch the way yorkie-js-sdk's test does on
+     * `SetOperation.prototype.execute`.
+     */
+    private func commitLocalChange(context: ChangeContext, actorID: ActorID) throws {
+        guard context.hasChange else { return }
 
-            let change = context.toChange()
-            let executionResult = try? change.execute(root: self.root, presences: &self.presences)
-            let opInfos = executionResult?.opInfos ?? []
+        Logger.trace("trying to update a local change: \(self.toJSON())")
 
-            // NOTE: in update(Set on array), the element is replaced with a new value.
-            // The history stack may still reference the old element's createdAt, so reconcile.
-            for op in change.operations {
-                if let arraySet = op as? ArraySetOperation {
-                    self.internalHistory.reconcileCreatedAt(
-                        prevCreatedAt: arraySet.getCreatedAt(),
-                        currCreatedAt: arraySet.getValue().createdAt
+        let prev = PrevPresenceState(
+            hadPresence: self.presences[actorID] != nil,
+            wasOnline: self.status == .attached,
+            presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+        )
+
+        let change = context.toChange()
+        let executionResult: ChangeExecutionResult
+        do {
+            executionResult = try change.execute(root: self.root, presences: &self.presences)
+        } catch {
+            // `Change.execute` does not roll back, so an operation that throws on this root
+            // pass leaves the prefix that already ran in the root. The change is never queued
+            // and `changeID` is left as it was, so the next change would build its context
+            // from the same ID, reissue the TimeTickets the prefix already burned and take
+            // over the prefix's slots -- two live elements under one id. Burn the lamport (and
+            // this actor's version-vector entry with it) so no later ticket can collide, but
+            // keep `clientSeq`, which names queued changes to the server and must stay
+            // gapless.
+            self.clone = nil
+            if !context.isPresenceOnlyChange {
+                self.changeID = context.getNextID().setClientSeq(self.changeID.getClientSeq())
+            }
+            throw error
+        }
+        let opInfos = executionResult.opInfos
+
+        // NOTE: in update(Set on array), the element is replaced with a new value.
+        // The history stack may still reference the old element's createdAt, so reconcile.
+        for op in change.operations {
+            if let arraySet = op as? ArraySetOperation {
+                self.internalHistory.reconcileCreatedAt(
+                    prevCreatedAt: arraySet.getCreatedAt(),
+                    currCreatedAt: arraySet.getValue().createdAt
+                )
+            }
+        }
+
+        // A plain local split can re-create an element a merge took away, too (a peer merged two
+        // blocks and this user splits them again), and the stacks may still name the merged-away
+        // element. Re-point them the way `applyChangeInternal` does for a peer's split and
+        // `executeUndoRedoInternal` for an undo/redo one, before this change's own reverse is
+        // pushed.
+        for op in executionResult.operations {
+            if let treeEdit = op as? TreeEditOperation {
+                for (prevID, currID) in treeEdit.getSplitRecreatedIDs() {
+                    self.internalHistory.reconcileTreeNodeID(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        prev: prevID,
+                        curr: currID
                     )
                 }
             }
-
-            self.localChanges.append(change)
-            self.onLocalChange?()
-            if let reverseOps = executionResult?.reverseOps, !reverseOps.isEmpty {
-                self.internalHistory.pushUndo(reverseOps)
-            }
-            // NOTE: clear redo when a new local operation is applied.
-            if !opInfos.isEmpty {
-                self.internalHistory.clearRedo()
-            }
-            self.changeID = context.getNextID()
-
-            // 03. Publish the document change event.
-            // NOTE(chacha912): Check opInfos, which represent the actually executed operations.
-            if !opInfos.isEmpty {
-                let changeInfo = ChangeInfo(message: change.message ?? "",
-                                            operations: opInfos,
-                                            actorID: actorID,
-                                            clientSeq: change.id.getClientSeq(),
-                                            serverSeq: change.id.getServerSeq())
-                let changeEvent = LocalChangeEvent(value: changeInfo)
-                self.publish(changeEvent)
-            }
-
-            if change.presenceChange != nil {
-                if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: .local) {
-                    self.publish(presenceEvent)
-                }
-            }
-
-            Logger.trace("after update a local change: \(self.toJSON())")
         }
+
+        self.localChanges.append(change)
+        if !executionResult.reverseOps.isEmpty {
+            self.internalHistory.pushUndo(executionResult.reverseOps)
+        }
+        // NOTE: clear redo when a new local operation is applied.
+        if !opInfos.isEmpty {
+            self.internalHistory.clearRedo()
+        }
+        self.changeID = context.getNextID()
+        // After the change id advances, as in yorkie-js-sdk and the undo/redo
+        // path, so a persist driven off this hook never serializes a pending
+        // change whose id has not moved.
+        self.onLocalChange?()
+
+        // 03. Publish the document change event.
+        // Gated on the operations that RAN, not on the OpInfos they produced, as
+        // in yorkie-js-sdk and `executeUndoRedoInternal`: an operation can mutate
+        // CRDT state, and the change still consumes a clientSeq, without yielding
+        // anything an editor could render (a style over text only, a removeStyle
+        // of an absent key).
+        if !executionResult.operations.isEmpty {
+            let changeInfo = ChangeInfo(message: change.message ?? "",
+                                        operations: opInfos,
+                                        actorID: actorID,
+                                        clientSeq: change.id.getClientSeq(),
+                                        serverSeq: change.id.getServerSeq())
+            let changeEvent = LocalChangeEvent(value: changeInfo)
+            self.publish(changeEvent)
+        }
+
+        if change.presenceChange != nil {
+            if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: .local) {
+                self.publish(presenceEvent)
+            }
+        }
+
+        Logger.trace("after update a local change: \(self.toJSON())")
+    }
+
+    /**
+     * `updateWithOperationForTest` pushes `ops` (and, optionally, a presence change) directly
+     * onto a fresh ``ChangeContext`` and commits it, bypassing ``update(_:_:)``'s updater/proxy
+     * path. Test only -- see ``commitLocalChange(context:actorID:)``.
+     */
+    func updateWithOperationForTest(_ ops: [Operation], presence: StringValueTypeDictionary? = nil) throws {
+        guard let actorID = self.actorID else {
+            throw YorkieError(code: .errUnexpected, message: "actor ID is null.")
+        }
+
+        let clone = self.cloned
+        let context = ChangeContext(prevID: self.changeID, root: clone.root)
+        for op in ops {
+            context.push(operation: op)
+        }
+        if let presence {
+            context.presenceChange = .put(presence: presence)
+        }
+        try self.commitLocalChange(context: context, actorID: actorID)
     }
 
     /**
@@ -374,6 +476,13 @@ public class Document: Attachable {
     }
 
     /**
+     * `pushUndoForTest` pushes operations onto the undo stack for testing.
+     */
+    func pushUndoForTest(_ ops: [HistoryOperation]) {
+        self.internalHistory.pushUndo(ops)
+    }
+
+    /**
      * `clearHistory` flushes the undo and redo stacks.
      *
      * Used internally when a snapshot replaces local state, and exposed so callers can drop
@@ -392,6 +501,23 @@ public class Document: Attachable {
             throw YorkieError(code: .errRefused, message: "\(isUndo ? "Undo" : "Redo") is not allowed during an update")
         }
 
+        // NOTE: The refusal above must not drop the clone: an updater is holding
+        // a proxy over it, and `update` reads it again after the updater returns.
+        do {
+            try self.executeUndoRedoInternal(isUndo: isUndo)
+        } catch {
+            // A partially executed undo/redo leaves the clone ahead of the root;
+            // drop it so the next access rebuilds it from the root.
+            self.clone = nil
+            throw error
+        }
+    }
+
+    /**
+     * `executeUndoRedoInternal` pops the history entry and applies it to the
+     * clone and the root.
+     */
+    private func executeUndoRedoInternal(isUndo: Bool) throws {
         guard let ops = isUndo ? self.internalHistory.popUndo() : self.internalHistory.popRedo() else {
             return
         }
@@ -402,9 +528,14 @@ public class Document: Attachable {
 
         let clone = self.cloned
         let context = ChangeContext(prevID: self.changeID, root: clone.root)
+        let treeRepointer = UndoRedoTreeNodeIDRepointer(ops: ops)
+        // Detach the handlers whether or not either pass below succeeds, so a later execution of
+        // these operations cannot re-point anything and the closures do not keep the popped entry
+        // alive.
+        defer { treeRepointer.detachHandlers() }
 
         // Apply the reverse operations into the context to generate a change.
-        for historyOp in ops {
+        for (opIndex, historyOp) in ops.enumerated() {
             // NOTE: presence reverse ops are not yet supported (deferred).
             guard case .operation(var op) = historyOp else {
                 continue
@@ -412,6 +543,21 @@ public class Document: Attachable {
 
             let ticket = context.issueTimeTicket
             op.executedAt = ticket
+
+            // A Set/Add/ArraySet reverse carries a deepcopy of the value it
+            // restores, and that copy keeps the split-sibling links of the
+            // tree it was taken from. Every other replica decodes this same
+            // operation through `dropSplitLinksInElement`, so without this
+            // the replica that ran the undo is the only one left holding the
+            // links, and the two disagree from the next same-boundary split
+            // on.
+            if let setOp = op as? SetOperation {
+                dropSplitLinksInElement(setOp.value)
+            } else if let addOp = op as? AddOperation {
+                dropSplitLinksInElement(addOp.value)
+            } else if let arraySetOp = op as? ArraySetOperation {
+                dropSplitLinksInElement(arraySetOp.getValue())
+            }
 
             // NOTE: in undo/redo, both ArraySet and Add may act as updates that restore an
             // element, which receives a new createdAt. Reconcile the history accordingly.
@@ -427,7 +573,14 @@ public class Document: Attachable {
                 // A reverse that re-inserts a copy of removed nodes carries their original ids;
                 // inserting them again would leave two nodes under one id. Restore-mode reverses
                 // revive by identity and keep theirs.
-                try treeEdit.reissueContentIDs { context.issueTimeTicket }
+                //
+                // A split reverse — the undo of a merge, or the redo of a split — re-creates
+                // elements a merge removed under brand-new ids, and anything recorded against the
+                // old ones — the rest of this entry and both history stacks — has to follow before
+                // garbage collection purges them (yorkie-js-sdk#1426). `prepare` issues this
+                // operation's split tickets too, one per level: an upper bound, not an exact count,
+                // since the split stops early when it reaches the root.
+                try treeRepointer.prepare(treeEdit, opIndex: opIndex, context: context)
             }
 
             context.push(operation: op)
@@ -436,10 +589,28 @@ public class Document: Attachable {
         let change = context.toChange()
         // Execute on the clone first, then on the real root.
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: .undoRedo)
-        let executionResult = try change.execute(root: self.root, presences: &self.presences, source: .undoRedo)
+        let executionResult: ChangeExecutionResult
+        do {
+            executionResult = try change.execute(root: self.root, presences: &self.presences, source: .undoRedo)
+        } catch {
+            // Same hazard as the root pass in `update()`: the operations that ran burned their
+            // tickets into the root, the change is never queued and `changeID` never advances, so
+            // the next change would reissue them. Burn the lamport, keep `clientSeq`. The caller
+            // (`executeUndoRedo`) drops the clone.
+            if !context.isPresenceOnlyChange {
+                self.changeID = context.getNextID().setClientSeq(self.changeID.getClientSeq())
+            }
+            throw error
+        }
         let opInfos = executionResult.opInfos
         let executedOperations = executionResult.operations
         let reverseOps = executionResult.reverseOps
+
+        // Now that the operations have run, re-point the history stacks at the ids this entry
+        // actually minted. Deferred to here because the new reverse ops are built from the
+        // executed state, so they already carry the new ids and must not be pushed before this
+        // runs.
+        treeRepointer.reconcile(into: self.internalHistory, executedOperations: executedOperations)
 
         if !reverseOps.isEmpty {
             if isUndo {
@@ -471,7 +642,15 @@ public class Document: Attachable {
         // task the hook starts cannot run until it returns. Not worth depending on.
         self.onLocalChange?()
 
-        if !opInfos.isEmpty {
+        // Gated on the operations that RAN, not on the `OpInfo`s they
+        // produced, for the same reason as the skip above: an undo can run
+        // and show nothing (a reverse style on a node a peer removed, a Tree
+        // restore whose nodes all land under a removed ancestor), and the
+        // change is still queued above and still consumes a `clientSeq`. The
+        // event still has to reach subscribers -- an editor binding that
+        // counts changes, or offline persistence reading `localChanges` --
+        // even when there is nothing in it to render.
+        if !executedOperations.isEmpty {
             let changeInfo = ChangeInfo(message: change.message ?? "",
                                         operations: opInfos,
                                         actorID: actorID,
@@ -601,13 +780,28 @@ public class Document: Attachable {
         let clientSeq = Int64(pack.getCheckpoint().getClientSeq())
 
         // 01. Apply snapshot or changes to the root object.
-        if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
-            try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot, clientSeq)
-        } else {
-            try self.applyChanges(pack.getChanges(), source: .remote)
+        //
+        // NOTE(yorkie-js-sdk#1403): the checkpoint below is only reached once this succeeds,
+        // so a throw here leaves it where it was and the server redelivers this same pack on
+        // every sync. Log that once, naming the checkpoint the document is stuck at, before
+        // letting the error out -- otherwise the only signal is a sync that never makes
+        // progress. This runs at the default log level and repeats on every redelivery, so
+        // everything it interpolates must be metadata: the key, the checkpoint, and an error
+        // that (per `Change.execute` / `applyChange`) names the change and the operation by
+        // type and ticket only -- never an operation's payload.
+        do {
+            if hasSnapshot, let snapshot = pack.getSnapshot(), let versionVector = pack.getVersionVector() {
+                try self.applySnapshot(pack.getCheckpoint().getServerSeq(), versionVector, snapshot, clientSeq)
+            } else {
+                try self.applyChanges(pack.getChanges(), source: .remote)
 
-            // Remove local changes applied to server.
-            self.removePushedLocalChanges(clientSeq: clientSeq)
+                // Remove local changes applied to server.
+                self.removePushedLocalChanges(clientSeq: clientSeq)
+            }
+        } catch {
+            Logger.error("[Document] \"\(self.key)\" cannot apply the pack at checkpoint \(self.checkpoint.toTestString); " +
+                "the server will redeliver it until this is resolved: \(error)")
+            throw error
         }
 
         // 02. Update the checkpoint.
@@ -628,6 +822,39 @@ public class Document: Attachable {
         }
 
         Logger.trace("\(self.root.toJSON())")
+    }
+
+    /**
+     * `acknowledgePushedChanges` removes the local changes the server has confirmed, and
+     * forwards only the client seq of the checkpoint. It is for a response pack dropped
+     * without applying its remote state: the server seq must stay put so the skipped state
+     * is pulled again later, while the confirmed changes must not be pushed again. The
+     * server dedupes a re-pushed change when storing it, but a snapshot it builds for the
+     * same request would apply that change a second time.
+     *
+     * The pack's metadata is not remote state, and is taken in full: the compaction epoch
+     * and the removal flag describe the document itself, not the content being skipped, and
+     * neither is re-sent by a later pull the way the skipped changes are.
+     *
+     * - Parameter pack: The change pack whose remote state (changes or snapshot) was dropped.
+     */
+    func acknowledgePushedChanges(_ pack: ChangePack) {
+        let clientSeq = pack.getCheckpoint().getClientSeq()
+        self.removePushedLocalChanges(clientSeq: Int64(clientSeq))
+        self.checkpoint.forward(other: Checkpoint(serverSeq: self.checkpoint.getServerSeq(), clientSeq: clientSeq))
+
+        // Dropping the epoch would leave the client presenting a superseded one on the next
+        // request, which the server answers with an epoch mismatch -- a re-anchor that
+        // discards exactly the un-pushed edits push-only mode exists to keep. A compaction is
+        // also the shape that arrives as a snapshot, i.e. precisely the pack this path drops.
+        self.epoch = pack.getEpoch()
+
+        // A removal is terminal: there is no later pull to learn it from, because the server
+        // row is gone. Skipping it leaves the document attached and its persisted envelope
+        // pointing at a row that no longer exists.
+        if pack.isRemoved {
+            self.applyStatus(.removed)
+        }
     }
 
     /**
@@ -983,84 +1210,8 @@ public class Document: Attachable {
 
         Logger.trace(changes.map { "\($0.id.toTestString)\t\($0.toTestString)" }.joined(separator: "\n"))
 
-        let clone = self.cloned
-
         for change in changes {
-            try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
-
-            var changeInfo: ChangeInfo?
-
-            guard let actorID = change.id.getActorID() else {
-                throw YorkieError(code: .errUnexpected, message: "ActorID is null")
-            }
-
-            // Capture prev state before execute updates this.presences.
-            let prev: PrevPresenceState? = change.presenceChange != nil ? PrevPresenceState(
-                hadPresence: self.presences[actorID] != nil,
-                wasOnline: self.onlineClients.contains(actorID),
-                presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
-            ) : nil
-
-            let executionResult = try change.execute(root: self.root, presences: &self.presences, source: source)
-            let opInfos = executionResult.opInfos
-
-            // NOTE: when a text edit is applied, reconcile the ranges of any edit operations
-            // sitting on the undo/redo stacks so later undo/redo lands at the correct position.
-            for op in executionResult.operations {
-                if let edit = op as? EditOperation {
-                    let (from, to) = try edit.normalizePos(self.root)
-                    self.internalHistory.reconcileTextEdit(
-                        parentCreatedAt: edit.parentCreatedAt,
-                        rangeFrom: from,
-                        rangeTo: to,
-                        contentLength: (edit.content as NSString).length
-                    )
-                }
-                if let treeEdit = op as? TreeEditOperation {
-                    let (from, to) = treeEdit.normalizePos()
-                    self.internalHistory.reconcileTreeEdit(
-                        parentCreatedAt: treeEdit.parentCreatedAt,
-                        rangeFrom: from,
-                        rangeTo: to,
-                        contentSize: treeEdit.getContentSize()
-                    )
-                }
-            }
-
-            // Opt-out (disableGC) documents advance only the lamport clock and do
-            // not merge remote actors' version vectors, keeping each subsequent
-            // local Change's VV at O(1). See ``setDisableGC(_:)``.
-            self.changeID = self.disableGC
-                ? self.changeID.syncLamport(with: change.id)
-                : self.changeID.syncClocks(with: change.id)
-
-            if change.hasOperations {
-                changeInfo = ChangeInfo(message: change.message ?? "",
-                                        operations: opInfos,
-                                        actorID: actorID,
-                                        clientSeq: change.id.getClientSeq(),
-                                        serverSeq: change.id.getServerSeq())
-            }
-
-            // DocEvent should be emitted synchronously with applying changes.
-            // This is because 3rd party model should be synced with the Document
-            // after RemoteChange event is emitted. If the event is emitted
-            // asynchronously, the model can be changed and breaking consistency.
-            if let info = changeInfo {
-                let remoteChangeEvent = RemoteChangeEvent(value: info)
-                self.publish(remoteChangeEvent)
-            }
-
-            if let prev, change.presenceChange != nil {
-                // Remove the client from onlineClients when presence is cleared,
-                // mirroring the JS handling of PresenceChangeType.Clear.
-                if case .clear = change.presenceChange {
-                    self.removeOnlineClient(actorID)
-                }
-                if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: source) {
-                    self.publish(presenceEvent)
-                }
-            }
+            try self.applyChange(change, source: source)
         }
 
         Logger.debug(
@@ -1070,6 +1221,146 @@ public class Document: Attachable {
             removeds:\(self.root.garbageElementSetSize)
             """
         )
+    }
+
+    /**
+     * `applyChange` applies the given change into this document.
+     */
+    private func applyChange(_ change: Change, source: OpSource) throws {
+        do {
+            try self.applyChangeInternal(change, source: source)
+        } catch {
+            // NOTE: `Change.execute` does not roll back, so a change that fails
+            // partway leaves the clone and the root holding different prefixes of
+            // it. Drop the clone so the next access rebuilds it from the root, the
+            // way `update` does on failure.
+            self.clone = nil
+
+            // NOTE(yorkie-js-sdk#1403): only a remote change is named -- see
+            // `Change.execute`'s matching gate. The document key is only known here, so it
+            // is added as the error passes through: an already-named `errChangeApplyFailed`
+            // (naming the operation) gets the key folded into its message, and any other
+            // failure on this path (e.g. a precondition unrelated to a single operation) is
+            // named fresh with the change id and the document key.
+            guard source == .remote else {
+                throw error
+            }
+
+            if let yorkieError = error as? YorkieError, yorkieError.code == .errChangeApplyFailed {
+                throw YorkieError(code: .errChangeApplyFailed, message: "document \"\(self.key)\" \(yorkieError.message)")
+            }
+
+            throw YorkieError(
+                code: .errChangeApplyFailed,
+                message: "document \"\(self.key)\" failed to apply change \(change.id.toTestString): \(error)"
+            )
+        }
+    }
+
+    /**
+     * `applyChangeInternal` applies the given change into the clone and the root.
+     */
+    private func applyChangeInternal(_ change: Change, source: OpSource) throws {
+        let clone = self.cloned
+        try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
+
+        var changeInfo: ChangeInfo?
+
+        guard let actorID = change.id.getActorID() else {
+            throw YorkieError(code: .errUnexpected, message: "ActorID is null")
+        }
+
+        // Capture prev state before execute updates this.presences.
+        let prev: PrevPresenceState? = change.presenceChange != nil ? PrevPresenceState(
+            hadPresence: self.presences[actorID] != nil,
+            wasOnline: self.onlineClients.contains(actorID),
+            presence: self.presences[actorID]?.mapValues { $0.toJSONObject }
+        ) : nil
+
+        let executionResult = try change.execute(root: self.root, presences: &self.presences, source: source)
+        let opInfos = executionResult.opInfos
+
+        // NOTE: when a text edit is applied, reconcile the ranges of any edit operations
+        // sitting on the undo/redo stacks so later undo/redo lands at the correct position.
+        for op in executionResult.operations {
+            if let edit = op as? EditOperation {
+                let (from, to) = try edit.normalizePos(self.root)
+                self.internalHistory.reconcileTextEdit(
+                    parentCreatedAt: edit.parentCreatedAt,
+                    rangeFrom: from,
+                    rangeTo: to,
+                    contentLength: (edit.content as NSString).length
+                )
+            }
+            if let treeEdit = op as? TreeEditOperation {
+                // A split re-creates the elements a merge took away, under brand-new ids -- see
+                // `CRDTTree.mergeSourceOf`. That happens whoever sent the split: `executeUndoRedo`
+                // re-points this replica's stacks when the split is its own, and here when it
+                // arrives from a peer. Left un-re-pointed, an entry still naming the element the
+                // peer replaced addresses a node garbage collection will purge, and the change it
+                // eventually pushes is rejected on every replica (yorkie-js-sdk#1425).
+                //
+                // Done before the index reconciliation below and before the event is published, for
+                // the same reason the undo/redo path defers to after execution: the pairs are only
+                // known once the split has run.
+                for (prevID, currID) in treeEdit.getSplitRecreatedIDs() {
+                    self.internalHistory.reconcileTreeNodeID(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        prev: prevID,
+                        curr: currID
+                    )
+                }
+
+                // One reconciliation per range the op actually changed, in the
+                // order it changed them: an identity-preserving
+                // restore/retombstone revives or re-removes several nodes at
+                // positions its stored indices never describe, and each
+                // measurement is relative to the one before it.
+                for (from, to, contentSize) in treeEdit.getExecutedRanges() {
+                    self.internalHistory.reconcileTreeEdit(
+                        parentCreatedAt: treeEdit.parentCreatedAt,
+                        rangeFrom: from,
+                        rangeTo: to,
+                        contentSize: contentSize
+                    )
+                }
+            }
+        }
+
+        // Opt-out (disableGC) documents advance only the lamport clock and do
+        // not merge remote actors' version vectors, keeping each subsequent
+        // local Change's VV at O(1). See ``setDisableGC(_:)``.
+        self.changeID = self.disableGC
+            ? self.changeID.syncLamport(with: change.id)
+            : self.changeID.syncClocks(with: change.id)
+
+        if change.hasOperations {
+            changeInfo = ChangeInfo(message: change.message ?? "",
+                                    operations: opInfos,
+                                    actorID: actorID,
+                                    clientSeq: change.id.getClientSeq(),
+                                    serverSeq: change.id.getServerSeq())
+        }
+
+        // DocEvent should be emitted synchronously with applying changes.
+        // This is because 3rd party model should be synced with the Document
+        // after RemoteChange event is emitted. If the event is emitted
+        // asynchronously, the model can be changed and breaking consistency.
+        if let info = changeInfo {
+            let remoteChangeEvent = RemoteChangeEvent(value: info)
+            self.publish(remoteChangeEvent)
+        }
+
+        if let prev, change.presenceChange != nil {
+            // Remove the client from onlineClients when presence is cleared,
+            // mirroring the JS handling of PresenceChangeType.Clear.
+            if case .clear = change.presenceChange {
+                self.removeOnlineClient(actorID)
+            }
+            if let presenceEvent = self.reconcilePresence(actorID: actorID, prev: prev, source: source) {
+                self.publish(presenceEvent)
+            }
+        }
     }
 
     /**
@@ -1519,6 +1810,34 @@ public class Document: Attachable {
         (self.root.object, self.presences, self.checkpoint, self.changeID, self.localChanges)
     }
 
+    /// Moves this document's `clientSeq` counter forward to the given sequence, and never
+    /// backward.
+    ///
+    /// Exists for one caller: the offline-persistence log-discontinuity repair, which has to
+    /// undo a persisted header without undoing the counter inside it. ``restoreFromBytes(_:)``
+    /// returns checkpoint, epoch and change id to what the snapshot carries, which is right for
+    /// a header the appended log cannot back -- except for the counter. A counter is not a
+    /// claim about content the way a checkpoint is: it records which `clientSeq` values this
+    /// client has already minted, and the server has taken some of them. Rewinding it to the
+    /// snapshot's counter mints those sequences a second time; the server skips them as
+    /// duplicates and the next ack, whose `clientSeq` covers them, drops them from the pending
+    /// queue as pushed. The edits are lost with no event.
+    ///
+    /// The position to hand over is the acked checkpoint, not the header's counter. The server
+    /// validates continuity from the position it holds, so the next change must be its
+    /// `clientSeq` plus one; the counter can lead that, and resuming there would mint past the
+    /// server and wedge every later push on `ErrInvalidClientSeq`.
+    ///
+    /// The counter only ever rises, so the guard is the whole contract: a caller that hands over
+    /// a stale position cannot pull the document back into reusing sequence numbers.
+    ///
+    /// - Parameter clientSeq: The sequence to advance to.
+    func advanceClientSeqTo(_ clientSeq: UInt32) {
+        if clientSeq > self.changeID.getClientSeq() {
+            self.changeID = self.changeID.setClientSeq(clientSeq)
+        }
+    }
+
     /// Overwrites the clocks a sync advances, leaving the root and pending changes alone.
     ///
     /// The write-side counterpart of ``metaToBytes()``. The snapshot stays put while a sync
@@ -1612,5 +1931,130 @@ public class Document: Attachable {
         self.docID = state.docID
         self.clone = nil
         self.clearHistory()
+    }
+}
+
+/// Tree node ids one undo/redo entry re-mints, and what they replace, collected while the
+/// entry's change is built and reconciled against the history stacks only once the operations
+/// have run. Kept as a reference type (rather than an inout accumulator) because
+/// ``TreeEditOperation/onSplitTicketConsumed(_:)``'s handler is `@escaping` and has to mutate
+/// the same accumulator the registering call captured.
+///
+/// File-scoped rather than nested in ``Document`` to keep nesting depth and `Document`'s own
+/// type-body length within this project's SwiftLint limits; it is otherwise private to
+/// `Document.executeUndoRedoInternal(isUndo:)`, the only caller.
+///
+/// See the "careful part" write-up ported from yorkie-js-sdk#1426: the clone pass and the root
+/// pass can consume a different number of a split's tickets, so a pair is only real once the
+/// root pass confirms it, and both `reissueContentIDs` and the tree-derived
+/// ``TreeEditOperation/getSplitRecreatedIDs()`` signal are needed — neither subsumes the other.
+private final class UndoRedoTreeNodeIDRepointer {
+    private struct Pending {
+        let op: TreeEditOperation
+        let prev: CRDTTreeNodeID
+        let curr: CRDTTreeNodeID
+        /// `-1` for a re-issued content id, minted unconditionally; otherwise the index into
+        /// `op`'s split tickets, checked against
+        /// ``TreeEditOperation/getConsumedSplitTicketCount()`` once the root pass has run.
+        let ticketIndex: Int
+    }
+
+    private let ops: [HistoryOperation]
+    private var pending: [Pending] = []
+    private var splitOps: [TreeEditOperation] = []
+
+    init(ops: [HistoryOperation]) {
+        self.ops = ops
+    }
+
+    /// Re-points the operations that follow `opIndex` in this entry from `prev` to `curr`.
+    private func repointRest(after opIndex: Int, prev: CRDTTreeNodeID, curr: CRDTTreeNodeID) {
+        for later in self.ops[(opIndex + 1)...] {
+            guard case .operation(let laterOp) = later else { continue }
+            if let treeEdit = laterOp as? TreeEditOperation {
+                treeEdit.reconcileNodeID(prev: prev, curr: curr)
+            } else if let treeStyle = laterOp as? TreeStyleOperation {
+                treeStyle.reconcileNodeID(prev: prev, curr: curr)
+            }
+        }
+    }
+
+    /// Reissues `treeEdit`'s content ids (a restore-mode reverse never splits, so this always
+    /// runs first) and, for a splitting reverse, registers the per-ticket re-pointing hook --
+    /// see ``TreeEditOperation/onSplitTicketConsumed(_:)``.
+    func prepare(_ treeEdit: TreeEditOperation, opIndex: Int, context: ChangeContext) throws {
+        for (prev, curr) in try treeEdit.reissueContentIDs({ context.issueTimeTicket }) {
+            self.repointRest(after: opIndex, prev: prev, curr: curr)
+            self.pending.append(Pending(op: treeEdit, prev: prev, curr: curr, ticketIndex: -1))
+        }
+
+        let level = treeEdit.splitLevel
+        guard level > 0 else { return }
+
+        treeEdit.setSplitTickets((0 ..< level).map { _ in context.issueTimeTicket })
+        treeEdit.onSplitTicketConsumed { [weak self] ticketIndex in
+            guard let self else { return }
+            // Read through the operation rather than off a captured array: an earlier
+            // re-point in this same entry may have replaced `replacedIDs` wholesale
+            // (`reconcileNodeID`).
+            let replacedIDs = treeEdit.getReplacedIDs()
+            guard ticketIndex < replacedIDs.count else { return }
+            let prev = replacedIDs[ticketIndex]
+            let curr = CRDTTreeNodeID(createdAt: treeEdit.getSplitTickets()[ticketIndex], offset: 0)
+            // Called once per execution, and the change is executed twice (clone, then
+            // root). `repointRest` no longer finds `prev` the second time, but the pending
+            // entry would be a duplicate.
+            guard !self.pending.contains(where: { $0.op === treeEdit && $0.prev == prev }) else { return }
+            self.repointRest(after: opIndex, prev: prev, curr: curr)
+            self.pending.append(Pending(op: treeEdit, prev: prev, curr: curr, ticketIndex: ticketIndex))
+        }
+        self.splitOps.append(treeEdit)
+    }
+
+    /// Detaches every registered hook so a later execution of these operations cannot
+    /// re-point anything and the closures do not keep this popped entry alive.
+    func detachHandlers() {
+        for splitOp in self.splitOps {
+            splitOp.onSplitTicketConsumed(nil)
+        }
+    }
+
+    /// Re-points the history stacks at the ids this entry actually minted, now that the
+    /// operations have run.
+    ///
+    /// Two things can still make a collected pair false, and both are only knowable now.
+    /// `Change.execute` skips an operation whose target element was removed during undo/redo,
+    /// so it minted nothing at all. And a pair is collected as the split takes its ticket on
+    /// WHICHEVER execution runs first -- the clone -- while the stacks have to follow the
+    /// root: the clone and the root are separate trees, so a split that crossed a level in
+    /// the clone can stop short of it in the root, leaving a pair naming a ticket no node in
+    /// the root ever received. Checked against what the root pass reports consuming
+    /// (reset per execution, so it describes the root pass here). Re-issued content ids carry
+    /// `-1`: those are minted unconditionally, once, up front.
+    ///
+    /// And then what the TREE says the split re-created, the same signal the local `update()`
+    /// and remote `applyChangeInternal` paths re-point from. The pairs above come from the
+    /// reverse op, which names the merge IT reverses; the split as executed can reverse one
+    /// this entry never knew about -- a peer merged two blocks while the undo sat on the
+    /// stack, and the redo of an unrelated split separates them again. Neither signal
+    /// subsumes the other, so both are applied, in that order; a pair the other already
+    /// handled sweeps nothing and costs nothing.
+    func reconcile(into history: History, executedOperations: [Operation]) {
+        for entry in self.pending {
+            guard executedOperations.contains(where: { ($0 as? TreeEditOperation) === entry.op }) else {
+                continue
+            }
+            if entry.ticketIndex >= 0, entry.ticketIndex >= entry.op.getConsumedSplitTicketCount() {
+                continue
+            }
+            history.reconcileTreeNodeID(parentCreatedAt: entry.op.parentCreatedAt, prev: entry.prev, curr: entry.curr)
+        }
+
+        for op in executedOperations {
+            guard let treeEdit = op as? TreeEditOperation else { continue }
+            for (prev, curr) in treeEdit.getSplitRecreatedIDs() {
+                history.reconcileTreeNodeID(parentCreatedAt: treeEdit.parentCreatedAt, prev: prev, curr: curr)
+            }
+        }
     }
 }

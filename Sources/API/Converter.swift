@@ -16,6 +16,21 @@
 
 import Foundation
 
+/**
+ * `loadZeroPadded` reads the first `MemoryLayout<T>.size` bytes of `data`, in
+ * storage order, as a fixed-width integer. The payload comes off the wire, so
+ * its length is whatever a peer sent: bytes it does not carry read as zero, as
+ * in yorkie-js-sdk, instead of trapping in `load(as:)` and taking the whole
+ * snapshot or change decode down with it. Extra bytes are ignored.
+ */
+func loadZeroPadded<T: FixedWidthInteger>(_ data: Data) -> T {
+    var value = T.zero
+    withUnsafeMutableBytes(of: &value) { buffer in
+        _ = data.prefix(MemoryLayout<T>.size).copyBytes(to: buffer)
+    }
+    return value
+}
+
 enum Converter {
 
     /**
@@ -26,12 +41,15 @@ enum Converter {
         case .null:
             return .null
         case .boolean:
-            return .boolean(data[0] == 1)
+            // Any nonzero byte is true and an empty payload is false, as in
+            // yorkie-js-sdk (`bytes[0] ? true : false`); indexing `data[0]`
+            // trapped on an empty payload.
+            return .boolean((data.first ?? 0) != 0)
         case .integer:
-            let result = Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
+            let result = Int32(littleEndian: loadZeroPadded(data))
             return .integer(result)
         case .double:
-            let result = Double(bitPattern: UInt64(littleEndian: data.withUnsafeBytes { $0.load(as: UInt64.self) }))
+            let result = Double(bitPattern: UInt64(littleEndian: loadZeroPadded(data)))
             return .double(result)
         case .string:
             guard let stringValue = String(data: data, encoding: .utf8) else {
@@ -39,12 +57,12 @@ enum Converter {
             }
             return .string(stringValue)
         case .long:
-            let result = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
+            let result = Int64(littleEndian: loadZeroPadded(data))
             return .long(result)
         case .bytes:
             return .bytes(data)
         case .date:
-            let milliseconds = Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
+            let milliseconds = Int64(littleEndian: loadZeroPadded(data))
             return .date(Date(timeIntervalSince1970: TimeInterval(Double(milliseconds) / 1000)))
         default:
             throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
@@ -54,9 +72,9 @@ enum Converter {
     static func countValueFrom(_ valueType: PbValueType, data: Data) throws -> any YorkieCountable {
         switch valueType {
         case .integerCnt, .integerDedupCnt:
-            return Int32(littleEndian: data.withUnsafeBytes { $0.load(as: Int32.self) })
+            return Int32(littleEndian: loadZeroPadded(data))
         case .longCnt:
-            return Int64(littleEndian: data.withUnsafeBytes { $0.load(as: Int64.self) })
+            return Int64(littleEndian: loadZeroPadded(data))
         default:
             throw YorkieError(code: .errUnimplemented, message: String(describing: valueType))
         }
@@ -312,15 +330,21 @@ extension Converter {
             if  pbElementSimple.value.isEmpty {
                 return CRDTObject(createdAt: fromTimeTicket(pbElementSimple.createdAt))
             } else {
-                return try Self.fromObject(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonObject)
+                let object = try Self.fromObject(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonObject)
+                // A Set/Add/ArraySet payload is client-supplied and freshly
+                // created, so none of the trees it may carry can legitimately
+                // be a split product. Drop the split-sibling links the wire
+                // format carries anyway.
+                return dropSplitLinksInElement(object)
             }
         case .jsonArray:
             if pbElementSimple.value.isEmpty {
                 return CRDTArray(createdAt: fromTimeTicket(pbElementSimple.createdAt))
             } else {
-                return try Self.fromArray(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonArray)
+                let array = try Self.fromArray(PbJSONElement.init(serializedBytes: pbElementSimple.value).jsonArray)
+                return dropSplitLinksInElement(array)
             }
-            
+
         case .text:
             return CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .null, .boolean, .integer, .long, .double, .string, .bytes, .date:
@@ -343,7 +367,7 @@ extension Converter {
 
             return CRDTCounter<Int64>(value: value, createdAt: fromTimeTicket(pbElementSimple.createdAt))
         case .tree:
-            return try bytesToTree(bytes: pbElementSimple.value)
+            return dropSplitLinksInElement(try bytesToTree(bytes: pbElementSimple.value))
         default:
             throw YorkieError(code: .errUnimplemented, message: "unimplemented element: \(pbElementSimple)")
         }
@@ -676,7 +700,7 @@ extension Converter {
                 let treeEdit = TreeEditOperation(parentCreatedAt: fromTimeTicket(pbTreeEditOperation.parentCreatedAt),
                                                  fromPos: fromTreePos(pbTreeEditOperation.from),
                                                  toPos: fromTreePos(pbTreeEditOperation.to),
-                                                 contents: fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
+                                                 contents: try fromTreeNodesWhenEdit(pbTreeEditOperation.contents),
                                                  splitLevel: pbTreeEditOperation.splitLevel,
                                                  executedAt: fromTimeTicket(pbTreeEditOperation.executedAt),
                                                  isUndoOp: treeRestoreMode != nil,
@@ -815,10 +839,10 @@ extension Converter {
             // independent of the order its members happen to arrive in
             // (yorkie-js-sdk#1343).
             //
-            // NOTE(yorkie-js-sdk#1377): replaying through `set` also bumps a decoded
-            // tombstone's `removedAt` when it loses to the occupant, so a document that has
-            // been through a snapshot load collects and measures differently from one that
-            // has not. Matches `converter.ts`.
+            // `set`'s losing branch is gated on the incoming value not already being removed,
+            // so a decoded tombstone that loses here keeps its own `removedAt` rather than
+            // being bumped to the occupant's `positionedAt` (yorkie-js-sdk#1377). Matches
+            // `converter.ts`.
             let value = try fromElement(pbElement: pbRHTNode.element)
             rht.set(key: pbRHTNode.key, value: value, executedAt: value.getPositionedAt())
         }
@@ -1012,11 +1036,18 @@ extension Converter {
     static func fromCounter(_ pbCounter: PbJSONElement.Counter) throws -> CRDTElement {
         switch pbCounter.type {
         case .integerDedupCnt:
-            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: fromTimeTicket(pbCounter.createdAt))
+            // Start from the value on the wire, as yorkie-js-sdk does, so a
+            // rejected HLL payload below leaves the counter at what the peer sent
+            // rather than at zero.
+            let counter = CRDTCounter<Int32>(dedupWithCreatedAt: fromTimeTicket(pbCounter.createdAt),
+                                             value: Int32(littleEndian: loadZeroPadded(pbCounter.value)))
             counter.movedAt = pbCounter.hasMovedAt ? fromTimeTicket(pbCounter.movedAt) : nil
             counter.removedAt = pbCounter.hasRemovedAt ? fromTimeTicket(pbCounter.removedAt) : nil
-            if !pbCounter.hllRegisters.isEmpty {
-                try counter.restoreHLL(pbCounter.hllRegisters)
+            // A rejected payload is logged and dropped rather than thrown on:
+            // snapshot decode has no handler, so throwing would stop this client
+            // from opening the document over one peer's malformed counter.
+            if !pbCounter.hllRegisters.isEmpty, try !counter.restoreHLL(pbCounter.hllRegisters) {
+                Logger.warning("discarding malformed HLL registers for counter \(counter.createdAt.toTestString): \(pbCounter.hllRegisters.count) bytes")
             }
             return counter
         case .integerCnt:
@@ -1049,6 +1080,12 @@ extension Converter {
         guard let tree = try fromTreeNodes(pbTree.nodes, fromTimeTicket(pbTree.createdAt)) else {
             throw YorkieError(code: .errUnexpected, message: "Can't get root from PbJSONElement.Tree")
         }
+        // `toTree` writes both tickets and `CRDTElement.getMetaUsage` charges both,
+        // so dropping them here makes a tree restored from a snapshot smaller than
+        // the same tree before the restore -- one ticket per stamp. Every other
+        // `from*` restores them; this one did not.
+        tree.movedAt = pbTree.hasMovedAt ? fromTimeTicket(pbTree.movedAt) : nil
+        tree.removedAt = pbTree.hasRemovedAt ? fromTimeTicket(pbTree.removedAt) : nil
         return tree
     }
 
@@ -1297,12 +1334,46 @@ extension Converter {
     /**
      * `fromTreeNodesWhenEdit` converts the given Protobuf format to model format.
      */
-    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNodes]) -> [CRDTTreeNode]? {
+    static func fromTreeNodesWhenEdit(_ pbTreeNodes: [PbTreeNodes]) throws -> [CRDTTreeNode]? {
         guard pbTreeNodes.isEmpty == false else {
             return nil
         }
-        
-        return pbTreeNodes.compactMap { try? fromTreeNodes($0.content)?.root }
+
+        var treeNodes: [CRDTTreeNode] = []
+        for pbTreeNode in pbTreeNodes {
+            let root = try fromTreeNodes(pbTreeNode.content)?.root
+            // An entry whose content is empty decodes to no node at all, and
+            // neither keeping nor dropping it is safe. Keeping it puts a hole in
+            // the contents array that every later reader dereferences; dropping
+            // it changes what the operation means, since `CRDTTree.edit` reads
+            // an absent content list as "delete the range". Reject the pack at
+            // the boundary instead, the way every other malformed field in this
+            // decoder does.
+            guard let root else {
+                throw YorkieError(code: .errInvalidArgument, message: "tree edit content has an entry with no node")
+            }
+            // Operation content is fully client-controlled and is always
+            // freshly created by the editing client, so it can never be a split
+            // product, carry a merge lineage, or arrive already tombstoned --
+            // `edit` stamps the lineage on the content it inserts from the
+            // merge parent it resolves locally, and tombstones it itself when
+            // the parent it lands in is removed. Drop the engine-only links
+            // and the tombstones the wire format carries anyway: the tree
+            // follows the links as trusted structural pointers once `edit`
+            // registers these nodes in `nodeMapByID`, and a node born
+            // tombstoned under a live parent is counted as live content that
+            // no GC pair will ever collect. The ATTRIBUTE tombstones the RHT
+            // decoder keeps verbatim are left alone -- the undo copy-reinsert
+            // path produces genuine ones, and stripping them here would
+            // diverge from every other producer and decoder of the same
+            // bytes. `CRDTTree.edit` books them into gc instead, so a crafted
+            // one is counted and collectable; see `clearTombstones`.
+            root.dropEngineOnlyLinks()
+            root.clearTombstones()
+            treeNodes.append(root)
+        }
+
+        return treeNodes
     }
 
     /**
@@ -1324,8 +1395,16 @@ extension Converter {
         
         for index in stride(from: rootIndex - 1, to: -1, by: -1) {
             let node = nodes[index]
-            let parent = depthTable[pbTreeNodes[index].depth - 1]
-            try parent?.prepend(contentsOf: [node])
+            // The depths come off the wire. A peer can send a node whose parent
+            // depth was never written, or name a text node as a parent; looking
+            // that miss up used to silently drop the node instead of raising.
+            // Reject the payload at the boundary instead, with the error every
+            // other malformed field here raises, so the caller sees a decode
+            // failure rather than a tree silently missing content.
+            guard let parent = depthTable[pbTreeNodes[index].depth - 1], parent.isText == false else {
+                throw YorkieError(code: .errInvalidArgument, message: "invalid tree node depth: \(pbTreeNodes[index].depth)")
+            }
+            try parent.prepend(contentsOf: [node])
             depthTable[pbTreeNodes[index].depth] = node
         }
         

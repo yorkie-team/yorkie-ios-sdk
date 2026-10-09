@@ -984,6 +984,65 @@ final class ClientIntegrationTests: XCTestCase {
         }
     }
 
+    // Ports: "Should not apply a snapshot pulled while in push-only mode" (yorkie-js-sdk#1401).
+    @MainActor
+    func test_should_not_apply_a_snapshot_pulled_while_in_push_only_mode() async throws {
+        try await withTwoClientsAndDocuments(self.description, detachDocuments: false) { c1, d1, c2, d2 in
+            // given — both clients converge on a document with a counter, then c1 switches to
+            // push-only mode.
+            try d1.update { root, _ in
+                root.counter = JSONCounter(value: Int64(0))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            try c1.changeSyncMode(d1, .realtimePushOnly)
+
+            var snapshotReceived = false
+            d1.subscribe("$") { event, _ in
+                if event.type == .snapshot {
+                    snapshotReceived = true
+                }
+            }
+
+            // when — 01. c2 makes enough changes for the server to answer c1 with a snapshot
+            // instead of changes.
+            for _ in 0 ..< defaultSnapshotThreshold {
+                try d2.update { root, _ in
+                    (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+                }
+            }
+            try await c2.sync()
+
+            // 02. An explicit sync always pulls, even in push-only mode. The snapshot it
+            // brings back must be dropped just like changes are.
+            try d1.update { root, _ in
+                (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+            }
+            try await c1.sync(d1)
+
+            // then — the dropped snapshot never reached the document, but the push still
+            // landed and was acked, so it must not be sent again.
+            XCTAssertFalse(snapshotReceived)
+            let d1CounterValue = (d1.getRoot().counter as? JSONCounter<Int64>)?.value
+            XCTAssertEqual(d1CounterValue, 1)
+            let hasLocalChanges = await d1.hasLocalChanges()
+            XCTAssertFalse(hasLocalChanges)
+
+            // 03. The local change still reached the server.
+            try await c2.sync()
+            let d2CounterValue = (d2.getRoot().counter as? JSONCounter<Int64>)?.value
+            XCTAssertEqual(d2CounterValue.map(Int.init), defaultSnapshotThreshold + 1)
+
+            // 04. Back in realtime, c1 catches up on what it dropped.
+            try c1.changeSyncMode(d1, .realtime)
+            try await c1.sync(d1)
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+
+            d1.unsubscribe("$")
+        }
+    }
+
     @MainActor
     func test_should_retry_on_network_failure_and_eventually_succeed() async throws {
         let c1 = Client(rpcAddress, isMockingEnabled: true)
