@@ -1447,7 +1447,9 @@ class GCIntegrationTests: XCTestCase {
         // back. yorkie-js-sdk deactivates with `synchronous: true` and runs this
         // against a Mongo-backed server: on the memory backend the detach fails
         // ("change not found"), so the row is never dropped. This waits for the
-        // detach, and skips when the server never performs it.
+        // detach. On a memory backend (the `yorkie server` default, and CI) it
+        // skips when the detach never happens; set YORKIE_SERVER_BACKEND to any
+        // other backend (e.g. `mongo`) to assert the tombstone is collected.
         try await client1.deactivate()
 
         let garbageLength1 = doc2.getGarbageLength()
@@ -1461,8 +1463,9 @@ class GCIntegrationTests: XCTestCase {
             try await Task.sleep(nanoseconds: 250_000_000)
             try await client2.sync()
         }
-        try XCTSkipIf(doc2.getGarbageLength() == 1,
-                      "the server never detached the deactivated client (memory backend), so the successor barrier holds the tombstone")
+        let serverBackend = ProcessInfo.processInfo.environment["YORKIE_SERVER_BACKEND"] ?? "memory"
+        try XCTSkipIf(serverBackend == "memory" && doc2.getGarbageLength() == 1,
+                      "the memory backend never detached the deactivated client, so the successor barrier holds the tombstone")
         let garbageLength2 = doc2.getGarbageLength()
         let getVersionVector2 = doc2.getVersionVector().size()
 
