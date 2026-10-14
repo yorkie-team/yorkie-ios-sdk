@@ -16,6 +16,50 @@
 
 import Foundation
 
+// MARK: - Watch requests
+
+extension Client {
+    /// Builds the Watch request for a document.
+    ///
+    /// The stable actor is sent or nothing: never the session id, which the server rejects as a
+    /// mismatch. An empty value makes the server fall back to the session id, as old SDKs get by
+    /// omitting the field. Mirrors yorkie-js-sdk, which sends `actorID ?? ''`.
+    ///
+    /// - Parameters:
+    ///   - clientID: The session id of this client.
+    ///   - actorID: The stable actor, or `nil` before the server assigned one.
+    ///   - documentID: The server-side id of the document to watch.
+    static func makeDocumentWatchRequest(clientID: String, actorID: ActorID?, documentID: String) -> WatchRequest {
+        return WatchRequest.with {
+            $0.clientID = clientID
+            $0.actorID = actorID ?? ""
+            $0.resources = [
+                ResourceDescriptor.with {
+                    $0.document = DocumentDescriptor.with {
+                        $0.documentID = documentID
+                    }
+                }
+            ]
+        }
+    }
+
+    /// Builds the Watch request for a channel, declaring the stable actor like
+    /// ``makeDocumentWatchRequest(clientID:actorID:documentID:)``.
+    static func makeChannelWatchRequest(clientID: String, actorID: ActorID?, channelKey: String) -> WatchRequest {
+        return WatchRequest.with {
+            $0.clientID = clientID
+            $0.actorID = actorID ?? ""
+            $0.resources = [
+                ResourceDescriptor.with {
+                    $0.channel = ChannelDescriptor.with {
+                        $0.channelKey = channelKey
+                    }
+                }
+            ]
+        }
+    }
+}
+
 // MARK: - Watch idle watchdog wiring
 
 extension Client {

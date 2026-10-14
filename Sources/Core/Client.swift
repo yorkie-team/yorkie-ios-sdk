@@ -1337,19 +1337,7 @@ public class Client {
                 }
             })
 
-            let request = WatchRequest.with {
-                $0.clientID = id
-                // Declaring the stable actor subscribes this client under it, so watch peer
-                // ids and watched/unwatched events match the presence CRDT keying.
-                $0.actorID = self.actorID ?? id
-                $0.resources = [
-                    ResourceDescriptor.with {
-                        $0.document = DocumentDescriptor.with {
-                            $0.documentID = docAttachment.resourceID
-                        }
-                    }
-                ]
-            }
+            let request = Self.makeDocumentWatchRequest(clientID: id, actorID: self.actorID, documentID: docAttachment.resourceID)
 
             stream.send(request)
 
@@ -1391,17 +1379,7 @@ public class Client {
                 }
             })
 
-            let request = WatchRequest.with {
-                $0.clientID = id
-                $0.actorID = self.actorID ?? id
-                $0.resources = [
-                    ResourceDescriptor.with {
-                        $0.channel = ChannelDescriptor.with {
-                            $0.channelKey = channelAttachment.resource.getKey()
-                        }
-                    }
-                ]
-            }
+            let request = Self.makeChannelWatchRequest(clientID: id, actorID: self.actorID, channelKey: channelAttachment.resource.getKey())
 
             stream.send(request)
             channelAttachment.connectStream(YorkieServerStream(stream))
