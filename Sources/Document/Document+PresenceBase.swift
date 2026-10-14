@@ -127,8 +127,11 @@ extension Document {
     ///
     /// The capability is unknown again -- it is learned from a returned pack, and none has landed in
     /// this session -- and the base is gone with it. A patch still queued counts as outstanding.
-    /// Persistence writes a patch as the put it stands for (see `Converter.toPersistedChange`), so a
-    /// restored queue holds none; the flag is still derived from the queue, not assumed.
+    /// Persistence writes a patch as the put it stands for (see `Converter.toPersistedChange`) and
+    /// records that it was minted as a patch, which ``hasPendingPresencePatch()`` counts too: that
+    /// patch may have been pushed before the restart and stored as empty by a server without the
+    /// capability, and the restored put is deduplicated, so only a heal repairs it. The flag is
+    /// derived from the queue, not assumed.
     func resetPresenceStateForRestore() {
         self.presenceBase.patchable = false
         self.presenceBase.baseSent = false

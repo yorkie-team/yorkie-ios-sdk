@@ -86,7 +86,9 @@ struct PersistedDocumentState {
 /// field for `full`, and a bare patch cannot be rewritten, so a pending patch is persisted as the
 /// put of its `full` presence (``Converter/toPersistedChange(_:)``, which feeds this envelope and the
 /// append-only change log alike). No patch is pending after a restore. The cost is one full presence
-/// upload after a restart instead of a patch.
+/// upload after a restart instead of a patch. The persisted change also records that it was minted as
+/// a patch (``Change/wasMintedAsPresencePatch``), so a restored document still heals a patch a server
+/// without the capability stored as empty, as upstream's does.
 public extension Document {
     /// Serializes the full restorable state of this document into a self-contained byte
     /// envelope: the root and presences (as a snapshot), the checkpoint, the change id, the
@@ -112,7 +114,7 @@ public extension Document {
         let changeIDBlob = try Converter.toChangeID(state.changeID).serializedData()
 
         var pbPendingChanges = PbChangePack()
-        pbPendingChanges.changes = Converter.toPersistedChanges(state.localChanges)
+        pbPendingChanges.changes = try Converter.toPersistedChanges(state.localChanges)
         let pendingChangesBlob = try pbPendingChanges.serializedData()
 
         let epochBlob = Data(String(self.getEpoch()).utf8)

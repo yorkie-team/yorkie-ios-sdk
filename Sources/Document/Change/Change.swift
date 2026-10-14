@@ -55,18 +55,30 @@ public struct Change {
     /// part of a pushed pack (see `Converter.toChangePack`).
     private(set) var isUndoRedo: Bool
 
+    /// Whether this change was minted as a presence patch, whatever it is now.
+    ///
+    /// Offline persistence writes a patch as the put of its `full` presence, which leaves the
+    /// restored change a put. A patch may already have been pushed before the restart, and a server
+    /// without the `presence-patch` capability stores that as an empty presence; the retry of the
+    /// restored put is deduplicated by `clientSeq`, so the presence stays empty unless the client
+    /// heals it. This mark is what tells it a heal may be owed. Local-only, like ``isUndoRedo``: it
+    /// is never part of a pushed pack.
+    private(set) var wasMintedAsPresencePatch: Bool
+
     init(
         id: ChangeID,
         operations: [Operation],
         presenceChange: PresenceChange? = nil,
         message: String? = nil,
-        isUndoRedo: Bool = false
+        isUndoRedo: Bool = false,
+        wasMintedAsPresencePatch: Bool = false
     ) {
         self.id = id
         self.operations = operations
         self.presenceChange = presenceChange
         self.message = message
         self.isUndoRedo = isUndoRedo
+        self.wasMintedAsPresencePatch = wasMintedAsPresencePatch
     }
 
     /**
@@ -84,6 +96,13 @@ public struct Change {
      */
     mutating func markAsUndoRedo() {
         self.isUndoRedo = true
+    }
+
+    /**
+     * `markAsMintedAsPresencePatch` records that this change was minted as a presence patch.
+     */
+    mutating func markAsMintedAsPresencePatch() {
+        self.wasMintedAsPresencePatch = true
     }
 
     /**

@@ -2144,11 +2144,15 @@ extension Document {
         self.resetPresenceStateForRestore()
     }
 
-    /// Whether a presence patch is still queued to be pushed. That is what makes a patch
-    /// "outstanding": it reaches the server verbatim, so a server without the capability would store
-    /// it as an empty presence and leave a presence to heal.
+    /// Whether a presence patch is still queued to be pushed, or a change minted as one that a
+    /// restore turned into a put. That is what makes a patch "outstanding": it reaches the server
+    /// verbatim (or did, before the restart), so a server without the capability would store it as an
+    /// empty presence and leave a presence to heal.
     func hasPendingPresencePatch() -> Bool {
         self.localChanges.contains {
+            if $0.wasMintedAsPresencePatch {
+                return true
+            }
             if case .patch = $0.presenceChange {
                 return true
             }

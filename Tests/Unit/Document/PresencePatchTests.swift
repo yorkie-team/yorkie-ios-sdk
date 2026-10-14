@@ -28,10 +28,10 @@ import XCTest
 ///   introduced": ``Presence`` can only add or overwrite a key (`set` has no way to delete one) and
 ///   there is no presence undo, so no update removes a key and the JS `removesKey` fallback has
 ///   nothing to guard.
-/// - "heals a restored patch the server stored as empty": persistence writes a pending patch as the
-///   put it stands for (a deliberate divergence from JS, see `Converter.toPersistedChange`), so a
-///   restored queue never holds a patch to heal. The adapted test below pins that a restored put is
-///   not healed.
+///
+/// Persistence writes a pending patch as the put it stands for (a deliberate divergence from JS, see
+/// `Converter.toPersistedChange`) and records that it was minted as a patch, so "heals a restored
+/// patch the server stored as empty" is ported against a restored put that still owes the heal.
 final class PresencePatchTests: XCTestCase {
     private let actor = "000000000000000000000001"
 
@@ -399,8 +399,9 @@ final class PresencePatchTests: XCTestCase {
         let pending = try XCTUnwrap(restored.createChangePack().getChanges().first)
         XCTAssertEqual(self.presence(of: pending), ["name": "\"a\"", "cursor": "1"])
         XCTAssertEqual(restored.getMyEncodedPresence(), ["name": "\"a\"", "cursor": "1"])
-        XCTAssertFalse(restored.hasPendingPresencePatch())
-        XCTAssertFalse(restored.presenceBase.patchSent)
+        // It is a put now, but it was minted as a patch, so it still counts as an outstanding one.
+        XCTAssertTrue(restored.hasPendingPresencePatch())
+        XCTAssertTrue(restored.presenceBase.patchSent)
 
         // The append-only log is written by the same converter, so it never holds a patch either, and
         // replaying it onto a document that has not seen the snapshot rebuilds the whole presence
@@ -413,19 +414,80 @@ final class PresencePatchTests: XCTestCase {
     }
 
     @MainActor
-    func test_does_not_heal_a_restored_put_when_the_reply_drops_the_capability() throws {
+    func test_heals_a_restored_patch_the_server_stored_as_empty() throws {
         let doc = self.makeDoc()
         try doc.update { _, presence in presence.set(["name": "a"]) }
         try self.ack(doc, [presencePatchCapability])
         try doc.update { _, presence in presence.set(["cursor": 1]) }
 
-        // Adapts "heals a restored patch the server stored as empty": the restored queue holds a put,
-        // which an old server stores faithfully, so there is nothing to heal.
+        // The queue is persisted as a put, but the change was minted as a patch and may have been
+        // pushed as one before the restart: an old server stored it as an empty presence and its reply
+        // was lost. The retry is deduplicated by clientSeq, so only the heal can repair the presence.
         let restored = try Document.fromBytes(key: doc.getKey(), bytes: doc.toBytes())
         XCTAssertEqual(self.pendingKinds(restored), [.put])
+        XCTAssertTrue(restored.presenceBase.patchSent)
+
+        try self.ack(restored, [])
+        XCTAssertEqual(self.pendingKinds(restored), [.put])
+        let healed = try XCTUnwrap(restored.createChangePack().getChanges().first)
+        XCTAssertEqual(self.presence(of: healed), ["name": "\"a\"", "cursor": "1"])
+    }
+
+    @MainActor
+    func test_does_not_heal_a_restored_put_that_was_never_a_patch() throws {
+        let doc = self.makeDoc()
+        try doc.update { _, presence in presence.set(["name": "a"]) }
+
+        let restored = try Document.fromBytes(key: doc.getKey(), bytes: doc.toBytes())
+        XCTAssertEqual(self.pendingKinds(restored), [.put])
+        XCTAssertFalse(restored.presenceBase.patchSent)
 
         try self.ack(restored, [])
         XCTAssertEqual(self.pendingKinds(restored), [])
+    }
+
+    @MainActor
+    func test_heals_a_patch_restored_from_the_append_only_log() throws {
+        let doc = self.makeDoc()
+        try doc.update { _, presence in presence.set(["name": "a"]) }
+        try self.ack(doc, [presencePatchCapability])
+        try doc.update { _, presence in presence.set(["cursor": 1]) }
+
+        let replayed = self.makeDoc()
+        try replayed.restoreAppendedChanges(doc.getPendingChangesAfter(0))
+        XCTAssertEqual(self.pendingKinds(replayed), [.put])
+        XCTAssertTrue(replayed.presenceBase.patchSent)
+
+        try self.ack(replayed, [])
+        let healed = try XCTUnwrap(replayed.createChangePack().getChanges().first)
+        XCTAssertEqual(self.presence(of: healed), ["name": "\"a\"", "cursor": "1"])
+    }
+
+    @MainActor
+    func test_keeps_the_patch_mark_across_a_second_restart() throws {
+        let doc = self.makeDoc()
+        try doc.update { _, presence in presence.set(["name": "a"]) }
+        try self.ack(doc, [presencePatchCapability])
+        try doc.update { _, presence in presence.set(["cursor": 1]) }
+
+        let once = try Document.fromBytes(key: doc.getKey(), bytes: doc.toBytes())
+        let twice = try Document.fromBytes(key: doc.getKey(), bytes: once.toBytes())
+        XCTAssertTrue(twice.presenceBase.patchSent)
+
+        try self.ack(twice, [])
+        XCTAssertEqual(self.pendingKinds(twice), [.put])
+    }
+
+    @MainActor
+    func test_stops_owing_a_heal_once_the_restored_patch_is_acknowledged_by_a_server_with_the_capability() throws {
+        let doc = self.makeDoc()
+        try doc.update { _, presence in presence.set(["name": "a"]) }
+        try self.ack(doc, [presencePatchCapability])
+        try doc.update { _, presence in presence.set(["cursor": 1]) }
+
+        let restored = try Document.fromBytes(key: doc.getKey(), bytes: doc.toBytes())
+        try self.ack(restored, [presencePatchCapability])
+        XCTAssertEqual(self.pendingKinds(restored), [], "a server that takes patches stored it faithfully")
     }
 
     // MARK: Wire

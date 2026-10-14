@@ -119,7 +119,8 @@ extension Document {
                 operations: operations,
                 presenceChange: change.presenceChange,
                 message: change.message,
-                isUndoRedo: change.isUndoRedo
+                isUndoRedo: change.isUndoRedo,
+                wasMintedAsPresencePatch: change.wasMintedAsPresencePatch
             ))
         }
 

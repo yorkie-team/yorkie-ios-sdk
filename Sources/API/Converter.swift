@@ -1633,20 +1633,45 @@ extension Converter {
     /// which is the behavior before the mark existed.
     static let persistedUndoRedoFieldNumber = 536_000_001
 
+    /// The protobuf field number under which a *persisted* ``PbChange`` records
+    /// ``Change/wasMintedAsPresencePatch``.
+    ///
+    /// Stored exactly like ``persistedUndoRedoFieldNumber``: a local-only unknown field, never part of
+    /// a pushed pack, skipped by a reader that does not know it. That reader restores the change as a
+    /// plain put and owes no heal, which is the behavior before the mark existed. It takes the next
+    /// number in the same block so the two never collide.
+    static let persistedPresencePatchFieldNumber = 536_000_002
+
     /**
      * `toPersistedChange` converts the given model to Protobuf format for local persistence. Unlike
-     * ``toChange(_:)`` it records ``Change/isUndoRedo``, so it must never feed a change pack.
+     * ``toChange(_:)`` it records ``Change/isUndoRedo`` and ``Change/wasMintedAsPresencePatch``, so it
+     * must never feed a change pack.
+     *
+     * - Throws: ``YorkieError`` when a local-only mark cannot be stored on the change.
      */
-    static func toPersistedChange(_ change: Change) -> PbChange {
+    static func toPersistedChange(_ change: Change) throws -> PbChange {
         var pbChange = toChange(persistable(change))
+        var marker = Data()
+        var mintedAsPatch = change.wasMintedAsPresencePatch
+        if case .patch(_, .some) = change.presenceChange {
+            mintedAsPatch = true
+        }
         if change.isUndoRedo {
-            var marker = Data()
-            appendVarint(UInt64(persistedUndoRedoFieldNumber) << 3, to: &marker)
-            appendVarint(1, to: &marker)
-            // NOTE: `UnknownStorage.append` is package-private to swift-protobuf, but merging the
-            // raw bytes of an unrecognised field is the supported way an unknown field lands in
-            // storage, and it is what a decode of these bytes does.
-            try? pbChange.merge(serializedBytes: marker)
+            appendMark(persistedUndoRedoFieldNumber, to: &marker)
+        }
+        if mintedAsPatch {
+            appendMark(persistedPresencePatchFieldNumber, to: &marker)
+        }
+        guard !marker.isEmpty else {
+            return pbChange
+        }
+        // NOTE: `UnknownStorage.append` is package-private to swift-protobuf, but merging the
+        // raw bytes of an unrecognised field is the supported way an unknown field lands in
+        // storage, and it is what a decode of these bytes does.
+        do {
+            try pbChange.merge(serializedBytes: marker)
+        } catch {
+            throw YorkieError(code: .errUnexpected, message: "could not record the local marks of a persisted change: \(error)")
         }
         return pbChange
     }
@@ -1659,8 +1684,10 @@ extension Converter {
      * patch's local-only `full` copy through persistence. A protobuf `PresenceChange` has no field
      * for it, and a bare patch cannot be rewritten into the put the server asks for when it has no
      * base. Persisting the put keeps a restored queue self-sufficient, at the cost of one full
-     * presence upload instead of a patch after a restart. A patch without `full` (never minted
-     * locally) is written as is.
+     * presence upload instead of a patch after a restart. The change also persists the mark that it
+     * was minted as a patch (``persistedPresencePatchFieldNumber``), which is what lets a restored
+     * document heal a patch an old server stored as empty, as upstream's does. A patch without
+     * `full` (never minted locally) is written as is.
      */
     private static func persistable(_ change: Change) -> Change {
         guard case .patch(_, let full?) = change.presenceChange else {
@@ -1673,26 +1700,36 @@ extension Converter {
 
     /**
      * `toPersistedChanges` converts the given models to Protobuf format for local persistence.
+     *
+     * - Throws: See ``toPersistedChange(_:)``.
      */
-    static func toPersistedChanges(_ changes: [Change]) -> [PbChange] {
-        changes.map { toPersistedChange($0) }
+    static func toPersistedChanges(_ changes: [Change]) throws -> [PbChange] {
+        try changes.map { try toPersistedChange($0) }
     }
 
     /**
      * `fromPersistedChanges` converts changes written by ``toPersistedChange(_:)`` back to model
-     * format, restoring ``Change/isUndoRedo``. A change written without the mark decodes exactly as
-     * ``fromChanges(_:)`` decodes it.
+     * format, restoring ``Change/isUndoRedo`` and ``Change/wasMintedAsPresencePatch``. A change
+     * written without the marks decodes exactly as ``fromChanges(_:)`` decodes it.
      */
     static func fromPersistedChanges(_ pbChanges: [PbChange]) throws -> [Change] {
         let changes = try fromChanges(pbChanges)
         return zip(changes, pbChanges).map { change, pbChange in
-            guard hasUndoRedoMark(pbChange.unknownFields.data) else {
-                return change
-            }
+            let marks = persistedMarks(pbChange.unknownFields.data)
             var marked = change
-            marked.markAsUndoRedo()
+            if marks.contains(UInt64(persistedUndoRedoFieldNumber)) {
+                marked.markAsUndoRedo()
+            }
+            if marks.contains(UInt64(persistedPresencePatchFieldNumber)) {
+                marked.markAsMintedAsPresencePatch()
+            }
             return marked
         }
+    }
+
+    private static func appendMark(_ fieldNumber: Int, to data: inout Data) {
+        appendVarint(UInt64(fieldNumber) << 3, to: &data)
+        appendVarint(1, to: &data)
     }
 
     private static func appendVarint(_ value: UInt64, to data: inout Data) {
@@ -1719,32 +1756,35 @@ extension Converter {
         return nil
     }
 
-    /// Scans the raw unknown-field bytes of a persisted change for the undo/redo mark, skipping every
-    /// other field. Malformed bytes read as "no mark".
-    private static func hasUndoRedoMark(_ data: Data) -> Bool {
+    /// Scans the raw unknown-field bytes of a persisted change for the local-only marks, skipping
+    /// every other field. Malformed bytes read as "no marks" from the point they stop making sense.
+    ///
+    /// - Returns: The field numbers of the varint fields set to a non-zero value.
+    private static func persistedMarks(_ data: Data) -> Set<UInt64> {
         let bytes = [UInt8](data)
         var index = 0
+        var marks = Set<UInt64>()
         while index < bytes.count {
-            guard let tag = readVarint(bytes, &index) else { return false }
+            guard let tag = readVarint(bytes, &index) else { return marks }
             let number = tag >> 3
             switch tag & 0x7 {
             case 0:
-                guard let value = readVarint(bytes, &index) else { return false }
-                if number == UInt64(persistedUndoRedoFieldNumber), value != 0 {
-                    return true
+                guard let value = readVarint(bytes, &index) else { return marks }
+                if value != 0 {
+                    marks.insert(number)
                 }
             case 1:
                 index += 8
             case 2:
-                guard let length = readVarint(bytes, &index), length <= UInt64(bytes.count - index) else { return false }
+                guard let length = readVarint(bytes, &index), length <= UInt64(bytes.count - index) else { return marks }
                 index += Int(length)
             case 5:
                 index += 4
             default:
-                return false
+                return marks
             }
         }
-        return false
+        return marks
     }
 }
 
