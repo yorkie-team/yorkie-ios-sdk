@@ -1955,6 +1955,9 @@ class CRDTTree: CRDTElement {
     /// `measureSplitLevel` measures where the split at `level` opened, at the end of what stayed in
     /// `parent`, and publishes the first level's position into `reported`.
     ///
+    /// `level` is the split count (1 for the text/element level, 2 for the paragraph level, ...),
+    /// not the depth of `parent` in the tree.
+    ///
     /// Concurrent inserts at the boundary stay on its left (§7.3) and the per-iteration advance can
     /// move past unknown split siblings (§7.5), so the requested position is not where the split
     /// landed. The measurement is taken on the tree after the split, in the space `toIndex`

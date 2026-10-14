@@ -274,6 +274,7 @@ final class CRDTTreeMergeLineageTests: XCTestCase {
     private func editWithTimeout(_ tree: CRDTTree, _ range: TreePosRange) -> EditResult? {
         final class Box: @unchecked Sendable {
             var result: EditResult?
+            var error: Error?
         }
         let box = Box()
         let done = expectation(description: "merge edit returns")
@@ -281,13 +282,19 @@ final class CRDTTreeMergeLineageTests: XCTestCase {
         nonisolated(unsafe) let unsafeRange = range
         let queue = DispatchQueue(label: "merge-lineage-edit")
         queue.async {
-            if let out = try? unsafeTree.edit(unsafeRange, nil, 0, timeT(), timeT, nil) {
+            do {
+                let out = try unsafeTree.edit(unsafeRange, nil, 0, timeT(), timeT, nil)
                 box.result = (out.1, out.3, out.13)
+            } catch {
+                box.error = error
             }
             done.fulfill()
         }
         let outcome = XCTWaiter().wait(for: [done], timeout: 10)
         XCTAssertEqual(outcome, .completed, "the merge edit never returned: a parent cycle was closed")
+        if outcome == .completed, let error = box.error {
+            XCTFail("edit threw: \(error)")
+        }
         return outcome == .completed ? box.result : nil
     }
 
@@ -325,7 +332,7 @@ final class CRDTTreeMergeLineageTests: XCTestCase {
             try n["b"]!.append(contentsOf: [n["c"]!])
             try n["c"]!.append(contentsOf: [n["d"]!])
             try n["d"]!.append(contentsOf: [n["e"]!])
-            n["a"]!.removedAt = timeT()
+            _ = n["a"]!.remove(timeT())
             n[tc.carrier]!.mergedFrom = n["a"]!.id
             n[tc.carrier]!.mergedAt = timeT()
 
@@ -337,12 +344,10 @@ final class CRDTTreeMergeLineageTests: XCTestCase {
             // come back as b's pre-edit size.
             let bSize = n["b"]!.paddedSize
 
-            guard let result = self.editWithTimeout(tree, (
+            let result = try XCTUnwrap(self.editWithTimeout(tree, (
                 CRDTTreePos(parentID: n["a"]!.id, leftSiblingID: n["x"]!.id),
                 CRDTTreePos(parentID: n["b"]!.id, leftSiblingID: n["b"]!.id)
-            )) else {
-                return
-            }
+            )))
 
             XCTAssertTrue(n["c"]!.parent === n["b"]!, "c stays where it was instead of moving under itself (\(tc.name))")
             XCTAssertTrue(n["d"]!.parent === n["c"]!)
@@ -380,19 +385,17 @@ final class CRDTTreeMergeLineageTests: XCTestCase {
         try c.append(contentsOf: [d])
         try d.append(contentsOf: [e])
         try f.append(contentsOf: [g])
-        a.removedAt = timeT()
+        _ = a.remove(timeT())
         e.mergedFrom = a.id
         e.mergedAt = timeT()
 
         let tree = CRDTTree(root: r, createdAt: timeT())
         XCTAssertEqual(a.mergedInto, d.id)
 
-        guard let result = self.editWithTimeout(tree, (
+        let result = try XCTUnwrap(self.editWithTimeout(tree, (
             CRDTTreePos(parentID: a.id, leftSiblingID: x.id),
             CRDTTreePos(parentID: b.id, leftSiblingID: b.id)
-        )) else {
-            return
-        }
+        )))
 
         XCTAssertTrue(f.parent === b, "a child must not move under a destination the guard just tombstoned")
         XCTAssertNil(f.mergedFrom, "a stranded child is not stamped")

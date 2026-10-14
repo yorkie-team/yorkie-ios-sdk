@@ -304,6 +304,9 @@ final class TreeSplitOpInfoTests: XCTestCase {
             // then: both converge, and replaying each side's remote OpInfos on that side's own
             // model reproduces its tree.
             let xmlA = try toXML(docA)
+            // Deliberately unconditional, even for a known-gap case. JS `it.fails` would also
+            // absorb a divergence here; this stays stricter because the gap is replay-vs-tree (the
+            // OpInfos cannot describe the result), not replica-vs-replica: the replicas do converge.
             XCTAssertEqual(xmlA, try toXML(docB), "replicas diverged (\(order))")
             let finalA = try snapshot(docA).render()
             let finalB = try snapshot(docB).render()
