@@ -32,6 +32,7 @@ public final class YorkieService {
     private var mockErrorPredicates: [String: (any Message) -> Bool] = [:]
     private var requestObservers: [String: (any Message) -> Void] = [:]
     private var responseHooks: [String: (any Message) async -> Void] = [:]
+    private var watchResponseObserver: (@Sendable (Yorkie_V1_WatchResponse) -> Void)?
 
     init(rpcClient: YorkieServiceClient, isMockingEnabled: Bool = false) {
         self.rpcClient = rpcClient
@@ -139,7 +140,15 @@ public final class YorkieService {
     }
 
     public func watch(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchRequest> {
-        return self.rpcClient.watch(headers: headers, onResult: onResult)
+        guard self.isMockingEnabled, let observer = self.watchResponseObserver else {
+            return self.rpcClient.watch(headers: headers, onResult: onResult)
+        }
+        return self.rpcClient.watch(headers: headers, onResult: { result in
+            if case .message(let message) = result {
+                observer(message)
+            }
+            onResult(result)
+        })
     }
 
     @available(iOS 15, *)
@@ -242,12 +251,26 @@ extension YorkieService {
     /// never stored and never called. A later call for the same method replaces the earlier
     /// observer; pass `nil` to remove it. It is not called when a mock error
     /// (``setMockError(for:error:count:)``) short-circuits the call. Streaming RPCs (`watch`)
-    /// are not covered.
+    /// are not covered; see ``observeWatchResponses(_:)``.
     func observeRequests(for method: Connect.MethodSpec, _ observer: ((any Message) -> Void)?) {
         guard self.isMockingEnabled else {
             return
         }
         self.requestObservers[method.name] = observer
+    }
+
+    /// Observes every message the Watch streams opened after this call deliver, before the client
+    /// handles it, so a test can read the init response and the heartbeats the client otherwise
+    /// consumes silently.
+    ///
+    /// Internal test seam, live only when mocking is enabled. It applies to streams opened after
+    /// the call, and a later call replaces the earlier observer; pass `nil` to remove it. The
+    /// observer runs on the transport's callback queue, not the main actor.
+    func observeWatchResponses(_ observer: (@Sendable (Yorkie_V1_WatchResponse) -> Void)?) {
+        guard self.isMockingEnabled else {
+            return
+        }
+        self.watchResponseObserver = observer
     }
 
     /// Arms a mock error that fires for every request `predicate` accepts, and for none other.

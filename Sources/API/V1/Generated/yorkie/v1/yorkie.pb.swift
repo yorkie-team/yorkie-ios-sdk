@@ -233,6 +233,15 @@ public struct Yorkie_V1_WatchRequest: Sendable {
   /// and the server falls back to client_id (the session id).
   public var actorID: String = String()
 
+  /// heartbeat_interval_ms is the interval, in milliseconds, at which this
+  /// stream asks the server to send a WatchHeartbeat while it is idle. 0, which
+  /// is also what an SDK older than the heartbeat leaves here, asks for none:
+  /// such a stream gets no WatchHeartbeat bodies at all, so the heartbeat can
+  /// never reach a client that would not recognize it. The server clamps the
+  /// request to its own bounds and reports the value it settled on in
+  /// WatchInitialization.heartbeat_interval_ms.
+  public var heartbeatIntervalMs: Int64 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1223,7 +1232,7 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0\u{3}actor_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0\u{3}actor_id\0\u{3}heartbeat_interval_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1234,6 +1243,7 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.resources) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.actorID) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.heartbeatIntervalMs) }()
       default: break
       }
     }
@@ -1249,6 +1259,9 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.actorID.isEmpty {
       try visitor.visitSingularStringField(value: self.actorID, fieldNumber: 3)
     }
+    if self.heartbeatIntervalMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.heartbeatIntervalMs, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1256,6 +1269,7 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.clientID != rhs.clientID {return false}
     if lhs.resources != rhs.resources {return false}
     if lhs.actorID != rhs.actorID {return false}
+    if lhs.heartbeatIntervalMs != rhs.heartbeatIntervalMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

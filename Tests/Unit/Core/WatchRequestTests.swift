@@ -20,7 +20,7 @@ import XCTest
 @MainActor
 final class WatchRequestTests: XCTestCase {
     func test_document_watch_request_declares_the_stable_actor() {
-        let request = Client.makeDocumentWatchRequest(clientID: "session", actorID: "stable", documentID: "doc-1")
+        let request = Client.makeDocumentWatchRequest(clientID: "session", actorID: "stable", documentID: "doc-1", heartbeatIntervalMs: 0)
 
         XCTAssertEqual(request.clientID, "session")
         XCTAssertEqual(request.actorID, "stable")
@@ -28,23 +28,80 @@ final class WatchRequestTests: XCTestCase {
     }
 
     func test_document_watch_request_never_sends_the_session_id_as_the_actor() {
-        let request = Client.makeDocumentWatchRequest(clientID: "session", actorID: nil, documentID: "doc-1")
+        let request = Client.makeDocumentWatchRequest(clientID: "session", actorID: nil, documentID: "doc-1", heartbeatIntervalMs: 0)
 
         XCTAssertEqual(request.clientID, "session")
         XCTAssertEqual(request.actorID, "")
     }
 
     func test_channel_watch_request_declares_the_stable_actor() {
-        let request = Client.makeChannelWatchRequest(clientID: "session", actorID: "stable", channelKey: "room")
+        let request = Client.makeChannelWatchRequest(clientID: "session", actorID: "stable", channelKey: "room", heartbeatIntervalMs: 0)
 
         XCTAssertEqual(request.actorID, "stable")
         XCTAssertEqual(request.resources.first?.channel.channelKey, "room")
     }
 
     func test_channel_watch_request_never_sends_the_session_id_as_the_actor() {
-        let request = Client.makeChannelWatchRequest(clientID: "session", actorID: nil, channelKey: "room")
+        let request = Client.makeChannelWatchRequest(clientID: "session", actorID: nil, channelKey: "room", heartbeatIntervalMs: 0)
 
         XCTAssertEqual(request.clientID, "session")
         XCTAssertEqual(request.actorID, "")
+    }
+
+    // MARK: - Heartbeat interval
+
+    // The server heartbeats only the streams that ask, so a Watch request that carried nothing
+    // would silently get no heartbeat and leave the idle watchdog disarmed. Both Watch requests
+    // must carry the interval, built from the option the way `Client` builds them.
+
+    private enum Kind: CaseIterable {
+        case document
+        case channel
+    }
+
+    private func requestedInterval(_ kind: Kind, _ options: ClientOptions = ClientOptions()) -> Int64 {
+        let client = Client("http://localhost", options)
+        let interval = client.watchHeartbeatIntervalMs
+        switch kind {
+        case .document:
+            return Client.makeDocumentWatchRequest(clientID: "session", actorID: "stable", documentID: "doc-1", heartbeatIntervalMs: interval).heartbeatIntervalMs
+        case .channel:
+            return Client.makeChannelWatchRequest(clientID: "session", actorID: "stable", channelKey: "room", heartbeatIntervalMs: interval).heartbeatIntervalMs
+        }
+    }
+
+    func test_watch_request_asks_for_the_default_heartbeat_interval_when_none_is_configured() {
+        for kind in Kind.allCases {
+            XCTAssertEqual(self.requestedInterval(kind), 20000, "\(kind)")
+        }
+    }
+
+    func test_watch_request_asks_for_the_configured_heartbeat_interval() {
+        for kind in Kind.allCases {
+            XCTAssertEqual(self.requestedInterval(kind, ClientOptions(watchHeartbeatInterval: 7000)), 7000, "\(kind)")
+        }
+    }
+
+    func test_watch_request_asks_for_no_heartbeat_when_the_interval_is_0() {
+        for kind in Kind.allCases {
+            XCTAssertEqual(self.requestedInterval(kind, ClientOptions(watchHeartbeatInterval: 0)), 0, "\(kind)")
+        }
+    }
+
+    func test_watch_request_reads_a_negative_interval_as_asking_for_nothing() {
+        // The option is a whole number of milliseconds, so JS's NaN case has no counterpart here.
+        for kind in Kind.allCases {
+            XCTAssertEqual(self.requestedInterval(kind, ClientOptions(watchHeartbeatInterval: -1)), 0, "\(kind)")
+            XCTAssertEqual(self.requestedInterval(kind, ClientOptions(watchHeartbeatInterval: Int.min)), 0, "\(kind)")
+        }
+    }
+
+    func test_watch_request_caps_an_interval_too_large_for_the_js_safe_integer_range() {
+        let max: Int64 = 9_007_199_254_740_991
+        for kind in Kind.allCases {
+            XCTAssertEqual(self.requestedInterval(kind, ClientOptions(watchHeartbeatInterval: Int.max)), max, "\(kind)")
+        }
+        XCTAssertEqual(Client.toHeartbeatIntervalMs(Int(max)), max)
+        XCTAssertEqual(Client.toHeartbeatIntervalMs(1), 1, "the smallest positive value is kept, not opted out")
     }
 }

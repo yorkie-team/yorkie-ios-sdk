@@ -97,6 +97,7 @@ public struct ClientOptions {
         static let retrySyncLoopDelay = 1000 // 1000 millisecond
         static let reconnectStreamDelay = 1000 // 1000 millisecond
         static let maximumAttachmentTimeout = 5000 // millisecond
+        static let watchHeartbeatInterval = 20000 // millisecond
     }
 
     /**
@@ -174,6 +175,19 @@ public struct ClientOptions {
      */
     var maximumAttachmentTimeout: Int
 
+    /// The interval, in milliseconds, at which the client asks the server to send a heartbeat on
+    /// an idle Watch stream. The default is `20000` (20 seconds).
+    ///
+    /// The server clamps the request into its own bounds (5 to 60 seconds by default) and echoes
+    /// the effective value back when the stream starts; that echoed value is what arms the idle
+    /// watchdog, which reconnects a stream that stays silent for several intervals. Like the other
+    /// interval options, the unit is milliseconds, not seconds. Zero or a negative value opts out:
+    /// the client asks for no heartbeat and the stream then has no idle watchdog. A value too large
+    /// for the wire is capped rather than rejected.
+    ///
+    /// This needs server support (v0.7.25 or later). An older server ignores the request.
+    public var watchHeartbeatInterval: Int
+
     private(set) var metadata: [String: String]
 
     /// The store that persists attached documents between sessions.
@@ -206,6 +220,7 @@ public struct ClientOptions {
                 retrySyncLoopDelay: Int? = nil,
                 reconnectStreamDelay: Int? = nil,
                 attachTimeout: Int? = nil,
+                watchHeartbeatInterval: Int? = nil,
                 store: DocStore? = nil,
                 sessionLock: SessionLock? = nil)
     {
@@ -216,6 +231,7 @@ public struct ClientOptions {
         self.retrySyncLoopDelay = retrySyncLoopDelay ?? DefaultClientOptions.retrySyncLoopDelay
         self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
         self.maximumAttachmentTimeout = attachTimeout ?? DefaultClientOptions.maximumAttachmentTimeout
+        self.watchHeartbeatInterval = watchHeartbeatInterval ?? DefaultClientOptions.watchHeartbeatInterval
         self.metadata = [:]
         self.store = store
         self.sessionLock = sessionLock ?? NoopSessionLock()
@@ -304,6 +320,8 @@ public class Client {
     private let reconnectStreamDelay: Int
     private let retrySyncLoopDelay: Int
     private let maximumAttachmentTimeout: Int
+    /// The heartbeat interval each Watch request asks for, converted once from the option.
+    let watchHeartbeatIntervalMs: Int64
     private let channelHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
     private let defaultPollingInterval: TimeInterval = 3.0 // 3 seconds
 
@@ -369,6 +387,7 @@ public class Client {
         self.retrySyncLoopDelay = options.retrySyncLoopDelay
         self.reconnectStreamDelay = options.reconnectStreamDelay
         self.maximumAttachmentTimeout = options.maximumAttachmentTimeout
+        self.watchHeartbeatIntervalMs = Self.toHeartbeatIntervalMs(options.watchHeartbeatInterval)
 
         let protocolClient = ProtocolClient(httpClient: URLSessionHTTPClient(),
                                             config: ProtocolClientConfig(host: urlString,
@@ -1347,7 +1366,7 @@ public class Client {
                 }
             })
 
-            let request = Self.makeDocumentWatchRequest(clientID: id, actorID: self.actorID, documentID: docAttachment.resourceID)
+            let request = self.makeDocumentWatchRequest(clientID: id, documentID: docAttachment.resourceID)
 
             stream.send(request)
 
@@ -1389,7 +1408,7 @@ public class Client {
                 }
             })
 
-            let request = Self.makeChannelWatchRequest(clientID: id, actorID: self.actorID, channelKey: channelAttachment.resource.getKey())
+            let request = self.makeChannelWatchRequest(clientID: id, channelKey: channelAttachment.resource.getKey())
 
             stream.send(request)
             channelAttachment.connectStream(YorkieServerStream(stream))
@@ -1951,6 +1970,12 @@ public extension Client {
     /// with `isMockingEnabled`. See ``YorkieService/observeRequests(for:_:)``.
     internal func observeRequests(for method: Connect.MethodSpec, _ observer: ((any Message) -> Void)?) {
         self.yorkieService.observeRequests(for: method, observer)
+    }
+
+    /// Observes the messages Watch streams deliver. Test seam, active only when the client was
+    /// created with `isMockingEnabled`. See ``YorkieService/observeWatchResponses(_:)``.
+    internal func observeWatchResponses(_ observer: (@Sendable (WatchResponse) -> Void)?) {
+        self.yorkieService.observeWatchResponses(observer)
     }
 
     /// Runs `hook` after the RPC for `method` returns and before the caller sees the response.

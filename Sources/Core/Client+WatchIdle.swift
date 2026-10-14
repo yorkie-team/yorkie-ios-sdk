@@ -16,9 +16,25 @@
 
 import Foundation
 
+/// `Number.MAX_SAFE_INTEGER` (2^53 - 1), the cap yorkie-js-sdk applies to the heartbeat interval.
+private let jsMaxSafeInteger: Int64 = 9_007_199_254_740_991
+
 // MARK: - Watch requests
 
 extension Client {
+    /// Converts ``ClientOptions/watchHeartbeatInterval`` into the `heartbeat_interval_ms` a Watch
+    /// request carries.
+    ///
+    /// Zero or a negative value asks for no heartbeat. A value past the largest integer a JS
+    /// number holds exactly is capped, as yorkie-js-sdk does, so the same option asks the same of
+    /// the server on every SDK. The option is whole milliseconds, so there is no fraction to round.
+    static func toHeartbeatIntervalMs(_ interval: Int) -> Int64 {
+        guard interval > 0 else {
+            return 0
+        }
+        return min(Int64(interval), jsMaxSafeInteger)
+    }
+
     /// Builds the Watch request for a document.
     ///
     /// The stable actor is sent or nothing: never the session id, which the server rejects as a
@@ -29,10 +45,17 @@ extension Client {
     ///   - clientID: The session id of this client.
     ///   - actorID: The stable actor, or `nil` before the server assigned one.
     ///   - documentID: The server-side id of the document to watch.
-    static func makeDocumentWatchRequest(clientID: String, actorID: ActorID?, documentID: String) -> WatchRequest {
+    ///   - heartbeatIntervalMs: The heartbeat interval to ask the server for, or `0` for none.
+    static func makeDocumentWatchRequest(
+        clientID: String,
+        actorID: ActorID?,
+        documentID: String,
+        heartbeatIntervalMs: Int64
+    ) -> WatchRequest {
         return WatchRequest.with {
             $0.clientID = clientID
             $0.actorID = actorID ?? ""
+            $0.heartbeatIntervalMs = heartbeatIntervalMs
             $0.resources = [
                 ResourceDescriptor.with {
                     $0.document = DocumentDescriptor.with {
@@ -45,10 +68,16 @@ extension Client {
 
     /// Builds the Watch request for a channel, declaring the stable actor like
     /// ``makeDocumentWatchRequest(clientID:actorID:documentID:)``.
-    static func makeChannelWatchRequest(clientID: String, actorID: ActorID?, channelKey: String) -> WatchRequest {
+    static func makeChannelWatchRequest(
+        clientID: String,
+        actorID: ActorID?,
+        channelKey: String,
+        heartbeatIntervalMs: Int64
+    ) -> WatchRequest {
         return WatchRequest.with {
             $0.clientID = clientID
             $0.actorID = actorID ?? ""
+            $0.heartbeatIntervalMs = heartbeatIntervalMs
             $0.resources = [
                 ResourceDescriptor.with {
                     $0.channel = ChannelDescriptor.with {
@@ -57,6 +86,18 @@ extension Client {
                 }
             ]
         }
+    }
+}
+
+extension Client {
+    /// Builds the Watch request for a document with this client's actor and heartbeat interval.
+    func makeDocumentWatchRequest(clientID: String, documentID: String) -> WatchRequest {
+        Self.makeDocumentWatchRequest(clientID: clientID, actorID: self.getActorID(), documentID: documentID, heartbeatIntervalMs: self.watchHeartbeatIntervalMs)
+    }
+
+    /// Builds the Watch request for a channel with this client's actor and heartbeat interval.
+    func makeChannelWatchRequest(clientID: String, channelKey: String) -> WatchRequest {
+        Self.makeChannelWatchRequest(clientID: clientID, actorID: self.getActorID(), channelKey: channelKey, heartbeatIntervalMs: self.watchHeartbeatIntervalMs)
     }
 }
 
