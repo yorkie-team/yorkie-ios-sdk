@@ -2065,6 +2065,7 @@ class CRDTTree: CRDTElement {
         var toBeMovedToFromParents = [CRDTTreeNode]()
         var toBeMergedNodes = [CRDTTreeNode]()
         var preTombstoned = Set<String>()
+        let enclosed = self.makeEnclosedCheck(collectFromParent, collectFromLeft, toParent, toLeft)
         try self.traverseInPosRange(collectFromParent, collectFromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
             // NOTE(hackerwins): If the node overlaps as a start tag with the
             // range then we need to move the remaining children to fromParent.
@@ -2112,7 +2113,7 @@ class CRDTTree: CRDTElement {
                     // Cascade delete to split siblings created by concurrent
                     // SplitElement. Only for element nodes.
                     if !node.isText, node.insNextID != nil, !toBeMergedNodes.contains(where: { $0 === node }) {
-                        nodesToBeRemoved.append(contentsOf: self.collectUnknownSplitSiblings(of: node, versionVector))
+                        try nodesToBeRemoved.append(contentsOf: self.collectUnknownSplitSiblings(of: node, versionVector, enclosed: enclosed))
                     }
                 }
                 tokensToBeRemoved.append((node, tokenType))
@@ -3769,13 +3770,57 @@ private extension CRDTTree {
         return boundaries
     }
 
+    /// `makeEnclosedCheck` returns a closure that reports whether the range covers an element
+    /// whole, start and end tokens both.
+    ///
+    /// The set of enclosed elements is collected on first use and cached; most deletes never ask.
+    private func makeEnclosedCheck(
+        _ fromParent: CRDTTreeNode,
+        _ fromLeft: CRDTTreeNode,
+        _ toParent: CRDTTreeNode,
+        _ toLeft: CRDTTreeNode
+    ) -> (CRDTTreeNode) throws -> Bool {
+        var enclosedNodes: Set<ObjectIdentifier>?
+        return { [self] node in
+            if let enclosedNodes {
+                return enclosedNodes.contains(ObjectIdentifier(node))
+            }
+            var found = Set<ObjectIdentifier>()
+            try self.traverseInPosRange(fromParent, fromLeft, toParent, toLeft, includeRemoved: true) { treeToken, ended in
+                let (token, tokenType) = treeToken
+                if tokenType == .start, ended {
+                    found.insert(ObjectIdentifier(token))
+                }
+            }
+            enclosedNodes = found
+            return found.contains(ObjectIdentifier(node))
+        }
+    }
+
     /**
      * `collectUnknownSplitSiblings` walks the `insNextID` chain from the given
      * node and collects the split siblings (and their subtrees) whose creation
      * the editor did not know about, so they can be cascade-deleted alongside
-     * the node being removed.
+     * the node being removed (§4.1 of yorkie's docs/design/concurrent-merge-split.md).
+     *
+     * The walk passes a sibling the editor knew only if the editor saw it gone:
+     * removed by a change the editor knew (merged back into `node`, say), or
+     * enclosed whole by this delete (`enclosed`). What lies past it was then
+     * inside `node` or inside the deleted range for the editor too. Any other
+     * known sibling ends the walk: the chain is in document order and a split
+     * product lands right after the node it was split off (or, under §7.8,
+     * after the same-boundary products ordered ahead of it), so an unknown
+     * sibling past such a sibling holds content the editor saw inside that
+     * sibling, not inside `node`. Walking on tombstoned it: after a split at
+     * offset 0 and a delete of the empty left piece, the concurrent
+     * same-boundary product that holds the moved content sits right after the
+     * editor's own product (yorkie-js-sdk#1408).
      */
-    func collectUnknownSplitSiblings(of node: CRDTTreeNode, _ versionVector: VersionVector?) -> [CRDTTreeNode] {
+    func collectUnknownSplitSiblings(
+        of node: CRDTTreeNode,
+        _ versionVector: VersionVector?,
+        enclosed: (CRDTTreeNode) throws -> Bool
+    ) rethrows -> [CRDTTreeNode] {
         var result = [CRDTTreeNode]()
         let walker = InsNextWalker()
         _ = walker.visit(node)
@@ -3783,7 +3828,12 @@ private extension CRDTTree {
         // Stop on a chain that loops back on itself; see `InsNextWalker`. An
         // unbounded walk here would also grow `result` without limit.
         while let id = nextID, let next = self.findFloorNode(id), walker.visit(next) {
-            if !ticketKnown(versionVector, next.id.createdAt) {
+            if ticketKnown(versionVector, next.id.createdAt) {
+                let seenGone = next.removedAt.map { ticketKnown(versionVector, $0) } ?? false
+                if !seenGone, try !enclosed(next) {
+                    break
+                }
+            } else {
                 result.append(next)
                 // Cascade through the full subtree, not just immediate children.
                 traverseAll(node: next) { descendant, _ in
