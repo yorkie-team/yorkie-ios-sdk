@@ -1072,16 +1072,18 @@ final class ClientIntegrationTests: XCTestCase {
             // before c1 handles the answer: the sync the pause below must cover.
             let pullInFlight = self.expectation(description: "c1 pulls the change")
             let pullHandled = self.expectation(description: "c1 handled the held pull")
-            var holding = true
+            // The hook runs off the main actor: share its state through locked types, and use a
+            // latch so releasing the pull never races the hook reaching its wait.
+            let holding = LockedValue(true)
+            let gate = TestGate()
             var released = false
-            var gate: CheckedContinuation<Void, Never>?
             c1.setResponseHook(for: YorkieServiceClient.Metadata.Methods.pushPullChanges) { response in
-                guard holding, let response = response as? Yorkie_V1_PushPullChangesResponse, !response.changePack.changes.isEmpty else {
+                guard holding.value, let response = response as? Yorkie_V1_PushPullChangesResponse, !response.changePack.changes.isEmpty else {
                     return
                 }
-                holding = false
+                holding.value = false
                 pullInFlight.fulfill()
-                await withCheckedContinuation { gate = $0 }
+                await gate.wait()
             }
 
             var remoteChanges = 0
@@ -1109,8 +1111,7 @@ final class ClientIntegrationTests: XCTestCase {
             // 02. While that pull is in flight c1 asks to stop receiving, then the answer arrives.
             try c1.changeSyncMode(d1, pauseMode)
             released = true
-            gate?.resume()
-            gate = nil
+            gate.open()
             await fulfillment(of: [pullHandled], timeout: 5)
 
             // then — 03. The pulled change must not be applied after the pause.
