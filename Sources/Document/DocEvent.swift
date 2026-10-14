@@ -299,6 +299,14 @@ public struct AuthErrorValue: Equatable {
         case watch
         case other(String)
 
+        /// Whether this is the PushPull method.
+        var isPushPull: Bool {
+            if case .pushPull = self {
+                return true
+            }
+            return false
+        }
+
         public var description: String {
             switch self {
             case .pushPull:
@@ -358,6 +366,11 @@ public struct LocalChangesDroppedValue {
         case actorMismatch = "actor-mismatch"
         /// The stored bytes could not be decoded at all, so nothing could be restored.
         case restoreFailed = "restore-failed"
+        /// The server refused this client's writes and ``Client/resync(_:discardLocalChanges:initialPresence:)``
+        /// took the refused changes out of the queue to re-anchor the document.
+        ///
+        /// Published once the detach has succeeded, i.e. once the changes are gone for good.
+        case writeDenied = "write-denied"
         /// The appended change log had a hole, so it could not be replayed and the snapshot
         /// was kept instead.
         ///

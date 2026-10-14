@@ -63,6 +63,19 @@ public class Presence {
         self.changeContext.presenceChange = presenceChange
     }
 
+    /// Merges already-encoded values into the presence and records the change.
+    ///
+    /// The counterpart of ``set(_:)`` for values that are already JSON strings, so a presence
+    /// read back from a document can be re-applied without a decode/encode round trip.
+    ///
+    /// - Parameter encoded: The JSON-encoded values, by key.
+    func setEncoded(_ encoded: StringValueTypeDictionary) {
+        for (key, value) in encoded {
+            self.presence[key] = value
+        }
+        self.changeContext.presenceChange = PresenceChange.put(presence: self.presence)
+    }
+
     /**
      * `get` returns the presence value of the given key.
      */

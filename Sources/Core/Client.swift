@@ -311,7 +311,9 @@ public class Client {
     private var authTokenInjector: AuthTokenInjector?
     private var authHeader: AuthHeader
     private var semaphoresForInitialzation = [String: DispatchSemaphore]()
-    private let syncSemaphore = AsyncSemaphore(value: 1)
+    /// Serialises every sync pass, and is the barrier ``resync(_:discardLocalChanges:initialPresence:)``
+    /// holds across its recovery.
+    let syncSemaphore = AsyncSemaphore(value: 1)
     private var channelHeartbeatTimer: Timer?
 
     // Public variables.
@@ -324,7 +326,7 @@ public class Client {
 
     // MARK: - Helper methods for typed attachments
 
-    private func getDocumentAttachment(_ key: String) -> Attachment<Document>? {
+    func getDocumentAttachment(_ key: String) -> Attachment<Document>? {
         return self.attachmentMap[key] as? Attachment<Document>
     }
 
@@ -518,6 +520,30 @@ public class Client {
                        documentPollInterval: TimeInterval? = nil,
                        disableGC: Bool = false,
                        disablePresence: Bool? = nil) async throws -> Document
+    {
+        try await self.attachInternal(doc,
+                                      presence: .values(initialPresence),
+                                      syncMode: syncMode,
+                                      schema: schema,
+                                      initialRoot: initialRoot,
+                                      documentPollInterval: documentPollInterval,
+                                      disableGC: disableGC,
+                                      disablePresence: disablePresence)
+    }
+
+    /// The attach behind ``attach(_:_:_:_:initialRoot:documentPollInterval:disableGC:disablePresence:)``,
+    /// taking the initial presence either as values or already encoded.
+    ///
+    /// The encoded form exists for ``resync(_:discardLocalChanges:initialPresence:)``, which
+    /// re-attaches with the presence the document already holds.
+    func attachInternal(_ doc: Document,
+                        presence initialPresence: InitialPresence,
+                        syncMode: SyncMode,
+                        schema: String = "",
+                        initialRoot: [String: JSONValuable?]? = nil,
+                        documentPollInterval: TimeInterval? = nil,
+                        disableGC: Bool = false,
+                        disablePresence: Bool? = nil) async throws -> Document
     {
         // 01. Check if the client is ready to attach documents.
         guard self.isActive else {
@@ -731,6 +757,17 @@ public class Client {
      */
     @discardableResult
     public func detach(_ doc: Document) async throws -> Document {
+        try await self.detachDocument(doc, skipPresenceClear: false)
+    }
+
+    /// The detach behind ``detach(_:)``.
+    ///
+    /// - Parameters:
+    ///   - doc: The document to detach.
+    ///   - skipPresenceClear: Suppresses the presence-clear change a detach normally mints. For
+    ///     ``resync(_:discardLocalChanges:initialPresence:)``, whose premise is that this client
+    ///     may mint no further change. The server drops the client's presence on detach regardless.
+    func detachDocument(_ doc: Document, skipPresenceClear: Bool) async throws -> Document {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -743,8 +780,12 @@ public class Client {
             throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
-        try doc.update { _, presence in
-            presence.clear()
+        // The clear is a courtesy to the other peers, not part of the detach contract, so it is
+        // skipped rather than failing the detach when the document cannot mint it.
+        if !skipPresenceClear, doc.isMintable {
+            try doc.update { _, presence in
+                presence.clear()
+            }
         }
 
         var detachDocumentRequest = DetachDocumentRequest()
@@ -1215,7 +1256,7 @@ public class Client {
      * `runSyncLoop` runs the sync loop. The sync loop pushes local changes to
      * the server and pulls remote changes from the server.
      */
-    private func runSyncLoop() async {
+    func runSyncLoop() async {
         Logger.debug("[SL] c:\"\(self.key)\" run sync loop")
         self.setCondition(.syncLoop, value: true)
         await self.doSyncLoop()
@@ -1941,7 +1982,14 @@ public extension Client {
     private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
         guard let connectError = error, let attachment else { return }
         let rawValue = errorCodeOf(error: connectError)
-        guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
+        guard let code = YorkieError.Code(rawValue: rawValue) else {
+            return
+        }
+        // `ErrPermissionDenied` rides the same event as `ErrUnauthenticated`, but only from
+        // PushPull: both mean the server refused this client's writes, and the app needs to tell
+        // that apart from a network failure. A watch denial is left out.
+        let isDeniedPush = code == .errPermissionDenied && method.isPushPull
+        guard code == .errUnauthenticated || isDeniedPush else {
             return
         }
 
@@ -2387,7 +2435,7 @@ extension Client {
     /// - Returns: The response to the retried attach.
     func retryAttachAfterReanchor(doc: Document,
                                   request: inout Yorkie_V1_AttachDocumentRequest,
-                                  initialPresence: PresenceData,
+                                  initialPresence: InitialPresence,
                                   disablePresence: Bool) async
         -> ResponseMessage<Yorkie_V1_AttachDocumentResponse>
     {
@@ -2404,7 +2452,7 @@ extension Client {
         if !disablePresence {
             do {
                 try doc.update { _, presence in
-                    presence.set(initialPresence)
+                    initialPresence.apply(to: presence)
                 }
             } catch {
                 // Not fatal to the retry, but never silent: the same input fails loudly on a
@@ -2805,10 +2853,10 @@ extension Client {
     ///   - presenceData: The presence to set.
     ///   - lease: The session lease already held for this attach, released if seeding fails.
     /// - Throws: Whatever the update throws, after letting the lease go.
-    func seedInitialPresence(_ doc: Document, _ presenceData: PresenceData, lease: SessionLockHandle?) async throws {
+    func seedInitialPresence(_ doc: Document, _ initialPresence: InitialPresence, lease: SessionLockHandle?) async throws {
         do {
             try doc.update { _, presence in
-                presence.set(presenceData)
+                initialPresence.apply(to: presence)
             }
         } catch {
             // Seeding can throw on schema validation or a size limit. The lease is already
@@ -2845,6 +2893,25 @@ extension Client {
     func releaseSession(for doc: Document, attachment: Attachment<Document>?) async {
         await self.quiescePersistence(for: doc)
         await self.releaseLease(of: attachment)
+    }
+
+    /// Tears down offline persistence for a document that stays attached: stops persisting it,
+    /// waits for a write already queued, and removes the stored copy and its tracked state.
+    ///
+    /// The lease is kept. ``resync(_:discardLocalChanges:initialPresence:)`` calls this before it
+    /// empties the queue, so no log keeps the refused changes to replay after the re-anchor.
+    ///
+    /// - Parameter doc: The document whose persisted state is dropped.
+    func discardPersistedState(for doc: Document) async {
+        await self.quiescePersistence(for: doc)
+        let key = self.storeKey(doc.getKey())
+        self.persistStates.removeValue(forKey: key)
+        do {
+            try await self.store?.remove(docKey: key)
+        } catch {
+            Logger.warning("[Store] could not remove \(doc.getKey()) before resync (\(error)); " +
+                "the re-attach will re-validate whatever is left")
+        }
     }
 
     /// Stops persisting `doc` and waits for any write already queued for it to finish.

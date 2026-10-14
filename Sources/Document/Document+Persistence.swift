@@ -335,6 +335,20 @@ public extension Document {
         self.persistenceSnapshot().localChanges
     }
 
+    /// Returns this client's own presence as stored: each value JSON-encoded to a string.
+    ///
+    /// ``getMyPresence()`` decodes the values to `Any`, which is lossy for a re-seed (number
+    /// widths, key order, null). A recovery that re-attaches with the presence it already holds
+    /// carries these strings through unchanged.
+    ///
+    /// - Returns: The encoded presence, or `nil` when the document has no actor or no entry.
+    internal func getMyEncodedPresence() -> StringValueTypeDictionary? {
+        guard let actorID = self.actorID else {
+            return nil
+        }
+        return self.persistenceSnapshot().presences[actorID]
+    }
+
     /// Drops all local state that was seeded from a stale persisted envelope so the document
     /// can be re-attached fresh. The server then re-anchors the client from the current
     /// snapshot.
@@ -357,6 +371,8 @@ public extension Document {
         // Back to a document that has absorbed nothing. `mintedOperations` stays: a push cannot be
         // taken back.
         self.absorbedRemote = false
+        // The counter is back at zero, so whatever hole a discard left is gone.
+        self.liftMintingSuspension()
     }
 }
 

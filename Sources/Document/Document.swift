@@ -190,6 +190,15 @@ public class Document: Attachable {
     /// Whether an `update` is in progress. Undo/redo is not allowed during an update.
     private var isUpdating = false
 
+    /// Whether minting is suspended because ``discardLocalChanges()`` left a `clientSeq` hole.
+    ///
+    /// While set, every minting entry point (`update`, undo, redo) refuses with
+    /// ``YorkieError/Code/errRefused`` instead of queueing a change the server can only reject
+    /// with `ErrInvalidClientSeq` or the re-anchor would wipe unreported. Lifted by
+    /// ``restoreLocalChanges(_:)`` (hole filled back in) or ``resetForReanchor()`` (counter back
+    /// to zero), the only two ways out of that state.
+    private var mintingSuspended = false
+
     private var root = CRDTRoot()
     private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
 
@@ -241,6 +250,7 @@ public class Document: Attachable {
         guard self.status != .removed else {
             throw YorkieError(code: .errDocumentRemoved, message: "\(self) is removed.")
         }
+        try self.ensureMintable("Update")
 
         guard let actorID = self.actorID else {
             throw YorkieError(code: .errUnexpected, message: "actor ID is null.")
@@ -459,14 +469,14 @@ public class Document: Attachable {
      * `canUndo` returns whether there are any operations to undo.
      */
     public var canUndo: Bool {
-        self.internalHistory.hasUndo && !self.isUpdating
+        self.internalHistory.hasUndo && !self.isUpdating && self.isMintable
     }
 
     /**
      * `canRedo` returns whether there are any operations to redo.
      */
     public var canRedo: Bool {
-        self.internalHistory.hasRedo && !self.isUpdating
+        self.internalHistory.hasRedo && !self.isUpdating && self.isMintable
     }
 
     /**
@@ -522,6 +532,7 @@ public class Document: Attachable {
         if self.isUpdating {
             throw YorkieError(code: .errRefused, message: "\(isUndo ? "Undo" : "Redo") is not allowed during an update")
         }
+        try self.ensureMintable(isUndo ? "Undo" : "Redo")
 
         // NOTE: The refusal above must not drop the clone: an updater is holding
         // a proxy over it, and `update` reads it again after the updater returns.
@@ -2007,6 +2018,79 @@ public class Document: Attachable {
         self.docID = state.docID
         self.clone = nil
         self.clearHistory()
+    }
+}
+
+/// The re-anchor window for ``Client/resync(_:discardLocalChanges:initialPresence:)``: discarding
+/// the queue and suspending minting. In an extension in this file, rather than the class body, to
+/// stay within this project's `type_body_length` budget while still reaching the private state.
+extension Document {
+    /// Takes the un-pushed local changes out of the queue and returns them.
+    ///
+    /// Used by ``Client/resync(_:discardLocalChanges:initialPresence:)`` when the server has
+    /// refused this client's writes: the queued changes would be re-sent and re-denied by every
+    /// later sync.
+    ///
+    /// The `clientSeq` counter is deliberately left where it is. The discarded changes already
+    /// minted those sequences, and rewinding would mint them a second time. The cost is a hole
+    /// relative to the acked checkpoint, so no change may be minted before the document is
+    /// re-anchored. The discard therefore suspends minting (see ``isMintable``) until
+    /// ``resetForReanchor()`` or ``restoreLocalChanges(_:)``. An empty discard leaves no hole and
+    /// suspends nothing.
+    ///
+    /// This does not undo the discarded changes on the root: they stay applied until the
+    /// re-anchor replaces the local state with the server's.
+    ///
+    /// - Returns: The discarded changes, in the order they were made.
+    func discardLocalChanges() -> [Change] {
+        let discarded = self.localChanges
+        self.localChanges = []
+        if !discarded.isEmpty {
+            self.mintingSuspended = true
+        }
+        return discarded
+    }
+
+    /// Puts changes taken by ``discardLocalChanges()`` back at the head of the queue.
+    ///
+    /// The rollback for a recovery that could not go through. The restored changes are older
+    /// than anything queued since, so they go in front; `clientSeq` is untouched because the
+    /// discard never moved it. Putting them back closes the hole, so minting is allowed again.
+    ///
+    /// - Parameter changes: The changes returned by ``discardLocalChanges()``.
+    func restoreLocalChanges(_ changes: [Change]) {
+        self.mintingSuspended = false
+        guard !changes.isEmpty else {
+            return
+        }
+        self.localChanges = changes + self.localChanges
+    }
+
+    /// Lifts the minting suspension. A bridge for ``resetForReanchor()``, which lives in
+    /// another file and cannot see the private flag.
+    func liftMintingSuspension() {
+        self.mintingSuspended = false
+    }
+
+    /// Whether this document may queue a new local change.
+    ///
+    /// `false` only inside the re-anchor window ``Client/resync(_:discardLocalChanges:initialPresence:)``
+    /// opens, where `update`, `undo` and `redo` refuse with ``YorkieError/Code/errRefused``.
+    /// Callers that mint a change as a side effect of something else (a presence clear on
+    /// detach) read it instead of throwing out of an unrelated API. ``canUndo`` and ``canRedo``
+    /// read it too.
+    public var isMintable: Bool {
+        !self.mintingSuspended
+    }
+
+    /// Refuses a caller that would queue a local change while minting is suspended.
+    private func ensureMintable(_ action: String) throws {
+        if self.mintingSuspended {
+            throw YorkieError(
+                code: .errRefused,
+                message: "\(action) is not allowed on \"\(self.key)\" while it is being re-anchored after the server refused its changes"
+            )
+        }
     }
 }
 
