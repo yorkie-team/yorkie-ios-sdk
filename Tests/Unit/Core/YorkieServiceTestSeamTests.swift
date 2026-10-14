@@ -80,4 +80,40 @@ final class YorkieServiceTestSeamTests: XCTestCase {
         XCTAssertEqual(response.error?.code, .unavailable)
         XCTAssertEqual(observed, 0)
     }
+
+    // The seams are armed from a test's actor and read from whichever task makes the call. The
+    // assertion is the absence of a data race, which the thread sanitizer reports
+    // (`swift test --sanitize=thread --filter YorkieServiceTestSeamTests`).
+    func test_should_survive_arming_the_seams_while_calls_are_in_flight() async {
+        let service = self.makeService(mocking: true)
+        let method = self.method
+        let error = ConnectError(code: .unavailable, message: "mock", exception: nil, details: [], metadata: [:])
+
+        let answered = await withTaskGroup(of: Int.self) { group in
+            for _ in 0 ..< 4 {
+                group.addTask {
+                    for _ in 0 ..< 100 {
+                        service.setMockError(for: method, error: error, count: 2)
+                        service.observeRequests(for: method) { _ in }
+                        service.setResponseHook(for: method) { _ in }
+                        service.observeRequests(for: method, nil)
+                    }
+                    return 0
+                }
+            }
+            for _ in 0 ..< 4 {
+                group.addTask {
+                    var count = 0
+                    for _ in 0 ..< 25 {
+                        let response = await service.pushPullChanges(request: Yorkie_V1_PushPullChangesRequest())
+                        if response.error != nil { count += 1 }
+                    }
+                    return count
+                }
+            }
+            return await group.reduce(0, +)
+        }
+
+        XCTAssertEqual(answered, 100, "every call is answered, by the mock or by the failed RPC")
+    }
 }

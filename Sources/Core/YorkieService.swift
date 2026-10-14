@@ -26,6 +26,10 @@ import SwiftProtobuf
  */
 public final class YorkieService {
     private let rpcClient: YorkieServiceClient
+    /// Guards the test-seam state below. Tests arm the seams from the main actor while the
+    /// nonisolated RPC methods read them from whatever task made the call. Every access sits
+    /// behind `isMockingEnabled`, so a client with mocking off never touches the lock.
+    private let seamLock = NSLock()
     private var mockErrors: [String: ConnectError] = [:]
     private var mockErrorCounts: [String: Int] = [:]
     private let isMockingEnabled: Bool
@@ -140,7 +144,7 @@ public final class YorkieService {
     }
 
     public func watch(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchRequest> {
-        guard self.isMockingEnabled, let observer = self.watchResponseObserver else {
+        guard self.isMockingEnabled, let observer = self.seamLock.withLock({ self.watchResponseObserver }) else {
             return self.rpcClient.watch(headers: headers, onResult: onResult)
         }
         return self.rpcClient.watch(headers: headers, onResult: { result in
@@ -209,36 +213,45 @@ extension YorkieService {
      * corresponding method is called.
      */
     public func setMockError(for method: Connect.MethodSpec, error: ConnectError, count: Int = 1) {
-        self.mockErrors[method.name] = error
-        self.mockErrorCounts[method.name] = count
-        self.mockErrorPredicates.removeValue(forKey: method.name)
+        self.seamLock.withLock {
+            self.mockErrors[method.name] = error
+            self.mockErrorCounts[method.name] = count
+            self.mockErrorPredicates.removeValue(forKey: method.name)
+        }
     }
 
     /**
      * `getMockError` retrieves and removes the mock error for a specific method.
      */
     private func getMockError(for method: Connect.MethodSpec, request: (any Message)? = nil) -> ConnectError? {
-        guard self.isMockingEnabled, let error = mockErrors[method.name], var count = mockErrorCounts[method.name] else {
+        guard self.isMockingEnabled else {
             return nil
         }
 
-        // A mock error armed with a predicate fires only for the requests it accepts, and a
-        // call that does not pass its request cannot satisfy one.
-        if let predicate = self.mockErrorPredicates[method.name], !(request.map(predicate) ?? false) {
-            return nil
+        // The predicate runs under the lock, so it must not call back into the service.
+        return self.seamLock.withLock {
+            guard let error = self.mockErrors[method.name], var count = self.mockErrorCounts[method.name] else {
+                return nil
+            }
+
+            // A mock error armed with a predicate fires only for the requests it accepts, and a
+            // call that does not pass its request cannot satisfy one.
+            if let predicate = self.mockErrorPredicates[method.name], !(request.map(predicate) ?? false) {
+                return nil
+            }
+
+            count -= 1
+            self.mockErrorCounts[method.name] = count
+
+            // swiftlint:disable:next empty_count
+            if count <= 0 {
+                self.mockErrorCounts.removeValue(forKey: method.name)
+                self.mockErrorPredicates.removeValue(forKey: method.name)
+                return self.mockErrors.removeValue(forKey: method.name)
+            }
+
+            return error
         }
-
-        count -= 1
-        self.mockErrorCounts[method.name] = count
-
-        // swiftlint:disable:next empty_count
-        if count <= 0 {
-            self.mockErrorCounts.removeValue(forKey: method.name)
-            self.mockErrorPredicates.removeValue(forKey: method.name)
-            return self.mockErrors.removeValue(forKey: method.name)
-        }
-
-        return error
     }
 }
 
@@ -256,7 +269,7 @@ extension YorkieService {
         guard self.isMockingEnabled else {
             return
         }
-        self.requestObservers[method.name] = observer
+        self.seamLock.withLock { self.requestObservers[method.name] = observer }
     }
 
     /// Observes every message the Watch streams opened after this call deliver, before the client
@@ -270,7 +283,7 @@ extension YorkieService {
         guard self.isMockingEnabled else {
             return
         }
-        self.watchResponseObserver = observer
+        self.seamLock.withLock { self.watchResponseObserver = observer }
     }
 
     /// Arms a mock error that fires for every request `predicate` accepts, and for none other.
@@ -283,9 +296,11 @@ extension YorkieService {
         guard self.isMockingEnabled else {
             return
         }
-        self.mockErrors[method.name] = error
-        self.mockErrorCounts[method.name] = Int.max
-        self.mockErrorPredicates[method.name] = predicate
+        self.seamLock.withLock {
+            self.mockErrors[method.name] = error
+            self.mockErrorCounts[method.name] = Int.max
+            self.mockErrorPredicates[method.name] = predicate
+        }
     }
 
     /// Runs `hook` after the real RPC for `method` has returned and before its response is
@@ -299,7 +314,7 @@ extension YorkieService {
         guard self.isMockingEnabled else {
             return
         }
-        self.responseHooks[method.name] = hook
+        self.seamLock.withLock { self.responseHooks[method.name] = hook }
     }
 
     /// Makes `call` and routes it through the test seam. With mocking disabled it is a plain call.
@@ -312,9 +327,11 @@ extension YorkieService {
             return await call()
         }
 
-        self.requestObservers[method.name]?(request)
+        // Read under the lock, called outside it: an observer may be slow and a hook suspends.
+        let observer = self.seamLock.withLock { self.requestObservers[method.name] }
+        observer?(request)
         let response = await call()
-        if let message = response.message, let hook = self.responseHooks[method.name] {
+        if let message = response.message, let hook = self.seamLock.withLock({ self.responseHooks[method.name] }) {
             await hook(message)
         }
         return response
