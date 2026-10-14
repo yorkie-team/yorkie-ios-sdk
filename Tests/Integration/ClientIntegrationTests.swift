@@ -22,6 +22,7 @@ import XCTest
 @testable import YorkieTestHelper
 #endif
 
+// swiftlint:disable:next type_body_length
 final class ClientIntegrationTests: XCTestCase {
     var cancellables = Set<AnyCancellable>()
 
@@ -1040,6 +1041,89 @@ final class ClientIntegrationTests: XCTestCase {
             XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
 
             d1.unsubscribe("$")
+        }
+    }
+
+    @MainActor
+    func test_should_drop_a_pull_already_in_flight_when_switching_to_push_only() async throws {
+        try await self.dropPullInFlight(whenSwitchingTo: .realtimePushOnly)
+    }
+
+    @MainActor
+    func test_should_drop_a_pull_already_in_flight_when_switching_to_sync_off() async throws {
+        try await self.dropPullInFlight(whenSwitchingTo: .realtimeSyncOff)
+    }
+
+    /// Shared body of the "drop a pull already in flight" tests, ported from yorkie-js-sdk#1453.
+    ///
+    /// iOS switches the mode synchronously, so it is immune by construction; the test pins that
+    /// down by holding c1's pull after the server answered, pausing, and releasing the pull.
+    @MainActor
+    private func dropPullInFlight(whenSwitchingTo pauseMode: SyncMode) async throws {
+        try await withTwoClientsAndDocuments(self.description, mockingEnabled: true, syncMode: .realtime) { c1, d1, c2, d2 in
+            // given
+            try d1.update { root, _ in
+                root.counter = JSONCounter(value: Int64(0))
+            }
+            try await c1.sync()
+            try await c2.sync()
+
+            // Hold c1's next pull that brings changes back, after the server has answered and
+            // before c1 handles the answer: the sync the pause below must cover.
+            let pullInFlight = self.expectation(description: "c1 pulls the change")
+            let pullHandled = self.expectation(description: "c1 handled the held pull")
+            var holding = true
+            var released = false
+            var gate: CheckedContinuation<Void, Never>?
+            c1.setResponseHook(for: YorkieServiceClient.Metadata.Methods.pushPullChanges) { response in
+                guard holding, let response = response as? Yorkie_V1_PushPullChangesResponse, !response.changePack.changes.isEmpty else {
+                    return
+                }
+                holding = false
+                pullInFlight.fulfill()
+                await withCheckedContinuation { gate = $0 }
+            }
+
+            var remoteChanges = 0
+            let caughtUp = self.expectation(description: "c1 catches up in realtime")
+            caughtUp.assertForOverFulfill = false
+            d1.subscribe { event, _ in
+                if event is RemoteChangeEvent {
+                    remoteChanges += 1
+                    if (d1.getRoot().counter as? JSONCounter<Int64>)?.value == 1 {
+                        caughtUp.fulfill()
+                    }
+                } else if let event = event as? SyncStatusChangedEvent, event.value == .synced, released {
+                    released = false
+                    pullHandled.fulfill()
+                }
+            }
+
+            // when — 01. c2 changes the counter; c1 starts pulling it in realtime.
+            try d2.update { root, _ in
+                (root.counter as? JSONCounter<Int64>)?.increase(value: 1)
+            }
+            try await c2.sync()
+            await fulfillment(of: [pullInFlight], timeout: 5)
+
+            // 02. While that pull is in flight c1 asks to stop receiving, then the answer arrives.
+            try c1.changeSyncMode(d1, pauseMode)
+            released = true
+            gate?.resume()
+            gate = nil
+            await fulfillment(of: [pullHandled], timeout: 5)
+
+            // then — 03. The pulled change must not be applied after the pause.
+            XCTAssertEqual(remoteChanges, 0)
+            XCTAssertEqual((d1.getRoot().counter as? JSONCounter<Int64>)?.value, 0)
+
+            // 04. Back in realtime, the sync loop picks up what was dropped by itself.
+            try c1.changeSyncMode(d1, .realtime)
+            await fulfillment(of: [caughtUp], timeout: 10)
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON())
+
+            c1.setResponseHook(for: YorkieServiceClient.Metadata.Methods.pushPullChanges, nil)
+            d1.unsubscribe()
         }
     }
 

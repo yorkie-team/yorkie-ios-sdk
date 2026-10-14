@@ -19,6 +19,7 @@ import Connect
 import Foundation
 import Logging
 import Semaphore
+import SwiftProtobuf
 
 /**
  * `ClientStatus` represents the status of the client.
@@ -1652,6 +1653,12 @@ public class Client {
             // empty reply reach garbage collection on a document that is paused mid-composition
             // -- the very collection this guard exists to prevent. While a document is in
             // PushOnly/SyncOff, nothing of the reply but the push ack is taken.
+            //
+            // NOTE: yorkie-js-sdk#1453 counts pending pauses (`pendingPullPauses`) here, because
+            // its `changeSyncMode` is queued behind an in-flight pull and the guard would still
+            // see the old mode. `changeSyncMode` is synchronous on the MainActor and sets
+            // `attachment.syncMode` before returning, and this guard reads it after the
+            // `await` above, so a pause requested mid-flight is already visible. No counter.
             let dropsRemoteState = pushOnly ||
                 attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff
 
@@ -1859,6 +1866,19 @@ public extension Client {
      */
     func setMockError(for method: Connect.MethodSpec, error: ConnectError, count: Int = 1) {
         self.yorkieService.setMockError(for: method, error: error, count: count)
+    }
+
+    /// Observes requests sent through `method`. Test seam, active only when the client was created
+    /// with `isMockingEnabled`. See ``YorkieService/observeRequests(for:_:)``.
+    internal func observeRequests(for method: Connect.MethodSpec, _ observer: ((any Message) -> Void)?) {
+        self.yorkieService.observeRequests(for: method, observer)
+    }
+
+    /// Runs `hook` after the RPC for `method` returns and before the caller sees the response.
+    /// Test seam, active only when the client was created with `isMockingEnabled`. See
+    /// ``YorkieService/setResponseHook(for:_:)``.
+    internal func setResponseHook(for method: Connect.MethodSpec, _ hook: ((any Message) async -> Void)?) {
+        self.yorkieService.setResponseHook(for: method, hook)
     }
 
     /**

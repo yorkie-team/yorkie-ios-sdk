@@ -16,6 +16,7 @@
 
 import Connect
 import Foundation
+import SwiftProtobuf
 
 /**
  * `YorkieService` provides a wrapper around `YorkieServiceClient`, enabling
@@ -28,6 +29,8 @@ public final class YorkieService {
     private var mockErrors: [String: ConnectError] = [:]
     private var mockErrorCounts: [String: Int] = [:]
     private let isMockingEnabled: Bool
+    private var requestObservers: [String: (any Message) -> Void] = [:]
+    private var responseHooks: [String: (any Message) async -> Void] = [:]
 
     init(rpcClient: YorkieServiceClient, isMockingEnabled: Bool = false) {
         self.rpcClient = rpcClient
@@ -39,7 +42,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.activateClient) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.activateClient(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.activateClient, request: request) {
+            await self.rpcClient.activateClient(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -47,7 +52,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.deactivateClient) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.deactivateClient(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.deactivateClient, request: request) {
+            await self.rpcClient.deactivateClient(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -55,7 +62,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.attachDocument) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.attachDocument(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.attachDocument, request: request) {
+            await self.rpcClient.attachDocument(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -63,7 +72,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.detachDocument) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.detachDocument(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.detachDocument, request: request) {
+            await self.rpcClient.detachDocument(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -71,7 +82,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.removeDocument) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.removeDocument(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.removeDocument, request: request) {
+            await self.rpcClient.removeDocument(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -79,7 +92,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.createRevision) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.createRevision(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.createRevision, request: request) {
+            await self.rpcClient.createRevision(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -87,7 +102,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.getRevision) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.getRevision(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.getRevision, request: request) {
+            await self.rpcClient.getRevision(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -95,7 +112,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.listRevisions) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.listRevisions(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.listRevisions, request: request) {
+            await self.rpcClient.listRevisions(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -103,7 +122,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.restoreRevision) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.restoreRevision(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.restoreRevision, request: request) {
+            await self.rpcClient.restoreRevision(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -111,7 +132,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.pushPullChanges(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.pushPullChanges, request: request) {
+            await self.rpcClient.pushPullChanges(request: request, headers: headers)
+        }
     }
 
     public func watch(headers: Connect.Headers = [:], onResult: @escaping @Sendable (Connect.StreamResult<Yorkie_V1_WatchResponse>) -> Void) -> any Connect.ServerOnlyStreamInterface<Yorkie_V1_WatchRequest> {
@@ -123,7 +146,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.broadcast) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.broadcast(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.broadcast, request: request) {
+            await self.rpcClient.broadcast(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -131,7 +156,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.attachChannel) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.attachChannel(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.attachChannel, request: request) {
+            await self.rpcClient.attachChannel(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -139,7 +166,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.detachChannel) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.detachChannel(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.detachChannel, request: request) {
+            await self.rpcClient.detachChannel(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -147,7 +176,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.refreshChannel) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.refreshChannel(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.refreshChannel, request: request) {
+            await self.rpcClient.refreshChannel(request: request, headers: headers)
+        }
     }
 
     @available(iOS 15, *)
@@ -155,7 +186,9 @@ public final class YorkieService {
         if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.peekChannel) {
             return .init(result: .failure(error))
         }
-        return await self.rpcClient.peekChannel(request: request, headers: headers)
+        return await self.intercept(YorkieServiceClient.Metadata.Methods.peekChannel, request: request) {
+            await self.rpcClient.peekChannel(request: request, headers: headers)
+        }
     }
 }
 
@@ -188,5 +221,55 @@ extension YorkieService {
         }
 
         return error
+    }
+}
+
+// MARK: - Test seam (mocking only)
+
+extension YorkieService {
+    /// Observes every request sent through `method`, before the RPC is made.
+    ///
+    /// Internal test seam, live only when mocking is enabled: with mocking disabled the observer is
+    /// never stored and never called. A later call for the same method replaces the earlier
+    /// observer; pass `nil` to remove it. It is not called when a mock error
+    /// (``setMockError(for:error:count:)``) short-circuits the call. Streaming RPCs (`watch`)
+    /// are not covered.
+    func observeRequests(for method: Connect.MethodSpec, _ observer: ((any Message) -> Void)?) {
+        guard self.isMockingEnabled else {
+            return
+        }
+        self.requestObservers[method.name] = observer
+    }
+
+    /// Runs `hook` after the real RPC for `method` has returned and before its response is
+    /// delivered to the caller, so a test can inspect the response or suspend inside the hook to
+    /// hold it.
+    ///
+    /// Internal test seam, live only when mocking is enabled. The hook receives the response
+    /// message and is skipped when the RPC failed. A later call for the same method replaces the
+    /// earlier hook; pass `nil` to remove it.
+    func setResponseHook(for method: Connect.MethodSpec, _ hook: ((any Message) async -> Void)?) {
+        guard self.isMockingEnabled else {
+            return
+        }
+        self.responseHooks[method.name] = hook
+    }
+
+    /// Makes `call` and routes it through the test seam. With mocking disabled it is a plain call.
+    private func intercept<Req: Message, Res: Message>(
+        _ method: Connect.MethodSpec,
+        request: Req,
+        _ call: () async -> ResponseMessage<Res>
+    ) async -> ResponseMessage<Res> {
+        guard self.isMockingEnabled else {
+            return await call()
+        }
+
+        self.requestObservers[method.name]?(request)
+        let response = await call()
+        if let message = response.message, let hook = self.responseHooks[method.name] {
+            await hook(message)
+        }
+        return response
     }
 }
