@@ -333,6 +333,19 @@ struct TreeRestoreSpan {
     let leftSiblingID: CRDTTreeNodeID?
     /// `nil` → was last child.
     let rightSiblingID: CRDTTreeNodeID?
+
+    /**
+     * `restoreKindAgrees` reports whether the span's `isText` flag matches its `nodeType`, as it
+     * always does on a span an honest replica captured. A span that disagrees would recreate a node
+     * of the wrong kind -- an element carrying a value is then invisible to the text lookup, so the
+     * same span applied again inserts a second node under one ID. Decoding cannot reject it: stored
+     * changes go through the same decoder and must stay loadable, so `restore` and `retombstone`
+     * skip it instead. The kind is part of the span itself, so every replica skips it alike.
+     * Mirrors Go's `TreeRestoreSpan.kindAgrees` (yorkie#2168).
+     */
+    var restoreKindAgrees: Bool {
+        self.isText == (self.nodeType == DefaultTreeNodeType.text.rawValue)
+    }
 }
 
 /**
@@ -3257,6 +3270,9 @@ extension CRDTTree {
         }
 
         for span in spans {
+            if !span.restoreKindAgrees {
+                continue
+            }
             if !span.isText {
                 if let node = self.findFloorNode(span.id), node.id == span.id {
                     if node.isRemoved {
@@ -3382,6 +3398,9 @@ extension CRDTTree {
         var diff = DataSize(data: 0, meta: 0)
         var changes = [TreeVisibleEdit]()
         for span in spans {
+            if !span.restoreKindAgrees {
+                continue
+            }
             let start = span.id.offset
             let end = start + Swift.max(span.length, 1)
             let pieces: [CRDTTreeNode]
@@ -3547,6 +3566,42 @@ extension CRDTTree {
     }
 
     /**
+     * `recreateParent` resolves the node a recreated span hangs under, or nil when the span must
+     * be left unplaced. Three shapes are unplaceable. The parent is genuinely absent (purged and
+     * not part of this restore). The parent is a text node, which cannot hold children. Or the
+     * identity being recreated, `id`, is one a surviving node already holds -- exactly, or inside
+     * a surviving text run of the same insertion -- in which case recreating would put a second
+     * node under one identity, and `registerNode` overwrites the live registration of the node
+     * that holds it, leaving every later change that addresses it unapplicable.
+     *
+     * No honest span is any of these: spans come from the wire, and the server stores a change
+     * before applying it, so throwing here would fail every later apply of the document. Each test
+     * reads only state that never changes afterwards (node kind, identity ownership), and a replica
+     * that does hold the named node resolves the span through restore's un-tombstone branch
+     * instead, so the replicas converge either way. Mirrors Go's `Tree.recreateParent`
+     * (yorkie#2168).
+     */
+    private func recreateParent(_ span: TreeRestoreSpan, _ id: CRDTTreeNodeID) -> CRDTTreeNode? {
+        guard let parentID = span.parentID,
+              let parent = self.findFloorNode(parentID),
+              parent.id == parentID,
+              !parent.isText
+        else {
+            return nil
+        }
+
+        if let holder = self.findFloorNode(id) {
+            let holdsExactly = holder.id.offset == id.offset
+            let insideTextRun = holder.isText && Int(holder.id.offset) + holder.value.length > Int(id.offset)
+            if holdsExactly || insideTextRun {
+                return nil
+            }
+        }
+
+        return parent
+    }
+
+    /**
      * `recreateFromSpan` rebuilds a purged node (or purged text sub-range) under
      * its original identity and attaches it. Anchor ladder, each rung doing
      * floor-lookup + parent-identity check:
@@ -3557,19 +3612,17 @@ extension CRDTTree {
      *       children at the first position whose id compares greater than the
      *       node's id (a pure function of ids → identical on every replica).
      *
-     * A genuinely absent parent → skip: the node stays unplaced/invisible, which
-     * is convergent because every replica resolves parent-absent identically.
+     * A span ``recreateParent(_:_:)`` refuses is skipped: the node stays
+     * unplaced/invisible. Go's `Tree.recreateFromSpan` applies the same rules.
      * A parent present but TOMBSTONED → the node is placed but born tombstoned,
      * stamped with the parent's `removedAt`, and `nil` is returned (see
      * `attach` below).
      */
     private func recreateFromSpan(_ span: TreeRestoreSpan, _ offset: Int32, _ length: Int32) throws -> CRDTTreeNode? {
-        guard let parentID = span.parentID,
-              let parent = self.findFloorNode(parentID),
-              parent.id == parentID
-        else {
-            // Parent gone (purged, and not part of this undo's spans). Leave the
-            // node unplaced; a later parent-restore will bring it back.
+        let id = CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset)
+        guard let parent = self.recreateParent(span, id) else {
+            // Parent gone (purged, and not part of this undo's spans), or the span is
+            // unplaceable. Leave the node unplaced; a later parent-restore will bring it back.
             return nil
         }
 
@@ -3587,7 +3640,7 @@ extension CRDTTree {
                 return nil
             }
             let value = source.substring(with: NSRange(location: base, length: Int(length))) as NSString
-            node = CRDTTreeNode(id: CRDTTreeNodeID(createdAt: span.id.createdAt, offset: offset),
+            node = CRDTTreeNode(id: id,
                                 type: span.nodeType,
                                 value: value)
         } else {
