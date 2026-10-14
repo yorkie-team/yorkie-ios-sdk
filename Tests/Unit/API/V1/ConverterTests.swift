@@ -560,4 +560,58 @@ class ConverterTests: XCTestCase {
         XCTAssertEqual(decoded.getDataSize(), text.getDataSize())
         XCTAssertEqual(Converter.toText(decoded).text.nodes.count, pbText.nodes.count - 2)
     }
+
+    // MARK: presence patch (yorkie-js-sdk#1477)
+
+    func test_presence_patch_goes_on_the_wire_with_only_the_changed_keys() throws {
+        let patch = PresenceChange.patch(presence: ["cursor": "1"], full: ["name": "\"a\"", "cursor": "1"])
+
+        let pb = Converter.toPresenceChange(presenceChange: patch)
+
+        XCTAssertEqual(pb.type, .patch)
+        XCTAssertEqual(pb.presence.data, ["cursor": "1"])
+        XCTAssertTrue(pb.removedKeys.isEmpty)
+    }
+
+    func test_presence_patch_decodes_without_a_full_presence() throws {
+        var pb = PbPresenceChange()
+        pb.type = .patch
+        pb.presence.data = ["cursor": "2"]
+
+        let decoded = try Converter.fromPresenceChange(pbPresenceChange: pb)
+
+        guard case .patch(let presence, let full) = decoded else {
+            return XCTFail("expected a patch, got \(decoded)")
+        }
+        XCTAssertEqual(presence, ["cursor": "2"])
+        XCTAssertNil(full)
+    }
+
+    func test_presence_patch_round_trips_through_a_change() throws {
+        let change = Change(id: ChangeID.initial,
+                            operations: [],
+                            presenceChange: .patch(presence: ["cursor": "1"], full: ["name": "\"a\"", "cursor": "1"]))
+
+        let converted = try XCTUnwrap(Converter.fromChanges(Converter.toChanges([change])).first)
+
+        guard case .patch(let presence, let full) = converted.presenceChange else {
+            return XCTFail("expected a patch, got \(String(describing: converted.presenceChange))")
+        }
+        XCTAssertEqual(presence, ["cursor": "1"])
+        XCTAssertNil(full, "`full` is local state and never crosses the wire")
+    }
+
+    func test_persisted_change_writes_a_patch_as_the_put_of_its_full_presence() throws {
+        let full = ["name": "\"a\"", "cursor": "1"]
+        let change = Change(id: ChangeID.initial, operations: [], presenceChange: .patch(presence: ["cursor": "1"], full: full))
+
+        let persisted = Converter.toPersistedChange(change)
+
+        XCTAssertEqual(persisted.presenceChange.type, .put)
+        XCTAssertEqual(persisted.presenceChange.presence.data, full)
+
+        // A patch with no `full` (never minted locally) cannot be widened, so it is written as is.
+        let bare = Change(id: ChangeID.initial, operations: [], presenceChange: .patch(presence: ["cursor": "1"], full: nil))
+        XCTAssertEqual(Converter.toPersistedChange(bare).presenceChange.type, .patch)
+    }
 }

@@ -70,6 +70,16 @@ public struct Change {
     }
 
     /**
+     * `setPresenceChange` replaces the presence change of this change. It is how a pending patch is
+     * rewritten into the full put the server asks for when it has no base to fold the patch into.
+     * The presence it resolves to is the same either way, so the change this document already
+     * applied locally stands.
+     */
+    mutating func setPresenceChange(_ presenceChange: PresenceChange?) {
+        self.presenceChange = presenceChange
+    }
+
+    /**
      * `markAsUndoRedo` records that an undo or a redo produced this change.
      */
     mutating func markAsUndoRedo() {
@@ -148,7 +158,18 @@ public struct Change {
             switch presenceChange {
             case .put(let presence):
                 presences[actorID] = presence
-            default:
+            case .patch(let presence, let full):
+                // A patch is an upload-side encoding: only the changed keys go on the wire. A locally
+                // minted one carries the whole presence as of that change in `full`, so there is
+                // nothing to fold -- apply that. One decoded off the wire has no `full` (it never goes
+                // on the wire), so fold its keys onto the presence already held for that actor, which
+                // is what the server would have done before storing it.
+                if let full {
+                    presences[actorID] = full
+                } else {
+                    presences[actorID, default: [:]].merge(presence) { _, new in new }
+                }
+            case .clear:
                 presences.removeValue(forKey: actorID)
             }
         }

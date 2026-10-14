@@ -617,7 +617,6 @@ public class Client {
         // Built AFTER any restore, so the change pack carries the un-acknowledged local
         // changes the restore brought back. Building it first would push an empty pack and
         // silently strand everything the previous session left unsynced.
-        attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
         attachRequest.schemaKey = schema
         attachRequest.disableGc = disableGC
         attachRequest.disablePresence = resolvedDisablePresence
@@ -627,7 +626,9 @@ public class Client {
 
             self.semaphoresForInitialzation[docKey] = semaphore
 
-            var attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
+            // A restored queue can still hold presence patches, and this attach is the request they
+            // ride out on, so it needs the presence-base fallback as much as a sync does.
+            var attachResponse = await self.sendAttach(&attachRequest, for: doc)
 
             // A restored document whose epoch the server has since compacted past cannot be
             // resumed: the un-acknowledged changes it carries are anchored to a state the
@@ -791,11 +792,15 @@ public class Client {
         var detachDocumentRequest = DetachDocumentRequest()
         detachDocumentRequest.clientID = clientID
         detachDocumentRequest.documentID = attachment.resourceID
-        detachDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
 
         do {
-            let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest,
-                                                                                 headers: self.authHeader.makeHeader(doc.getKey()))
+            let detachDocumentResponse = await self.pushWithPresenceBase(doc,
+                                                                         build: { Converter.toChangePack(pack: doc.createChangePack()) },
+                                                                         send: { pack in
+                                                                             detachDocumentRequest.changePack = pack
+                                                                             return await self.yorkieService.detachDocument(request: detachDocumentRequest,
+                                                                                                                            headers: self.authHeader.makeHeader(doc.getKey()))
+                                                                         })
 
             guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
                 throw self.handleErrorResponse(detachDocumentResponse.error, defaultMessage: "Unknown detach error")
@@ -843,10 +848,15 @@ public class Client {
         var removeDocumentRequest = RemoveDocumentRequest()
         removeDocumentRequest.clientID = clientID
         removeDocumentRequest.documentID = attachment.resourceID
-        removeDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack(true))
 
         do {
-            let removeDocumentResponse = await self.yorkieService.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
+            let removeDocumentResponse = await self.pushWithPresenceBase(doc,
+                                                                         build: { Converter.toChangePack(pack: doc.createChangePack(true)) },
+                                                                         send: { pack in
+                                                                             removeDocumentRequest.changePack = pack
+                                                                             return await self.yorkieService.removeDocument(request: removeDocumentRequest,
+                                                                                                                            headers: self.authHeader.makeHeader(doc.getKey()))
+                                                                         })
 
             guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
                 throw self.handleErrorResponse(removeDocumentResponse.error, defaultMessage: "Unknown remove error")
@@ -1645,11 +1655,11 @@ public class Client {
         pushPullRequest.clientID = clientID
 
         let doc = attachment.resource
-        let requestPack = doc.createChangePack()
-        let localSize = requestPack.getChangeSize()
+        // The pack the request actually carried: the builder records it, so a presence-base retry
+        // leaves the log line below reporting the resent one.
+        var requestPack = doc.createChangePack()
         let pushOnly = syncMode == .realtimePushOnly
 
-        pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.resourceID
         pushPullRequest.pushOnly = pushOnly
         pushPullRequest.disableGc = attachment.disableGC
@@ -1657,7 +1667,16 @@ public class Client {
         do {
             let docKey = doc.getKey()
 
-            let pushpullResponse = await self.yorkieService.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
+            let pushpullResponse = await self.pushWithPresenceBase(doc,
+                                                                   build: {
+                                                                       requestPack = doc.createChangePack()
+                                                                       return Converter.toChangePack(pack: requestPack)
+                                                                   },
+                                                                   send: { pack in
+                                                                       pushPullRequest.changePack = pack
+                                                                       return await self.yorkieService.pushPullChanges(request: pushPullRequest,
+                                                                                                                       headers: self.authHeader.makeHeader(docKey))
+                                                                   })
 
             guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
                 throw self.handleErrorResponse(pushpullResponse.error, defaultMessage: "Unknown pushpull error")
@@ -1764,7 +1783,7 @@ public class Client {
             doc.publishSyncEvent(.synced)
 
             let remoteSize = responsePack.getChangeSize()
-            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(requestPack.getChangeSize()) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {
@@ -2438,6 +2457,25 @@ extension Client {
         }
     }
 
+    /// Sends the attach request with the document's pack, under ``pushWithPresenceBase(_:build:send:)``.
+    ///
+    /// - Parameters:
+    ///   - request: The attach request. Its change pack is set to the pack that was sent last.
+    ///   - doc: The document being attached.
+    /// - Returns: The response to the attach that was sent last.
+    func sendAttach(_ request: inout Yorkie_V1_AttachDocumentRequest,
+                    for doc: Document) async -> ResponseMessage<Yorkie_V1_AttachDocumentResponse>
+    {
+        let docKey = doc.getKey()
+        return await self.pushWithPresenceBase(doc,
+                                               build: { Converter.toChangePack(pack: doc.createChangePack()) },
+                                               send: { pack in
+                                                   request.changePack = pack
+                                                   return await self.yorkieService.attachDocument(request: request,
+                                                                                                  headers: self.authHeader.makeHeader(docKey))
+                                               })
+    }
+
     /// Re-anchors a document whose resume the server rejected for a stale epoch, and retries
     /// the attach once.
     ///
@@ -2482,9 +2520,7 @@ extension Client {
             }
         }
 
-        request.changePack = Converter.toChangePack(pack: doc.createChangePack())
-        return await self.yorkieService.attachDocument(request: request,
-                                                       headers: self.authHeader.makeHeader(docKey))
+        return await self.sendAttach(&request, for: doc)
     }
 
     /// Discards a resumed document's persisted state when the server purged the document

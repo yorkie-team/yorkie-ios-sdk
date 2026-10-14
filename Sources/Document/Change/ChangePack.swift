@@ -51,6 +51,13 @@ struct ChangePack {
     private let epoch: Int64
 
     /**
+     * `capabilities` are the wire features the server advertises on the pack it returns. It is the
+     * negotiation channel for features a peer may not have: absence means unsupported, so an old
+     * server, which sets nothing, is read as supporting none of them. A client never sends them.
+     */
+    private let capabilities: [String]
+
+    /**
      * `IsRemoved` is a flag that indicates whether the document is removed.
      */
     let isRemoved: Bool
@@ -61,7 +68,8 @@ struct ChangePack {
          changes: [Change],
          snapshot: Data? = nil,
          versionVector: VersionVector?,
-         epoch: Int64 = 0)
+         epoch: Int64 = 0,
+         capabilities: [String] = [])
     {
         self.documentKey = key
         self.checkpoint = checkpoint
@@ -70,6 +78,7 @@ struct ChangePack {
         self.versionVector = versionVector
         self.epoch = epoch
         self.isRemoved = isRemoved
+        self.capabilities = capabilities
     }
 
     /**
@@ -133,5 +142,12 @@ struct ChangePack {
      */
     func getEpoch() -> Int64 {
         return self.epoch
+    }
+
+    /**
+     * `hasCapability` returns whether this pack advertises the given wire feature.
+     */
+    func hasCapability(_ capability: String) -> Bool {
+        return self.capabilities.contains(capability)
     }
 }

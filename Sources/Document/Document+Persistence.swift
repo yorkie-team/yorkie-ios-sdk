@@ -79,6 +79,14 @@ struct PersistedDocumentState {
 /// `changes` field — reusing an existing message rather than adding a new one, the same
 /// reasoning upstream gives for reusing its `Snapshot` message in ``Converter/snapshotToBytes(root:presences:)``.
 /// Blob order and the 4-byte-LE framing are otherwise identical to upstream.
+///
+/// A second consequence of the protobuf blob (yorkie-js-sdk#1477): upstream's JSON change struct
+/// carries a presence patch's local-only `full` copy, so a pending patch survives a restart as a
+/// patch and can still be rewritten into the put it stands for. A protobuf `PresenceChange` has no
+/// field for `full`, and a bare patch cannot be rewritten, so a pending patch is persisted as the
+/// put of its `full` presence (``Converter/toPersistedChange(_:)``, which feeds this envelope and the
+/// append-only change log alike). No patch is pending after a restore. The cost is one full presence
+/// upload after a restart instead of a patch.
 public extension Document {
     /// Serializes the full restorable state of this document into a self-contained byte
     /// envelope: the root and presences (as a snapshot), the checkpoint, the change id, the

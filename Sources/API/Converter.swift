@@ -130,6 +130,13 @@ extension Converter {
         case .put(let presence):
             pbPresenceChange.type = .put
             pbPresenceChange.presence = toPresence(presence: presence)
+        case .patch(let presence, _):
+            // Only the changed keys go on the wire; the patch's `full` copy is local state for
+            // `Change.execute` and the base-unavailable fallback. The server folds the patch into the
+            // base it holds before storing it. `removed_keys` is never sent: this SDK cannot remove a
+            // presence key.
+            pbPresenceChange.type = .patch
+            pbPresenceChange.presence = toPresence(presence: presence)
         case .clear:
             pbPresenceChange.type = .clear
         }
@@ -157,6 +164,12 @@ extension Converter {
         switch pbPresenceChange.type {
         case .put:
             return .put(presence: fromPresence(pbPresence: pbPresenceChange.presence))
+        case .patch:
+            // The server folds a patch into the base it holds before storing one, so a pulled pack
+            // does not normally carry a patch. It is decoded anyway -- an echo of a pushed change, or
+            // a peer ahead of this SDK, must not fail the whole pack. There is no `full` on the wire:
+            // `Change.execute` merges the carried keys onto the presence already held for the actor.
+            return .patch(presence: fromPresence(pbPresence: pbPresenceChange.presence), full: nil)
         case .clear:
             return .clear
         default:
@@ -1553,7 +1566,8 @@ extension Converter {
                    changes: try fromChanges(pbPack.changes),
                    snapshot: pbPack.snapshot.isEmpty ? nil : pbPack.snapshot,
                    versionVector: fromVersionVector(pbPack.versionVector),
-                   epoch: pbPack.epoch
+                   epoch: pbPack.epoch,
+                   capabilities: pbPack.capabilities
         )
     }
 
@@ -1624,7 +1638,7 @@ extension Converter {
      * ``toChange(_:)`` it records ``Change/isUndoRedo``, so it must never feed a change pack.
      */
     static func toPersistedChange(_ change: Change) -> PbChange {
-        var pbChange = toChange(change)
+        var pbChange = toChange(persistable(change))
         if change.isUndoRedo {
             var marker = Data()
             appendVarint(UInt64(persistedUndoRedoFieldNumber) << 3, to: &marker)
@@ -1635,6 +1649,26 @@ extension Converter {
             try? pbChange.merge(serializedBytes: marker)
         }
         return pbChange
+    }
+
+    /**
+     * `persistable` returns the change as it is written to local persistence: a presence patch
+     * becomes the put of the `full` presence it stands for.
+     *
+     * NOTE: a deliberate divergence from yorkie-js-sdk#1477, whose JSON `ChangeStruct` carries a
+     * patch's local-only `full` copy through persistence. A protobuf `PresenceChange` has no field
+     * for it, and a bare patch cannot be rewritten into the put the server asks for when it has no
+     * base. Persisting the put keeps a restored queue self-sufficient, at the cost of one full
+     * presence upload instead of a patch after a restart. A patch without `full` (never minted
+     * locally) is written as is.
+     */
+    private static func persistable(_ change: Change) -> Change {
+        guard case .patch(_, let full?) = change.presenceChange else {
+            return change
+        }
+        var persisted = change
+        persisted.setPresenceChange(.put(presence: full))
+        return persisted
     }
 
     /**
