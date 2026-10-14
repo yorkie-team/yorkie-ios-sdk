@@ -458,7 +458,7 @@ final class TreeEditOperation: Operation {
         // accepted. The reverse operation and the undo stack both read that size rather than the
         // content this operation carried: a range covering content the tree refused would delete a
         // neighbour on redo.
-        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize, splitSize, mergedNodes, splitRecreatedIDs) = try tree.edit(
+        let (changes, pairs, diff, removedNodes, preEditFromIdx, mergeLevel, preTombstoned, removedSpans, insertedSpans, insertedContentSize, splitSize, mergedNodes, splitRecreatedIDs, strandedNodes) = try tree.edit(
             (self.fromPos, self.toPos),
             self.contents?.compactMap { $0.deepcopy() },
             self.splitLevel,
@@ -470,7 +470,9 @@ final class TreeEditOperation: Operation {
         // Capture the pre-edit range so a remote/local edit can reconcile parked undo ops. `toIdx`
         // is `fromIdx` plus the total visible tokens of the nodes this edit removed.
         self.lastFromIdx = preEditFromIdx
-        let removedSize = removedNodes.reduce(0) { $0 + $1.paddedSize }
+        // The merge's stranded subtrees are part of the consumed range too: they are not in `removedNodes`,
+        // yet tombstoning them drained their size out of the removed source they stay under.
+        let removedSize = (removedNodes + strandedNodes).reduce(0) { $0 + $1.paddedSize }
         self.lastToIdx = preEditFromIdx + removedSize
         self.insertedContentSize = insertedContentSize
         self.splitSize = splitSize

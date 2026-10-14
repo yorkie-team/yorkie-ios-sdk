@@ -2027,7 +2027,7 @@ class CRDTTree: CRDTElement {
         _ versionVector: VersionVector? = nil
     ) throws -> (
         [TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int,
-        [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)]
+        [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)], [CRDTTreeNode]
     ) {
         // 01. find nodes from the given range and split nodes.
         var diff = DataSize(data: 0, meta: 0)
@@ -2145,7 +2145,10 @@ class CRDTTree: CRDTElement {
         // 03. Merge: move the nodes that are marked as moved, then set the
         // forwarding pointer on merge-source nodes. Returns the resolved
         // destination, which differs from `fromParent` in a chained merge.
-        let mergeDest = try self.applyMergeMoves(toBeMovedToFromParents, fromParent, editedAt)
+        let (mergeDest, stranded) = try self.applyMergeMoves(toBeMovedToFromParents, fromParent, editedAt)
+        // The refused children get their GC pairs before the merge-delete propagation below, in
+        // the order the server books them.
+        pairs.append(contentsOf: stranded.map { GCPair(parent: self, child: $0) })
 
         // 03-1. Propagate deletes to children moved by prior merges. When a
         // merge-source node is fully deleted (not a merge boundary), its former
@@ -2212,7 +2215,10 @@ class CRDTTree: CRDTElement {
         // cascade-deleted descendants and nodes already tombstoned.
         return (
             changes, pairs, diff, nodesToBeRemoved, fromIdx, mergeLevel, preTombstoned, outRemoved, outInserted, insertedContentSize, splitSize,
-            toBeMergedNodes, splitRecreatedIDs
+            toBeMergedNodes, splitRecreatedIDs,
+            // The subtrees the merge's cycle guard tombstoned in place. Not in `nodesToBeRemoved` --
+            // the merge had collected them to move -- yet the range this edit consumed includes them.
+            stranded
         )
     }
 
@@ -2359,7 +2365,7 @@ class CRDTTree: CRDTElement {
      * parent. It then sets the `mergedInto` forwarding cache on the merge-source
      * nodes.
      */
-    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ editedAt: TimeTicket) throws -> CRDTTreeNode {
+    private func applyMergeMoves(_ toBeMovedToFromParents: [CRDTTreeNode], _ fromParent: CRDTTreeNode, _ editedAt: TimeTicket) throws -> (CRDTTreeNode, [CRDTTreeNode]) {
         // §6.3 Chained-Merge Flattening: a merge chain P->Q->R is kept flat so
         // runtime state matches what `rebuildMergeState` derives from a snapshot
         // (which can only ever represent the compressed chain, because it records
@@ -2368,11 +2374,39 @@ class CRDTTree: CRDTElement {
         // children merged into an already-merged-away parent forward to the final
         // live target instead of piling up under the removed intermediate.
         let dest = self.resolveMergeTarget(fromParent)
+        // The nodes the cycle guard below tombstones in place instead of moving, in post-order. Each
+        // gets a GC pair, and the operation layer counts them toward the size this edit removed.
+        var stranded = [CRDTTreeNode]()
+        // Set once the guard tombstones a subtree that contains dest. The destination is resolved
+        // once, before the loop, but the list can hold several merge sources' children, so entries
+        // remain after the guard fires. dest is inside the subtree just tombstoned, so moving those
+        // remaining children there would put live nodes under a tombstone. They are stranded too.
+        var destTombstoned = false
         for node in toBeMovedToFromParents {
             // A moved child must have a source parent to record; skip otherwise
             // rather than append an untracked node (a node without `mergedFrom`
             // is invisible to the merge-delete propagation and rebuild logic).
             guard let parent = node.parent else {
+                continue
+            }
+            // A destination that is the node itself or lies inside it can only come from a forged
+            // lineage: `mergedInto` is derived from the `mergedFrom` an element payload keeps, so a
+            // crafted one can aim the destination's forwarding chain at a child this merge moves, or
+            // at a node inside one. Moving the node there would close a parent cycle in the index
+            // tree, and every later ancestor walk would spin forever. The check reads only the tree
+            // the change lands on, so replicas holding the same tree decide alike.
+            //
+            // Left live, it would stay under the source step 02 just tombstoned, whose eventual
+            // purge detaches the subtree while it stays registered in `nodeMapByID` and charged as
+            // live. So it is tombstoned where it stands, with its descendants, the way the cascade
+            // tombstones a merge-moved child whose source this edit deletes.
+            if node === dest || node.isAncestorOf(node: dest) {
+                destTombstoned = true
+                stranded.append(contentsOf: self.tombstoneSubtree(node, editedAt))
+                continue
+            }
+            if destTombstoned {
+                stranded.append(contentsOf: self.tombstoneSubtree(node, editedAt))
                 continue
             }
             // Tombstoned children are moved too (kept removed): they stay as RGA
@@ -2429,7 +2463,26 @@ class CRDTTree: CRDTElement {
             }
         }
 
-        return dest
+        return (dest, stranded)
+    }
+
+    /**
+     * `tombstoneSubtree` tombstones `node` and every live node below it with `editedAt`, returning
+     * the nodes it actually tombstoned, in post-order. A node already removed keeps its own
+     * `removedAt` and is not reported again, which also keeps the result disjoint from the nodes
+     * step 02 removed.
+     */
+    private func tombstoneSubtree(_ node: CRDTTreeNode, _ editedAt: TimeTicket) -> [CRDTTreeNode] {
+        var removed = [CRDTTreeNode]()
+        traverseAll(node: node) { node, _ in
+            if node.removedAt != nil {
+                return
+            }
+            if node.remove(editedAt) {
+                removed.append(node)
+            }
+        }
+        return removed
     }
 
     /// `editT` edits the given range with the given value.
@@ -2443,7 +2496,7 @@ class CRDTTree: CRDTElement {
         _ issueTimeTicket: () -> TimeTicket
     ) throws -> (
         [TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int,
-        [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)]
+        [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)], [CRDTTreeNode]
     ) {
         let fromPos = try self.findPos(range.0)
         let toPos = try self.findPos(range.1)
