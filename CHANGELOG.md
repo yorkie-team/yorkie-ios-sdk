@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.25] - 2026-10-14
+
+> Requires a Yorkie server v0.7.25 or later. Upgrade every server node first, and do not roll the server back below v0.7.25 once clients of this SDK are connected: a presence patch stored by an older server is served as an unspecified change, and every client fails the pulls that include it.
+
+> **New public API (additive).** `Client.resync(_:discardLocalChanges:initialPresence:)`, `Document.isMintable`, `ClientOptions.watchHeartbeatInterval`, `WriteRejectedEvent` / `WriteRejectedValue` with `Document.subscribeWriteRejected(_:)`, `DocEventType.writeRejected` and `LocalChangesDroppedValue.Reason.writeDenied`. The new enum cases break an app that switches exhaustively over `DocEventType` or `LocalChangesDroppedValue.Reason`; add a `default` branch.
+
+> **Behavioural change — refused writes.** A push the server refuses with `ErrDocumentSizeExceedsLimit` or `ErrChangeTooLarge` is no longer retried: the document is parked, other documents keep syncing, and a `WriteRejectedEvent` is published. An `ErrPermissionDenied` on PushPull now also publishes an `AuthErrorEvent`. Use `Client.resync` to discard the refused changes and re-anchor the document in place.
+
+> **Behavioural change — pre-attach edits.** With a generated client key, edits made before `attach` are re-issued to the client's actor on attach, so positions or element ids taken before attach no longer resolve afterwards.
+
+> **Behavioural change — Watch heartbeats.** The client asks the server for a heartbeat every 20 seconds on an idle Watch stream, and reconnects a stream that stays silent for three advertised intervals.
+
+> **Storage note.** Offline persistence stores a pending presence patch as a full presence, and keeps the undo/redo mark of a queued change as a local-only field of its stored bytes. Neither reaches the wire.
+
+### Added
+
+- Recover a document in place after the server refuses its writes in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Reconnect a Watch stream that goes silent past the server heartbeat in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Ask the server for Watch heartbeats at a chosen interval in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+
+### Changed
+
+- Send presence as a patch when the server advertises presence-patch in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+
+### Fixed
+
+- Re-issue pre-attach tickets to the client's actor on attach in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Drop a pull already in flight when switching to push-only in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Report a remote split where it landed, not where it was asked for in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Stop the split-sibling cascade at a sibling the editor saw alive in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Identify the local user with `getActorID()` in the examples in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Stop retrying a push the server will never accept in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Skip a Tree restore span with a text parent in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Refuse a merge that would move a node under itself in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Resolve the index before a text that follows an element in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Send the content of an Object or Array value set or added by an operation, so an undo that restores one reaches peers intact in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Do not send the session id as the Watch actor in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+
 ## [v0.7.24] - 2026-10-08
 
 > Requires a Yorkie server v0.7.24 or later: the protos are synced with Go (new schema-only fields: `ChangePack.capabilities`, `restore_mode` on Set/Add/ArraySet, `revived_at` on every element, `channel_session_ttl`), and several tree and GC fixes mirror the server's.
