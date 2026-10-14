@@ -61,6 +61,35 @@ private final class Box<T>: @unchecked Sendable {
     }
 }
 
+/// A latch a test closes around a seam closure: `wait()` suspends until `open()` is called.
+private final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            self.lock.lock()
+            if self.isOpen {
+                self.lock.unlock()
+                continuation.resume()
+            } else {
+                self.waiter = continuation
+                self.lock.unlock()
+            }
+        }
+    }
+
+    func open() {
+        self.lock.lock()
+        self.isOpen = true
+        let pending = self.waiter
+        self.waiter = nil
+        self.lock.unlock()
+        pending?.resume()
+    }
+}
+
 final class ResyncIntegrationTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
@@ -257,6 +286,118 @@ final class ResyncIntegrationTests: XCTestCase {
         // And the retry goes through once the webhook relents.
         try await client.resync(doc, discardLocalChanges: true)
         XCTAssertEqual(doc.status, .attached)
+        try await client.detach(doc)
+    }
+
+    @MainActor
+    func test_waits_for_an_in_flight_sync_before_it_detaches() async throws {
+        // given: a sync suspended inside its PushPull response, holding the client's sync lock.
+        let client = try await self.makeClient()
+        let doc = Document(key: self.docKey)
+        try await client.attach(doc, [:], .manual)
+        try doc.update { root, _ in
+            root.text = "refused edit"
+        }
+
+        let detaches = Box(0)
+        client.observeRequests(for: Self.detach) { _ in detaches.value += 1 }
+        let inFlight = Gate()
+        let release = Gate()
+        client.setResponseHook(for: Self.pushPull) { _ in
+            inFlight.open()
+            await release.wait()
+        }
+        let sync = Task { @MainActor in try await client.sync(doc) }
+        await inFlight.wait()
+        client.setResponseHook(for: Self.pushPull, nil)
+
+        // when: the resync is asked for while the sync is still in flight.
+        let resync = Task { @MainActor in try await client.resync(doc, discardLocalChanges: true) }
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        // then: it has not touched the document yet.
+        XCTAssertEqual(detaches.value, 0, "the detach waits for the in-flight sync")
+
+        release.open()
+        _ = try await sync.value
+        _ = try await resync.value
+        XCTAssertEqual(detaches.value, 1)
+        XCTAssertEqual(doc.status, .attached)
+
+        try await client.detach(doc)
+    }
+
+    @MainActor
+    func test_resyncs_with_the_sync_mode_in_force_when_it_gets_the_lock() async throws {
+        // given: a resync queued behind an in-flight sync, which then has its mode changed.
+        let client = try await self.makeClient()
+        let doc = Document(key: self.docKey)
+        try await client.attach(doc, [:], .manual)
+        try doc.update { root, _ in
+            root.text = "refused edit"
+        }
+
+        let inFlight = Gate()
+        let release = Gate()
+        client.setResponseHook(for: Self.pushPull) { _ in
+            inFlight.open()
+            await release.wait()
+        }
+        let sync = Task { @MainActor in try await client.sync(doc) }
+        await inFlight.wait()
+        client.setResponseHook(for: Self.pushPull, nil)
+
+        let resync = Task { @MainActor in try await client.resync(doc, discardLocalChanges: true) }
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        // when: the app changes the mode while the resync waits for the lock.
+        _ = try client.changeSyncMode(doc, .polling)
+        release.open()
+        _ = try await sync.value
+        _ = try await resync.value
+
+        // then: the re-attach restores the mode the document has now, not the one it had when
+        // the resync was called.
+        XCTAssertEqual(client.getDocumentAttachment(doc.getKey())?.syncMode, .polling)
+
+        try await client.detach(doc)
+    }
+
+    @MainActor
+    func test_two_concurrent_resyncs_each_run_against_the_live_attachment() async throws {
+        // given
+        let client = try await self.makeClient()
+        let doc = Document(key: self.docKey)
+        let attaches = Box(0)
+        let detachedIDs = Box([String]())
+        client.observeRequests(for: Self.attach) { _ in attaches.value += 1 }
+        client.observeRequests(for: Self.detach) { request in
+            detachedIDs.value += [(request as? Yorkie_V1_DetachDocumentRequest)?.documentID ?? ""]
+        }
+        try await client.attach(doc, ["cursor": 3], .manual)
+        let firstID = try XCTUnwrap(client.getDocumentAttachment(doc.getKey())).resourceID
+        try doc.update { root, _ in
+            root.text = "refused edit"
+        }
+
+        // when: the recovery fires twice, as an auth-error handler can.
+        let first = Task { @MainActor in try await client.resync(doc, discardLocalChanges: true) }
+        let second = Task { @MainActor in try await client.resync(doc, discardLocalChanges: true) }
+        let firstDropped = try await first.value
+        _ = try await second.value
+
+        // then: both ran to the end, one after the other, and the second worked on the attachment
+        // the first one left rather than the one it was called against.
+        XCTAssertEqual(attaches.value, 3)
+        XCTAssertEqual(detachedIDs.value.count, 2)
+        XCTAssertEqual(detachedIDs.value, [firstID, firstID], "the server document is the same; each detach is for it")
+        let liveAttachment = try XCTUnwrap(client.getDocumentAttachment(doc.getKey()))
+        XCTAssertEqual(doc.status, .attached)
+        XCTAssertEqual(liveAttachment.syncMode, .manual)
+        XCTAssertEqual(doc.getMyPresence()?["cursor"] as? Int, 3)
+        XCTAssertTrue(doc.isMintable)
+        XCTAssertFalse(firstDropped.isEmpty)
+
         try await client.detach(doc)
     }
 

@@ -95,14 +95,36 @@ extension Client {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
-        guard let attachment = self.getDocumentAttachment(doc.getKey()) else {
-            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
-        }
-
         // Only the discarding form exists. Requiring it explicitly keeps the data loss at the
         // call site rather than in the default.
         guard discardLocalChanges else {
             throw YorkieError(code: .errInvalidArgument, message: "resync requires discardLocalChanges: true")
+        }
+
+        // A cheap early refusal, so a document that is not attached does not queue for the lock.
+        // The attachment itself is read again below, under the lock.
+        guard self.getDocumentAttachment(doc.getKey()) != nil else {
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
+        }
+
+        // The barrier: a sync pass takes this semaphore, so holding it waits out an in-flight
+        // sync and keeps a fresh one from starting in any await gap below. `attach` and `detach`
+        // never take it themselves, so they run safely inside. It is released before the sync
+        // loop restarts, because a loop tick takes the same semaphore.
+        await self.syncSemaphore.wait()
+
+        // The target is read only now. Waiting for the lock can take a whole sync round trip,
+        // and a resync ahead in the queue replaces the attachment (a re-attach builds a new
+        // one), while the app may change the sync mode or the poll interval. What was read
+        // before the wait would be stale: the recovery would act on an attachment no longer in
+        // the map and re-attach with options the document no longer has.
+        guard self.isActive else {
+            self.syncSemaphore.signal()
+            throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
+        }
+        guard let attachment = self.getDocumentAttachment(doc.getKey()) else {
+            self.syncSemaphore.signal()
+            throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
         // Preserve how the document was attached, so recovery is invisible to the app beyond the
@@ -115,11 +137,6 @@ extension Client {
             presence: initialPresence.map { .values($0) } ?? .encoded(doc.getMyEncodedPresence() ?? [:])
         )
 
-        // The barrier: a sync pass takes this semaphore, so holding it waits out an in-flight
-        // sync and keeps a fresh one from starting in any await gap below. `attach` and `detach`
-        // never take it themselves, so they run safely inside. It is released before the sync
-        // loop restarts, because a loop tick takes the same semaphore.
-        await self.syncSemaphore.wait()
         let dropped: [DroppedChange]
         do {
             dropped = try await self.recoverInPlace(doc, attachment: attachment, options: options)
