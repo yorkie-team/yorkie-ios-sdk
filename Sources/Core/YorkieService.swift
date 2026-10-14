@@ -29,6 +29,7 @@ public final class YorkieService {
     private var mockErrors: [String: ConnectError] = [:]
     private var mockErrorCounts: [String: Int] = [:]
     private let isMockingEnabled: Bool
+    private var mockErrorPredicates: [String: (any Message) -> Bool] = [:]
     private var requestObservers: [String: (any Message) -> Void] = [:]
     private var responseHooks: [String: (any Message) async -> Void] = [:]
 
@@ -129,7 +130,7 @@ public final class YorkieService {
 
     @available(iOS 15, *)
     public func pushPullChanges(request: Yorkie_V1_PushPullChangesRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Yorkie_V1_PushPullChangesResponse> {
-        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges) {
+        if self.isMockingEnabled, let error = getMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges, request: request) {
             return .init(result: .failure(error))
         }
         return await self.intercept(YorkieServiceClient.Metadata.Methods.pushPullChanges, request: request) {
@@ -201,13 +202,20 @@ extension YorkieService {
     public func setMockError(for method: Connect.MethodSpec, error: ConnectError, count: Int = 1) {
         self.mockErrors[method.name] = error
         self.mockErrorCounts[method.name] = count
+        self.mockErrorPredicates.removeValue(forKey: method.name)
     }
 
     /**
      * `getMockError` retrieves and removes the mock error for a specific method.
      */
-    private func getMockError(for method: Connect.MethodSpec) -> ConnectError? {
+    private func getMockError(for method: Connect.MethodSpec, request: (any Message)? = nil) -> ConnectError? {
         guard self.isMockingEnabled, let error = mockErrors[method.name], var count = mockErrorCounts[method.name] else {
+            return nil
+        }
+
+        // A mock error armed with a predicate fires only for the requests it accepts, and a
+        // call that does not pass its request cannot satisfy one.
+        if let predicate = self.mockErrorPredicates[method.name], !(request.map(predicate) ?? false) {
             return nil
         }
 
@@ -217,6 +225,7 @@ extension YorkieService {
         // swiftlint:disable:next empty_count
         if count <= 0 {
             self.mockErrorCounts.removeValue(forKey: method.name)
+            self.mockErrorPredicates.removeValue(forKey: method.name)
             return self.mockErrors.removeValue(forKey: method.name)
         }
 
@@ -239,6 +248,21 @@ extension YorkieService {
             return
         }
         self.requestObservers[method.name] = observer
+    }
+
+    /// Arms a mock error that fires for every request `predicate` accepts, and for none other.
+    ///
+    /// Internal test seam, live only when mocking is enabled, and applied to `pushPullChanges`
+    /// alone. It lets a test refuse one document while the client's others sync normally. The
+    /// error stays armed until the method's mock error is replaced, so a test ends the refusal by
+    /// making the predicate answer `false`.
+    func setMockError(for method: Connect.MethodSpec, error: ConnectError, where predicate: @escaping (any Message) -> Bool) {
+        guard self.isMockingEnabled else {
+            return
+        }
+        self.mockErrors[method.name] = error
+        self.mockErrorCounts[method.name] = Int.max
+        self.mockErrorPredicates[method.name] = predicate
     }
 
     /// Runs `hook` after the real RPC for `method` has returned and before its response is

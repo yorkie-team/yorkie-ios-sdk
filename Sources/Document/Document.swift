@@ -210,6 +210,7 @@ public class Document: Attachable {
     private var syncSubscribeCallback: SubscribeCallback?
     private var authErrorSubscribeCallback: SubscribeCallback?
     private var epochMismatchSubscribeCallback: SubscribeCallback?
+    private var writeRejectedSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -759,6 +760,15 @@ public class Document: Attachable {
     }
 
     /**
+     * `subscribeWriteRejected` registers a callback to subscribe to events on the document.
+     * The callback will be called when the server refuses to store this document's pushed
+     * changes for a reason that resending them cannot fix (``WriteRejectedValue/Code``).
+     */
+    public func subscribeWriteRejected(_ callback: @escaping SubscribeCallback) {
+        self.writeRejectedSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -802,6 +812,13 @@ public class Document: Attachable {
      */
     public func unsubscribeEpochMismatch() {
         self.epochMismatchSubscribeCallback = nil
+    }
+
+    /**
+     * `unsubscribeWriteRejected` unregisters the write-rejected callback.
+     */
+    public func unsubscribeWriteRejected() {
+        self.writeRejectedSubscribeCallback = nil
     }
 
     /**
@@ -1521,6 +1538,10 @@ public class Document: Attachable {
         self.publish(EpochMismatchEvent(value: EpochMismatchValue(method: method)))
     }
 
+    func publishWriteRejectedEvent(code: WriteRejectedValue.Code, reason: String, method: String) {
+        self.publish(WriteRejectedEvent(value: WriteRejectedValue(code: code, reason: reason, method: method)))
+    }
+
     /// Publishes the changes an offline resume had to discard.
     ///
     /// - Parameters:
@@ -1600,6 +1621,8 @@ public class Document: Attachable {
             self.authErrorSubscribeCallback?(authErrorEvent, self)
         } else if let epochMismatchEvent = event as? EpochMismatchEvent {
             self.epochMismatchSubscribeCallback?(epochMismatchEvent, self)
+        } else if let writeRejectedEvent = event as? WriteRejectedEvent {
+            self.writeRejectedSubscribeCallback?(writeRejectedEvent, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
 

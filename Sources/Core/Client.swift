@@ -1202,10 +1202,18 @@ public class Client {
                     if let docAttachment = anyAttachment as? Attachment<Document>,
                        await docAttachment.needRealtimeSync()
                     {
+                        // Skip a document whose last push the server rejected outright:
+                        // resending the same pack cannot change its verdict. Only this
+                        // attachment is parked; the loop keeps syncing the rest. An explicit
+                        // `sync(doc)` after the document is shrunk clears it.
+                        if docAttachment.isWriteRejected() {
+                            continue
+                        }
+
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         result.append(docAttachment.resource)
                         if let syncMode = docAttachment.syncMode {
-                            try await self.syncInternal(docAttachment, syncMode)
+                            try await self.syncParkingWriteRejection(docAttachment, syncMode)
                         }
                     }
                 }
@@ -1640,7 +1648,7 @@ public class Client {
     }
 
     @discardableResult
-    private func syncInternal(_ attachment: Attachment<Document>, _ syncMode: SyncMode) async throws -> Document {
+    func syncInternal(_ attachment: Attachment<Document>, _ syncMode: SyncMode) async throws -> Document {
         guard let clientID = self.id else {
             throw YorkieError(code: .errUnexpected, message: "Invalid Client ID!")
         }
@@ -1761,6 +1769,10 @@ public class Client {
                 self.attachmentMap.removeValue(forKey: docKey)
             }
 
+            // The push the server rejected is behind us, so let the sync loop take this document
+            // again. Reaching here from an explicit `sync(doc)` is the way back for a document
+            // parked by a size rejection.
+            attachment.clearWriteRejected()
             doc.publishSyncEvent(.synced)
 
             let remoteSize = responsePack.getChangeSize()
@@ -1771,6 +1783,9 @@ public class Client {
             doc.publishSyncEvent(.syncFailed)
             publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .pushPull)
             publishEpochMismatchIfNeeded(error: error as? ConnectError, attachment: attachment)
+            // The server refused to store what was pushed and will refuse it again. `syncFailed`
+            // alone cannot be told apart from a network blip, so report the reason too.
+            self.publishWriteRejectedIfNeeded(error: error, attachment: attachment)
 
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 
@@ -1783,8 +1798,18 @@ public class Client {
      * retried after handling, it returns true.
      */
     @discardableResult
-    private func handleConnectError(_ error: Error?) async -> Bool {
+    func handleConnectError(_ error: Error?) async -> Bool {
         guard let connectError = error as? ConnectError else {
+            return false
+        }
+
+        // NOTE(hackerwins): `ErrDocumentSizeExceedsLimit` and `ErrChangeTooLarge` mean the server
+        // refused to store the pushed changes and will refuse the same pack again, while the
+        // shared `PushPull` RPC blocks pulls too. Not retryable; `syncInternal` publishes a
+        // `writeRejected` event so the app can say why. Checked ahead of the generic retry block
+        // below because the server sends both as `ResourceExhausted`. The sync loop never
+        // consults this for a document rejection: it parks that one attachment itself.
+        if Self.writeRejectionCode(of: connectError) != nil {
             return false
         }
 
@@ -1907,6 +1932,12 @@ public extension Client {
      */
     func setMockError(for method: Connect.MethodSpec, error: ConnectError, count: Int = 1) {
         self.yorkieService.setMockError(for: method, error: error, count: count)
+    }
+
+    /// Refuses the requests `predicate` accepts with `error`. Test seam, active only when the
+    /// client was created with `isMockingEnabled`. See ``YorkieService/setMockError(for:error:where:)``.
+    internal func setMockError(for method: Connect.MethodSpec, error: ConnectError, where predicate: @escaping (any Message) -> Bool) {
+        self.yorkieService.setMockError(for: method, error: error, where: predicate)
     }
 
     /// Observes requests sent through `method`. Test seam, active only when the client was created

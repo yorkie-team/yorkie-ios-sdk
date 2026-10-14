@@ -63,6 +63,9 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrDocumentSizeExceedsLimit is returned when the document size exceeds the limit.
         case errDocumentSizeExceedsLimit = "ErrDocumentSizeExceedsLimit"
 
+        /// ErrChangeTooLarge is returned when a single change is too large to store.
+        case errChangeTooLarge = "ErrChangeTooLarge"
+
         /// ErrDocumentSchemaValidationFailed is returned when the document schema validation failed.
         case errDocumentSchemaValidationFailed = "ErrDocumentSchemaValidationFailed"
 

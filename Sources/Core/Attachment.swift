@@ -52,6 +52,7 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
     private var isDisconnected: Bool
+    private var writeRejected = false
 
     init(
         resource: R,
@@ -105,6 +106,27 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         let hasLocalChanges = await self.resource.hasLocalChanges()
 
         return syncMode != .manual && (hasLocalChanges || (self.changeEventReceived ?? false))
+    }
+
+    /// Marks this attachment as holding changes the server refused to store
+    /// (``YorkieError/Code/errDocumentSizeExceedsLimit``, ``YorkieError/Code/errChangeTooLarge``).
+    ///
+    /// The sync loop then skips this attachment alone, instead of the rejection taking down the
+    /// loop shared by every other attachment of the client. Documents only.
+    func markWriteRejected() {
+        self.writeRejected = true
+    }
+
+    /// Returns whether the sync loop should skip this attachment because the server rejected its
+    /// last push outright.
+    func isWriteRejected() -> Bool {
+        return self.writeRejected
+    }
+
+    /// Lets the sync loop pick this attachment up again, once a push has been accepted. An
+    /// explicit `sync(doc)` after the document was shrunk is the way back in.
+    func clearWriteRejected() {
+        self.writeRejected = false
     }
 
     /// Updates the last heartbeat timestamp to the current time.
