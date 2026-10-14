@@ -882,8 +882,13 @@ class RGATreeSplit<T: RGATreeSplitValue> {
     @discardableResult
     private func splitNode(_ node: RGATreeSplitNode<T>, _ offset: Int32) throws -> (RGATreeSplitNode<T>?, DataSize) {
         var diff = DataSize(data: 0, meta: 0)
-        guard offset <= node.contentLength else {
-            let message = "offset should be less than or equal to length"
+        // A negative offset is as out of range as one past the end. `findNodeWithSplit` derives the
+        // offset by subtracting the node's own offset from the position's, so a position resolved
+        // through an `insPrev` link into a node of a HIGHER offset -- which only a forged link can
+        // produce -- arrives here negative. Without this guard `split` would clamp it into an
+        // out-of-range slice (an `NSRangeException` on iOS) rather than fail (yorkie-js-sdk#1449).
+        guard offset >= 0, offset <= node.contentLength else {
+            let message = "offset should be between 0 and the length of the node"
             throw YorkieError(code: .errInvalidArgument, message: message)
         }
 

@@ -104,7 +104,7 @@ public extension Document {
         let changeIDBlob = try Converter.toChangeID(state.changeID).serializedData()
 
         var pbPendingChanges = PbChangePack()
-        pbPendingChanges.changes = Converter.toChanges(state.localChanges)
+        pbPendingChanges.changes = Converter.toPersistedChanges(state.localChanges)
         let pendingChangesBlob = try pbPendingChanges.serializedData()
 
         let epochBlob = Data(String(self.getEpoch()).utf8)
@@ -138,6 +138,13 @@ public extension Document {
             epoch: decoded.epoch,
             docID: decoded.docID
         ))
+        // A persisted envelope is state an actor already held under this key: its root carries tickets
+        // that actor minted and its pending changes are about to be pushed under it. Mark the decoded
+        // document as having minted so an app that restores through this factory and attaches the
+        // result takes the re-issue claim exactly as the in-place `restoreFromBytes` does, and as not
+        // never-synced so it is never re-issued.
+        document.absorbedRemote = true
+        document.mintedOperations = true
         return document
     }
 
@@ -183,6 +190,10 @@ public extension Document {
             epoch: decoded.epoch,
             docID: decoded.docID
         ))
+        // See `fromBytes(key:bytes:opts:)`: persisted state was minted under an actor in an earlier
+        // session, so it is neither re-issuable nor free for a later document of the key.
+        self.absorbedRemote = true
+        self.mintedOperations = true
     }
 
     /// Serializes the clocks a sync advances: checkpoint, change id, epoch and document id.
@@ -278,7 +289,7 @@ public extension Document {
     internal func getPendingChangesAfter(_ clientSeq: UInt32) throws -> [StoredChange] {
         try self.persistenceSnapshot().localChanges
             .filter { $0.id.getClientSeq() > clientSeq }
-            .map { try StoredChange(clientSeq: $0.id.getClientSeq(), bytes: Converter.toChange($0).serializedData()) }
+            .map { try StoredChange(clientSeq: $0.id.getClientSeq(), bytes: Converter.toPersistedChange($0).serializedData()) }
     }
 
     /// Replays the appended change log onto a document just restored from its snapshot.
@@ -306,7 +317,7 @@ public extension Document {
         }
 
         let pbChanges = try stored.map { try PbChange(serializedBytes: $0.bytes) }
-        let changes = try Converter.fromChanges(pbChanges)
+        let changes = try Converter.fromPersistedChanges(pbChanges)
         try self.appendRestoredChanges(changes, ackedClientSeq: ackedClientSeq)
     }
 
@@ -343,6 +354,9 @@ public extension Document {
             epoch: 0,
             docID: ""
         ))
+        // Back to a document that has absorbed nothing. `mintedOperations` stays: a push cannot be
+        // taken back.
+        self.absorbedRemote = false
     }
 }
 
@@ -396,7 +410,7 @@ private extension Document {
         let changeID = try Converter.fromChangeID(PbChangeID(serializedBytes: blobs[2]))
 
         let pbPendingChanges = try PbChangePack(serializedBytes: blobs[3])
-        let localChanges = try Converter.fromChanges(pbPendingChanges.changes)
+        let localChanges = try Converter.fromPersistedChanges(pbPendingChanges.changes)
 
         // Absent in a pre-epoch envelope, in which case the document re-learns the epoch from
         // the next server response.

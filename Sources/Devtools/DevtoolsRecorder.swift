@@ -99,6 +99,27 @@ public final class DevtoolsRecorder {
         self.notifyObservers()
     }
 
+    /// Throws the recording away and starts it again from `baseline`, notifying observers once.
+    ///
+    /// The panel replays a document from its initial root by applying the raw changes the recording
+    /// carries. A document that re-issues its pre-attach tickets to the client's actor rewrites those
+    /// changes in place, so the recorded copies name an actor nothing in the document uses any more:
+    /// replaying them and then the changes that follow diverges from the live root or throws on an
+    /// operation whose target the replay never created. Nothing can repair the recorded copies, so
+    /// the history is dropped. The panel replays onto a freshly built empty document and cannot be
+    /// told "start from here", so a recording that merely started over would be a history missing its
+    /// beginning; `baseline` -- a snapshot of the document as it stands -- becomes the first entry so
+    /// that what the panel holds is a complete history again.
+    ///
+    /// - Parameter baseline: The event the new recording starts with, or `nil` for an empty one.
+    func reset(baseline: DocEvent?) {
+        self.events.removeAll()
+        if let baseline, let encoded = DevtoolsEncoder.encode(event: baseline) {
+            self.events.append(encoded)
+        }
+        self.notifyObservers()
+    }
+
     /// Returns the recording as `Array<DocEventsForReplay>`.
     ///
     /// Each iOS event is delivered individually, so it is wrapped as a

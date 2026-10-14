@@ -102,6 +102,11 @@ public struct ClientOptions {
      * `key` is the client key. It is used to identify the client.
      * If not set, a random key is generated.
      *
+     * The random default is a `UUID`, drawn from the system CSPRNG, and is minted per ``Client``
+     * instance. Only a client whose key was generated re-issues the tickets of a document edited
+     * before ``Client/attach(_:_:)``: an explicit key names an actor shared by every session that
+     * passes it, so a pre-attach document keeps the initial actor there.
+     *
      * That random default is minted per ``Client`` instance, so it differs on every launch.
      * **Offline persistence requires a stable key**: the server derives the actor stamped
      * into every change from the project and this key, and it also scopes the ``store``
@@ -278,6 +283,17 @@ public class Client {
     /// `attachmentMap` is only populated once the attach round trip resolves, so this
     /// set is what rejects a concurrent duplicate attach of the same key.
     private var attachingDocs = Set<String>()
+
+    /// Whether the client key was generated for this instance rather than passed in
+    /// (`ClientOptions.key == nil`), which makes the actor derived from it this client's alone.
+    ///
+    /// The generated key is a `UUID`, which draws from the system CSPRNG, so unlike yorkie-js-sdk
+    /// (where `uuid()` can fall back to `Math.random`) there is no weak-randomness case to refuse
+    /// here. See ``claimReissue(_:docKey:)``.
+    private let keyGenerated: Bool
+    /// Maps a document key to the actor this client last minted tickets under there. See
+    /// ``claimReissue(_:docKey:)``.
+    private var reissueClaims = [String: ActorID]()
     private var conditions: [ClientCondition: Bool] = [
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
@@ -343,6 +359,9 @@ public class Client {
         isMockingEnabled: Bool = false
     ) {
         self.key = options.key ?? UUID().uuidString
+        // A generated key names an actor this client alone can reach, which is what the
+        // pre-attach re-issue rests on; an explicit one is shared by every session that passes it.
+        self.keyGenerated = options.key == nil
         self.syncLoopDuration = options.syncLoopDuration
         self.retrySyncLoopDelay = options.retrySyncLoopDelay
         self.reconnectStreamDelay = options.reconnectStreamDelay
@@ -537,7 +556,11 @@ public class Client {
         let pollIntervalPinned = documentPollInterval != nil
         let pollInterval = self.resolvePollInterval(documentPollInterval, syncMode)
 
-        doc.setActor(self.actorID ?? clientID)
+        // Before the first suspension point below: a document edited before this attach re-issues the
+        // tickets it minted under the initial actor to this client's actor (yorkie-js-sdk#1449). The
+        // store restore (which repopulates the root, change id and pending changes under their
+        // persisted actor) runs after this, in `prepareOfflineResume`.
+        try self.stampActor(of: doc, actor: self.actorID ?? clientID)
 
         // Resolve the effective presence-disabled state at attach time. The
         // explicit option wins; absent that, the Document's seeded value (from
@@ -1498,8 +1521,70 @@ public class Client {
         }
     }
 
+    /// Stamps the client's actor on a document about to be attached, re-issuing the tickets a
+    /// never-synced document minted under the initial actor when ``claimReissue(_:docKey:)`` allows
+    /// it.
+    ///
+    /// Runs once the attach options are known to be valid, so a rejected option has not re-issued the
+    /// document or taken the claim.
+    private func stampActor(of doc: Document, actor: ActorID) throws {
+        let reissued = try doc.setActor(actor, reissue: self.claimReissue(actor, docKey: doc.getKey()))
+        // Take the claim where the actor's lamport space in this key stops being free: the re-issue
+        // just minted tickets under it, or pre-attach edits the re-issue declined are about to be
+        // pushed with their `executedAt` re-stamped to it. It is taken before the round trip, since
+        // an attach whose response is lost may still have pushed. A document that has minted nothing
+        // leaves the claim alone, so a later document of the key can still re-issue;
+        // `detachInternal` takes it if this one mints while attached.
+        if reissued || doc.hasMintedOperations() {
+            self.markReissueClaim(actor, docKey: doc.getKey())
+        }
+    }
+
+    /// Returns whether a document of the given key edited before this attach may re-issue its tickets
+    /// to the given actor.
+    ///
+    /// A re-issue keeps each ticket's lamport, which starts at 1 in every fresh document, so it is
+    /// sound only for an actor that has minted nothing else in the document. An explicit client key
+    /// gives every session of that key -- a relaunch, another process -- one stable actor, and a
+    /// re-issued ticket would equal one an earlier session's first edits carry: the server would
+    /// keep one of the two elements. Only a generated key makes the actor this client's alone, so
+    /// only then does the re-issue run; other documents keep the initial actor, as before.
+    ///
+    /// Within this client, a second never-synced document of a key whose actor has already minted
+    /// operation tickets there would mint the tickets the first document pushed, so such a repeat is
+    /// declined. That is what the claim records, and only that: asking is free, and
+    /// ``markReissueClaim(_:docKey:)`` takes the claim where tickets naming the actor actually enter
+    /// the document -- at attach for a document that already carries them
+    /// (``Document/hasMintedOperations()``), and at detach for one that minted them while attached. A
+    /// plain attach of an untouched document takes nothing.
+    ///
+    /// A taken claim is never released: an attach whose response was lost may still have pushed, and
+    /// a detach does not take pushed tickets back.
+    func claimReissue(_ actor: ActorID, docKey: String) -> Bool {
+        guard self.keyGenerated else {
+            return false
+        }
+
+        return self.reissueClaims[docKey] != actor
+    }
+
+    /// Records that the given actor has minted tickets in the document the given key names, so no
+    /// later document of that key may re-issue onto this actor. See ``claimReissue(_:docKey:)``.
+    func markReissueClaim(_ actor: ActorID, docKey: String) {
+        self.reissueClaims[docKey] = actor
+    }
+
     private func detachInternal(_ key: String) throws {
         if let attachment = getDocumentAttachment(key) {
+            // Take the re-issue claim if the document minted operation tickets while it was
+            // attached: those tickets are in the document this key names, so the actor's lamports
+            // there are no longer free for a later document of the key to re-issue onto. One that
+            // minted nothing leaves the claim alone. The actor comes from this client, not from the
+            // document: a detach resets the document's own actor to the initial one
+            // (`applyStatus(.detached)`) before this runs.
+            if let actor = self.actorID ?? self.id, attachment.resource.hasMintedOperations() {
+                self.markReissueClaim(actor, docKey: key)
+            }
             attachment.resource.resetOnlineClients()
             try self.stopWatchLoop(key, with: attachment)
         } else if let attachment = getChannelAttachment(key) {

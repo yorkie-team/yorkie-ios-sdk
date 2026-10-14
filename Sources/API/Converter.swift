@@ -288,13 +288,18 @@ extension Converter {
     /**
      * `toElementSimple` converts the given model to Protobuf format.
      */
-    static func toElementSimple(_ element: CRDTElement) -> PbJSONElementSimple {
+    static func toElementSimple(_ element: CRDTElement) throws -> PbJSONElementSimple {
         var pbElementSimple = PbJSONElementSimple()
 
-        if element is CRDTObject {
+        // An Object or Array travels with its whole content, as in yorkie-js-sdk: a value a reverse
+        // operation restores (the undo of a Remove) carries children the wire has no other
+        // operation for. `fromElementSimple` already decodes the bytes.
+        if let object = element as? CRDTObject {
             pbElementSimple.type = .jsonObject
-        } else if element is CRDTArray {
+            pbElementSimple.value = try objectToBytes(obj: object)
+        } else if let array = element as? CRDTArray {
             pbElementSimple.type = .jsonArray
+            pbElementSimple.value = try arrayToBytes(array: array)
         } else if element is CRDTText {
             pbElementSimple.type = .text
         } else if let element = element as? Primitive {
@@ -309,11 +314,7 @@ extension Converter {
             pbElementSimple.value = counter.toBytes()
         } else if let tree = element as? CRDTTree {
             pbElementSimple.type = .tree
-            do {
-                pbElementSimple.value = try treeToBytes(tree)
-            } catch {
-                fatalError("Can't convert CRDTTree to bytes.")
-            }
+            pbElementSimple.value = try treeToBytes(tree)
         }
 
         pbElementSimple.createdAt = toTimeTicket(element.createdAt)
@@ -515,14 +516,14 @@ extension Converter {
             var pbSetOperation = PbOperation.Set()
             pbSetOperation.parentCreatedAt = toTimeTicket(setOperation.parentCreatedAt)
             pbSetOperation.key = setOperation.key
-            pbSetOperation.value = toElementSimple(setOperation.value)
+            pbSetOperation.value = try toElementSimple(setOperation.value)
             pbSetOperation.executedAt = toTimeTicket(setOperation.executedAt)
             pbOperation.set = pbSetOperation
         } else if let addOperation = operation as? AddOperation {
             var pbAddOperation = PbOperation.Add()
             pbAddOperation.parentCreatedAt = toTimeTicket(addOperation.parentCreatedAt)
             pbAddOperation.prevCreatedAt = toTimeTicket(addOperation.previousCreatedAt)
-            pbAddOperation.value = toElementSimple(addOperation.value)
+            pbAddOperation.value = try toElementSimple(addOperation.value)
             pbAddOperation.executedAt = toTimeTicket(addOperation.executedAt)
             pbOperation.add = pbAddOperation
         } else if let moveOperation = operation as? MoveOperation {
@@ -572,7 +573,7 @@ extension Converter {
         } else if let increaseOperation = operation as? IncreaseOperation {
             var pbIncreaseOperation = PbOperation.Increase()
             pbIncreaseOperation.parentCreatedAt = toTimeTicket(increaseOperation.parentCreatedAt)
-            pbIncreaseOperation.value = toElementSimple(increaseOperation.value)
+            pbIncreaseOperation.value = try toElementSimple(increaseOperation.value)
             pbIncreaseOperation.executedAt = toTimeTicket(increaseOperation.executedAt)
             pbIncreaseOperation.actor = increaseOperation.actor
             pbOperation.increase = pbIncreaseOperation
@@ -612,7 +613,7 @@ extension Converter {
             var pbArraySetOperation = PbOperation.ArraySet()
             pbArraySetOperation.parentCreatedAt = toTimeTicket(arraySet.parentCreatedAt)
             pbArraySetOperation.createdAt = toTimeTicket(arraySet.createdAt)
-            pbArraySetOperation.value = toElementSimple(arraySet.getValue())
+            pbArraySetOperation.value = try toElementSimple(arraySet.getValue())
             pbArraySetOperation.executedAt = toTimeTicket(arraySet.executedAt)
             
             pbOperation.body = .arraySet(pbArraySetOperation)
@@ -981,6 +982,18 @@ extension Converter {
     static func fromText(_ pbText: PbJSONElement.Text) -> CRDTText {
         let rgaTreeSplit = RGATreeSplit<CRDTTextValue>()
 
+        // A Text can arrive inside a client-supplied Set/Add/ArraySet payload, where its split
+        // links are as untrusted as the tree links `dropSplitLinksInElement` strips. They are kept
+        // rather than dropped -- such a payload can be a copy of real document state, the Text a
+        // reverse of Remove restores, whose nodes a later Edit still targets -- so each link is
+        // resolved by EXACT id against the nodes already decoded. `findNode` is a floor lookup: a
+        // dangling or forward link would silently become a link to the wrong node.
+        //
+        // Being decoded earlier is not enough. Every producer of a link points it at an earlier
+        // piece of the SAME insertion, so a link naming another insertion, or an offset at or above
+        // this node's own, is one no local edit could have made. It is dropped, which is what a
+        // Text with no links at all already looks like.
+        var decoded = [String: RGATreeSplitNode<CRDTTextValue>]()
         var prev = rgaTreeSplit.head
         pbText.nodes.forEach { pbNode in
             // A snapshot iOS wrote before 0.7.23 carries the head sentinel (and,
@@ -992,8 +1005,15 @@ extension Converter {
             }
             let current = rgaTreeSplit.insertAfter(prev, fromTextNode(pbNode))
             if pbNode.hasInsPrevID {
-                current.setInsPrev(rgaTreeSplit.findNode(fromTextNodeID(pbNode.insPrevID)))
+                let insPrevID = fromTextNodeID(pbNode.insPrevID)
+                if insPrevID.hasSameCreatedAt(current.id),
+                   insPrevID.offset < current.id.offset,
+                   let insPrev = decoded[insPrevID.toIDString]
+                {
+                    current.setInsPrev(insPrev)
+                }
             }
+            decoded[current.id.toIDString] = current
             prev = current
         }
 
@@ -1450,10 +1470,21 @@ extension Converter {
         var pbTextNodes = [PbTextNode]()
         // iOS's iterator yields the head sentinel, which JS's skips. Encoding it
         // made every decode insert an extra empty node after the real head.
+        //
+        // The decoders resolve `insPrevID` against the nodes they have already decoded (the Go one
+        // rejects a link it cannot find), so a link is written only when its target was already
+        // emitted in this very iteration. A split product's `insPrev` always precedes it here, so
+        // this drops nothing a snapshot or a re-issue needs; what it drops is a dangling link into
+        // a node no longer in this split (a purged tombstone), which no decoder could resolve.
+        var emitted = Set<String>()
         for textNode in rgaTreeSplit where textNode !== rgaTreeSplit.head {
             var pbTextNode = PbTextNode()
             pbTextNode.id = toTextNodeID(id: textNode.id)
             pbTextNode.value = String(describing: textNode.value.content)
+            if let insPrevID = textNode.insPrevID, emitted.contains(insPrevID.toIDString) {
+                pbTextNode.insPrevID = toTextNodeID(id: insPrevID)
+            }
+            emitted.insert(textNode.id.toIDString)
             // Every attribute, tombstones included, with its removal flag: the
             // tree path in this file has always done both. Dropping a tombstone
             // lets an older concurrent write win on a replica hydrated from the
@@ -1569,6 +1600,120 @@ extension Converter {
     }
 }
 
+// MARK: Persisted change
+extension Converter {
+    /// The protobuf field number under which a *persisted* ``PbChange`` records ``Change/isUndoRedo``.
+    ///
+    /// `Change.isUndoRedo` is local-only state: the wire protocol has no field for it and a pushed
+    /// pack must never carry it (``toChangePack(pack:)`` goes through ``toChange(_:)``, which does not
+    /// write it). Offline persistence has to keep it, though, because a queued change outlives the
+    /// process and its replay (`Document.restoreAppendedChanges`) must run under the source the change
+    /// originally ran with. It is stored as a swift-protobuf *unknown field* on the persisted bytes
+    /// rather than as a schema change, so the generated protobuf types stay in sync with the server's
+    /// and a third-party ``DocStore`` -- which only ever sees opaque bytes -- keeps working unchanged.
+    ///
+    /// The number is deliberately far above any field the Yorkie `Change` message uses or is likely to
+    /// grow (it uses single digits) and outside protobuf's reserved 19000...19999 range, so a future
+    /// server-side field cannot collide with it. A reader that does not know the field (an older SDK
+    /// reading a newer SDK's store) skips it as an unknown field and replays the change as `.local`,
+    /// which is the behavior before the mark existed.
+    static let persistedUndoRedoFieldNumber = 536_000_001
+
+    /**
+     * `toPersistedChange` converts the given model to Protobuf format for local persistence. Unlike
+     * ``toChange(_:)`` it records ``Change/isUndoRedo``, so it must never feed a change pack.
+     */
+    static func toPersistedChange(_ change: Change) -> PbChange {
+        var pbChange = toChange(change)
+        if change.isUndoRedo {
+            var marker = Data()
+            appendVarint(UInt64(persistedUndoRedoFieldNumber) << 3, to: &marker)
+            appendVarint(1, to: &marker)
+            // NOTE: `UnknownStorage.append` is package-private to swift-protobuf, but merging the
+            // raw bytes of an unrecognised field is the supported way an unknown field lands in
+            // storage, and it is what a decode of these bytes does.
+            try? pbChange.merge(serializedBytes: marker)
+        }
+        return pbChange
+    }
+
+    /**
+     * `toPersistedChanges` converts the given models to Protobuf format for local persistence.
+     */
+    static func toPersistedChanges(_ changes: [Change]) -> [PbChange] {
+        changes.map { toPersistedChange($0) }
+    }
+
+    /**
+     * `fromPersistedChanges` converts changes written by ``toPersistedChange(_:)`` back to model
+     * format, restoring ``Change/isUndoRedo``. A change written without the mark decodes exactly as
+     * ``fromChanges(_:)`` decodes it.
+     */
+    static func fromPersistedChanges(_ pbChanges: [PbChange]) throws -> [Change] {
+        let changes = try fromChanges(pbChanges)
+        return zip(changes, pbChanges).map { change, pbChange in
+            guard hasUndoRedoMark(pbChange.unknownFields.data) else {
+                return change
+            }
+            var marked = change
+            marked.markAsUndoRedo()
+            return marked
+        }
+    }
+
+    private static func appendVarint(_ value: UInt64, to data: inout Data) {
+        var value = value
+        while value >= 0x80 {
+            data.append(UInt8(value & 0x7F) | 0x80)
+            value >>= 7
+        }
+        data.append(UInt8(value))
+    }
+
+    private static func readVarint(_ bytes: [UInt8], _ index: inout Int) -> UInt64? {
+        var result: UInt64 = 0
+        var shift: UInt64 = 0
+        while index < bytes.count, shift < 64 {
+            let byte = bytes[index]
+            index += 1
+            result |= UInt64(byte & 0x7F) << shift
+            if byte & 0x80 == 0 {
+                return result
+            }
+            shift += 7
+        }
+        return nil
+    }
+
+    /// Scans the raw unknown-field bytes of a persisted change for the undo/redo mark, skipping every
+    /// other field. Malformed bytes read as "no mark".
+    private static func hasUndoRedoMark(_ data: Data) -> Bool {
+        let bytes = [UInt8](data)
+        var index = 0
+        while index < bytes.count {
+            guard let tag = readVarint(bytes, &index) else { return false }
+            let number = tag >> 3
+            switch tag & 0x7 {
+            case 0:
+                guard let value = readVarint(bytes, &index) else { return false }
+                if number == UInt64(persistedUndoRedoFieldNumber), value != 0 {
+                    return true
+                }
+            case 1:
+                index += 8
+            case 2:
+                guard let length = readVarint(bytes, &index), length <= UInt64(bytes.count - index) else { return false }
+                index += Int(length)
+            case 5:
+                index += 4
+            default:
+                return false
+            }
+        }
+        return false
+    }
+}
+
 // MARK: Bytes.
 extension Converter {
     /**
@@ -1661,6 +1806,13 @@ extension Converter {
      */
     static func objectToBytes(obj: CRDTObject) throws -> Data {
         try toElement(obj).serializedData()
+    }
+
+    /**
+     * `arrayToBytes` converts the given CRDTArray to byte array.
+     */
+    static func arrayToBytes(array: CRDTArray) throws -> Data {
+        try toElement(array).serializedData()
     }
 }
 

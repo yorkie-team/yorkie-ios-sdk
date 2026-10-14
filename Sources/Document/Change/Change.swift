@@ -44,11 +44,36 @@ public struct Change {
     // `message` is used to save a description of the change.
     let message: String?
 
-    init(id: ChangeID, operations: [Operation], presenceChange: PresenceChange? = nil, message: String? = nil) {
+    /// Whether an undo or a redo produced this change, which is to say whether a replay of it has to
+    /// run under ``OpSource/undoRedo``.
+    ///
+    /// ``SetOperation`` and ``RemoveOperation`` consult that source to skip an operation whose target
+    /// now sits under a removed parent. Replaying such a change as `.local` runs an operation that
+    /// never ran, so the rebuilt root differs from the one the user sees. Anything that replays a
+    /// queued change -- ``Document/applySnapshot(_:_:_:_:)``, the pre-attach re-issue, the persisted
+    /// log -- executes it under the source it originally ran with. The mark is local-only: it is never
+    /// part of a pushed pack (see `Converter.toChangePack`).
+    private(set) var isUndoRedo: Bool
+
+    init(
+        id: ChangeID,
+        operations: [Operation],
+        presenceChange: PresenceChange? = nil,
+        message: String? = nil,
+        isUndoRedo: Bool = false
+    ) {
         self.id = id
         self.operations = operations
         self.presenceChange = presenceChange
         self.message = message
+        self.isUndoRedo = isUndoRedo
+    }
+
+    /**
+     * `markAsUndoRedo` records that an undo or a redo produced this change.
+     */
+    mutating func markAsUndoRedo() {
+        self.isUndoRedo = true
     }
 
     /**

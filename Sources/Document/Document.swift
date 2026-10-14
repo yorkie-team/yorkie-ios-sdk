@@ -144,6 +144,27 @@ public class Document: Attachable {
     private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
+
+    /// Whether this document took in state it did not mint itself: a snapshot, a remote change or a
+    /// persisted envelope.
+    ///
+    /// Such a document is not "never synced" even when its checkpoint, status and version vector
+    /// still look untouched (a snapshot pack can carry the initial checkpoint), so the pre-attach
+    /// re-issue (``setActor(_:reissue:)``) leaves it alone. Set by ``applySnapshot(_:_:_:_:)``, by a
+    /// change applied with ``OpSource/remote`` and by the restore paths; cleared by
+    /// ``resetForReanchor()``. Unlike a plain "applied changes" flag it is not set by
+    /// ``applyChanges(_:source:)`` as a whole, because this SDK also replays its own local changes
+    /// through it.
+    var absorbedRemote = false
+
+    /// Whether this document has produced at least one local change carrying operations, so tickets
+    /// naming its actor may already be in the document its key names.
+    ///
+    /// Decoding a persisted envelope sets it too: that state was minted under an actor in an earlier
+    /// session. It is never cleared -- a push cannot be taken back -- and it is what ``Client``
+    /// consults to decide whether the actor's lamport space in a document key is still free for a
+    /// re-issue.
+    var mintedOperations = false
     private var maxSizeLimit: Int
     private var schemaRules: [Rule] = []
 
@@ -374,6 +395,7 @@ public class Document: Attachable {
         }
 
         self.localChanges.append(change)
+        self.mintedOperations = self.mintedOperations || change.hasOperations
         if !executionResult.reverseOps.isEmpty {
             self.internalHistory.pushUndo(executionResult.reverseOps)
         }
@@ -586,7 +608,7 @@ public class Document: Attachable {
             context.push(operation: op)
         }
 
-        let change = context.toChange()
+        var change = context.toChange()
         // Execute on the clone first, then on the real root.
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: .undoRedo)
         let executionResult: ChangeExecutionResult
@@ -634,7 +656,11 @@ public class Document: Attachable {
             return
         }
 
+        // Remember the source this change ran under: a replay of the queue has to use it again.
+        // See ``Change/isUndoRedo``.
+        change.markAsUndoRedo()
         self.localChanges.append(change)
+        self.mintedOperations = self.mintedOperations || change.hasOperations
         self.changeID = context.getNextID()
         // After the change id advances, so a persist driven off this hook cannot serialize a
         // document whose pending change is present but whose id has not moved. Ordering rather
@@ -1172,6 +1198,7 @@ public class Document: Attachable {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
+        self.absorbedRemote = true
         self.changeID = self.changeID.setClocks(
             with: snapshotVector.maxLamport(),
             vector: snapshotVector
@@ -1186,7 +1213,10 @@ public class Document: Attachable {
         // them after applying the snapshot, as local changes are not included in the snapshot data.
         // Afterward, we should publish a snapshot event with the latest
         // version of the document to ensure the user receives the most up-to-date snapshot.
-        try self.applyChanges(self.localChanges, source: .local)
+        //
+        // Each queued change is replayed under the source it originally ran with: see
+        // ``replaySource(of:)``.
+        try self.replayLocalChanges(self.localChanges)
         self.clearHistory()
 
         let hexSnapshotVector = try Converter.versionVectorToHex(vector: snapshotVector)
@@ -1221,6 +1251,17 @@ public class Document: Attachable {
             removeds:\(self.root.garbageElementSetSize)
             """
         )
+    }
+
+    /**
+     * `replayLocalChanges` applies the given queued local changes, each under the source it
+     * originally ran with (``replaySource(of:)``). A plain `applyChanges(_:source: .local)` would
+     * run an operation an undo had skipped, so every replay of the queue goes through here.
+     */
+    func replayLocalChanges(_ changes: [Change]) throws {
+        for change in changes {
+            try self.applyChange(change, source: Self.replaySource(of: change))
+        }
     }
 
     /**
@@ -1261,6 +1302,9 @@ public class Document: Attachable {
      * `applyChangeInternal` applies the given change into the clone and the root.
      */
     private func applyChangeInternal(_ change: Change, source: OpSource) throws {
+        if source == .remote {
+            self.absorbedRemote = true
+        }
         let clone = self.cloned
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
 
@@ -1810,6 +1854,33 @@ public class Document: Attachable {
         (self.root.object, self.presences, self.checkpoint, self.changeID, self.localChanges)
     }
 
+    /// Swaps in the state a pre-attach re-issue built aside, all at once.
+    ///
+    /// A bridge for ``Document/Document+Reissue.swift``: `localChanges`, `root`, `presences` and the
+    /// `changeID` setter are `private` to this file. The clone and the undo/redo stacks hold the old
+    /// tickets and cannot be re-issued the way the local changes are (a reverse operation carries
+    /// local-only state the wire format does not name), so they are dropped, which is the state every
+    /// other path that rewrites the root leaves them in.
+    ///
+    /// - Parameters:
+    ///   - changes: The re-issued local changes.
+    ///   - root: The root rebuilt by replaying `changes`.
+    ///   - presences: The presences rebuilt by replaying `changes`.
+    ///   - changeID: The re-keyed change id.
+    func installReissuedState(
+        changes: [Change],
+        root: CRDTRoot,
+        presences: [ActorID: StringValueTypeDictionary],
+        changeID: ChangeID
+    ) {
+        self.localChanges = changes
+        self.root = root
+        self.presences = presences
+        self.changeID = changeID
+        self.clone = nil
+        self.clearHistory()
+    }
+
     /// Moves this document's `clientSeq` counter forward to the given sequence, and never
     /// backward.
     ///
@@ -1888,8 +1959,13 @@ public class Document: Attachable {
         // content, so skipping an acked one would leave the root behind. Only the un-acked
         // ones are queued: re-pushing what the server has already taken presents a
         // `clientSeq` it will skip.
-        try self.applyChanges(changes, source: .local)
+        //
+        // A change an undo or a redo produced carries that through ``Change/isUndoRedo`` and is
+        // replayed under ``OpSource/undoRedo``: see ``replaySource(of:)``.
+        try self.replayLocalChanges(changes)
         self.localChanges.append(contentsOf: changes.filter { $0.id.getClientSeq() > ackedClientSeq })
+        self.mintedOperations = self.mintedOperations || changes.contains { $0.hasOperations }
+        self.absorbedRemote = true
 
         // Adopt the last replayed change's ID as the document's own counter.
         //

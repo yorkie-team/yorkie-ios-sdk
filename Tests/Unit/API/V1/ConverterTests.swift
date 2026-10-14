@@ -348,15 +348,17 @@ class ConverterTests: XCTestCase {
 
             object.set(key: "boolean", value: boolean, executedAt: boolean.createdAt)
 
+            // An Object travels with its whole content, as in yorkie-js-sdk (`objectToBytes`): a value
+            // a reverse operation restores carries children the wire has no other operation for.
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(object))
-            XCTAssertEqual(CRDTObject(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
+            XCTAssertEqual(object.toJSON(), converted.toJSON())
 
             // Array
             let array = CRDTArray(createdAt: TimeTicket.initial)
 
             try array.insert(value: object, prevCreatedAt: TimeTicket.initial)
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(array))
-            XCTAssertEqual(CRDTArray(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
+            XCTAssertEqual(array.toJSON(), converted.toJSON())
         } catch {
             XCTFail("\(error)")
         }
