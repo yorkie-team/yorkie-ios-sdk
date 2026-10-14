@@ -63,6 +63,9 @@ struct YorkieError: Error, CustomStringConvertible {
         /// ErrDocumentSizeExceedsLimit is returned when the document size exceeds the limit.
         case errDocumentSizeExceedsLimit = "ErrDocumentSizeExceedsLimit"
 
+        /// ErrChangeTooLarge is returned when a single change is too large to store.
+        case errChangeTooLarge = "ErrChangeTooLarge"
+
         /// ErrDocumentSchemaValidationFailed is returned when the document schema validation failed.
         case errDocumentSchemaValidationFailed = "ErrDocumentSchemaValidationFailed"
 
@@ -128,6 +131,17 @@ struct YorkieError: Error, CustomStringConvertible {
         // throw. Local edits (``Document/update(_:_:)``) and undo/redo are not wrapped: the
         // caller that asked for them matches on the original code.
         case errChangeApplyFailed = "ErrChangeApplyFailed"
+
+        // ErrPresenceBaseUnavailable is returned when the server has no base to fold a presence
+        // patch into, because it was evicted from the cache or never reached this server. Nothing
+        // in the pack was stored: the client resends it with the patch replaced by a full put. It
+        // is an expected signal rather than a failure.
+        case errPresenceBaseUnavailable = "ErrPresenceBaseUnavailable"
+
+        // ErrWatchStreamIdle is reported when a watch stream stays silent for longer than the
+        // heartbeat interval the server advertised allows, which is how a half-open connection
+        // is told from a quiet document.
+        case errWatchStreamIdle = "ErrWatchStreamIdle"
     }
 }
 

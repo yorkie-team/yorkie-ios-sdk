@@ -261,4 +261,149 @@ final class CRDTTreeMergeLineageTests: XCTestCase {
         XCTAssertEqual(fixture.text.innerChildren.count, 0)
         XCTAssertEqual(fixture.tree.toXML(), "<r><p>cd</p><p></p></r>")
     }
+
+    // MARK: - A merge must not move a node under itself (yorkie-js-sdk#1478)
+
+    private typealias EditResult = (pairs: [GCPair], removedNodes: [CRDTTreeNode], stranded: [CRDTTreeNode])
+
+    /// `editWithTimeout` runs the merge edit off the test thread. The edit is synchronous, so a
+    /// regression of the cycle guard spins `updateAncestorsSize` forever and no XCTest timeout can
+    /// interrupt it: the test would hang the whole run instead of failing. Waiting on an
+    /// expectation turns that hang into a failure (the stuck worker is abandoned until the test
+    /// process exits).
+    private func editWithTimeout(_ tree: CRDTTree, _ range: TreePosRange) -> EditResult? {
+        final class Box: @unchecked Sendable {
+            var result: EditResult?
+            var error: Error?
+        }
+        let box = Box()
+        let done = expectation(description: "merge edit returns")
+        nonisolated(unsafe) let unsafeTree = tree
+        nonisolated(unsafe) let unsafeRange = range
+        let queue = DispatchQueue(label: "merge-lineage-edit")
+        queue.async {
+            do {
+                let out = try unsafeTree.edit(unsafeRange, nil, 0, timeT(), timeT, nil)
+                box.result = (out.1, out.3, out.13)
+            } catch {
+                box.error = error
+            }
+            done.fulfill()
+        }
+        let outcome = XCTWaiter().wait(for: [done], timeout: 10)
+        XCTAssertEqual(outcome, .completed, "the merge edit never returned: a parent cycle was closed")
+        if outcome == .completed, let error = box.error {
+            XCTFail("edit threw: \(error)")
+        }
+        return outcome == .completed ? box.result : nil
+    }
+
+    private func node(_ type: String) -> CRDTTreeNode {
+        CRDTTreeNode(id: posT(), type: type)
+    }
+
+    private func text(_ value: String) -> CRDTTreeNode {
+        CRDTTreeNode(id: posT(), type: DefaultTreeNodeType.text.rawValue, value: value as NSString)
+    }
+
+    private struct CycleCase {
+        let name: String
+        let carrier: String
+        let dest: String
+    }
+
+    // swiftlint:disable identifier_name
+    func test_a_merge_should_not_move_a_node_under_itself() throws {
+        for tc in [
+            CycleCase(name: "the moved node", carrier: "d", dest: "c"),
+            CycleCase(name: "a node inside it", carrier: "e", dest: "d")
+        ] {
+            // <r><a>x</a><b><c><d>e</d></c></b></r> with a tombstoned and one node carrying
+            // mergedFrom = a, as an element payload may: rebuildMergeState then points a at that
+            // node's parent. A merge of b into a resolves its destination through that pointer, so
+            // it lands on c, the child it moves, or on d inside it. Moving c there would close a
+            // parent cycle in the index tree and every later ancestor walk would spin forever.
+            let n = [
+                "r": self.node("r"), "a": self.node("a"), "x": self.text("x"), "b": self.node("b"),
+                "c": self.node("c"), "d": self.node("d"), "e": self.text("e")
+            ]
+            try n["r"]!.append(contentsOf: [n["a"]!, n["b"]!])
+            try n["a"]!.append(contentsOf: [n["x"]!])
+            try n["b"]!.append(contentsOf: [n["c"]!])
+            try n["c"]!.append(contentsOf: [n["d"]!])
+            try n["d"]!.append(contentsOf: [n["e"]!])
+            _ = n["a"]!.remove(timeT())
+            n[tc.carrier]!.mergedFrom = n["a"]!.id
+            n[tc.carrier]!.mergedAt = timeT()
+
+            // Re-read exactly as the converter re-reads an element payload.
+            let tree = CRDTTree(root: n["r"]!, createdAt: timeT())
+            XCTAssertEqual(n["a"]!.mergedInto, n[tc.dest]!.id, tc.name)
+
+            // b is the range this edit consumes and all of it is live, so the removed size has to
+            // come back as b's pre-edit size.
+            let bSize = n["b"]!.paddedSize
+
+            let result = try XCTUnwrap(self.editWithTimeout(tree, (
+                CRDTTreePos(parentID: n["a"]!.id, leftSiblingID: n["x"]!.id),
+                CRDTTreePos(parentID: n["b"]!.id, leftSiblingID: n["b"]!.id)
+            )))
+
+            XCTAssertTrue(n["c"]!.parent === n["b"]!, "c stays where it was instead of moving under itself (\(tc.name))")
+            XCTAssertTrue(n["d"]!.parent === n["c"]!)
+            XCTAssertNil(n["c"]!.mergedFrom, "a refused child is not stamped as moved")
+            XCTAssertNil(n["b"]!.mergedInto, "no moved child names b, so neither runtime nor rebuild points it")
+            XCTAssertEqual(tree.toXML(), "<r></r>")
+
+            // Left live under b, which this edit tombstoned, the skipped child would be detached by
+            // b's purge while it stays registered. It is tombstoned in place with its descendants,
+            // and each gets a GC pair.
+            for key in ["c", "d", "e"] {
+                let refused = n[key]!
+                XCTAssertTrue(refused.isRemoved, "a refused child is tombstoned (\(key))")
+                XCTAssertTrue(result.pairs.contains { ($0.child as? CRDTTreeNode) === refused }, "and booked for GC (\(key))")
+                XCTAssertTrue(result.stranded.contains { $0 === refused }, "and reported as stranded (\(key))")
+            }
+
+            // The stranded subtree is not in removedNodes -- the merge had collected it to move --
+            // yet the range the edit consumed includes it.
+            let removedSize = (result.removedNodes + result.stranded).reduce(0) { $0 + $1.paddedSize }
+            XCTAssertEqual(removedSize, bSize, tc.name)
+        }
+    }
+
+    func test_a_merge_should_strand_the_children_after_one_the_cycle_guard_refused() throws {
+        // <r><a>x</a><b><c><d>e</d></c><f>g</f></b></r> with a tombstoned and e carrying
+        // mergedFrom = a, so a forwards to d. The merge of b into a collects both c and f to move;
+        // the guard refuses c and tombstones it, and d with it. f, later in the same list, must not
+        // then move under the tombstoned d: it is tombstoned in place too.
+        let r = self.node("r"), a = self.node("a"), x = self.text("x"), b = self.node("b")
+        let c = self.node("c"), d = self.node("d"), e = self.text("e"), f = self.node("f"), g = self.text("g")
+        try r.append(contentsOf: [a, b])
+        try a.append(contentsOf: [x])
+        try b.append(contentsOf: [c, f])
+        try c.append(contentsOf: [d])
+        try d.append(contentsOf: [e])
+        try f.append(contentsOf: [g])
+        _ = a.remove(timeT())
+        e.mergedFrom = a.id
+        e.mergedAt = timeT()
+
+        let tree = CRDTTree(root: r, createdAt: timeT())
+        XCTAssertEqual(a.mergedInto, d.id)
+
+        let result = try XCTUnwrap(self.editWithTimeout(tree, (
+            CRDTTreePos(parentID: a.id, leftSiblingID: x.id),
+            CRDTTreePos(parentID: b.id, leftSiblingID: b.id)
+        )))
+
+        XCTAssertTrue(f.parent === b, "a child must not move under a destination the guard just tombstoned")
+        XCTAssertNil(f.mergedFrom, "a stranded child is not stamped")
+        for node in [c, d, e, f, g] {
+            XCTAssertTrue(node.isRemoved, "a stranded node is tombstoned")
+            XCTAssertTrue(result.pairs.contains { ($0.child as? CRDTTreeNode) === node }, "and booked for GC")
+            XCTAssertTrue(result.stranded.contains { $0 === node })
+        }
+    }
+    // swiftlint:enable identifier_name
 }

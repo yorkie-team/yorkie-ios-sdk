@@ -233,6 +233,15 @@ public struct Yorkie_V1_WatchRequest: Sendable {
   /// and the server falls back to client_id (the session id).
   public var actorID: String = String()
 
+  /// heartbeat_interval_ms is the interval, in milliseconds, at which this
+  /// stream asks the server to send a WatchHeartbeat while it is idle. 0, which
+  /// is also what an SDK older than the heartbeat leaves here, asks for none:
+  /// such a stream gets no WatchHeartbeat bodies at all, so the heartbeat can
+  /// never reach a client that would not recognize it. The server clamps the
+  /// request to its own bounds and reports the value it settled on in
+  /// WatchInitialization.heartbeat_interval_ms.
+  public var heartbeatIntervalMs: Int64 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -319,11 +328,20 @@ public struct Yorkie_V1_WatchResponse: Sendable {
     set {body = .event(newValue)}
   }
 
+  public var heartbeat: Yorkie_V1_WatchHeartbeat {
+    get {
+      if case .heartbeat(let v)? = body {return v}
+      return Yorkie_V1_WatchHeartbeat()
+    }
+    set {body = .heartbeat(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum OneOf_Body: Equatable, Sendable {
     case initialization(Yorkie_V1_WatchInitialization)
     case event(Yorkie_V1_WatchEvent)
+    case heartbeat(Yorkie_V1_WatchHeartbeat)
 
   }
 
@@ -336,6 +354,24 @@ public struct Yorkie_V1_WatchInitialization: Sendable {
   // methods supported on all messages.
 
   public var resourceInits: [Yorkie_V1_ResourceInit] = []
+
+  /// heartbeat_interval_ms is the interval, in milliseconds, at which the
+  /// server sends a WatchHeartbeat on this stream while it is idle. 0 means
+  /// the server sends none, so the client must not apply an idle timeout.
+  public var heartbeatIntervalMs: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// WatchHeartbeat is sent on an idle Watch stream so a client can tell a live
+/// stream from a half-open one. It carries no payload: its arrival is the
+/// signal.
+public struct Yorkie_V1_WatchHeartbeat: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1196,7 +1232,7 @@ extension Yorkie_V1_DetachDocumentResponse: SwiftProtobuf.Message, SwiftProtobuf
 
 extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0\u{3}actor_id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}client_id\0\u{1}resources\0\u{3}actor_id\0\u{3}heartbeat_interval_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1207,6 +1243,7 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 1: try { try decoder.decodeSingularStringField(value: &self.clientID) }()
       case 2: try { try decoder.decodeRepeatedMessageField(value: &self.resources) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.actorID) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.heartbeatIntervalMs) }()
       default: break
       }
     }
@@ -1222,6 +1259,9 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.actorID.isEmpty {
       try visitor.visitSingularStringField(value: self.actorID, fieldNumber: 3)
     }
+    if self.heartbeatIntervalMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.heartbeatIntervalMs, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1229,6 +1269,7 @@ extension Yorkie_V1_WatchRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.clientID != rhs.clientID {return false}
     if lhs.resources != rhs.resources {return false}
     if lhs.actorID != rhs.actorID {return false}
+    if lhs.heartbeatIntervalMs != rhs.heartbeatIntervalMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1363,7 +1404,7 @@ extension Yorkie_V1_ChannelDescriptor: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 extension Yorkie_V1_WatchResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialization\0\u{1}event\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}initialization\0\u{1}event\0\u{1}heartbeat\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1397,6 +1438,19 @@ extension Yorkie_V1_WatchResponse: SwiftProtobuf.Message, SwiftProtobuf._Message
           self.body = .event(v)
         }
       }()
+      case 3: try {
+        var v: Yorkie_V1_WatchHeartbeat?
+        var hadOneofValue = false
+        if let current = self.body {
+          hadOneofValue = true
+          if case .heartbeat(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.body = .heartbeat(v)
+        }
+      }()
       default: break
       }
     }
@@ -1416,6 +1470,10 @@ extension Yorkie_V1_WatchResponse: SwiftProtobuf.Message, SwiftProtobuf._Message
       guard case .event(let v)? = self.body else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     }()
+    case .heartbeat?: try {
+      guard case .heartbeat(let v)? = self.body else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }()
     case nil: break
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1430,7 +1488,7 @@ extension Yorkie_V1_WatchResponse: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 extension Yorkie_V1_WatchInitialization: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WatchInitialization"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_inits\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}resource_inits\0\u{3}heartbeat_interval_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1439,6 +1497,7 @@ extension Yorkie_V1_WatchInitialization: SwiftProtobuf.Message, SwiftProtobuf._M
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.resourceInits) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.heartbeatIntervalMs) }()
       default: break
       }
     }
@@ -1448,11 +1507,34 @@ extension Yorkie_V1_WatchInitialization: SwiftProtobuf.Message, SwiftProtobuf._M
     if !self.resourceInits.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.resourceInits, fieldNumber: 1)
     }
+    if self.heartbeatIntervalMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.heartbeatIntervalMs, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_WatchInitialization, rhs: Yorkie_V1_WatchInitialization) -> Bool {
     if lhs.resourceInits != rhs.resourceInits {return false}
+    if lhs.heartbeatIntervalMs != rhs.heartbeatIntervalMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension Yorkie_V1_WatchHeartbeat: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".WatchHeartbeat"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    // Load everything into unknown fields
+    while try decoder.nextFieldNumber() != nil {}
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Yorkie_V1_WatchHeartbeat, rhs: Yorkie_V1_WatchHeartbeat) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

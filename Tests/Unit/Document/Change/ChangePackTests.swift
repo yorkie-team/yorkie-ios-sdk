@@ -53,3 +53,35 @@ class ChangePackTests: XCTestCase {
         XCTAssertEqual(target.getChangeSize(), 2)
     }
 }
+
+extension ChangePackTests {
+    func test_reports_the_capabilities_the_server_advertised() {
+        let none = ChangePack(key: "k", checkpoint: Checkpoint.initial, isRemoved: false, changes: [], versionVector: nil)
+        XCTAssertFalse(none.hasCapability(presencePatchCapability))
+
+        let advertised = ChangePack(key: "k",
+                                    checkpoint: Checkpoint.initial,
+                                    isRemoved: false,
+                                    changes: [],
+                                    versionVector: nil,
+                                    capabilities: ["other", presencePatchCapability])
+        XCTAssertTrue(advertised.hasCapability(presencePatchCapability))
+        XCTAssertTrue(advertised.hasCapability("other"))
+        XCTAssertFalse(advertised.hasCapability("unknown"))
+    }
+
+    func test_reads_the_capabilities_off_the_wire_and_never_sends_them() throws {
+        var pbPack = PbChangePack()
+        pbPack.documentKey = "k"
+        pbPack.capabilities = [presencePatchCapability]
+        XCTAssertTrue(try Converter.fromChangePack(pbPack).hasCapability(presencePatchCapability))
+
+        let sent = ChangePack(key: "k",
+                              checkpoint: Checkpoint.initial,
+                              isRemoved: false,
+                              changes: [],
+                              versionVector: nil,
+                              capabilities: [presencePatchCapability])
+        XCTAssertTrue(Converter.toChangePack(pack: sent).capabilities.isEmpty)
+    }
+}

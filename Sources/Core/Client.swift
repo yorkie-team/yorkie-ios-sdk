@@ -19,6 +19,7 @@ import Connect
 import Foundation
 import Logging
 import Semaphore
+import SwiftProtobuf
 
 /**
  * `ClientStatus` represents the status of the client.
@@ -96,11 +97,17 @@ public struct ClientOptions {
         static let retrySyncLoopDelay = 1000 // 1000 millisecond
         static let reconnectStreamDelay = 1000 // 1000 millisecond
         static let maximumAttachmentTimeout = 5000 // millisecond
+        static let watchHeartbeatInterval = 20000 // millisecond
     }
 
     /**
      * `key` is the client key. It is used to identify the client.
      * If not set, a random key is generated.
+     *
+     * The random default is a `UUID`, drawn from the system CSPRNG, and is minted per ``Client``
+     * instance. Only a client whose key was generated re-issues the tickets of a document edited
+     * before ``Client/attach(_:_:)``: an explicit key names an actor shared by every session that
+     * passes it, so a pre-attach document keeps the initial actor there.
      *
      * That random default is minted per ``Client`` instance, so it differs on every launch.
      * **Offline persistence requires a stable key**: the server derives the actor stamped
@@ -168,6 +175,19 @@ public struct ClientOptions {
      */
     var maximumAttachmentTimeout: Int
 
+    /// The interval, in milliseconds, at which the client asks the server to send a heartbeat on
+    /// an idle Watch stream. The default is `20000` (20 seconds).
+    ///
+    /// The server clamps the request into its own bounds (5 to 60 seconds by default) and echoes
+    /// the effective value back when the stream starts; that echoed value is what arms the idle
+    /// watchdog, which reconnects a stream that stays silent for several intervals. Like the other
+    /// interval options, the unit is milliseconds, not seconds. Zero or a negative value opts out:
+    /// the client asks for no heartbeat and the stream then has no idle watchdog. A value too large
+    /// for the wire is capped rather than rejected.
+    ///
+    /// This needs server support (v0.7.25 or later). An older server ignores the request.
+    public var watchHeartbeatInterval: Int
+
     private(set) var metadata: [String: String]
 
     /// The store that persists attached documents between sessions.
@@ -200,6 +220,7 @@ public struct ClientOptions {
                 retrySyncLoopDelay: Int? = nil,
                 reconnectStreamDelay: Int? = nil,
                 attachTimeout: Int? = nil,
+                watchHeartbeatInterval: Int? = nil,
                 store: DocStore? = nil,
                 sessionLock: SessionLock? = nil)
     {
@@ -210,6 +231,7 @@ public struct ClientOptions {
         self.retrySyncLoopDelay = retrySyncLoopDelay ?? DefaultClientOptions.retrySyncLoopDelay
         self.reconnectStreamDelay = reconnectStreamDelay ?? DefaultClientOptions.reconnectStreamDelay
         self.maximumAttachmentTimeout = attachTimeout ?? DefaultClientOptions.maximumAttachmentTimeout
+        self.watchHeartbeatInterval = watchHeartbeatInterval ?? DefaultClientOptions.watchHeartbeatInterval
         self.metadata = [:]
         self.store = store
         self.sessionLock = sessionLock ?? NoopSessionLock()
@@ -255,7 +277,7 @@ private func namespaceOf(_ apiKey: String, _ clientKey: String, _ docKey: String
  */
 @MainActor
 public class Client {
-    private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
+    private(set) var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
     /// The stable actor stamped into this client's document changes.
     ///
     /// Supplied by the server on activate and derived from the project and client key, so it
@@ -278,6 +300,17 @@ public class Client {
     /// `attachmentMap` is only populated once the attach round trip resolves, so this
     /// set is what rejects a concurrent duplicate attach of the same key.
     private var attachingDocs = Set<String>()
+
+    /// Whether the client key was generated for this instance rather than passed in
+    /// (`ClientOptions.key == nil`), which makes the actor derived from it this client's alone.
+    ///
+    /// The generated key is a `UUID`, which draws from the system CSPRNG, so unlike yorkie-js-sdk
+    /// (where `uuid()` can fall back to `Math.random`) there is no weak-randomness case to refuse
+    /// here. See ``claimReissue(_:docKey:)``.
+    private let keyGenerated: Bool
+    /// Maps a document key to the actor this client last minted tickets under there. See
+    /// ``claimReissue(_:docKey:)``.
+    private var reissueClaims = [String: ActorID]()
     private var conditions: [ClientCondition: Bool] = [
         ClientCondition.syncLoop: false,
         ClientCondition.watchLoop: false
@@ -287,6 +320,10 @@ public class Client {
     private let reconnectStreamDelay: Int
     private let retrySyncLoopDelay: Int
     private let maximumAttachmentTimeout: Int
+    /// The heartbeat interval each Watch request asks for, converted once from the option.
+    let watchHeartbeatIntervalMs: Int64
+    /// The clock the Watch idle watchdogs run on. Tests substitute a fake one.
+    var watchIdleClock = WatchIdleClock.system
     private let channelHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
     private let defaultPollingInterval: TimeInterval = 3.0 // 3 seconds
 
@@ -294,7 +331,9 @@ public class Client {
     private var authTokenInjector: AuthTokenInjector?
     private var authHeader: AuthHeader
     private var semaphoresForInitialzation = [String: DispatchSemaphore]()
-    private let syncSemaphore = AsyncSemaphore(value: 1)
+    /// Serialises every sync pass, and is the barrier ``resync(_:discardLocalChanges:initialPresence:)``
+    /// holds across its recovery.
+    let syncSemaphore = AsyncSemaphore(value: 1)
     private var channelHeartbeatTimer: Timer?
 
     // Public variables.
@@ -307,7 +346,7 @@ public class Client {
 
     // MARK: - Helper methods for typed attachments
 
-    private func getDocumentAttachment(_ key: String) -> Attachment<Document>? {
+    func getDocumentAttachment(_ key: String) -> Attachment<Document>? {
         return self.attachmentMap[key] as? Attachment<Document>
     }
 
@@ -343,10 +382,14 @@ public class Client {
         isMockingEnabled: Bool = false
     ) {
         self.key = options.key ?? UUID().uuidString
+        // A generated key names an actor this client alone can reach, which is what the
+        // pre-attach re-issue rests on; an explicit one is shared by every session that passes it.
+        self.keyGenerated = options.key == nil
         self.syncLoopDuration = options.syncLoopDuration
         self.retrySyncLoopDelay = options.retrySyncLoopDelay
         self.reconnectStreamDelay = options.reconnectStreamDelay
         self.maximumAttachmentTimeout = options.maximumAttachmentTimeout
+        self.watchHeartbeatIntervalMs = Self.toHeartbeatIntervalMs(options.watchHeartbeatInterval)
 
         let protocolClient = ProtocolClient(httpClient: URLSessionHTTPClient(),
                                             config: ProtocolClientConfig(host: urlString,
@@ -499,6 +542,30 @@ public class Client {
                        disableGC: Bool = false,
                        disablePresence: Bool? = nil) async throws -> Document
     {
+        try await self.attachInternal(doc,
+                                      presence: .values(initialPresence),
+                                      syncMode: syncMode,
+                                      schema: schema,
+                                      initialRoot: initialRoot,
+                                      documentPollInterval: documentPollInterval,
+                                      disableGC: disableGC,
+                                      disablePresence: disablePresence)
+    }
+
+    /// The attach behind ``attach(_:_:_:_:initialRoot:documentPollInterval:disableGC:disablePresence:)``,
+    /// taking the initial presence either as values or already encoded.
+    ///
+    /// The encoded form exists for ``resync(_:discardLocalChanges:initialPresence:)``, which
+    /// re-attaches with the presence the document already holds.
+    func attachInternal(_ doc: Document,
+                        presence initialPresence: InitialPresence,
+                        syncMode: SyncMode,
+                        schema: String = "",
+                        initialRoot: [String: JSONValuable?]? = nil,
+                        documentPollInterval: TimeInterval? = nil,
+                        disableGC: Bool = false,
+                        disablePresence: Bool? = nil) async throws -> Document
+    {
         // 01. Check if the client is ready to attach documents.
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
@@ -537,7 +604,11 @@ public class Client {
         let pollIntervalPinned = documentPollInterval != nil
         let pollInterval = self.resolvePollInterval(documentPollInterval, syncMode)
 
-        doc.setActor(self.actorID ?? clientID)
+        // Before the first suspension point below: a document edited before this attach re-issues the
+        // tickets it minted under the initial actor to this client's actor (yorkie-js-sdk#1449). The
+        // store restore (which repopulates the root, change id and pending changes under their
+        // persisted actor) runs after this, in `prepareOfflineResume`.
+        try self.stampActor(of: doc, actor: self.actorID ?? clientID)
 
         // Resolve the effective presence-disabled state at attach time. The
         // explicit option wins; absent that, the Document's seeded value (from
@@ -567,7 +638,6 @@ public class Client {
         // Built AFTER any restore, so the change pack carries the un-acknowledged local
         // changes the restore brought back. Building it first would push an empty pack and
         // silently strand everything the previous session left unsynced.
-        attachRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
         attachRequest.schemaKey = schema
         attachRequest.disableGc = disableGC
         attachRequest.disablePresence = resolvedDisablePresence
@@ -577,7 +647,9 @@ public class Client {
 
             self.semaphoresForInitialzation[docKey] = semaphore
 
-            var attachResponse = await self.yorkieService.attachDocument(request: attachRequest, headers: self.authHeader.makeHeader(docKey))
+            // A restored queue can still hold presence patches, and this attach is the request they
+            // ride out on, so it needs the presence-base fallback as much as a sync does.
+            var attachResponse = await self.sendAttach(&attachRequest, for: doc)
 
             // A restored document whose epoch the server has since compacted past cannot be
             // resumed: the un-acknowledged changes it carries are anchored to a state the
@@ -707,6 +779,17 @@ public class Client {
      */
     @discardableResult
     public func detach(_ doc: Document) async throws -> Document {
+        try await self.detachDocument(doc, skipPresenceClear: false)
+    }
+
+    /// The detach behind ``detach(_:)``.
+    ///
+    /// - Parameters:
+    ///   - doc: The document to detach.
+    ///   - skipPresenceClear: Suppresses the presence-clear change a detach normally mints. For
+    ///     ``resync(_:discardLocalChanges:initialPresence:)``, whose premise is that this client
+    ///     may mint no further change. The server drops the client's presence on detach regardless.
+    func detachDocument(_ doc: Document, skipPresenceClear: Bool) async throws -> Document {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -719,18 +802,26 @@ public class Client {
             throw YorkieError(code: .errNotAttached, message: "\(doc.getKey()) is not attached when \(#function).")
         }
 
-        try doc.update { _, presence in
-            presence.clear()
+        // The clear is a courtesy to the other peers, not part of the detach contract, so it is
+        // skipped rather than failing the detach when the document cannot mint it.
+        if !skipPresenceClear, doc.isMintable {
+            try doc.update { _, presence in
+                presence.clear()
+            }
         }
 
         var detachDocumentRequest = DetachDocumentRequest()
         detachDocumentRequest.clientID = clientID
         detachDocumentRequest.documentID = attachment.resourceID
-        detachDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack())
 
         do {
-            let detachDocumentResponse = await self.yorkieService.detachDocument(request: detachDocumentRequest,
-                                                                                 headers: self.authHeader.makeHeader(doc.getKey()))
+            let detachDocumentResponse = await self.pushWithPresenceBase(doc,
+                                                                         build: { Converter.toChangePack(pack: doc.createChangePack()) },
+                                                                         send: { pack in
+                                                                             detachDocumentRequest.changePack = pack
+                                                                             return await self.yorkieService.detachDocument(request: detachDocumentRequest,
+                                                                                                                            headers: self.authHeader.makeHeader(doc.getKey()))
+                                                                         })
 
             guard detachDocumentResponse.error == nil, let message = detachDocumentResponse.message else {
                 throw self.handleErrorResponse(detachDocumentResponse.error, defaultMessage: "Unknown detach error")
@@ -778,10 +869,15 @@ public class Client {
         var removeDocumentRequest = RemoveDocumentRequest()
         removeDocumentRequest.clientID = clientID
         removeDocumentRequest.documentID = attachment.resourceID
-        removeDocumentRequest.changePack = Converter.toChangePack(pack: doc.createChangePack(true))
 
         do {
-            let removeDocumentResponse = await self.yorkieService.removeDocument(request: removeDocumentRequest, headers: self.authHeader.makeHeader(doc.getKey()))
+            let removeDocumentResponse = await self.pushWithPresenceBase(doc,
+                                                                         build: { Converter.toChangePack(pack: doc.createChangePack(true)) },
+                                                                         send: { pack in
+                                                                             removeDocumentRequest.changePack = pack
+                                                                             return await self.yorkieService.removeDocument(request: removeDocumentRequest,
+                                                                                                                            headers: self.authHeader.makeHeader(doc.getKey()))
+                                                                         })
 
             guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
                 throw self.handleErrorResponse(removeDocumentResponse.error, defaultMessage: "Unknown remove error")
@@ -1137,10 +1233,18 @@ public class Client {
                     if let docAttachment = anyAttachment as? Attachment<Document>,
                        await docAttachment.needRealtimeSync()
                     {
+                        // Skip a document whose last push the server rejected outright:
+                        // resending the same pack cannot change its verdict. Only this
+                        // attachment is parked; the loop keeps syncing the rest. An explicit
+                        // `sync(doc)` after the document is shrunk clears it.
+                        if docAttachment.isWriteRejected() {
+                            continue
+                        }
+
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         result.append(docAttachment.resource)
                         if let syncMode = docAttachment.syncMode {
-                            try await self.syncInternal(docAttachment, syncMode)
+                            try await self.syncParkingWriteRejection(docAttachment, syncMode)
                         }
                     }
                 }
@@ -1149,13 +1253,25 @@ public class Client {
                     result.append(attachment.resource)
                     try await self.syncInternal(attachment, .realtime)
                 } else {
+                    // Every document is tried even when an earlier one fails, as the JS
+                    // `Promise.all` over the attachments still pushes the rest. A document the
+                    // server refuses outright (a size-rejected write is permanent) must not
+                    // hold up the documents after it. The first error is rethrown at the end.
+                    var firstError: Error?
                     for (_, anyAttachment) in self.attachmentMap {
                         if let docAttachment = anyAttachment as? Attachment<Document> {
                             result.append(docAttachment.resource)
                             if let syncMode = docAttachment.syncMode {
-                                try await self.syncInternal(docAttachment, syncMode)
+                                do {
+                                    try await self.syncInternal(docAttachment, syncMode)
+                                } catch {
+                                    firstError = firstError ?? error
+                                }
                             }
                         }
+                    }
+                    if let firstError {
+                        throw firstError
                     }
                 }
             }
@@ -1191,7 +1307,7 @@ public class Client {
      * `runSyncLoop` runs the sync loop. The sync loop pushes local changes to
      * the server and pulls remote changes from the server.
      */
-    private func runSyncLoop() async {
+    func runSyncLoop() async {
         Logger.debug("[SL] c:\"\(self.key)\" run sync loop")
         self.setCondition(.syncLoop, value: true)
         await self.doSyncLoop()
@@ -1230,47 +1346,16 @@ public class Client {
         // Handle Document watch streams. Uses the unified Watch RPC, sending a
         // single document ResourceDescriptor and consuming WatchResponse.
         if let docAttachment = attachment as? Attachment<Document> {
-            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { result in
-                Task {
-                    switch result {
-                    case .headers:
-                        break
-                    case .message(let message):
-                        await self.handleWatchDocumentsResponse(docKey: key, response: message)
-                    case .complete(_, let error, _):
-                        if error != nil {
-                            await docAttachment.resource.resetOnlineClients()
-                            await docAttachment.resource.publishInitializedEvent()
-                            await docAttachment.resource.publishConnectionEvent(.disconnected)
-                        }
-
-                        Logger.debug("[WD] c:\"\(self.key)\" unwatches")
-
-                        if await self.handleConnectError(error) {
-                            Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
-                            await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: docAttachment, method: .watch)
-                            try await self.onStreamDisconnect(key, with: docAttachment)
-                        } else {
-                            await self.setCondition(.watchLoop, value: false)
-                            try await self.onStreamDisconnect(key, with: docAttachment)
-                        }
-                    }
+            // The capture list starts this stream's generation: see ``Attachment/watchGeneration``.
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { [generation = docAttachment.beginWatchStream()] result in
+                // One main-actor hop, so the generation check and the work it guards cannot be
+                // split by another task bumping the generation in between.
+                Task { @MainActor in
+                    await self.handleDocumentWatchResult(result, key: key, attachment: docAttachment, generation: generation)
                 }
             })
 
-            let request = WatchRequest.with {
-                $0.clientID = id
-                // Declaring the stable actor subscribes this client under it, so watch peer
-                // ids and watched/unwatched events match the presence CRDT keying.
-                $0.actorID = self.actorID ?? id
-                $0.resources = [
-                    ResourceDescriptor.with {
-                        $0.document = DocumentDescriptor.with {
-                            $0.documentID = docAttachment.resourceID
-                        }
-                    }
-                ]
-            }
+            let request = self.makeDocumentWatchRequest(clientID: id, documentID: docAttachment.resourceID)
 
             stream.send(request)
 
@@ -1283,43 +1368,13 @@ public class Client {
         // single channel ResourceDescriptor and dispatching presence-count
         // updates + remote broadcast events to the Channel's event system.
         if let channelAttachment = attachment as? Attachment<Channel> {
-            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { result in
-                Task {
-                    switch result {
-                    case .headers:
-                        break
-                    case .message(let message):
-                        await self.handleWatchChannelResponse(channelKey: key, response: message)
-                    case .complete(_, let error, _):
-                        Logger.debug("[WC] c:\"\(self.key)\" unwatches")
-                        if await self.handleConnectError(error) {
-                            Logger.warning("[WL] c:\"\(self.key)\" channel has Error \(String(describing: error))")
-                            await self.publishChannelAuthErrorIfNeeded(error: error as? ConnectError, channel: channelAttachment.resource, method: "Watch")
-                            try await self.onStreamDisconnect(key, with: channelAttachment)
-                        } else {
-                            if let error = error as? ConnectError {
-                                await channelAttachment.resource.publish(
-                                    ChannelSyncErrorEvent(error: error, method: "Watch")
-                                )
-                            }
-                            await self.setCondition(.watchLoop, value: false)
-                            try await self.onStreamDisconnect(key, with: channelAttachment)
-                        }
-                    }
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { [generation = channelAttachment.beginWatchStream()] result in
+                Task { @MainActor in
+                    await self.handleChannelWatchResult(result, key: key, attachment: channelAttachment, generation: generation)
                 }
             })
 
-            let request = WatchRequest.with {
-                $0.clientID = id
-                $0.actorID = self.actorID ?? id
-                $0.resources = [
-                    ResourceDescriptor.with {
-                        $0.channel = ChannelDescriptor.with {
-                            $0.channelKey = channelAttachment.resource.getKey()
-                        }
-                    }
-                ]
-            }
+            let request = self.makeChannelWatchRequest(clientID: id, channelKey: channelAttachment.resource.getKey())
 
             stream.send(request)
             channelAttachment.connectStream(YorkieServerStream(stream))
@@ -1368,7 +1423,7 @@ public class Client {
         }
     }
 
-    private func handleWatchDocumentsResponse(docKey: DocKey, response: WatchResponse) async {
+    func handleWatchDocumentsResponse(docKey: DocKey, response: WatchResponse) {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
         guard let body = response.body else {
@@ -1435,6 +1490,7 @@ public class Client {
             default:
                 break
             }
+        case .heartbeat: break // Proves liveness only; activity is recorded before dispatch.
         }
     }
 
@@ -1448,7 +1504,7 @@ public class Client {
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
-    private func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
+    func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
         let cancelled = attachment.cancelled
         self.disconnectWatchStream(key, with: attachment)
         // check if watch loop is stopped. `.manual` and `.polling` are stream-less
@@ -1498,8 +1554,70 @@ public class Client {
         }
     }
 
+    /// Stamps the client's actor on a document about to be attached, re-issuing the tickets a
+    /// never-synced document minted under the initial actor when ``claimReissue(_:docKey:)`` allows
+    /// it.
+    ///
+    /// Runs once the attach options are known to be valid, so a rejected option has not re-issued the
+    /// document or taken the claim.
+    private func stampActor(of doc: Document, actor: ActorID) throws {
+        let reissued = try doc.setActor(actor, reissue: self.claimReissue(actor, docKey: doc.getKey()))
+        // Take the claim where the actor's lamport space in this key stops being free: the re-issue
+        // just minted tickets under it, or pre-attach edits the re-issue declined are about to be
+        // pushed with their `executedAt` re-stamped to it. It is taken before the round trip, since
+        // an attach whose response is lost may still have pushed. A document that has minted nothing
+        // leaves the claim alone, so a later document of the key can still re-issue;
+        // `detachInternal` takes it if this one mints while attached.
+        if reissued || doc.hasMintedOperations() {
+            self.markReissueClaim(actor, docKey: doc.getKey())
+        }
+    }
+
+    /// Returns whether a document of the given key edited before this attach may re-issue its tickets
+    /// to the given actor.
+    ///
+    /// A re-issue keeps each ticket's lamport, which starts at 1 in every fresh document, so it is
+    /// sound only for an actor that has minted nothing else in the document. An explicit client key
+    /// gives every session of that key -- a relaunch, another process -- one stable actor, and a
+    /// re-issued ticket would equal one an earlier session's first edits carry: the server would
+    /// keep one of the two elements. Only a generated key makes the actor this client's alone, so
+    /// only then does the re-issue run; other documents keep the initial actor, as before.
+    ///
+    /// Within this client, a second never-synced document of a key whose actor has already minted
+    /// operation tickets there would mint the tickets the first document pushed, so such a repeat is
+    /// declined. That is what the claim records, and only that: asking is free, and
+    /// ``markReissueClaim(_:docKey:)`` takes the claim where tickets naming the actor actually enter
+    /// the document -- at attach for a document that already carries them
+    /// (``Document/hasMintedOperations()``), and at detach for one that minted them while attached. A
+    /// plain attach of an untouched document takes nothing.
+    ///
+    /// A taken claim is never released: an attach whose response was lost may still have pushed, and
+    /// a detach does not take pushed tickets back.
+    func claimReissue(_ actor: ActorID, docKey: String) -> Bool {
+        guard self.keyGenerated else {
+            return false
+        }
+
+        return self.reissueClaims[docKey] != actor
+    }
+
+    /// Records that the given actor has minted tickets in the document the given key names, so no
+    /// later document of that key may re-issue onto this actor. See ``claimReissue(_:docKey:)``.
+    func markReissueClaim(_ actor: ActorID, docKey: String) {
+        self.reissueClaims[docKey] = actor
+    }
+
     private func detachInternal(_ key: String) throws {
         if let attachment = getDocumentAttachment(key) {
+            // Take the re-issue claim if the document minted operation tickets while it was
+            // attached: those tickets are in the document this key names, so the actor's lamports
+            // there are no longer free for a later document of the key to re-issue onto. One that
+            // minted nothing leaves the claim alone. The actor comes from this client, not from the
+            // document: a detach resets the document's own actor to the initial one
+            // (`applyStatus(.detached)`) before this runs.
+            if let actor = self.actorID ?? self.id, attachment.resource.hasMintedOperations() {
+                self.markReissueClaim(actor, docKey: key)
+            }
             attachment.resource.resetOnlineClients()
             try self.stopWatchLoop(key, with: attachment)
         } else if let attachment = getChannelAttachment(key) {
@@ -1513,7 +1631,7 @@ public class Client {
     }
 
     @discardableResult
-    private func syncInternal(_ attachment: Attachment<Document>, _ syncMode: SyncMode) async throws -> Document {
+    func syncInternal(_ attachment: Attachment<Document>, _ syncMode: SyncMode) async throws -> Document {
         guard let clientID = self.id else {
             throw YorkieError(code: .errUnexpected, message: "Invalid Client ID!")
         }
@@ -1522,11 +1640,12 @@ public class Client {
         pushPullRequest.clientID = clientID
 
         let doc = attachment.resource
-        let requestPack = doc.createChangePack()
-        let localSize = requestPack.getChangeSize()
+        // The size of the pack the request actually carried: the builder records it, so a
+        // presence-base retry leaves the log line below reporting the resent one. The pack is
+        // built once per send, inside `build`.
+        var requestChangeSize = 0
         let pushOnly = syncMode == .realtimePushOnly
 
-        pushPullRequest.changePack = Converter.toChangePack(pack: requestPack)
         pushPullRequest.documentID = attachment.resourceID
         pushPullRequest.pushOnly = pushOnly
         pushPullRequest.disableGc = attachment.disableGC
@@ -1534,7 +1653,17 @@ public class Client {
         do {
             let docKey = doc.getKey()
 
-            let pushpullResponse = await self.yorkieService.pushPullChanges(request: pushPullRequest, headers: self.authHeader.makeHeader(docKey))
+            let pushpullResponse = await self.pushWithPresenceBase(doc,
+                                                                   build: {
+                                                                       let pack = doc.createChangePack()
+                                                                       requestChangeSize = pack.getChangeSize()
+                                                                       return Converter.toChangePack(pack: pack)
+                                                                   },
+                                                                   send: { pack in
+                                                                       pushPullRequest.changePack = pack
+                                                                       return await self.yorkieService.pushPullChanges(request: pushPullRequest,
+                                                                                                                       headers: self.authHeader.makeHeader(docKey))
+                                                                   })
 
             guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
                 throw self.handleErrorResponse(pushpullResponse.error, defaultMessage: "Unknown pushpull error")
@@ -1567,6 +1696,12 @@ public class Client {
             // empty reply reach garbage collection on a document that is paused mid-composition
             // -- the very collection this guard exists to prevent. While a document is in
             // PushOnly/SyncOff, nothing of the reply but the push ack is taken.
+            //
+            // NOTE: yorkie-js-sdk#1453 counts pending pauses (`pendingPullPauses`) here, because
+            // its `changeSyncMode` is queued behind an in-flight pull and the guard would still
+            // see the old mode. `changeSyncMode` is synchronous on the MainActor and sets
+            // `attachment.syncMode` before returning, and this guard reads it after the
+            // `await` above, so a pause requested mid-flight is already visible. No counter.
             let dropsRemoteState = pushOnly ||
                 attachment.syncMode == .realtimePushOnly || attachment.syncMode == .realtimeSyncOff
 
@@ -1628,16 +1763,23 @@ public class Client {
                 self.attachmentMap.removeValue(forKey: docKey)
             }
 
+            // The push the server rejected is behind us, so let the sync loop take this document
+            // again. Reaching here from an explicit `sync(doc)` is the way back for a document
+            // parked by a size rejection.
+            attachment.clearWriteRejected()
             doc.publishSyncEvent(.synced)
 
             let remoteSize = responsePack.getChangeSize()
-            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(localSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(requestChangeSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {
             doc.publishSyncEvent(.syncFailed)
             publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .pushPull)
             publishEpochMismatchIfNeeded(error: error as? ConnectError, attachment: attachment)
+            // The server refused to store what was pushed and will refuse it again. `syncFailed`
+            // alone cannot be told apart from a network blip, so report the reason too.
+            self.publishWriteRejectedIfNeeded(error: error, attachment: attachment)
 
             Logger.error("[PP] c:\"\(self.key)\" err : \(error)")
 
@@ -1650,8 +1792,18 @@ public class Client {
      * retried after handling, it returns true.
      */
     @discardableResult
-    private func handleConnectError(_ error: Error?) async -> Bool {
+    func handleConnectError(_ error: Error?) async -> Bool {
         guard let connectError = error as? ConnectError else {
+            return false
+        }
+
+        // NOTE(hackerwins): `ErrDocumentSizeExceedsLimit` and `ErrChangeTooLarge` mean the server
+        // refused to store the pushed changes and will refuse the same pack again, while the
+        // shared `PushPull` RPC blocks pulls too. Not retryable; `syncInternal` publishes a
+        // `writeRejected` event so the app can say why. Checked ahead of the generic retry block
+        // below because the server sends both as `ResourceExhausted`. The sync loop never
+        // consults this for a document rejection: it parks that one attachment itself.
+        if Self.writeRejectionCode(of: connectError) != nil {
             return false
         }
 
@@ -1776,6 +1928,40 @@ public extension Client {
         self.yorkieService.setMockError(for: method, error: error, count: count)
     }
 
+    /// Refuses the requests `predicate` accepts with `error`. Test seam, active only when the
+    /// client was created with `isMockingEnabled`. See ``YorkieService/setMockError(for:error:where:)``.
+    internal func setMockError(for method: Connect.MethodSpec, error: ConnectError, where predicate: @escaping (any Message) -> Bool) {
+        self.yorkieService.setMockError(for: method, error: error, where: predicate)
+    }
+
+    /// Observes requests sent through `method`. Test seam, active only when the client was created
+    /// with `isMockingEnabled`. See ``YorkieService/observeRequests(for:_:)``.
+    internal func observeRequests(for method: Connect.MethodSpec, _ observer: ((any Message) -> Void)?) {
+        self.yorkieService.observeRequests(for: method, observer)
+    }
+
+    /// Makes `attachment` the client's attachment under `key` as an activated client with `actorID`,
+    /// so the Watch wiring can be driven without a server. Test seam.
+    internal func adoptAttachment<R: Attachable>(_ attachment: Attachment<R>, key: String, actorID: ActorID) {
+        self.status = .activated
+        self.id = actorID
+        self.actorID = actorID
+        self.attachmentMap[key] = attachment
+    }
+
+    /// Observes the messages Watch streams deliver. Test seam, active only when the client was
+    /// created with `isMockingEnabled`. See ``YorkieService/observeWatchResponses(_:)``.
+    internal func observeWatchResponses(_ observer: (@Sendable (WatchResponse) -> Void)?) {
+        self.yorkieService.observeWatchResponses(observer)
+    }
+
+    /// Runs `hook` after the RPC for `method` returns and before the caller sees the response.
+    /// Test seam, active only when the client was created with `isMockingEnabled`. See
+    /// ``YorkieService/setResponseHook(for:_:)``.
+    internal func setResponseHook(for method: Connect.MethodSpec, _ hook: ((any Message) async -> Void)?) {
+        self.yorkieService.setResponseHook(for: method, hook)
+    }
+
     /**
      * Calculates an exponential backoff interval based on the retry count
      */
@@ -1833,10 +2019,17 @@ public extension Client {
         self.authHeader.updateToken(token)
     }
 
-    private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
+    internal func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
         guard let connectError = error, let attachment else { return }
         let rawValue = errorCodeOf(error: connectError)
-        guard let code = YorkieError.Code(rawValue: rawValue), code == .errUnauthenticated else {
+        guard let code = YorkieError.Code(rawValue: rawValue) else {
+            return
+        }
+        // `ErrPermissionDenied` rides the same event as `ErrUnauthenticated`, but only from
+        // PushPull: both mean the server refused this client's writes, and the app needs to tell
+        // that apart from a network failure. A watch denial is left out.
+        let isDeniedPush = code == .errPermissionDenied && method.isPushPull
+        guard code == .errUnauthenticated || isDeniedPush else {
             return
         }
 
@@ -1865,7 +2058,7 @@ public extension Client {
 
 // MARK: - Channel watch response handling
 
-private extension Client {
+extension Client {
     @MainActor
     func handleWatchChannelResponse(channelKey: String, response: WatchResponse) {
         guard let channel = getChannelAttachment(channelKey)?.resource else { return }
@@ -1899,6 +2092,7 @@ private extension Client {
             case .unspecified, .UNRECOGNIZED:
                 break
             }
+        case .heartbeat: break
         case .none:
             break
         }
@@ -2265,6 +2459,25 @@ extension Client {
         }
     }
 
+    /// Sends the attach request with the document's pack, under ``pushWithPresenceBase(_:build:send:)``.
+    ///
+    /// - Parameters:
+    ///   - request: The attach request. Its change pack is set to the pack that was sent last.
+    ///   - doc: The document being attached.
+    /// - Returns: The response to the attach that was sent last.
+    func sendAttach(_ request: inout Yorkie_V1_AttachDocumentRequest,
+                    for doc: Document) async -> ResponseMessage<Yorkie_V1_AttachDocumentResponse>
+    {
+        let docKey = doc.getKey()
+        return await self.pushWithPresenceBase(doc,
+                                               build: { Converter.toChangePack(pack: doc.createChangePack()) },
+                                               send: { pack in
+                                                   request.changePack = pack
+                                                   return await self.yorkieService.attachDocument(request: request,
+                                                                                                  headers: self.authHeader.makeHeader(docKey))
+                                               })
+    }
+
     /// Re-anchors a document whose resume the server rejected for a stale epoch, and retries
     /// the attach once.
     ///
@@ -2282,7 +2495,7 @@ extension Client {
     /// - Returns: The response to the retried attach.
     func retryAttachAfterReanchor(doc: Document,
                                   request: inout Yorkie_V1_AttachDocumentRequest,
-                                  initialPresence: PresenceData,
+                                  initialPresence: InitialPresence,
                                   disablePresence: Bool) async
         -> ResponseMessage<Yorkie_V1_AttachDocumentResponse>
     {
@@ -2299,7 +2512,7 @@ extension Client {
         if !disablePresence {
             do {
                 try doc.update { _, presence in
-                    presence.set(initialPresence)
+                    initialPresence.apply(to: presence)
                 }
             } catch {
                 // Not fatal to the retry, but never silent: the same input fails loudly on a
@@ -2309,9 +2522,7 @@ extension Client {
             }
         }
 
-        request.changePack = Converter.toChangePack(pack: doc.createChangePack())
-        return await self.yorkieService.attachDocument(request: request,
-                                                       headers: self.authHeader.makeHeader(docKey))
+        return await self.sendAttach(&request, for: doc)
     }
 
     /// Discards a resumed document's persisted state when the server purged the document
@@ -2700,10 +2911,10 @@ extension Client {
     ///   - presenceData: The presence to set.
     ///   - lease: The session lease already held for this attach, released if seeding fails.
     /// - Throws: Whatever the update throws, after letting the lease go.
-    func seedInitialPresence(_ doc: Document, _ presenceData: PresenceData, lease: SessionLockHandle?) async throws {
+    func seedInitialPresence(_ doc: Document, _ initialPresence: InitialPresence, lease: SessionLockHandle?) async throws {
         do {
             try doc.update { _, presence in
-                presence.set(presenceData)
+                initialPresence.apply(to: presence)
             }
         } catch {
             // Seeding can throw on schema validation or a size limit. The lease is already
@@ -2740,6 +2951,25 @@ extension Client {
     func releaseSession(for doc: Document, attachment: Attachment<Document>?) async {
         await self.quiescePersistence(for: doc)
         await self.releaseLease(of: attachment)
+    }
+
+    /// Tears down offline persistence for a document that stays attached: stops persisting it,
+    /// waits for a write already queued, and removes the stored copy and its tracked state.
+    ///
+    /// The lease is kept. ``resync(_:discardLocalChanges:initialPresence:)`` calls this before it
+    /// empties the queue, so no log keeps the refused changes to replay after the re-anchor.
+    ///
+    /// - Parameter doc: The document whose persisted state is dropped.
+    func discardPersistedState(for doc: Document) async {
+        await self.quiescePersistence(for: doc)
+        let key = self.storeKey(doc.getKey())
+        self.persistStates.removeValue(forKey: key)
+        do {
+            try await self.store?.remove(docKey: key)
+        } catch {
+            Logger.warning("[Store] could not remove \(doc.getKey()) before resync (\(error)); " +
+                "the re-attach will re-validate whatever is left")
+        }
     }
 
     /// Stops persisting `doc` and waits for any write already queued for it to finish.

@@ -133,11 +133,8 @@ final class DocumentIntegrationTests: XCTestCase {
 
         XCTAssertEqual(doc2Content, doc3Content)
 
-        try await self.c1.detach(self.d2)
-        try await self.c2.detach(self.d3)
-
         try await self.c1.deactivate()
-        try await self.c1.deactivate()
+        try await self.c2.deactivate()
     }
 
     @MainActor

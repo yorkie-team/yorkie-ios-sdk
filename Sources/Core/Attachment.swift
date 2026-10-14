@@ -51,7 +51,16 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     var persistsToStore: Bool = false
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
+    /// Identifies the watch stream this attachment currently owns.
+    ///
+    /// The client bumps it whenever a new stream starts or the current one is abandoned as idle,
+    /// and a stream ignores its own messages and completion once its generation is stale, so an
+    /// abandoned stream can neither reach the reconnect path nor cancel its successor.
+    var watchGeneration = 0
+    /// Detects the current watch stream going silent past the server heartbeat.
+    var watchIdleWatchdog: WatchIdleWatchdog?
     private var isDisconnected: Bool
+    private var writeRejected = false
 
     init(
         resource: R,
@@ -107,12 +116,47 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         return syncMode != .manual && (hasLocalChanges || (self.changeEventReceived ?? false))
     }
 
+    /// Marks this attachment as holding changes the server refused to store
+    /// (``YorkieError/Code/errDocumentSizeExceedsLimit``, ``YorkieError/Code/errChangeTooLarge``).
+    ///
+    /// The sync loop then skips this attachment alone, instead of the rejection taking down the
+    /// loop shared by every other attachment of the client. Documents only.
+    func markWriteRejected() {
+        self.writeRejected = true
+    }
+
+    /// Returns whether the sync loop should skip this attachment because the server rejected its
+    /// last push outright.
+    func isWriteRejected() -> Bool {
+        return self.writeRejected
+    }
+
+    /// Lets the sync loop pick this attachment up again, once a push has been accepted. An
+    /// explicit `sync(doc)` after the document was shrunk is the way back in.
+    func clearWriteRejected() {
+        self.writeRejected = false
+    }
+
     /// Updates the last heartbeat timestamp to the current time.
     func updateHeartbeatTime() {
         self.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
+    /// Starts a new watch stream generation and returns it, which makes any older stream stale.
+    func beginWatchStream() -> Int {
+        self.watchGeneration += 1
+        return self.watchGeneration
+    }
+
+    /// Stops the idle watchdog without reporting idle.
+    func cancelWatchIdleWatchdog() {
+        self.watchIdleWatchdog?.cancel()
+        self.watchIdleWatchdog = nil
+    }
+
     func connectStream(_ stream: YorkieServerStream?) {
+        self.watchIdleWatchdog?.cancel()
+        self.watchIdleWatchdog = nil
         // Cancel the old stream if it exists to prevent it from interfering
         if let oldStream = self.remoteWatchStream {
             oldStream.cancel()
@@ -125,6 +169,8 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     }
 
     func disconnectStream() {
+        self.watchIdleWatchdog?.cancel()
+        self.watchIdleWatchdog = nil
         self.remoteWatchStream?.cancel()
         self.remoteWatchStream = nil
 

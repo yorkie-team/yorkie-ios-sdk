@@ -49,7 +49,7 @@ final class CRDTTreeUndoCopyPathTests: XCTestCase {
             _ versionVector: VersionVector?
         ) throws -> (
             [TreeChange], [GCPair], DataSize, [CRDTTreeNode], Int, Int, Set<String>, [TreeRestoreSpan], [TreeRestoreSpan], Int, Int,
-            [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)]
+            [CRDTTreeNode], [(CRDTTreeNodeID, CRDTTreeNodeID)], [CRDTTreeNode]
         ) {
             var result = try super.edit(range, contents, splitLevel, editedAt, issueTimeTicket, versionVector)
             result.7 = []

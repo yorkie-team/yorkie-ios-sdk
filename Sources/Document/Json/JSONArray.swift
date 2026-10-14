@@ -499,12 +499,10 @@ public class JSONArray: CustomDebugStringConvertible {
             let counter = CRDTCounter<Int32>(value: value, createdAt: ticket)
             element.initialize(context: self.context, counter: counter)
 
-            let clone = counter.deepcopy()
+            try self.target.insert(value: counter, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(counter, parent: self.target)
 
-            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
-            self.context.registerElement(clone, parent: self.target)
-
-            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             return counter
@@ -512,12 +510,10 @@ public class JSONArray: CustomDebugStringConvertible {
             let counter = CRDTCounter<Int64>(value: value, createdAt: ticket)
             element.initialize(context: self.context, counter: counter)
 
-            let clone = counter.deepcopy()
+            try self.target.insert(value: counter, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(counter, parent: self.target)
 
-            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
-            self.context.registerElement(clone, parent: self.target)
-
-            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             return counter
@@ -525,12 +521,10 @@ public class JSONArray: CustomDebugStringConvertible {
             let counter = CRDTCounter<Int32>(dedupWithCreatedAt: ticket)
             element.initialize(context: self.context, counter: counter)
 
-            let clone = counter.deepcopy()
+            try self.target.insert(value: counter, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(counter, parent: self.target)
 
-            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
-            self.context.registerElement(clone, parent: self.target)
-
-            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: counter.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             return counter
@@ -538,12 +532,10 @@ public class JSONArray: CustomDebugStringConvertible {
             let text = CRDTText(rgaTreeSplit: RGATreeSplit(), createdAt: ticket)
             element.initialize(context: self.context, text: text)
 
-            let clone = text.deepcopy()
+            try self.target.insert(value: text, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(text, parent: self.target)
 
-            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
-            self.context.registerElement(clone, parent: self.target)
-
-            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: text, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: text.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             return text
@@ -554,12 +546,10 @@ public class JSONArray: CustomDebugStringConvertible {
             let tree = CRDTTree(root: root, createdAt: ticket)
             element.initialize(context: self.context, tree: tree)
 
-            let clone = tree.deepcopy()
+            try self.target.insert(value: tree, prevCreatedAt: previousCreatedAt)
+            self.context.registerElement(tree, parent: self.target)
 
-            try self.target.insert(value: clone, prevCreatedAt: previousCreatedAt)
-            self.context.registerElement(clone, parent: self.target)
-
-            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: tree, executedAt: ticket)
+            let operation = AddOperation(parentCreatedAt: self.target.createdAt, previousCreatedAt: previousCreatedAt, value: tree.deepcopy(), executedAt: ticket)
             self.context.push(operation: operation)
 
             return tree

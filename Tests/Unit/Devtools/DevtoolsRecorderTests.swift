@@ -605,10 +605,12 @@ final class DevtoolsRecorderTests: XCTestCase {
         // given
         let authEvent = AuthErrorEvent(value: AuthErrorValue(reason: "forbidden", method: .pushPull))
         let epochEvent = EpochMismatchEvent(value: EpochMismatchValue(method: "PushPull"))
+        let rejectedEvent = WriteRejectedEvent(value: WriteRejectedValue(code: .documentSizeExceedsLimit, reason: "full", method: "PushPull"))
 
         // when / then
         XCTAssertNil(DevtoolsEncoder.encode(event: authEvent))
         XCTAssertNil(DevtoolsEncoder.encode(event: epochEvent))
+        XCTAssertNil(DevtoolsEncoder.encode(event: rejectedEvent))
     }
 
     // MARK: DevtoolsRecorder — ring buffer behaviour
@@ -622,8 +624,9 @@ final class DevtoolsRecorderTests: XCTestCase {
         recorder.record(SyncStatusChangedEvent(value: .synced))
         recorder.record(AuthErrorEvent(value: AuthErrorValue(reason: "401", method: .watch)))
         recorder.record(EpochMismatchEvent(value: EpochMismatchValue(method: "PushPull")))
+        recorder.record(WriteRejectedEvent(value: WriteRejectedValue(code: .changeTooLarge, reason: "big", method: "PushPull")))
 
-        // then — connection + sync are captured; auth + epoch are ignored
+        // then — connection + sync are captured; auth + epoch + write-rejected are ignored
         XCTAssertEqual(recorder.count, 2)
     }
 

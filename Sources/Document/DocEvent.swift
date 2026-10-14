@@ -83,6 +83,15 @@ public enum DocEventType: String {
     case epochMismatch = "epoch-mismatch"
 
     /**
+     * `writeRejected` indicates the server refused to store this document's pushed
+     * changes for a reason that resending them cannot fix, such as the document being
+     * over its size limit. The sync loop parks this document while the client's other
+     * documents keep syncing, and the rejected changes stay applied locally but never
+     * reach the server until the app recovers.
+     */
+    case writeRejected = "write-rejected"
+
+    /**
      * `localChangesDropped` indicates the offline-persistence layer discarded
      * un-pushed local changes it could not reconcile with the server.
      */
@@ -299,6 +308,14 @@ public struct AuthErrorValue: Equatable {
         case watch
         case other(String)
 
+        /// Whether this is the PushPull method.
+        var isPushPull: Bool {
+            if case .pushPull = self {
+                return true
+            }
+            return false
+        }
+
         public var description: String {
             switch self {
             case .pushPull:
@@ -346,6 +363,33 @@ public struct EpochMismatchEvent: DocEvent {
     public let value: EpochMismatchValue
 }
 
+/// The reason and origin of a push the server refused for good.
+public struct WriteRejectedValue: Equatable {
+    /// The server code that says why the push was refused.
+    public enum Code: String, Equatable {
+        /// The document is over its size limit.
+        case documentSizeExceedsLimit = "ErrDocumentSizeExceedsLimit"
+        /// A single change is too large to store.
+        case changeTooLarge = "ErrChangeTooLarge"
+    }
+
+    /// Which refusal the server reported.
+    public let code: Code
+    /// The server's message for the refusal.
+    public let reason: String
+    /// The API method whose response surfaced the rejection. Currently always `"PushPull"`.
+    public let method: String
+}
+
+/// `WriteRejectedEvent` is published when the server refuses to store a document's pushed changes
+/// for a reason that resending them cannot fix. ``WriteRejectedValue/code`` tells a full document
+/// from a single oversized change, so an app can tell the user and switch the editor to read-only
+/// instead of mistaking the failure for a network error.
+public struct WriteRejectedEvent: DocEvent {
+    public let type: DocEventType = .writeRejected
+    public let value: WriteRejectedValue
+}
+
 /// The changes an offline resume had to discard, and why.
 public struct LocalChangesDroppedValue {
     /// Why the changes could not be reconciled with the server.
@@ -358,6 +402,11 @@ public struct LocalChangesDroppedValue {
         case actorMismatch = "actor-mismatch"
         /// The stored bytes could not be decoded at all, so nothing could be restored.
         case restoreFailed = "restore-failed"
+        /// The server refused this client's writes and ``Client/resync(_:discardLocalChanges:initialPresence:)``
+        /// took the refused changes out of the queue to re-anchor the document.
+        ///
+        /// Published once the detach has succeeded, i.e. once the changes are gone for good.
+        case writeDenied = "write-denied"
         /// The appended change log had a hole, so it could not be replayed and the snapshot
         /// was kept instead.
         ///

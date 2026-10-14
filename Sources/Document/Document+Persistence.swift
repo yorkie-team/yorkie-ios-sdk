@@ -79,6 +79,16 @@ struct PersistedDocumentState {
 /// `changes` field — reusing an existing message rather than adding a new one, the same
 /// reasoning upstream gives for reusing its `Snapshot` message in ``Converter/snapshotToBytes(root:presences:)``.
 /// Blob order and the 4-byte-LE framing are otherwise identical to upstream.
+///
+/// A second consequence of the protobuf blob (yorkie-js-sdk#1477): upstream's JSON change struct
+/// carries a presence patch's local-only `full` copy, so a pending patch survives a restart as a
+/// patch and can still be rewritten into the put it stands for. A protobuf `PresenceChange` has no
+/// field for `full`, and a bare patch cannot be rewritten, so a pending patch is persisted as the
+/// put of its `full` presence (``Converter/toPersistedChange(_:)``, which feeds this envelope and the
+/// append-only change log alike). No patch is pending after a restore. The cost is one full presence
+/// upload after a restart instead of a patch. The persisted change also records that it was minted as
+/// a patch (``Change/wasMintedAsPresencePatch``), so a restored document still heals a patch a server
+/// without the capability stored as empty, as upstream's does.
 public extension Document {
     /// Serializes the full restorable state of this document into a self-contained byte
     /// envelope: the root and presences (as a snapshot), the checkpoint, the change id, the
@@ -104,7 +114,7 @@ public extension Document {
         let changeIDBlob = try Converter.toChangeID(state.changeID).serializedData()
 
         var pbPendingChanges = PbChangePack()
-        pbPendingChanges.changes = Converter.toChanges(state.localChanges)
+        pbPendingChanges.changes = try Converter.toPersistedChanges(state.localChanges)
         let pendingChangesBlob = try pbPendingChanges.serializedData()
 
         let epochBlob = Data(String(self.getEpoch()).utf8)
@@ -138,6 +148,13 @@ public extension Document {
             epoch: decoded.epoch,
             docID: decoded.docID
         ))
+        // A persisted envelope is state an actor already held under this key: its root carries tickets
+        // that actor minted and its pending changes are about to be pushed under it. Mark the decoded
+        // document as having minted so an app that restores through this factory and attaches the
+        // result takes the re-issue claim exactly as the in-place `restoreFromBytes` does, and as not
+        // never-synced so it is never re-issued.
+        document.absorbedRemote = true
+        document.mintedOperations = true
         return document
     }
 
@@ -183,6 +200,10 @@ public extension Document {
             epoch: decoded.epoch,
             docID: decoded.docID
         ))
+        // See `fromBytes(key:bytes:opts:)`: persisted state was minted under an actor in an earlier
+        // session, so it is neither re-issuable nor free for a later document of the key.
+        self.absorbedRemote = true
+        self.mintedOperations = true
     }
 
     /// Serializes the clocks a sync advances: checkpoint, change id, epoch and document id.
@@ -278,7 +299,7 @@ public extension Document {
     internal func getPendingChangesAfter(_ clientSeq: UInt32) throws -> [StoredChange] {
         try self.persistenceSnapshot().localChanges
             .filter { $0.id.getClientSeq() > clientSeq }
-            .map { try StoredChange(clientSeq: $0.id.getClientSeq(), bytes: Converter.toChange($0).serializedData()) }
+            .map { try StoredChange(clientSeq: $0.id.getClientSeq(), bytes: Converter.toPersistedChange($0).serializedData()) }
     }
 
     /// Replays the appended change log onto a document just restored from its snapshot.
@@ -306,7 +327,7 @@ public extension Document {
         }
 
         let pbChanges = try stored.map { try PbChange(serializedBytes: $0.bytes) }
-        let changes = try Converter.fromChanges(pbChanges)
+        let changes = try Converter.fromPersistedChanges(pbChanges)
         try self.appendRestoredChanges(changes, ackedClientSeq: ackedClientSeq)
     }
 
@@ -322,6 +343,20 @@ public extension Document {
     /// - Returns: The document's pending local changes, in application order.
     internal func getPendingChangeStructs() -> [Change] {
         self.persistenceSnapshot().localChanges
+    }
+
+    /// Returns this client's own presence as stored: each value JSON-encoded to a string.
+    ///
+    /// ``getMyPresence()`` decodes the values to `Any`, which is lossy for a re-seed (number
+    /// widths, key order, null). A recovery that re-attaches with the presence it already holds
+    /// carries these strings through unchanged.
+    ///
+    /// - Returns: The encoded presence, or `nil` when the document has no actor or no entry.
+    internal func getMyEncodedPresence() -> StringValueTypeDictionary? {
+        guard let actorID = self.actorID else {
+            return nil
+        }
+        return self.persistenceSnapshot().presences[actorID]
     }
 
     /// Drops all local state that was seeded from a stale persisted envelope so the document
@@ -343,6 +378,11 @@ public extension Document {
             epoch: 0,
             docID: ""
         ))
+        // Back to a document that has absorbed nothing. `mintedOperations` stays: a push cannot be
+        // taken back.
+        self.absorbedRemote = false
+        // The counter is back at zero, so whatever hole a discard left is gone.
+        self.liftMintingSuspension()
     }
 }
 
@@ -396,7 +436,7 @@ private extension Document {
         let changeID = try Converter.fromChangeID(PbChangeID(serializedBytes: blobs[2]))
 
         let pbPendingChanges = try PbChangePack(serializedBytes: blobs[3])
-        let localChanges = try Converter.fromChanges(pbPendingChanges.changes)
+        let localChanges = try Converter.fromPersistedChanges(pbPendingChanges.changes)
 
         // Absent in a pre-epoch envelope, in which case the document re-learns the epoch from
         // the next server response.

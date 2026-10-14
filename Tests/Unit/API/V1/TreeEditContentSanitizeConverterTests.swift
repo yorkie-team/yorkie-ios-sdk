@@ -177,7 +177,7 @@ final class TreeEditContentSanitizeConverterTests: XCTestCase {
         var lamport: Int64 = 20
 
         // when
-        let (_, pairs, _, _, _, _, _, _, _, _, _, _, _) = try tree.editT((0, 0), [content], 0, self.ticket(10)) {
+        let (_, pairs, _, _, _, _, _, _, _, _, _, _, _, _) = try tree.editT((0, 0), [content], 0, self.ticket(10)) {
             defer { lamport += 1 }
             return self.ticket(lamport)
         }

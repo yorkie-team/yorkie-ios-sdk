@@ -348,15 +348,17 @@ class ConverterTests: XCTestCase {
 
             object.set(key: "boolean", value: boolean, executedAt: boolean.createdAt)
 
+            // An Object travels with its whole content, as in yorkie-js-sdk (`objectToBytes`): a value
+            // a reverse operation restores carries children the wire has no other operation for.
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(object))
-            XCTAssertEqual(CRDTObject(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
+            XCTAssertEqual(object.toJSON(), converted.toJSON())
 
             // Array
             let array = CRDTArray(createdAt: TimeTicket.initial)
 
             try array.insert(value: object, prevCreatedAt: TimeTicket.initial)
             converted = try Converter.fromElementSimple(pbElementSimple: Converter.toElementSimple(array))
-            XCTAssertEqual(CRDTArray(createdAt: TimeTicket.initial).toJSON(), converted.toJSON())
+            XCTAssertEqual(array.toJSON(), converted.toJSON())
         } catch {
             XCTFail("\(error)")
         }
@@ -557,5 +559,90 @@ class ConverterTests: XCTestCase {
         XCTAssertEqual(decoded.toJSON(), text.toJSON())
         XCTAssertEqual(decoded.getDataSize(), text.getDataSize())
         XCTAssertEqual(Converter.toText(decoded).text.nodes.count, pbText.nodes.count - 2)
+    }
+
+    // MARK: presence patch (yorkie-js-sdk#1477)
+
+    func test_presence_patch_goes_on_the_wire_with_only_the_changed_keys() throws {
+        let patch = PresenceChange.patch(presence: ["cursor": "1"], full: ["name": "\"a\"", "cursor": "1"])
+
+        let pb = Converter.toPresenceChange(presenceChange: patch)
+
+        XCTAssertEqual(pb.type, .patch)
+        XCTAssertEqual(pb.presence.data, ["cursor": "1"])
+        XCTAssertTrue(pb.removedKeys.isEmpty)
+    }
+
+    func test_presence_patch_decodes_without_a_full_presence() throws {
+        var pb = PbPresenceChange()
+        pb.type = .patch
+        pb.presence.data = ["cursor": "2"]
+
+        let decoded = try Converter.fromPresenceChange(pbPresenceChange: pb)
+
+        guard case .patch(let presence, let full) = decoded else {
+            return XCTFail("expected a patch, got \(decoded)")
+        }
+        XCTAssertEqual(presence, ["cursor": "2"])
+        XCTAssertNil(full)
+    }
+
+    func test_presence_patch_round_trips_through_a_change() throws {
+        let change = Change(id: ChangeID.initial,
+                            operations: [],
+                            presenceChange: .patch(presence: ["cursor": "1"], full: ["name": "\"a\"", "cursor": "1"]))
+
+        let converted = try XCTUnwrap(Converter.fromChanges(Converter.toChanges([change])).first)
+
+        guard case .patch(let presence, let full) = converted.presenceChange else {
+            return XCTFail("expected a patch, got \(String(describing: converted.presenceChange))")
+        }
+        XCTAssertEqual(presence, ["cursor": "1"])
+        XCTAssertNil(full, "`full` is local state and never crosses the wire")
+    }
+
+    func test_persisted_change_writes_a_patch_as_the_put_of_its_full_presence() throws {
+        let full = ["name": "\"a\"", "cursor": "1"]
+        let change = Change(id: ChangeID.initial, operations: [], presenceChange: .patch(presence: ["cursor": "1"], full: full))
+
+        let persisted = try Converter.toPersistedChange(change)
+
+        XCTAssertEqual(persisted.presenceChange.type, .put)
+        XCTAssertEqual(persisted.presenceChange.presence.data, full)
+
+        // A patch with no `full` (never minted locally) cannot be widened, so it is written as is.
+        let bare = Change(id: ChangeID.initial, operations: [], presenceChange: .patch(presence: ["cursor": "1"], full: nil))
+        XCTAssertEqual(try Converter.toPersistedChange(bare).presenceChange.type, .patch)
+    }
+
+    func test_persisted_change_remembers_that_a_put_was_minted_as_a_patch() throws {
+        let full = ["name": "\"a\"", "cursor": "1"]
+        let patch = Change(id: ChangeID.initial, operations: [], presenceChange: .patch(presence: ["cursor": "1"], full: full))
+        let put = Change(id: ChangeID.initial, operations: [], presenceChange: .put(presence: full))
+
+        let restoredPatch = try XCTUnwrap(Converter.fromPersistedChanges([Converter.toPersistedChange(patch)]).first)
+        let restoredPut = try XCTUnwrap(Converter.fromPersistedChanges([Converter.toPersistedChange(put)]).first)
+
+        XCTAssertTrue(restoredPatch.wasMintedAsPresencePatch)
+        XCTAssertFalse(restoredPut.wasMintedAsPresencePatch)
+
+        // Persisting the restored change again keeps the mark, so it survives any number of restarts.
+        let again = try XCTUnwrap(Converter.fromPersistedChanges([Converter.toPersistedChange(restoredPatch)]).first)
+        XCTAssertTrue(again.wasMintedAsPresencePatch)
+
+        // The mark is local-only: it never reaches a pushed change, and an undo mark is independent.
+        XCTAssertTrue(Converter.toChange(restoredPatch).unknownFields.data.isEmpty)
+        XCTAssertFalse(restoredPatch.isUndoRedo)
+    }
+
+    func test_persisted_change_keeps_the_undo_and_the_patch_marks_apart() throws {
+        let full = ["name": "\"a\""]
+        var change = Change(id: ChangeID.initial, operations: [], presenceChange: .patch(presence: ["name": "\"a\""], full: full))
+        change.markAsUndoRedo()
+
+        let restored = try XCTUnwrap(Converter.fromPersistedChanges([Converter.toPersistedChange(change)]).first)
+
+        XCTAssertTrue(restored.isUndoRedo)
+        XCTAssertTrue(restored.wasMintedAsPresencePatch)
     }
 }

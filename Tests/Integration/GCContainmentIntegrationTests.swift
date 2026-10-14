@@ -93,22 +93,11 @@ final class GCContainmentIntegrationTests: XCTestCase {
     /// exercising the restore-duplicates-identity path this release fixes
     /// under sustained pressure.
     ///
-    /// **Scope note -- convergence is deliberately not asserted here, unlike
-    /// upstream.** Upstream reorders with `r.items.splice(0, 0, plain)`, and
-    /// `buildCRDTElement` builds the object's members first so the whole literal
-    /// goes out as ONE `Add`. iOS accepts the same literal now, but still
-    /// inserts an empty container and pushes the members as their own
-    /// operations -- so two peers reordering concurrently interleave a different
-    /// sequence than upstream's, and the documents end up disagreeing about the
-    /// re-inserted entry.
-    ///
-    /// That was first assumed to be an artifact of this test having to spell the
-    /// insert out as an empty object plus `Set`s. It is not: with the literal
-    /// insert in place the divergence reproduces byte-for-byte, and it also
-    /// reproduces on the commit before the v0.7.21 fix (`160aa95dc2^`). Closing
-    /// it means porting `buildCRDTElement`, which is its own change. What this
-    /// test pins meanwhile is what #1341 is actually about: the clients keep
-    /// syncing.
+    /// The two documents are also asserted to converge, as upstream does. They used to disagree on
+    /// iOS (one peer ended holding an empty `{}` where an item should be) because
+    /// `Converter.toElementSimple` never encoded the content of an Object or Array value, so the
+    /// reverse of a Remove -- a Set/Add carrying a whole element -- reached the other peer empty.
+    /// Encoding it, as yorkie-js-sdk does, closed the gap (yorkie-js-sdk#1449).
     @MainActor
     func test_keeps_syncing_while_two_peers_reorder_edit_and_undo_one_element() async throws {
         try await withTwoClientsAndDocuments(self.description) { c1, d1, c2, d2 in
@@ -198,25 +187,7 @@ final class GCContainmentIntegrationTests: XCTestCase {
             try d2.update({ root, _ in root.pingD2 = Int64(2) }, "ping d2")
             try await sync()
 
-            // Upstream asserts the two documents agree here. On iOS they do
-            // not, so the assertion is kept and marked expected-to-fail rather
-            // than deleted.
-            //
-            // STRICT deliberately: if the two documents ever start converging,
-            // the expected failure does not fire and this test FAILS, which is
-            // the report we want -- a non-strict block would pass silently and
-            // the gap would close unnoticed. The divergence is deterministic
-            // (verified over repeated standalone runs and a full-suite run), so
-            // strict does not make this flaky.
-            //
-            // The divergence is real and pre-existing -- it reproduces
-            // byte-for-byte on `160aa95dc2^` and with `Sources/Document`
-            // reverted to `main` -- but it is not small: d1 ends holding an
-            // empty `{}` where an item should be, and the other item loses its
-            // `id`, while d2 keeps both. See the scope note above.
-            XCTExpectFailure("iOS array reorder/undo convergence gap -- pre-existing, not yorkie-js-sdk#1341; upstream asserts convergence here") {
-                XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON(), "the two documents disagree after the final edit")
-            }
+            XCTAssertEqual(d1.toSortedJSON(), d2.toSortedJSON(), "the two documents disagree after the final edit")
 
             for (name, json) in [("d1", d1.toSortedJSON()), ("d2", d2.toSortedJSON())] {
                 XCTAssertTrue(json.contains("\"pingD1\":1"), "\(name) never received d1's edit -- it stopped applying change packs")

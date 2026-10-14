@@ -144,6 +144,27 @@ public class Document: Attachable {
     private(set) var changeID: ChangeID = .initial
     var checkpoint: Checkpoint = .initial
     private var localChanges = [Change]()
+
+    /// Whether this document took in state it did not mint itself: a snapshot, a remote change or a
+    /// persisted envelope.
+    ///
+    /// Such a document is not "never synced" even when its checkpoint, status and version vector
+    /// still look untouched (a snapshot pack can carry the initial checkpoint), so the pre-attach
+    /// re-issue (``setActor(_:reissue:)``) leaves it alone. Set by ``applySnapshot(_:_:_:_:)``, by a
+    /// change applied with ``OpSource/remote`` and by the restore paths; cleared by
+    /// ``resetForReanchor()``. Unlike a plain "applied changes" flag it is not set by
+    /// ``applyChanges(_:source:)`` as a whole, because this SDK also replays its own local changes
+    /// through it.
+    var absorbedRemote = false
+
+    /// Whether this document has produced at least one local change carrying operations, so tickets
+    /// naming its actor may already be in the document its key names.
+    ///
+    /// Decoding a persisted envelope sets it too: that state was minted under an actor in an earlier
+    /// session. It is never cleared -- a push cannot be taken back -- and it is what ``Client``
+    /// consults to decide whether the actor's lamport space in a document key is still free for a
+    /// re-issue.
+    var mintedOperations = false
     private var maxSizeLimit: Int
     private var schemaRules: [Rule] = []
 
@@ -154,6 +175,10 @@ public class Document: Attachable {
     /// force-compacted while offline the server sees a stale epoch and rejects the
     /// resume, which should drive a store-backed re-anchor via ``resetForReanchor()``.
     private var epoch: Int64 = 0
+
+    /// What this document knows about the server's presence-patch support and the base it holds for
+    /// this client. See ``PresenceBaseState`` and `Document+PresenceBase.swift`.
+    var presenceBase = PresenceBaseState()
 
     /// The server-assigned document id recorded after a successful attach via
     /// ``setDocID(_:)``. Persisted by ``toBytes()`` so a restored offline session can
@@ -169,6 +194,15 @@ public class Document: Attachable {
     /// Whether an `update` is in progress. Undo/redo is not allowed during an update.
     private var isUpdating = false
 
+    /// Whether minting is suspended because ``discardLocalChanges()`` left a `clientSeq` hole.
+    ///
+    /// While set, every minting entry point (`update`, undo, redo) refuses with
+    /// ``YorkieError/Code/errRefused`` instead of queueing a change the server can only reject
+    /// with `ErrInvalidClientSeq` or the re-anchor would wipe unreported. Lifted by
+    /// ``restoreLocalChanges(_:)`` (hole filled back in) or ``resetForReanchor()`` (counter back
+    /// to zero), the only two ways out of that state.
+    private var mintingSuspended = false
+
     private var root = CRDTRoot()
     private var clone: (root: CRDTRoot, presences: [ActorID: StringValueTypeDictionary])?
 
@@ -180,6 +214,7 @@ public class Document: Attachable {
     private var syncSubscribeCallback: SubscribeCallback?
     private var authErrorSubscribeCallback: SubscribeCallback?
     private var epochMismatchSubscribeCallback: SubscribeCallback?
+    private var writeRejectedSubscribeCallback: SubscribeCallback?
 
     /**
      * `onlineClients` is a set of client IDs that are currently online.
@@ -220,6 +255,7 @@ public class Document: Attachable {
         guard self.status != .removed else {
             throw YorkieError(code: .errDocumentRemoved, message: "\(self) is removed.")
         }
+        try self.ensureMintable("Update")
 
         guard let actorID = self.actorID else {
             throw YorkieError(code: .errUnexpected, message: "actor ID is null.")
@@ -239,7 +275,7 @@ public class Document: Attachable {
             self.clone?.presences[actorID] = [:]
         }
 
-        var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:])
+        var presence = Presence(changeContext: context, presence: self.clone?.presences[actorID] ?? [:], patchable: self.canPatchPresence())
 
         // NOTE: the updater must not call undo/redo; isUpdating guards against that.
         self.isUpdating = true
@@ -373,7 +409,8 @@ public class Document: Attachable {
             }
         }
 
-        self.localChanges.append(change)
+        self.queueLocalChange(change)
+        self.mintedOperations = self.mintedOperations || change.hasOperations
         if !executionResult.reverseOps.isEmpty {
             self.internalHistory.pushUndo(executionResult.reverseOps)
         }
@@ -437,14 +474,14 @@ public class Document: Attachable {
      * `canUndo` returns whether there are any operations to undo.
      */
     public var canUndo: Bool {
-        self.internalHistory.hasUndo && !self.isUpdating
+        self.internalHistory.hasUndo && !self.isUpdating && self.isMintable
     }
 
     /**
      * `canRedo` returns whether there are any operations to redo.
      */
     public var canRedo: Bool {
-        self.internalHistory.hasRedo && !self.isUpdating
+        self.internalHistory.hasRedo && !self.isUpdating && self.isMintable
     }
 
     /**
@@ -500,6 +537,7 @@ public class Document: Attachable {
         if self.isUpdating {
             throw YorkieError(code: .errRefused, message: "\(isUndo ? "Undo" : "Redo") is not allowed during an update")
         }
+        try self.ensureMintable(isUndo ? "Undo" : "Redo")
 
         // NOTE: The refusal above must not drop the clone: an updater is holding
         // a proxy over it, and `update` reads it again after the updater returns.
@@ -586,7 +624,7 @@ public class Document: Attachable {
             context.push(operation: op)
         }
 
-        let change = context.toChange()
+        var change = context.toChange()
         // Execute on the clone first, then on the real root.
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: .undoRedo)
         let executionResult: ChangeExecutionResult
@@ -634,7 +672,11 @@ public class Document: Attachable {
             return
         }
 
-        self.localChanges.append(change)
+        // Remember the source this change ran under: a replay of the queue has to use it again.
+        // See ``Change/isUndoRedo``.
+        change.markAsUndoRedo()
+        self.queueLocalChange(change)
+        self.mintedOperations = self.mintedOperations || change.hasOperations
         self.changeID = context.getNextID()
         // After the change id advances, so a persist driven off this hook cannot serialize a
         // document whose pending change is present but whose id has not moved. Ordering rather
@@ -722,6 +764,15 @@ public class Document: Attachable {
     }
 
     /**
+     * `subscribeWriteRejected` registers a callback to subscribe to events on the document.
+     * The callback will be called when the server refuses to store this document's pushed
+     * changes for a reason that resending them cannot fix (``WriteRejectedValue/Code``).
+     */
+    public func subscribeWriteRejected(_ callback: @escaping SubscribeCallback) {
+        self.writeRejectedSubscribeCallback = callback
+    }
+
+    /**
      * `unsubscribe` unregisters a callback to subscribe to events on the document.
      */
     public func unsubscribe(_ targetPath: String? = nil) {
@@ -768,6 +819,13 @@ public class Document: Attachable {
     }
 
     /**
+     * `unsubscribeWriteRejected` unregisters the write-rejected callback.
+     */
+    public func unsubscribeWriteRejected() {
+        self.writeRejectedSubscribeCallback = nil
+    }
+
+    /**
      * `applyChangePack` applies the given change pack into this document.
      * 1. Remove local changes applied to server.
      * 2. Update the checkpoint.
@@ -811,6 +869,10 @@ public class Document: Attachable {
         // subsequent attach/sync (and any persisted envelope) presents it back.
         self.epoch = pack.getEpoch()
 
+        // 02-2. Learn whether this server takes presence patches, and remember whether that leaves a
+        // presence to heal.
+        let needsHeal = self.learnPresenceCapability(pack)
+
         // 03. Do Garbage collection.
         if !hasSnapshot, let versionVector = pack.getVersionVector() {
             self.garbageCollect(minSyncedVersionVector: versionVector)
@@ -820,6 +882,10 @@ public class Document: Attachable {
         if pack.isRemoved {
             self.applyStatus(.removed)
         }
+
+        // 05. Heal a presence the server may have stored as empty. Deferred to here so the put is
+        // minted against the state this pack left behind.
+        self.healPresenceBase(needed: needsHeal)
 
         Logger.trace("\(self.root.toJSON())")
     }
@@ -840,6 +906,14 @@ public class Document: Attachable {
      */
     func acknowledgePushedChanges(_ pack: ChangePack) {
         let clientSeq = pack.getCheckpoint().getClientSeq()
+
+        // The capabilities describe the server that took this push, not the content being skipped,
+        // so they are metadata as well -- and a push whose reply is dropped is exactly a push that
+        // carried the patch which a server without the capability has just stored as an empty
+        // presence. Skipping the heal here would leave a document in PushOnly/SyncOff patching into
+        // the void for as long as it stays there.
+        let needsHeal = self.learnPresenceCapability(pack)
+
         self.removePushedLocalChanges(clientSeq: Int64(clientSeq))
         self.checkpoint.forward(other: Checkpoint(serverSeq: self.checkpoint.getServerSeq(), clientSeq: clientSeq))
 
@@ -855,6 +929,10 @@ public class Document: Attachable {
         if pack.isRemoved {
             self.applyStatus(.removed)
         }
+
+        // Minted last, so the put is queued behind the ack that just dropped the pushed changes
+        // rather than in front of it.
+        self.healPresenceBase(needed: needsHeal)
     }
 
     /**
@@ -1172,6 +1250,7 @@ public class Document: Attachable {
         let (root, presences) = try Converter.bytesToSnapshot(bytes: snapshot)
         self.root = CRDTRoot(rootObject: root)
         self.presences = presences
+        self.absorbedRemote = true
         self.changeID = self.changeID.setClocks(
             with: snapshotVector.maxLamport(),
             vector: snapshotVector
@@ -1186,7 +1265,10 @@ public class Document: Attachable {
         // them after applying the snapshot, as local changes are not included in the snapshot data.
         // Afterward, we should publish a snapshot event with the latest
         // version of the document to ensure the user receives the most up-to-date snapshot.
-        try self.applyChanges(self.localChanges, source: .local)
+        //
+        // Each queued change is replayed under the source it originally ran with: see
+        // ``replaySource(of:)``.
+        try self.replayLocalChanges(self.localChanges)
         self.clearHistory()
 
         let hexSnapshotVector = try Converter.versionVectorToHex(vector: snapshotVector)
@@ -1221,6 +1303,17 @@ public class Document: Attachable {
             removeds:\(self.root.garbageElementSetSize)
             """
         )
+    }
+
+    /**
+     * `replayLocalChanges` applies the given queued local changes, each under the source it
+     * originally ran with (``replaySource(of:)``). A plain `applyChanges(_:source: .local)` would
+     * run an operation an undo had skipped, so every replay of the queue goes through here.
+     */
+    func replayLocalChanges(_ changes: [Change]) throws {
+        for change in changes {
+            try self.applyChange(change, source: Self.replaySource(of: change))
+        }
     }
 
     /**
@@ -1261,6 +1354,9 @@ public class Document: Attachable {
      * `applyChangeInternal` applies the given change into the clone and the root.
      */
     private func applyChangeInternal(_ change: Change, source: OpSource) throws {
+        if source == .remote {
+            self.absorbedRemote = true
+        }
         let clone = self.cloned
         try change.execute(root: clone.root, presences: &self.clone!.presences, source: source)
 
@@ -1466,6 +1562,10 @@ public class Document: Attachable {
         self.publish(EpochMismatchEvent(value: EpochMismatchValue(method: method)))
     }
 
+    func publishWriteRejectedEvent(code: WriteRejectedValue.Code, reason: String, method: String) {
+        self.publish(WriteRejectedEvent(value: WriteRejectedValue(code: code, reason: reason, method: method)))
+    }
+
     /// Publishes the changes an offline resume had to discard.
     ///
     /// - Parameters:
@@ -1545,6 +1645,8 @@ public class Document: Attachable {
             self.authErrorSubscribeCallback?(authErrorEvent, self)
         } else if let epochMismatchEvent = event as? EpochMismatchEvent {
             self.epochMismatchSubscribeCallback?(epochMismatchEvent, self)
+        } else if let writeRejectedEvent = event as? WriteRejectedEvent {
+            self.writeRejectedSubscribeCallback?(writeRejectedEvent, self)
         } else if let event = event as? ChangeEvent {
             var operations = [String: [any OperationInfo]]()
 
@@ -1810,6 +1912,33 @@ public class Document: Attachable {
         (self.root.object, self.presences, self.checkpoint, self.changeID, self.localChanges)
     }
 
+    /// Swaps in the state a pre-attach re-issue built aside, all at once.
+    ///
+    /// A bridge for ``Document/Document+Reissue.swift``: `localChanges`, `root`, `presences` and the
+    /// `changeID` setter are `private` to this file. The clone and the undo/redo stacks hold the old
+    /// tickets and cannot be re-issued the way the local changes are (a reverse operation carries
+    /// local-only state the wire format does not name), so they are dropped, which is the state every
+    /// other path that rewrites the root leaves them in.
+    ///
+    /// - Parameters:
+    ///   - changes: The re-issued local changes.
+    ///   - root: The root rebuilt by replaying `changes`.
+    ///   - presences: The presences rebuilt by replaying `changes`.
+    ///   - changeID: The re-keyed change id.
+    func installReissuedState(
+        changes: [Change],
+        root: CRDTRoot,
+        presences: [ActorID: StringValueTypeDictionary],
+        changeID: ChangeID
+    ) {
+        self.localChanges = changes
+        self.root = root
+        self.presences = presences
+        self.changeID = changeID
+        self.clone = nil
+        self.clearHistory()
+    }
+
     /// Moves this document's `clientSeq` counter forward to the given sequence, and never
     /// backward.
     ///
@@ -1873,7 +2002,7 @@ public class Document: Attachable {
         // Stricter than `document.ts`, which filters only the appended log against this same
         // watermark and leaves the snapshot's own queue alone. Applying the one rule to both
         // is what keeps the two consistent.
-        self.localChanges.removeAll { $0.id.getClientSeq() <= checkpoint.getClientSeq() }
+        self.dropAcknowledgedChanges(upTo: checkpoint.getClientSeq())
     }
 
     /// Replays a run of persisted changes onto this document and re-queues the un-acked
@@ -1888,8 +2017,15 @@ public class Document: Attachable {
         // content, so skipping an acked one would leave the root behind. Only the un-acked
         // ones are queued: re-pushing what the server has already taken presents a
         // `clientSeq` it will skip.
-        try self.applyChanges(changes, source: .local)
-        self.localChanges.append(contentsOf: changes.filter { $0.id.getClientSeq() > ackedClientSeq })
+        //
+        // A change an undo or a redo produced carries that through ``Change/isUndoRedo`` and is
+        // replayed under ``OpSource/undoRedo``: see ``replaySource(of:)``.
+        try self.replayLocalChanges(changes)
+        // Restoring counts as a reconnect: the server that answers the resume may never have seen
+        // this presence, so the first update owes it a full put.
+        self.queueRestoredChanges(changes.filter { $0.id.getClientSeq() > ackedClientSeq })
+        self.mintedOperations = self.mintedOperations || changes.contains { $0.hasOperations }
+        self.absorbedRemote = true
 
         // Adopt the last replayed change's ID as the document's own counter.
         //
@@ -1926,11 +2062,150 @@ public class Document: Attachable {
         self.presences = state.presences
         self.checkpoint = state.checkpoint
         self.changeID = state.changeID
-        self.localChanges = state.localChanges
+        // Also resets the presence-patch state, which `fromBytes`, `restoreFromBytes` and
+        // `resetForReanchor` share through here, so an in-place restore is left in the same state as
+        // the factory and a re-anchor leaves every flag down.
+        self.installPendingChanges(state.localChanges)
         self.epoch = state.epoch
         self.docID = state.docID
         self.clone = nil
         self.clearHistory()
+    }
+}
+
+/// The re-anchor window for ``Client/resync(_:discardLocalChanges:initialPresence:)``: discarding
+/// the queue and suspending minting. In an extension in this file, rather than the class body, to
+/// stay within this project's `type_body_length` budget while still reaching the private state.
+extension Document {
+    /// Takes the un-pushed local changes out of the queue and returns them.
+    ///
+    /// Used by ``Client/resync(_:discardLocalChanges:initialPresence:)`` when the server has
+    /// refused this client's writes: the queued changes would be re-sent and re-denied by every
+    /// later sync.
+    ///
+    /// The `clientSeq` counter is deliberately left where it is. The discarded changes already
+    /// minted those sequences, and rewinding would mint them a second time. The cost is a hole
+    /// relative to the acked checkpoint, so no change may be minted before the document is
+    /// re-anchored. The discard therefore suspends minting (see ``isMintable``) until
+    /// ``resetForReanchor()`` or ``restoreLocalChanges(_:)``. An empty discard leaves no hole and
+    /// suspends nothing.
+    ///
+    /// This does not undo the discarded changes on the root: they stay applied until the
+    /// re-anchor replaces the local state with the server's.
+    ///
+    /// - Returns: The discarded changes, in the order they were made.
+    func discardLocalChanges() -> [Change] {
+        let discarded = self.localChanges
+        self.localChanges = []
+        if !discarded.isEmpty {
+            self.mintingSuspended = true
+        }
+        return discarded
+    }
+
+    /// Puts changes taken by ``discardLocalChanges()`` back at the head of the queue.
+    ///
+    /// The rollback for a recovery that could not go through. The restored changes are older
+    /// than anything queued since, so they go in front; `clientSeq` is untouched because the
+    /// discard never moved it. Putting them back closes the hole, so minting is allowed again.
+    ///
+    /// - Parameter changes: The changes returned by ``discardLocalChanges()``.
+    func restoreLocalChanges(_ changes: [Change]) {
+        self.mintingSuspended = false
+        guard !changes.isEmpty else {
+            return
+        }
+        self.localChanges = changes + self.localChanges
+    }
+
+    /// Queues a change this document just minted and tracks what it did to the presence base.
+    func queueLocalChange(_ change: Change) {
+        self.localChanges.append(change)
+        self.trackPresenceBase(change)
+    }
+
+    /// Drops the queued changes the server has acknowledged, up to and including `clientSeq`.
+    func dropAcknowledgedChanges(upTo clientSeq: UInt32) {
+        self.localChanges.removeAll { $0.id.getClientSeq() <= clientSeq }
+        self.presenceBase.patchSent = self.hasPendingPresencePatch()
+    }
+
+    /// Queues changes rebuilt from persistence behind the ones already queued, and returns the
+    /// presence-patch state to what a restore may assume (see ``resetPresenceStateForRestore()``).
+    func queueRestoredChanges(_ changes: [Change]) {
+        self.localChanges.append(contentsOf: changes)
+        self.resetPresenceStateForRestore()
+    }
+
+    /// Replaces the queue with changes rebuilt from persistence, and returns the presence-patch state
+    /// to what a restore may assume (see ``resetPresenceStateForRestore()``).
+    func installPendingChanges(_ changes: [Change]) {
+        self.localChanges = changes
+        self.resetPresenceStateForRestore()
+    }
+
+    /// Whether a presence patch is still queued to be pushed, or a change minted as one that a
+    /// restore turned into a put. That is what makes a patch "outstanding": it reaches the server
+    /// verbatim (or did, before the restart), so a server without the capability would store it as an
+    /// empty presence and leave a presence to heal.
+    func hasPendingPresencePatch() -> Bool {
+        self.localChanges.contains {
+            if $0.wasMintedAsPresencePatch {
+                return true
+            }
+            if case .patch = $0.presenceChange {
+                return true
+            }
+            return false
+        }
+    }
+
+    /// Rewrites the earliest pending presence patch that carries its `full` presence into the put it
+    /// stands for, leaving every other change alone.
+    ///
+    /// A bridge for ``restorePresencePatches()``, which lives in another file and cannot see the
+    /// private queue.
+    ///
+    /// - Returns: Whether a patch was rewritten.
+    func rewriteFirstPendingPresencePatch() -> Bool {
+        for index in self.localChanges.indices {
+            // `full` is what the patch is rewritten into, and only a locally minted patch has one. A
+            // queued change is always local, so a patch without it cannot be rewritten and is left
+            // for the server to fold.
+            guard case .patch(_, let full?) = self.localChanges[index].presenceChange else {
+                continue
+            }
+            self.localChanges[index].setPresenceChange(.put(presence: full))
+            return true
+        }
+        return false
+    }
+
+    /// Lifts the minting suspension. A bridge for ``resetForReanchor()``, which lives in
+    /// another file and cannot see the private flag.
+    func liftMintingSuspension() {
+        self.mintingSuspended = false
+    }
+
+    /// Whether this document may queue a new local change.
+    ///
+    /// `false` only inside the re-anchor window ``Client/resync(_:discardLocalChanges:initialPresence:)``
+    /// opens, where `update`, `undo` and `redo` refuse with ``YorkieError/Code/errRefused``.
+    /// Callers that mint a change as a side effect of something else (a presence clear on
+    /// detach) read it instead of throwing out of an unrelated API. ``canUndo`` and ``canRedo``
+    /// read it too.
+    public var isMintable: Bool {
+        !self.mintingSuspended
+    }
+
+    /// Refuses a caller that would queue a local change while minting is suspended.
+    private func ensureMintable(_ action: String) throws {
+        if self.mintingSuspended {
+            throw YorkieError(
+                code: .errRefused,
+                message: "\(action) is not allowed on \"\(self.key)\" while it is being re-anchored after the server refused its changes"
+            )
+        }
     }
 }
 
