@@ -1862,8 +1862,9 @@ class CRDTTree: CRDTElement {
      * advancing past concurrent split siblings at each level (§7.5/§7.7) and
      * skipping the current operation's own split products.
      */
-    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws -> (DataSize, [(CRDTTreeNodeID, CRDTTreeNodeID)]) {
+    private func applySplitLevel(_ splitLevel: Int32, from: (parent: CRDTTreeNode, left: CRDTTreeNode, idx: Int, path: [Int]), editedAt: TimeTicket, issueTimeTicket: () -> TimeTicket, versionVector: VersionVector?) throws -> (diff: DataSize, recreatedIDs: [(CRDTTreeNodeID, CRDTTreeNodeID)], reported: (idx: Int, path: [Int])) {
         var diff = DataSize(data: 0, meta: 0)
+        var reported = SplitReportedPosition(idx: from.idx, path: from.path)
         // The `(removed element, its replacement)` pairs this split produced -- see
         // ``mergeSourceOf(splitNode:splitTarget:)``. Reported so a replica applying the split, its
         // own or a peer's, can re-point whatever it recorded against the removed one.
@@ -1910,11 +1911,58 @@ class CRDTTree: CRDTElement {
             if let splitNode, let recreated = self.mergeSourceOf(splitNode: splitNode, splitTarget: target) {
                 splitRecreatedIDs.append((recreated, splitNode.id))
             }
+            if splitNode != nil {
+                self.measureSplitLevel(parent, level: splitCount, into: &reported)
+            }
             left = parent
             parent = nextParent
             splitCount += 1
         }
-        return (diff, splitRecreatedIDs)
+        return (diff, splitRecreatedIDs, (reported.idx, reported.path))
+    }
+
+    /// The position a split is reported at, and the first boundary a level measured.
+    ///
+    /// `idx`/`path` start as the position the editor asked for; the first level that splits
+    /// replaces them with where the split actually opened on this replica.
+    private struct SplitReportedPosition {
+        var idx: Int
+        var path: [Int]
+        /// The first level that measured a boundary and its index, to check later levels against.
+        var boundary: (level: Int32, idx: Int)?
+    }
+
+    /// `measureSplitLevel` measures where the split at `level` opened, at the end of what stayed in
+    /// `parent`, and publishes the first level's position into `reported`.
+    ///
+    /// Concurrent inserts at the boundary stay on its left (§7.3) and the per-iteration advance can
+    /// move past unknown split siblings (§7.5), so the requested position is not where the split
+    /// landed. The measurement is taken on the tree after the split, in the space `toIndex`
+    /// measures (tombstones are not counted). Later levels only warn when their boundary does not
+    /// nest one to the right per level. A throw degrades to the requested position; the index and
+    /// path are published together, only once both calls returned.
+    private func measureSplitLevel(_ parent: CRDTTreeNode, level: Int32, into reported: inout SplitReportedPosition) {
+        // Live children only: a tombstone takes no room in the index and `toIndex`/`toPath` on a
+        // removed node cannot be resolved.
+        let last = parent.children.last ?? parent
+        do {
+            let idx = try self.toIndex(parent, last)
+            let path = try self.toPath(parent, last)
+            if level == 0 {
+                reported.idx = idx
+                reported.path = path
+            }
+            if let boundary = reported.boundary {
+                let expected = boundary.idx + Int(level - boundary.level)
+                if idx != expected {
+                    Logger.warning("[TR] split level \(level) opened at \(idx), not at \(expected) as level \(boundary.level) implies; the reported split position describes the inner level only")
+                }
+            } else {
+                reported.boundary = (level, idx)
+            }
+        } catch {
+            Logger.warning("[TR] failed to measure split position: \(error)")
+        }
     }
 
     /// `narrowedCollectRange` narrows the edit traversal range when `fromLeft` and
@@ -2117,16 +2165,16 @@ class CRDTTree: CRDTElement {
         // re-point whatever it recorded against the removed one.
         var splitRecreatedIDs: [(CRDTTreeNodeID, CRDTTreeNodeID)] = []
         if splitLevel > 0 {
-            let (splitDiff, recreatedIDs) = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
+            let (splitDiff, recreatedIDs, splitFrom) = try self.applySplitLevel(splitLevel, from: (fromParent, fromLeft, fromIdx, fromPath), editedAt: editedAt, issueTimeTicket: issueTimeTicket, versionVector: versionVector)
             diff.addDataSizes(others: splitDiff)
             splitRecreatedIDs = recreatedIDs
 
             changes.append(TreeChange(actor: editedAt.actorID,
                                       type: .content,
-                                      from: fromIdx,
-                                      to: fromIdx,
-                                      fromPath: fromPath,
-                                      toPath: fromPath,
+                                      from: splitFrom.idx,
+                                      to: splitFrom.idx,
+                                      fromPath: splitFrom.path,
+                                      toPath: splitFrom.path,
                                       value: nil,
                                       splitLevel: 0))
         }
