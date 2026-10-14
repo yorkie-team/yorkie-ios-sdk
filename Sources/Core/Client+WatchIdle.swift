@@ -67,17 +67,23 @@ extension Client {
         }
     }
 
-    /// Builds the Watch request for a channel, declaring the stable actor like
-    /// ``makeDocumentWatchRequest(clientID:actorID:documentID:heartbeatIntervalMs:)``.
+    /// Builds the Watch request for a channel.
+    ///
+    /// Unlike ``makeDocumentWatchRequest(clientID:actorID:documentID:heartbeatIntervalMs:)`` it
+    /// declares no actor: a channel session is not a document actor, and yorkie-js-sdk v0.7.25
+    /// sends only the client id, the heartbeat interval and the resource.
+    ///
+    /// - Parameters:
+    ///   - clientID: The session id of this client.
+    ///   - channelKey: The key of the channel to watch.
+    ///   - heartbeatIntervalMs: The heartbeat interval to ask the server for, or `0` for none.
     static func makeChannelWatchRequest(
         clientID: String,
-        actorID: ActorID?,
         channelKey: String,
         heartbeatIntervalMs: Int64
     ) -> WatchRequest {
         return WatchRequest.with {
             $0.clientID = clientID
-            $0.actorID = actorID ?? ""
             $0.heartbeatIntervalMs = heartbeatIntervalMs
             $0.resources = [
                 ResourceDescriptor.with {
@@ -96,9 +102,9 @@ extension Client {
         Self.makeDocumentWatchRequest(clientID: clientID, actorID: self.getActorID(), documentID: documentID, heartbeatIntervalMs: self.watchHeartbeatIntervalMs)
     }
 
-    /// Builds the Watch request for a channel with this client's actor and heartbeat interval.
+    /// Builds the Watch request for a channel with this client's heartbeat interval.
     func makeChannelWatchRequest(clientID: String, channelKey: String) -> WatchRequest {
-        Self.makeChannelWatchRequest(clientID: clientID, actorID: self.getActorID(), channelKey: channelKey, heartbeatIntervalMs: self.watchHeartbeatIntervalMs)
+        Self.makeChannelWatchRequest(clientID: clientID, channelKey: channelKey, heartbeatIntervalMs: self.watchHeartbeatIntervalMs)
     }
 }
 

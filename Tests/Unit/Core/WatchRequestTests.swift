@@ -34,18 +34,25 @@ final class WatchRequestTests: XCTestCase {
         XCTAssertEqual(request.actorID, "")
     }
 
-    func test_channel_watch_request_declares_the_stable_actor() {
-        let request = Client.makeChannelWatchRequest(clientID: "session", actorID: "stable", channelKey: "room", heartbeatIntervalMs: 0)
-
-        XCTAssertEqual(request.actorID, "stable")
-        XCTAssertEqual(request.resources.first?.channel.channelKey, "room")
-    }
-
-    func test_channel_watch_request_never_sends_the_session_id_as_the_actor() {
-        let request = Client.makeChannelWatchRequest(clientID: "session", actorID: nil, channelKey: "room", heartbeatIntervalMs: 0)
+    func test_channel_watch_request_does_not_declare_an_actor() {
+        // yorkie-js-sdk v0.7.25 createChannelWatchStream sends only clientId, heartbeatIntervalMs and
+        // resources: a channel session is not a document actor.
+        let request = Client.makeChannelWatchRequest(clientID: "session", channelKey: "room", heartbeatIntervalMs: 5000)
 
         XCTAssertEqual(request.clientID, "session")
         XCTAssertEqual(request.actorID, "")
+        XCTAssertEqual(request.heartbeatIntervalMs, 5000)
+        XCTAssertEqual(request.resources.first?.channel.channelKey, "room")
+    }
+
+    func test_the_client_never_sends_its_actor_on_the_channel_watch_request() {
+        let client = Client("http://localhost", ClientOptions(), isMockingEnabled: true)
+        let attachment = Attachment(resource: Document(key: "doc"), resourceID: "r")
+        client.adoptAttachment(attachment, key: "doc", actorID: "stable")
+
+        XCTAssertEqual(client.getActorID(), "stable")
+        XCTAssertEqual(client.makeChannelWatchRequest(clientID: "session", channelKey: "room").actorID, "")
+        XCTAssertEqual(client.makeDocumentWatchRequest(clientID: "session", documentID: "doc-1").actorID, "stable")
     }
 
     // MARK: - Heartbeat interval
@@ -66,7 +73,7 @@ final class WatchRequestTests: XCTestCase {
         case .document:
             return Client.makeDocumentWatchRequest(clientID: "session", actorID: "stable", documentID: "doc-1", heartbeatIntervalMs: interval).heartbeatIntervalMs
         case .channel:
-            return Client.makeChannelWatchRequest(clientID: "session", actorID: "stable", channelKey: "room", heartbeatIntervalMs: interval).heartbeatIntervalMs
+            return Client.makeChannelWatchRequest(clientID: "session", channelKey: "room", heartbeatIntervalMs: interval).heartbeatIntervalMs
         }
     }
 
