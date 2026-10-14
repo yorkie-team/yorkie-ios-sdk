@@ -42,7 +42,9 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 - Refuse a merge that would move a node under itself in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
 - Resolve the index before a text that follows an element in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
 - Send the content of an Object or Array value set or added by an operation, so an undo that restores one reaches peers intact in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
-- Do not send the session id as the Watch actor in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Do not send the session id as the Watch actor, and send no actor on a channel Watch, as the JS SDK does in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Push a copy of an appended Text, Counter or Tree, so edits made through its handle in the same update no longer diverge from peers or count twice in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
+- Keep syncing the other documents when one explicit `Client.sync()` fails in https://github.com/yorkie-team/yorkie-ios-sdk/pull/279
 
 ## [v0.7.24] - 2026-10-08
 
