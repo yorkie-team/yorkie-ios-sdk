@@ -114,8 +114,12 @@ public final class DevtoolsRecorder {
     /// - Parameter baseline: The event the new recording starts with, or `nil` for an empty one.
     func reset(baseline: DocEvent?) {
         self.events.removeAll()
-        if let baseline, let encoded = DevtoolsEncoder.encode(event: baseline) {
-            self.events.append(encoded)
+        if let baseline {
+            if let encoded = DevtoolsEncoder.encode(event: baseline) {
+                self.events.append(encoded)
+            } else {
+                Logger.warning("[DT] d:\"\(self.docKey)\" could not encode the baseline event \(type(of: baseline)); the recording starts empty")
+            }
         }
         self.notifyObservers()
     }

@@ -83,6 +83,11 @@ final class SetActorReissueTests: XCTestCase {
 
     /// Edits a detached document with every kind of element, so every place a ticket can hide is
     /// populated before the attach.
+    ///
+    /// Keep this in step with the wire: the iOS ticket walker (`TicketReissuer`) is hand-written,
+    /// so a `TimeTicket` field added to `resources.proto` is not rewritten until the walker learns
+    /// it, and nothing fails unless a test here puts a value there. Extend this method whenever
+    /// `resources.proto` gains a `TimeTicket` field.
     private func fillEverything(_ doc: Document) throws {
         try doc.update { root, presence in
             root.text = JSONText()

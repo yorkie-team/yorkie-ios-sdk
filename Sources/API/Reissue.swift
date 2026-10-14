@@ -45,6 +45,9 @@ enum Reissue {
     /// - Throws: ``YorkieError`` when an operation cannot be encoded or does not decode back.
     static func reissueOperations(_ operations: [Operation], from: ActorID, to: ActorID) throws -> [Operation] {
         let reissuer = TicketReissuer(from: from, to: to)
+        if let failure = reissuer.failure {
+            throw failure
+        }
 
         var reissued = [Operation]()
         reissued.reserveCapacity(operations.count)
@@ -93,8 +96,18 @@ final class TicketReissuer {
     private(set) var failure: Error?
 
     init(from: ActorID, to: ActorID) {
-        self.from = from.toData ?? Data()
-        self.to = to.toData ?? Data()
+        // An actor that is not hex has no byte form. Falling back to empty bytes would rewrite
+        // the tickets onto an empty actor, so the failure is recorded for the caller instead.
+        let fromData = from.toData
+        let toData = to.toData
+        self.from = fromData ?? Data()
+        self.to = toData ?? Data()
+        if fromData == nil || toData == nil {
+            self.failure = YorkieError(
+                code: .errInvalidArgument,
+                message: "reissue operations: actor is not a valid actor id (from: \(from), to: \(to))"
+            )
+        }
     }
 
     // MARK: Text value

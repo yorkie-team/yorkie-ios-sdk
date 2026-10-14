@@ -40,6 +40,24 @@ final class ReissueTests: XCTestCase {
         JSONTreeElementNode(type: "p", children: [JSONTreeTextNode(value: value)])
     }
 
+    func test_refuses_an_actor_that_has_no_byte_form_instead_of_rewriting_onto_an_empty_one() throws {
+        // given: an actor that is not hex, so `toData` is nil.
+        let doc = Document(key: "d")
+        try doc.update { root, _ in root.k = "v" }
+        let ops = self.opsOf(doc)
+
+        // when
+        let reissuer = TicketReissuer(from: ActorIDs.initial, to: "not-a-hex-actor")
+
+        // then: the failure is recorded and the entry point throws rather than emitting tickets
+        // that name an empty actor.
+        XCTAssertNotNil(reissuer.failure)
+        XCTAssertThrowsError(try Reissue.reissueOperations(ops, from: ActorIDs.initial, to: "not-a-hex-actor")) { error in
+            XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument)
+        }
+        XCTAssertNil(TicketReissuer(from: ActorIDs.initial, to: self.actorA).failure)
+    }
+
     func test_re_issues_the_tickets_nested_in_object_array_and_tree_values() throws {
         // given
         let doc = Document(key: "d")

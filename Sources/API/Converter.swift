@@ -640,8 +640,23 @@ extension Converter {
     /**
      * `toOperations` converts the given model to Protobuf format.
      */
-    static func toOperations(_ operations: [Operation]) -> [PbOperation] {
-        operations.compactMap { try? toOperation($0) }
+    ///
+    /// An operation that cannot be encoded is left out of the result, so the pushed change is
+    /// shorter than the local one. That is a defect the app cannot recover from here, so it is
+    /// logged with the operation type and the owning change rather than dropped silently.
+    ///
+    /// - Parameters:
+    ///   - operations: The operations to convert.
+    ///   - changeID: The ID of the change the operations belong to, for the log only.
+    static func toOperations(_ operations: [Operation], changeID: String = "-") -> [PbOperation] {
+        operations.compactMap { operation in
+            do {
+                return try toOperation(operation)
+            } catch {
+                Logger.error("[CV] dropped \(type(of: operation)) of change \(changeID): it could not be encoded", error: error)
+                return nil
+            }
+        }
     }
 
     /**
@@ -1583,7 +1598,7 @@ extension Converter {
         pbChange.id = toChangeID(change.id)
         pbChange.message = change.message ?? ""
         if change.hasOperations {
-            pbChange.operations = toOperations(change.operations)
+            pbChange.operations = toOperations(change.operations, changeID: change.id.toTestString)
         }
         if let presenceChange = change.presenceChange {
             pbChange.presenceChange = toPresenceChange(presenceChange: presenceChange)

@@ -1640,9 +1640,10 @@ public class Client {
         pushPullRequest.clientID = clientID
 
         let doc = attachment.resource
-        // The pack the request actually carried: the builder records it, so a presence-base retry
-        // leaves the log line below reporting the resent one.
-        var requestPack = doc.createChangePack()
+        // The size of the pack the request actually carried: the builder records it, so a
+        // presence-base retry leaves the log line below reporting the resent one. The pack is
+        // built once per send, inside `build`.
+        var requestChangeSize = 0
         let pushOnly = syncMode == .realtimePushOnly
 
         pushPullRequest.documentID = attachment.resourceID
@@ -1654,8 +1655,9 @@ public class Client {
 
             let pushpullResponse = await self.pushWithPresenceBase(doc,
                                                                    build: {
-                                                                       requestPack = doc.createChangePack()
-                                                                       return Converter.toChangePack(pack: requestPack)
+                                                                       let pack = doc.createChangePack()
+                                                                       requestChangeSize = pack.getChangeSize()
+                                                                       return Converter.toChangePack(pack: pack)
                                                                    },
                                                                    send: { pack in
                                                                        pushPullRequest.changePack = pack
@@ -1768,7 +1770,7 @@ public class Client {
             doc.publishSyncEvent(.synced)
 
             let remoteSize = responsePack.getChangeSize()
-            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(requestPack.getChangeSize()) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
+            Logger.info("[PP] c:\"\(self.key)\" sync d:\"\(docKey)\", push:\(requestChangeSize) pull:\(remoteSize) cp:\(responsePack.getCheckpoint().toTestString)")
 
             return doc
         } catch {
