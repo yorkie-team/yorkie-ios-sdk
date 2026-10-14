@@ -131,6 +131,11 @@ struct YorkieError: Error, CustomStringConvertible {
         // throw. Local edits (``Document/update(_:_:)``) and undo/redo are not wrapped: the
         // caller that asked for them matches on the original code.
         case errChangeApplyFailed = "ErrChangeApplyFailed"
+
+        // ErrWatchStreamIdle is reported when a watch stream stays silent for longer than the
+        // heartbeat interval the server advertised allows, which is how a half-open connection
+        // is told from a quiet document.
+        case errWatchStreamIdle = "ErrWatchStreamIdle"
     }
 }
 

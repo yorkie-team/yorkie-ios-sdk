@@ -1303,12 +1303,18 @@ public class Client {
         // Handle Document watch streams. Uses the unified Watch RPC, sending a
         // single document ResourceDescriptor and consuming WatchResponse.
         if let docAttachment = attachment as? Attachment<Document> {
-            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { result in
+            // The capture list starts this stream's generation: see ``Attachment/watchGeneration``.
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { [generation = docAttachment.beginWatchStream()] result in
                 Task {
+                    // A stream that was abandoned or replaced must not reach the handlers: its
+                    // completion would otherwise disconnect, and then reconnect, its successor.
+                    guard await docAttachment.watchGeneration == generation else { return }
+
                     switch result {
                     case .headers:
                         break
                     case .message(let message):
+                        await self.recordWatchActivity(of: message, key: key, on: docAttachment, generation: generation)
                         await self.handleWatchDocumentsResponse(docKey: key, response: message)
                     case .complete(_, let error, _):
                         if error != nil {
@@ -1356,12 +1362,15 @@ public class Client {
         // single channel ResourceDescriptor and dispatching presence-count
         // updates + remote broadcast events to the Channel's event system.
         if let channelAttachment = attachment as? Attachment<Channel> {
-            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { result in
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { [generation = channelAttachment.beginWatchStream()] result in
                 Task {
+                    guard await channelAttachment.watchGeneration == generation else { return }
+
                     switch result {
                     case .headers:
                         break
                     case .message(let message):
+                        await self.recordWatchActivity(of: message, key: key, on: channelAttachment, generation: generation)
                         await self.handleWatchChannelResponse(channelKey: key, response: message)
                     case .complete(_, let error, _):
                         Logger.debug("[WC] c:\"\(self.key)\" unwatches")
@@ -1508,6 +1517,7 @@ public class Client {
             default:
                 break
             }
+        case .heartbeat: break // Proves liveness only; activity is recorded before dispatch.
         }
     }
 
@@ -1521,7 +1531,7 @@ public class Client {
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
-    private func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
+    func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
         let cancelled = attachment.cancelled
         self.disconnectWatchStream(key, with: attachment)
         // check if watch loop is stopped. `.manual` and `.polling` are stream-less
@@ -2083,6 +2093,7 @@ private extension Client {
             case .unspecified, .UNRECOGNIZED:
                 break
             }
+        case .heartbeat: break
         case .none:
             break
         }

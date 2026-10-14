@@ -2429,6 +2429,10 @@ public struct Yorkie_V1_PresenceChange: Sendable {
   /// Clears the value of `presence`. Subsequent reads from it will return its default value.
   public mutating func clearPresence() {self._presence = nil}
 
+  /// removed_keys lists the top-level keys a CHANGE_TYPE_PATCH deletes. Unused
+  /// by the other change types.
+  public var removedKeys: [String] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public enum ChangeType: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -2437,6 +2441,14 @@ public struct Yorkie_V1_PresenceChange: Sendable {
     case put // = 1
     case delete // = 2
     case clear // = 3
+
+    /// CHANGE_TYPE_PATCH carries only the top-level keys that changed since
+    /// the sender's previous presence: set entries in presence, deleted keys
+    /// in removed_keys. Clients send it only to a server that advertises the
+    /// "presence-patch" capability on ChangePack. The server folds it into
+    /// a CHANGE_TYPE_PUT of the full presence before storing, so it never
+    /// appears in a pulled change.
+    case patch // = 4
     case UNRECOGNIZED(Int)
 
     public init() {
@@ -2449,6 +2461,7 @@ public struct Yorkie_V1_PresenceChange: Sendable {
       case 1: self = .put
       case 2: self = .delete
       case 3: self = .clear
+      case 4: self = .patch
       default: self = .UNRECOGNIZED(rawValue)
       }
     }
@@ -2459,6 +2472,7 @@ public struct Yorkie_V1_PresenceChange: Sendable {
       case .put: return 1
       case .delete: return 2
       case .clear: return 3
+      case .patch: return 4
       case .UNRECOGNIZED(let i): return i
       }
     }
@@ -2469,6 +2483,7 @@ public struct Yorkie_V1_PresenceChange: Sendable {
       .put,
       .delete,
       .clear,
+      .patch,
     ]
 
   }
@@ -6192,7 +6207,7 @@ extension Yorkie_V1_DocumentSummary: SwiftProtobuf.Message, SwiftProtobuf._Messa
 
 extension Yorkie_V1_PresenceChange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PresenceChange"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}presence\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}type\0\u{1}presence\0\u{3}removed_keys\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6202,6 +6217,7 @@ extension Yorkie_V1_PresenceChange: SwiftProtobuf.Message, SwiftProtobuf._Messag
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularEnumField(value: &self.type) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._presence) }()
+      case 3: try { try decoder.decodeRepeatedStringField(value: &self.removedKeys) }()
       default: break
       }
     }
@@ -6218,19 +6234,23 @@ extension Yorkie_V1_PresenceChange: SwiftProtobuf.Message, SwiftProtobuf._Messag
     try { if let v = self._presence {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
+    if !self.removedKeys.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.removedKeys, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Yorkie_V1_PresenceChange, rhs: Yorkie_V1_PresenceChange) -> Bool {
     if lhs.type != rhs.type {return false}
     if lhs._presence != rhs._presence {return false}
+    if lhs.removedKeys != rhs.removedKeys {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
 extension Yorkie_V1_PresenceChange.ChangeType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CHANGE_TYPE_UNSPECIFIED\0\u{1}CHANGE_TYPE_PUT\0\u{1}CHANGE_TYPE_DELETE\0\u{1}CHANGE_TYPE_CLEAR\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0CHANGE_TYPE_UNSPECIFIED\0\u{1}CHANGE_TYPE_PUT\0\u{1}CHANGE_TYPE_DELETE\0\u{1}CHANGE_TYPE_CLEAR\0\u{1}CHANGE_TYPE_PATCH\0")
 }
 
 extension Yorkie_V1_Presence: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

@@ -51,6 +51,14 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     var persistsToStore: Bool = false
     var watchLoopReconnectTimer: Timer?
     var cancelled: Bool
+    /// Identifies the watch stream this attachment currently owns.
+    ///
+    /// The client bumps it whenever a new stream starts or the current one is abandoned as idle,
+    /// and a stream ignores its own messages and completion once its generation is stale, so an
+    /// abandoned stream can neither reach the reconnect path nor cancel its successor.
+    var watchGeneration = 0
+    /// Detects the current watch stream going silent past the server heartbeat.
+    var watchIdleWatchdog: WatchIdleWatchdog?
     private var isDisconnected: Bool
     private var writeRejected = false
 
@@ -134,7 +142,15 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         self.lastHeartbeatTime = Date().timeIntervalSince1970
     }
 
+    /// Starts a new watch stream generation and returns it, which makes any older stream stale.
+    func beginWatchStream() -> Int {
+        self.watchGeneration += 1
+        return self.watchGeneration
+    }
+
     func connectStream(_ stream: YorkieServerStream?) {
+        self.watchIdleWatchdog?.cancel()
+        self.watchIdleWatchdog = nil
         // Cancel the old stream if it exists to prevent it from interfering
         if let oldStream = self.remoteWatchStream {
             oldStream.cancel()
@@ -147,6 +163,8 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
     }
 
     func disconnectStream() {
+        self.watchIdleWatchdog?.cancel()
+        self.watchIdleWatchdog = nil
         self.remoteWatchStream?.cancel()
         self.remoteWatchStream = nil
 
