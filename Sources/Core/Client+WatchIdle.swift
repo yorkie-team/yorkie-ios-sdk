@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import Connect
 import Foundation
 
 /// `Number.MAX_SAFE_INTEGER` (2^53 - 1), the cap yorkie-js-sdk applies to the heartbeat interval.
@@ -67,7 +68,7 @@ extension Client {
     }
 
     /// Builds the Watch request for a channel, declaring the stable actor like
-    /// ``makeDocumentWatchRequest(clientID:actorID:documentID:)``.
+    /// ``makeDocumentWatchRequest(clientID:actorID:documentID:heartbeatIntervalMs:)``.
     static func makeChannelWatchRequest(
         clientID: String,
         actorID: ActorID?,
@@ -129,7 +130,7 @@ extension Client {
             return
         }
 
-        let watchdog = WatchIdleWatchdog { [weak self, weak attachment] in
+        let watchdog = WatchIdleWatchdog(now: self.watchIdleClock.now, sleep: self.watchIdleClock.sleep) { [weak self, weak attachment] in
             // A fire for a stream the client already cancelled or replaced is not idle.
             guard let self, let attachment, attachment.watchGeneration == generation, !attachment.cancelled else {
                 return
@@ -159,6 +160,114 @@ extension Client {
             document.publishConnectionEvent(.disconnected)
         }
 
-        try? self.onStreamDisconnect(key, with: attachment)
+        do {
+            try self.onStreamDisconnect(key, with: attachment)
+        } catch {
+            Logger.warning("[WL] c:\"\(self.key)\" failed to reconnect an idle watch stream: \(error)")
+        }
+    }
+}
+
+// MARK: - Watch stream results
+
+extension Client {
+    /// Handles one result of a document Watch stream.
+    ///
+    /// Runs on the main actor from the first line to the first suspension, so the generation check
+    /// and the synchronous work it guards happen in one hop: a watchdog bump cannot land between
+    /// them. A stream that was abandoned or replaced must not reach the handlers, since its
+    /// completion would otherwise disconnect, and then reconnect, its successor.
+    func handleDocumentWatchResult(
+        _ result: StreamResult<WatchResponse>,
+        key: String,
+        attachment: Attachment<Document>,
+        generation: Int
+    ) async {
+        guard attachment.watchGeneration == generation else {
+            return
+        }
+
+        switch result {
+        case .headers:
+            break
+        case .message(let message):
+            self.recordWatchActivity(of: message, key: key, on: attachment, generation: generation)
+            self.handleWatchDocumentsResponse(docKey: key, response: message)
+        case .complete(_, let error, _):
+            // The stream is over, so the watchdog must not fire during the awaits below: it would
+            // bump the generation and reconnect, and this completion would then tear the successor down.
+            attachment.cancelWatchIdleWatchdog()
+
+            if error != nil {
+                attachment.resource.resetOnlineClients()
+                attachment.resource.publishInitializedEvent()
+                attachment.resource.publishConnectionEvent(.disconnected)
+            }
+
+            Logger.debug("[WD] c:\"\(self.key)\" unwatches")
+
+            let retryable = await self.handleConnectError(error)
+            // Handling the error can suspend (an auth token refresh): the stream may have been
+            // replaced meanwhile, and a replaced stream owns nothing to disconnect.
+            guard attachment.watchGeneration == generation else {
+                return
+            }
+
+            if retryable {
+                Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
+                self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .watch)
+            } else {
+                self.setCondition(.watchLoop, value: false)
+            }
+            self.finishWatchStream(key, with: attachment)
+        }
+    }
+
+    /// Handles one result of a channel Watch stream. See ``handleDocumentWatchResult(_:key:attachment:generation:)``.
+    func handleChannelWatchResult(
+        _ result: StreamResult<WatchResponse>,
+        key: String,
+        attachment: Attachment<Channel>,
+        generation: Int
+    ) async {
+        guard attachment.watchGeneration == generation else {
+            return
+        }
+
+        switch result {
+        case .headers:
+            break
+        case .message(let message):
+            self.recordWatchActivity(of: message, key: key, on: attachment, generation: generation)
+            self.handleWatchChannelResponse(channelKey: key, response: message)
+        case .complete(_, let error, _):
+            attachment.cancelWatchIdleWatchdog()
+
+            Logger.debug("[WC] c:\"\(self.key)\" unwatches")
+
+            let retryable = await self.handleConnectError(error)
+            guard attachment.watchGeneration == generation else {
+                return
+            }
+
+            if retryable {
+                Logger.warning("[WL] c:\"\(self.key)\" channel has Error \(String(describing: error))")
+                self.publishChannelAuthErrorIfNeeded(error: error as? ConnectError, channel: attachment.resource, method: "Watch")
+            } else {
+                if let error = error as? ConnectError {
+                    attachment.resource.publish(ChannelSyncErrorEvent(error: error, method: "Watch"))
+                }
+                self.setCondition(.watchLoop, value: false)
+            }
+            self.finishWatchStream(key, with: attachment)
+        }
+    }
+
+    private func finishWatchStream<R: Attachable>(_ key: String, with attachment: Attachment<R>) {
+        do {
+            try self.onStreamDisconnect(key, with: attachment)
+        } catch {
+            Logger.warning("[WL] c:\"\(self.key)\" failed to settle a finished watch stream: \(error)")
+        }
     }
 }

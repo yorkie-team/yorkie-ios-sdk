@@ -21,7 +21,7 @@ import XCTest
 /// A deterministic stand-in for the clock and `Task.sleep`, mirroring vitest fake timers.
 ///
 /// A pending sleep is a timer: ``timerCount`` is `vi.getTimerCount()`.
-private final class FakeWatchClock: @unchecked Sendable {
+final class FakeWatchClock: @unchecked Sendable {
     private struct Sleeper {
         let id: Int
         let deadline: Int64

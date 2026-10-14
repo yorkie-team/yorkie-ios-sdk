@@ -61,6 +61,17 @@ func watchHeartbeatInterval(_ response: WatchResponse) -> Int64 {
     return 0
 }
 
+/// The clock a ``WatchIdleWatchdog`` reads and sleeps on. Tests substitute a fake one.
+struct WatchIdleClock {
+    let now: @MainActor () -> Int64
+    let sleep: @MainActor (UInt64) async throws -> Void
+
+    static let system = WatchIdleClock(
+        now: { WatchIdleWatchdog.monotonicNowMs() },
+        sleep: { try await Task.sleep(nanoseconds: $0) }
+    )
+}
+
 /// Detects a watch stream that has gone silent past the server heartbeat.
 ///
 /// A quiet document sends nothing on its watch stream, so a half-open connection looks exactly

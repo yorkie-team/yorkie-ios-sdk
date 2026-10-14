@@ -277,7 +277,7 @@ private func namespaceOf(_ apiKey: String, _ clientKey: String, _ docKey: String
  */
 @MainActor
 public class Client {
-    private var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
+    private(set) var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
     /// The stable actor stamped into this client's document changes.
     ///
     /// Supplied by the server on activate and derived from the project and client key, so it
@@ -322,6 +322,8 @@ public class Client {
     private let maximumAttachmentTimeout: Int
     /// The heartbeat interval each Watch request asks for, converted once from the option.
     let watchHeartbeatIntervalMs: Int64
+    /// The clock the Watch idle watchdogs run on. Tests substitute a fake one.
+    var watchIdleClock = WatchIdleClock.system
     private let channelHeartbeatInterval: TimeInterval = 5.0 // 5 seconds
     private let defaultPollingInterval: TimeInterval = 3.0 // 3 seconds
 
@@ -1334,35 +1336,10 @@ public class Client {
         if let docAttachment = attachment as? Attachment<Document> {
             // The capture list starts this stream's generation: see ``Attachment/watchGeneration``.
             let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { [generation = docAttachment.beginWatchStream()] result in
-                Task {
-                    // A stream that was abandoned or replaced must not reach the handlers: its
-                    // completion would otherwise disconnect, and then reconnect, its successor.
-                    guard await docAttachment.watchGeneration == generation else { return }
-
-                    switch result {
-                    case .headers:
-                        break
-                    case .message(let message):
-                        await self.recordWatchActivity(of: message, key: key, on: docAttachment, generation: generation)
-                        await self.handleWatchDocumentsResponse(docKey: key, response: message)
-                    case .complete(_, let error, _):
-                        if error != nil {
-                            await docAttachment.resource.resetOnlineClients()
-                            await docAttachment.resource.publishInitializedEvent()
-                            await docAttachment.resource.publishConnectionEvent(.disconnected)
-                        }
-
-                        Logger.debug("[WD] c:\"\(self.key)\" unwatches")
-
-                        if await self.handleConnectError(error) {
-                            Logger.warning("[WL] c:\"\(self.key)\" has Error \(String(describing: error))")
-                            await self.publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: docAttachment, method: .watch)
-                            try await self.onStreamDisconnect(key, with: docAttachment)
-                        } else {
-                            await self.setCondition(.watchLoop, value: false)
-                            try await self.onStreamDisconnect(key, with: docAttachment)
-                        }
-                    }
+                // One main-actor hop, so the generation check and the work it guards cannot be
+                // split by another task bumping the generation in between.
+                Task { @MainActor in
+                    await self.handleDocumentWatchResult(result, key: key, attachment: docAttachment, generation: generation)
                 }
             })
 
@@ -1380,31 +1357,8 @@ public class Client {
         // updates + remote broadcast events to the Channel's event system.
         if let channelAttachment = attachment as? Attachment<Channel> {
             let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { [generation = channelAttachment.beginWatchStream()] result in
-                Task {
-                    guard await channelAttachment.watchGeneration == generation else { return }
-
-                    switch result {
-                    case .headers:
-                        break
-                    case .message(let message):
-                        await self.recordWatchActivity(of: message, key: key, on: channelAttachment, generation: generation)
-                        await self.handleWatchChannelResponse(channelKey: key, response: message)
-                    case .complete(_, let error, _):
-                        Logger.debug("[WC] c:\"\(self.key)\" unwatches")
-                        if await self.handleConnectError(error) {
-                            Logger.warning("[WL] c:\"\(self.key)\" channel has Error \(String(describing: error))")
-                            await self.publishChannelAuthErrorIfNeeded(error: error as? ConnectError, channel: channelAttachment.resource, method: "Watch")
-                            try await self.onStreamDisconnect(key, with: channelAttachment)
-                        } else {
-                            if let error = error as? ConnectError {
-                                await channelAttachment.resource.publish(
-                                    ChannelSyncErrorEvent(error: error, method: "Watch")
-                                )
-                            }
-                            await self.setCondition(.watchLoop, value: false)
-                            try await self.onStreamDisconnect(key, with: channelAttachment)
-                        }
-                    }
+                Task { @MainActor in
+                    await self.handleChannelWatchResult(result, key: key, attachment: channelAttachment, generation: generation)
                 }
             })
 
@@ -1457,7 +1411,7 @@ public class Client {
         }
     }
 
-    private func handleWatchDocumentsResponse(docKey: DocKey, response: WatchResponse) async {
+    func handleWatchDocumentsResponse(docKey: DocKey, response: WatchResponse) {
         Logger.debug("[WL] c:\"\(self.key)\" got response \(response)")
 
         guard let body = response.body else {
@@ -1972,6 +1926,15 @@ public extension Client {
         self.yorkieService.observeRequests(for: method, observer)
     }
 
+    /// Makes `attachment` the client's attachment under `key` as an activated client with `actorID`,
+    /// so the Watch wiring can be driven without a server. Test seam.
+    internal func adoptAttachment<R: Attachable>(_ attachment: Attachment<R>, key: String, actorID: ActorID) {
+        self.status = .activated
+        self.id = actorID
+        self.actorID = actorID
+        self.attachmentMap[key] = attachment
+    }
+
     /// Observes the messages Watch streams deliver. Test seam, active only when the client was
     /// created with `isMockingEnabled`. See ``YorkieService/observeWatchResponses(_:)``.
     internal func observeWatchResponses(_ observer: (@Sendable (WatchResponse) -> Void)?) {
@@ -2042,7 +2005,7 @@ public extension Client {
         self.authHeader.updateToken(token)
     }
 
-    private func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
+    internal func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
         guard let connectError = error, let attachment else { return }
         let rawValue = errorCodeOf(error: connectError)
         guard let code = YorkieError.Code(rawValue: rawValue) else {
@@ -2081,7 +2044,7 @@ public extension Client {
 
 // MARK: - Channel watch response handling
 
-private extension Client {
+extension Client {
     @MainActor
     func handleWatchChannelResponse(channelKey: String, response: WatchResponse) {
         guard let channel = getChannelAttachment(channelKey)?.resource else { return }

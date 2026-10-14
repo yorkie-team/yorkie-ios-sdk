@@ -148,6 +148,12 @@ final class Attachment<R: Attachable>: @unchecked Sendable {
         return self.watchGeneration
     }
 
+    /// Stops the idle watchdog without reporting idle.
+    func cancelWatchIdleWatchdog() {
+        self.watchIdleWatchdog?.cancel()
+        self.watchIdleWatchdog = nil
+    }
+
     func connectStream(_ stream: YorkieServerStream?) {
         self.watchIdleWatchdog?.cancel()
         self.watchIdleWatchdog = nil
