@@ -240,6 +240,55 @@ final class WriteRejectedIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func test_keeps_syncing_the_other_documents_when_one_explicit_sync_fails() async throws {
+        // given: four manual documents, each with an edit to push; the size gate refuses one.
+        let client = try await self.makeClient()
+        let bad = Document(key: self.docKey("-bad"))
+        let goods = (0 ..< 3).map { Document(key: self.docKey("-good\($0)")) }
+        try await client.attach(bad, [:], .manual)
+        for good in goods {
+            try await client.attach(good, [:], .manual)
+        }
+        let badID = try XCTUnwrap(client.getDocumentAttachment(bad.getKey())).resourceID
+        let goodIDs = try goods.map { try XCTUnwrap(client.getDocumentAttachment($0.getKey())).resourceID }
+
+        let pushed = Shared(Set<String>())
+        client.setMockError(for: Self.pushPull, error: writeRejection(.errDocumentSizeExceedsLimit, "document size exceeds limit")) { request in
+            (request as? Yorkie_V1_PushPullChangesRequest)?.documentID == badID
+        }
+        client.observeRequests(for: Self.pushPull) { request in
+            if let id = (request as? Yorkie_V1_PushPullChangesRequest)?.documentID {
+                pushed.value.insert(id)
+            }
+        }
+        for doc in [bad] + goods {
+            try doc.update { root, _ in
+                root.text = "edit"
+            }
+        }
+
+        // when: an explicit sync over every document.
+        var thrown: Error?
+        do {
+            _ = try await client.sync()
+        } catch {
+            thrown = error
+        }
+
+        // then: the refusal is still reported, but it did not stop the documents after it.
+        XCTAssertNotNil(thrown, "the first error is rethrown once every document has been tried")
+        // The observer is skipped for a request the mock error short-circuits, so the refused document
+        // is not in the set.
+        XCTAssertEqual(pushed.value, Set(goodIDs), "every other document was pushed, whatever the order")
+
+        client.setMockError(for: Self.pushPull, error: writeRejection(.errDocumentSizeExceedsLimit, "document size exceeds limit")) { _ in false }
+        try await client.resync(bad, discardLocalChanges: true)
+        for doc in [bad] + goods {
+            try await client.detach(doc)
+        }
+    }
+
+    @MainActor
     func test_resyncs_with_the_oversized_changes_discarded_and_syncs_again() async throws {
         // given: a realtime document whose oversized change the size gate refuses.
         let client = try await self.makeClient()

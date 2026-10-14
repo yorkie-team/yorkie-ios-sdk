@@ -1253,13 +1253,25 @@ public class Client {
                     result.append(attachment.resource)
                     try await self.syncInternal(attachment, .realtime)
                 } else {
+                    // Every document is tried even when an earlier one fails, as the JS
+                    // `Promise.all` over the attachments still pushes the rest. A document the
+                    // server refuses outright (a size-rejected write is permanent) must not
+                    // hold up the documents after it. The first error is rethrown at the end.
+                    var firstError: Error?
                     for (_, anyAttachment) in self.attachmentMap {
                         if let docAttachment = anyAttachment as? Attachment<Document> {
                             result.append(docAttachment.resource)
                             if let syncMode = docAttachment.syncMode {
-                                try await self.syncInternal(docAttachment, syncMode)
+                                do {
+                                    try await self.syncInternal(docAttachment, syncMode)
+                                } catch {
+                                    firstError = firstError ?? error
+                                }
                             }
                         }
+                    }
+                    if let firstError {
+                        throw firstError
                     }
                 }
             }
