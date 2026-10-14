@@ -64,7 +64,8 @@ extension Client {
     /// part of the discarded set and is reported with the rest.
     ///
     /// A detach the server refuses restores the queue and leaves the document attached as it was,
-    /// so the call can be retried. Past the detach the changes are gone for good and are published
+    /// so the call can be retried. Offline persistence is the exception, as in yorkie-js-sdk: it
+    /// is torn down before the detach and stays down until the next attach. Past the detach the changes are gone for good and are published
     /// as a ``LocalChangesDroppedEvent`` with reason ``LocalChangesDroppedValue/Reason/writeDenied``,
     /// before the re-attach, which can still fail.
     ///
@@ -139,7 +140,7 @@ extension Client {
 
         let dropped: [DroppedChange]
         do {
-            dropped = try await self.recoverInPlace(doc, attachment: attachment, options: options)
+            dropped = try await self.recoverInPlace(doc, options: options)
         } catch {
             self.syncSemaphore.signal()
             throw error
@@ -168,7 +169,6 @@ extension Client {
     /// The critical section of ``resync(_:discardLocalChanges:initialPresence:)``; the caller
     /// holds the sync semaphore.
     private func recoverInPlace(_ doc: Document,
-                                attachment: Attachment<Document>,
                                 options: ReattachOptions) async throws -> [DroppedChange]
     {
         // Take offline persistence out of the picture before the queue is emptied. Its log is
@@ -189,12 +189,12 @@ extension Client {
             // The detach did not happen: hand the refused changes back so the document is left
             // as it was found, attached, queue intact, counter untouched.
             doc.restoreLocalChanges(discarded)
-            if self.getDocumentAttachment(doc.getKey()) === attachment {
-                self.installOfflinePersistence(on: attachment,
-                                               doc: doc,
-                                               lease: attachment.sessionLockHandle,
-                                               persist: attachment.persistsToStore)
-            }
+            // NOTE: Offline persistence was torn down by `discardPersistedState` above and is
+            // deliberately not reinstalled, matching yorkie-js-sdk, which leaves it torn down
+            // after a refused detach too. The document keeps working in memory, but its
+            // un-pushed changes are no longer saved until the next attach. That gap is being
+            // raised upstream against yorkie-js-sdk; until it is settled here, iOS stays at
+            // parity rather than diverging.
             Logger.error("[RS] c:\"\(self.key)\" resync d:\"\(doc.getKey())\" detach failed; local changes restored", error: error)
             throw error
         }

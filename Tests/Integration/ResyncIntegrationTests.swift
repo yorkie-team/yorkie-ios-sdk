@@ -402,6 +402,42 @@ final class ResyncIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func test_leaves_offline_persistence_torn_down_when_the_detach_is_refused() async throws {
+        // given: a document persisted to a store, with an edit the webhook refused.
+        let store = MemoryDocStore()
+        let client = Client(self.rpcAddress, ClientOptions(key: UUID().uuidString, store: store), isMockingEnabled: true)
+        try await client.activate()
+        self.addTeardownBlock { try? await client.deactivate() }
+        let doc = Document(key: self.docKey)
+        try await client.attach(doc, [:], .manual)
+        let storeKey = client.storeKey(doc.getKey())
+        await client.drainPersists()
+        let before = try await store.load(docKey: storeKey)
+        XCTAssertNotNil(before, "attaching persists a base")
+        client.setMockError(for: Self.detach, error: permissionDeniedError("document is locked"))
+
+        // when
+        do {
+            try await client.resync(doc, discardLocalChanges: true)
+            XCTFail("the refused detach must surface")
+        } catch {}
+
+        // then: parity with yorkie-js-sdk. The stored copy is gone and later edits are not
+        // persisted, until the next attach.
+        let after = try await store.load(docKey: storeKey)
+        XCTAssertNil(after)
+        try doc.update { root, _ in
+            root.text = "edited after the refused resync"
+        }
+        await client.drainPersists()
+        let later = try await store.load(docKey: storeKey)
+        XCTAssertNil(later, "no reinstall: the edit is not persisted")
+        XCTAssertEqual(doc.status, .attached)
+
+        try await client.detach(doc)
+    }
+
+    @MainActor
     func test_refuses_an_edit_minted_inside_the_resync_window() async throws {
         // given: an edit is attempted while the detach RPC is in flight, the widest part of the
         // window.
