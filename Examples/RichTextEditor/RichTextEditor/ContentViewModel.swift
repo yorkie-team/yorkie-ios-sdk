@@ -452,11 +452,11 @@ extension ContentViewModel {
     func decodeEvent(_ peer: PeerElement) {
         // change selection
         // change cursors
-        // Identify self by clientID (actorID), not username: the published username
+        // Identify self by actor (getActorID()), not username or session id: the published username
         // may differ from `localUsername` and is not unique across clients, so a
         // username comparison can fail to exclude self (self then shows up as a peer)
         // or wrongly merge two peers that share a name.
-        if peer.clientID == self.client.id {
+        if peer.clientID == self.client.getActorID() {
             Log.log("Local presence, no update", level: .debug)
             return
         }
@@ -930,7 +930,7 @@ extension ContentViewModel {
     func update(peers: [Peer]) {
         Log.log("peers: \(peers.map { $0.name }.sorted().joined(separator: ", "))", level: .debug)
         self.peers = peers
-        for i in peers where i.clientID != self.client.id {
+        for i in peers where i.clientID != self.client.getActorID() {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                 // TODO: - Refactor this to wait until the text is updated after adding cursor without using DispatchQueueMain
                 self.placeCursor(at: i.position.location, in: self.uitextView, with: i)
