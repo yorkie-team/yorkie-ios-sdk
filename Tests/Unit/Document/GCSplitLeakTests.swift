@@ -262,6 +262,19 @@ final class GCTreeSplitLeakTests: XCTestCase {
 
 // MARK: - GC tombstone-split leak (Text)
 
+/// The size of the one tombstone left in the text, the piece two concurrent deletions hold.
+@MainActor
+private func heldTombstoneSize(_ doc: Document) -> DataSize {
+    guard let text = doc.getRootObject().get(key: "k") as? CRDTText else {
+        return DataSize(data: 0, meta: 0)
+    }
+    for node in text.rgaTreeSplit where node.isRemoved {
+        XCTAssertEqual(node.value.toString, "cd")
+        return node.getDataSize()
+    }
+    return DataSize(data: 0, meta: 0)
+}
+
 // Same class of leak in the Text CRDT: `RGATreeSplitNode.split()` copies
 // `removedAt` into the new piece, so pieces split off an already-tombstoned
 // text node are born removed without passing through `remove()` and miss GC
@@ -290,14 +303,17 @@ final class GCTextSplitLeakTests: XCTestCase {
 
         // then
         XCTAssertEqual(purged1, purged2, "asymmetric purge for identical state: d1=\(purged1) d2=\(purged2)")
-        XCTAssertEqual(countTextTombstones(d1), 0)
-        XCTAssertEqual(countTextTombstones(d2), 0)
-        XCTAssertEqual(d1.getGarbageLength(), 0)
-        XCTAssertEqual(d2.getGarbageLength(), 0)
+        // `cd` is removed by both deletions, so it stays until an undo leaves one of them (see
+        // `RGATreeSplitNode.heldFromPurge`); every other piece, including the born-dead split
+        // remainder, is purged.
+        XCTAssertEqual(countTextTombstones(d1), 1)
+        XCTAssertEqual(countTextTombstones(d2), 1)
+        XCTAssertEqual(d1.getGarbageLength(), 1)
+        XCTAssertEqual(d2.getGarbageLength(), 1)
 
-        // Same docSize invariants as the tree case.
+        // Same docSize invariants as the tree case, with only `cd` left in gc.
         XCTAssertEqual(d2.getDocSize(), d1.getDocSize())
-        XCTAssertEqual(d1.getDocSize().gc, DataSize(data: 0, meta: 0))
+        XCTAssertEqual(d1.getDocSize().gc, heldTombstoneSize(d1))
     }
 
     @MainActor
@@ -322,9 +338,10 @@ final class GCTextSplitLeakTests: XCTestCase {
 
         // then
         XCTAssertEqual(purged1, purged2, "asymmetric purge for identical state: d1=\(purged1) d2=\(purged2)")
-        XCTAssertEqual(countTextTombstones(d1), 0)
-        XCTAssertEqual(countTextTombstones(d2), 0)
-        XCTAssertEqual(d1.getGarbageLength(), 0)
-        XCTAssertEqual(d2.getGarbageLength(), 0)
+        // `cd` is removed by both deletions and stays, as above.
+        XCTAssertEqual(countTextTombstones(d1), 1)
+        XCTAssertEqual(countTextTombstones(d2), 1)
+        XCTAssertEqual(d1.getGarbageLength(), 1)
+        XCTAssertEqual(d2.getGarbageLength(), 1)
     }
 }

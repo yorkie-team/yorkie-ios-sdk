@@ -402,6 +402,10 @@ final class TicketReissuer {
         if node.hasRemovedAt { self.walk(&node.removedAt) }
         if node.hasInsPrevID { self.walk(&node.insPrevID) }
         node.attributes = node.attributes.mapValues(self.reissued)
+        // The removal ledger beyond `removed_at` (yorkie-js-sdk#1514): its tickets name the
+        // deleting and undoing actors, so they are re-issued like `removed_at`. Lamports are kept,
+        // so the per-actor alternation `setRemovalEvents` pairs by is unchanged.
+        node.removalEvents = node.removalEvents.map(self.reissued)
     }
 
     private func walk(_ node: inout PbTreeNode) {

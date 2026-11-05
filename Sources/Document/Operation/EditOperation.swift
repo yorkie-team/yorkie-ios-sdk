@@ -108,8 +108,28 @@ final class EditOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        if self.restoreSpans != nil || self.retombstoneSpans != nil {
-            return try self.executeIdentityPreserving(root: root, text: text, source: source)
+        // The identity-preserving path is selected by the mode, not by the spans being present: a
+        // reverse whose span sets both came out empty is still an identity op and must run as a
+        // no-op here. Falling through to the positional path below would read its positions as an
+        // ordinary edit range.
+        if self.restoreMode != nil {
+            return try self.executeIdentityPreserving(
+                root: root,
+                text: text,
+                source: source,
+                versionVector: versionVector
+            )
+        }
+
+        // An undo edit that inserts nothing changes nothing wherever it sits, but its position can
+        // name an offset the text no longer has: stacked entries are reconciled against remote
+        // positional edits, not against remote undos and redos, which change the text by identity.
+        // Run it as the no-op it is, moved to the head so the copy that goes out to other replicas
+        // resolves on every one of them.
+        if self.isUndoOp, self.content.isEmpty {
+            self.fromPos = Self.headPos
+            self.toPos = Self.headPos
+            return ExecutionResult(opInfos: [], reverseOp: source == .remote ? nil : self.emptyReverse())
         }
 
         // When replaying a reverse edit, the range may reference a split chain that has since
@@ -160,7 +180,12 @@ final class EditOperation: Operation {
     /// `retombstoneSpans`; the redo (`retombstone`) does the opposite. Both sets
     /// are revived/removed by their original identity, never re-inserted as
     /// fresh nodes, so relative order is preserved across chained undo.
-    private func executeIdentityPreserving(root: CRDTRoot, text: CRDTText, source: OpSource) throws -> ExecutionResult {
+    private func executeIdentityPreserving(
+        root: CRDTRoot,
+        text: CRDTText,
+        source: OpSource,
+        versionVector: VersionVector?
+    ) throws -> ExecutionResult {
         let isRetombstone = self.restoreMode == .retombstone
         let toRestore = (isRetombstone ? self.retombstoneSpans : self.restoreSpans) ?? []
         let toRetombstone = (isRetombstone ? self.restoreSpans : self.retombstoneSpans) ?? []
@@ -179,9 +204,17 @@ final class EditOperation: Operation {
             ? text.rgaTreeSplit.refreshSpans(toRetombstone)
             : nil
 
-        // 1. Remove the content the reversed edit inserted (by identity).
+        // 1. Remove the content the reversed edit inserted (by identity). The reverse names only the
+        // pieces the removal was recorded on: naming it on a piece someone else removed would
+        // cancel a removal that piece never had, and a replica that purged the piece could not tell.
+        var recorded: [RestoreSpan<CRDTTextValue>]?
         if !toRetombstone.isEmpty {
-            let (pairs, changes, diff) = try text.retombstone(toRetombstone, self.executedAt)
+            let (pairs, changes, diff, spans) = try text.retombstone(
+                refreshed ?? toRetombstone,
+                self.executedAt,
+                versionVector
+            )
+            recorded = spans
             totalDiff.addDataSizes(others: diff)
             for pair in pairs {
                 root.registerGCPair(pair)
@@ -198,6 +231,9 @@ final class EditOperation: Operation {
                 self.executedAt,
                 self.fromPos
             )
+            if text.hasCancelledRemovals {
+                root.registerLedgerHolder(text)
+            }
             // Register first: a `pendingGCPairs` entry whose child ended up in
             // `untombstoned` was never registered under its own id (it was born
             // by splitting a larger tombstone), so the unregister loop below can
@@ -217,8 +253,41 @@ final class EditOperation: Operation {
 
         root.acc(totalDiff)
 
-        // Reverse keeps the same span sets and flips the direction.
-        let reverseOp = EditOperation(
+        // Reverse keeps the same span sets and flips the direction. The re-removed set is the pieces
+        // the removal was recorded on, taken from the spans refreshed against live attributes (a
+        // purged replica rebuilds from them).
+        let reverseOp = self.identityReverse(
+            restoreSpans: isRetombstone ? (recorded ?? self.restoreSpans) : self.restoreSpans,
+            restoreMode: isRetombstone ? .restore : .retombstone,
+            retombstoneSpans: !isRetombstone ? (recorded ?? self.retombstoneSpans) : self.retombstoneSpans
+        )
+
+        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    }
+
+    /// The position at the start of the head node, the one node of a text GC never purges.
+    private static var headPos: RGATreeSplitPos {
+        RGATreeSplitPos(RGATreeSplitNodeID.initial, 0)
+    }
+
+    /// Builds the reverse of an identity-preserving edit, or -- when both of its span sets came out
+    /// empty -- an ordinary no-op edit anchored at the text's head.
+    ///
+    /// A reverse with no spans has nothing to revive and nothing to re-remove, but it still has to
+    /// exist: dropping it would leave the undo stack one entry short of the redo stack, so a later
+    /// redo would replay the wrong entry. It cannot be kept in identity form either -- the
+    /// converter writes a restore mode only with spans, so it would go out as a positional edit of
+    /// its stale range -- so it degrades to the same shape an edit that removed and inserted
+    /// nothing reverses to.
+    private func identityReverse(
+        restoreSpans: [RestoreSpan<CRDTTextValue>]?,
+        restoreMode: RestoreMode,
+        retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
+    ) -> EditOperation {
+        if (restoreSpans?.isEmpty ?? true), (retombstoneSpans?.isEmpty ?? true) {
+            return self.emptyReverse()
+        }
+        return EditOperation(
             parentCreatedAt: self.parentCreatedAt,
             fromPos: self.fromPos,
             toPos: self.toPos,
@@ -226,12 +295,24 @@ final class EditOperation: Operation {
             attributes: nil,
             executedAt: TimeTicket.initial,
             isUndoOp: true,
-            restoreSpans: isRetombstone ? (refreshed ?? self.restoreSpans) : self.restoreSpans,
-            restoreMode: isRetombstone ? .restore : .retombstone,
-            retombstoneSpans: !isRetombstone ? (refreshed ?? self.retombstoneSpans) : self.retombstoneSpans
+            restoreSpans: restoreSpans,
+            restoreMode: restoreMode,
+            retombstoneSpans: retombstoneSpans
         )
+    }
 
-        return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
+    /// Returns an empty undo edit at the head of this op's text: the reverse of an edit that
+    /// changes nothing.
+    private func emptyReverse() -> EditOperation {
+        EditOperation(
+            parentCreatedAt: self.parentCreatedAt,
+            fromPos: Self.headPos,
+            toPos: Self.headPos,
+            content: "",
+            attributes: nil,
+            executedAt: TimeTicket.initial,
+            isUndoOp: true
+        )
     }
 
     /// Builds the reverse edit: re-inserts the removed content over the range that this edit's

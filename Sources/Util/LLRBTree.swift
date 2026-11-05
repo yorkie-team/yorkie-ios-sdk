@@ -136,6 +136,28 @@ class LLRBTree<K: Comparable, V> {
         return result?.entry
     }
 
+    /// Returns the entry for the least key greater than or equal to the given key.
+    ///
+    /// - Parameter key: The key to search from.
+    /// - Returns: The entry, or `nil` when there is no such key.
+    func ceilingEntry(_ key: K) -> Entry? {
+        var node = self.root
+        var result: Node?
+
+        while let current = node {
+            if key == current.key {
+                return current.entry
+            } else if key < current.key {
+                result = current
+                node = current.left
+            } else {
+                node = current.right
+            }
+        }
+
+        return result?.entry
+    }
+
     /**
      * `lastEntry` returns last entry of LLRBTree.
      */

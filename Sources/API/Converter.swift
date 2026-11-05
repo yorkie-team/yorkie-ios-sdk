@@ -1537,6 +1537,10 @@ extension Converter {
             if let removedAt = textNode.removedAt {
                 pbTextNode.removedAt = toTimeTicket(removedAt)
             }
+            // The removal ledger beyond removed_at. A node whose removed_at says it all writes
+            // nothing, so a character removed by one deletion and never restored encodes to the
+            // same bytes as before.
+            pbTextNode.removalEvents = textNode.getRemovalEvents().map { toTimeTicket($0) }
             pbTextNodes.append(pbTextNode)
         }
 
@@ -1555,8 +1559,28 @@ extension Converter {
                                              removed: $0.value.isRemoved)
         }
         let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), textValue)
-        if  pbTextNode.hasRemovedAt {
-            textNode.remove(fromTimeTicket(pbTextNode.removedAt))
+        if pbTextNode.hasRemovedAt {
+            textNode.setRemoveAt(fromTimeTicket(pbTextNode.removedAt))
+        }
+        if !pbTextNode.removalEvents.isEmpty {
+            // A rejected ledger is logged and dropped rather than thrown on: `fromTextNode` is
+            // reached from snapshot decoding and from element payloads inside remote operations, and
+            // throwing would stop this client from attaching, restoring from local bytes, or ever
+            // draining the pull that carries one peer's bad node -- a document wedged for good
+            // rather than one node decoded coarsely.
+            //
+            // The cost is a node left with `removed_at` alone, which answers `isRemovedInView` and
+            // `uncancelledRemovalBy` differently from a replica holding the full ledger. That is a
+            // divergence of one node against a payload no honest peer emits; a wedged document is
+            // worse. No count bound: a snapshot carries the ledgers its writer's rules grew.
+            let events = pbTextNode.removalEvents.map { fromTimeTicket($0) }
+            do {
+                // `setRemovalEvents` leaves the node as it was when it refuses, so the node here
+                // still carries `removed_at` alone.
+                try textNode.setRemovalEvents(events)
+            } catch {
+                Logger.warning("discarding malformed removal ledger for text node \(textNode.id.toTestString): \(error)")
+            }
         }
         return textNode
     }
