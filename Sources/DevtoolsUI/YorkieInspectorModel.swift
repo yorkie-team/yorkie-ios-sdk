@@ -40,7 +40,7 @@ public final class YorkieInspectorModel: ObservableObject {
     /// The most recent error message, surfaced for the UI.
     @Published public private(set) var lastError: String?
 
-    private weak var document: Document?
+    private weak var document: Yorkie.Document?
     private var recorder: DevtoolsRecorder?
 
     public init() {}
@@ -53,7 +53,7 @@ public final class YorkieInspectorModel: ObservableObject {
     private var observerToken: UUID?
 
     /// Attaches to `document` and performs an initial refresh.
-    public func start(document: Document) {
+    public func start(document: Yorkie.Document) {
         self.document = document
         self.recorder = document.attachDevtoolsRecorder()
         self.isRecording = self.recorder != nil

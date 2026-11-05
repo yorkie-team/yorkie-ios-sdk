@@ -31,9 +31,9 @@ import Yorkie
 /// ```
 public struct YorkieInspectorView: View {
     @StateObject private var model = YorkieInspectorModel()
-    private let document: Document
+    private let document: Yorkie.Document
 
-    public init(document: Document) {
+    public init(document: Yorkie.Document) {
         self.document = document
     }
 
