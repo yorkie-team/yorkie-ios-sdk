@@ -626,6 +626,9 @@ extension Converter {
             pbTreeStyleOperation.parentCreatedAt = toTimeTicket(treeStyleOperation.parentCreatedAt)
             pbTreeStyleOperation.from = toTreePos(treeStyleOperation.fromPos)
             pbTreeStyleOperation.to = toTreePos(treeStyleOperation.toPos)
+            // Encode both fields, as Go's `toTreeStyle` does. The reverse of a style that overwrote
+            // some attributes and added others carries both, and dropping either half would let
+            // peers apply something other than what the undoing client applied.
             treeStyleOperation.attributes.forEach { key, value in
                 pbTreeStyleOperation.attributes[key] = value
             }
@@ -749,21 +752,15 @@ extension Converter {
                 treeEdit.setSplitTickets(pbTreeEditOperation.splitTickets.map { fromTimeTicket($0) })
                 return treeEdit
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
-                if !pbTreeStyleOperation.attributesToRemove.isEmpty {
-                    return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
-                                              fromPos: fromTreePos(pbTreeStyleOperation.from),
-                                              toPos: fromTreePos(pbTreeStyleOperation.to),
-                                              attributes: [:],
-                                              attributesToRemove: pbTreeStyleOperation.attributesToRemove,
-                                              executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
-                } else {
-                    return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
-                                              fromPos: fromTreePos(pbTreeStyleOperation.from),
-                                              toPos: fromTreePos(pbTreeStyleOperation.to),
-                                              attributes: pbTreeStyleOperation.attributes,
-                                              attributesToRemove: [],
-                                              executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
-                }
+                // A sender may set both fields at once -- that is how it encodes the reverse of a
+                // style that overwrote some attributes and added others -- so read both rather than
+                // letting either one shadow the other, as Go's `fromTreeStyle` does.
+                return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
+                                          fromPos: fromTreePos(pbTreeStyleOperation.from),
+                                          toPos: fromTreePos(pbTreeStyleOperation.to),
+                                          attributes: pbTreeStyleOperation.attributes,
+                                          attributesToRemove: pbTreeStyleOperation.attributesToRemove,
+                                          executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
             } else if case let .arraySet(pdArraySetOperation) = pbOperation.body {
                 return ArraySetOperation(
                     parentCreatedAt: fromTimeTicket(pdArraySetOperation.parentCreatedAt),
