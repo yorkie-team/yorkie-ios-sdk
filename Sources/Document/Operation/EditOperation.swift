@@ -284,7 +284,7 @@ final class EditOperation: Operation {
         restoreMode: RestoreMode,
         retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
     ) -> EditOperation {
-        if (restoreSpans?.isEmpty ?? true), (retombstoneSpans?.isEmpty ?? true) {
+        if restoreSpans?.isEmpty ?? true, retombstoneSpans?.isEmpty ?? true {
             return self.emptyReverse()
         }
         return EditOperation(

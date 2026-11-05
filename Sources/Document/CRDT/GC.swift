@@ -117,7 +117,7 @@ protocol GCChild: AnyObject {
 
 extension GCChild {
     /// Defaults to no hold; only a Text node with a removal ledger is held.
-    func heldFromPurge(_ vector: VersionVector) -> Bool {
+    func heldFromPurge(_: VersionVector) -> Bool {
         false
     }
 }
