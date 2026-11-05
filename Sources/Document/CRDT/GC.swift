@@ -97,6 +97,29 @@ protocol GCChild: AnyObject {
     var toIDString: String { get }
     var removedAt: TimeTicket? { get }
     func getDataSize() -> DataSize
+
+    /// Tells whether the child has to outlive the point where `removedAt` alone would release it.
+    ///
+    /// A Text node keeps a removal ledger: the deletions that removed it and the undos that
+    /// cancelled some of them. Once purged, the ledger is gone, so the node may go only when a
+    /// restore that later finds it missing can answer as the ledger would. Until then
+    /// ``CRDTRoot/garbageCollect(minSyncedVersionVector:)`` skips it without counting it as
+    /// deferred: unlike a barrier, holding it back frees nothing else, and a node held by two
+    /// deletions nobody undoes stays registered, and counted as garbage, for good.
+    ///
+    /// Mirrors Go's `crdt.GCHold`. Declared as a requirement so a conforming type's override is
+    /// still reached through a `GCChild` existential.
+    ///
+    /// - Parameter vector: The versions every replica has seen.
+    /// - Returns: Whether GC must keep the child.
+    func heldFromPurge(_ vector: VersionVector) -> Bool
+}
+
+extension GCChild {
+    /// Defaults to no hold; only a Text node with a removal ledger is held.
+    func heldFromPurge(_: VersionVector) -> Bool {
+        false
+    }
 }
 
 protocol CRDTGCPairContainable: CRDTElement {

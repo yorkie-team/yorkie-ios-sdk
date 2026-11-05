@@ -145,6 +145,22 @@ public struct ClientOptions {
      * `authTokenInjector` is a function that provides a token for the auth webhook.
      * When the webhook response status code is 401, this function is called to refresh the token.
      * The `reason` parameter is the reason from the webhook response.
+     *
+     * If the function throws, the client keeps the previous token, and its loops (the sync loop,
+     * the Watch streams and broadcast retries) do not call the function again for a while: 1s
+     * after the first failure, doubling up to 30s, jittered. A loop that got a 401 retries on its
+     * own after its usual delay, or once that time is up if it is later, but waits at most 5s for
+     * it, so the loops come back once the token API does. A one-shot call such as `attach`,
+     * `detach`, `remove` or `sync` calls the function on every 401: it throws the function's error
+     * if the function throws, and the `errUnauthenticated` it received otherwise; retrying it is
+     * up to the caller. The first try of `broadcast` calls it the same way and throws the
+     * function's error if it throws; otherwise `broadcast` retries as usual.
+     *
+     * A failure is treated as transient. When the function can tell that a refresh will never
+     * succeed (for example, the token API answers that the user is signed out), the app should
+     * deactivate the client to stop the retries. If the server refuses the deactivation with a 401
+     * as well and the function throws again, `deactivate` still stops the client locally and
+     * throws the function's error; the server reaps it after its `clientDeactivateThreshold`.
      */
     var authTokenInjector: AuthTokenInjector?
 
@@ -157,15 +173,17 @@ public struct ClientOptions {
 
     /**
      * `retrySyncLoopDelay` is the delay of the retry sync loop. If the sync loop
-     * fails, the client waits for the delay to retry the sync loop. The default
-     * value is `1000`(ms).
+     * fails, the client waits for the delay to retry the sync loop, or up to 5s
+     * after a 401 while the token refresh backs off (see `authTokenInjector`).
+     * The default value is `1000`(ms).
      */
     var retrySyncLoopDelay: Int
 
     /**
      * `reconnectStreamDelay` is the delay of the reconnect stream. If the stream
-     * is disconnected, the client waits for the delay to reconnect the stream. The
-     * default value is `1000`(ms).
+     * is disconnected, the client waits for the delay to reconnect the stream,
+     * or up to 5s after a 401 while the token refresh backs off (see
+     * `authTokenInjector`). The default value is `1000`(ms).
      */
     var reconnectStreamDelay: Int
 
@@ -330,6 +348,13 @@ public class Client {
     private var yorkieService: YorkieService
     private var authTokenInjector: AuthTokenInjector?
     private var authHeader: AuthHeader
+    /// Token refresh backoff state, see ``refreshAuthToken(reason:inRetryLoop:)``.
+    var authRefresh = AuthRefreshState()
+    /// The clock the token refresh backoff runs on (ms). Tests substitute a fake one.
+    var authRefreshNow: @MainActor () -> Int64 = { WatchIdleWatchdog.monotonicNowMs() }
+    /// Numbers the sync loops, so a deactivate followed by an activate cannot leave two running;
+    /// see ``runSyncLoop()``.
+    private var syncLoopGeneration = 0
     private var semaphoresForInitialzation = [String: DispatchSemaphore]()
     /// Serialises every sync pass, and is the barrier ``resync(_:discardLocalChanges:initialPresence:)``
     /// holds across its recovery.
@@ -443,7 +468,9 @@ public class Client {
         }
 
         if let authTokenInjector {
-            try await injectAuthTokenAfterGet(with: authTokenInjector, reason: nil)
+            let token = try await authTokenInjector.getToken(reason: nil)
+            self.authHeader.updateToken(token)
+            self.authRefresh.tokenSetByActivation()
         }
 
         do {
@@ -485,7 +512,7 @@ public class Client {
             Logger.debug("Client(\(self.key)) activated")
         } catch {
             Logger.error("Failed to request activate client(\(self.key)).")
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -519,7 +546,30 @@ public class Client {
             Logger.info("Client(\(self.key) deactivated.")
         } catch {
             Logger.error("Failed to request deactivate client(\(self.key)).")
-            await self.handleConnectError(error)
+
+            // NOTE(chacha912): The app deactivates to stop the retries when the token can no
+            // longer be refreshed, and the auth webhook may refuse `DeactivateClient` too. Stop
+            // locally then, or the loops would keep resending the refused token with nothing left
+            // to stop them.
+            if let connectError = error as? ConnectError,
+               YorkieError.Code(rawValue: errorCodeOf(error: connectError)) == .errUnauthenticated,
+               self.authTokenInjector != nil
+            {
+                do {
+                    try await self.refreshAuthToken(reason: errorMetadataOf(error: connectError)["reason"], inRetryLoop: false)
+                } catch let refreshError {
+                    await self.releaseAllSessions()
+                    do {
+                        try self.deactivateInternal()
+                    } catch {
+                        Logger.error("Failed deactivateInternal for client (\(self.key)) with error: \(error)")
+                    }
+                    throw refreshError
+                }
+                throw error
+            }
+
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -764,7 +814,7 @@ public class Client {
             // Only reached when no attachment took ownership of it.
             await pendingSessionLockHandle?.release()
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -844,7 +894,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request detach document(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -897,7 +947,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request remove document(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -943,7 +993,7 @@ public class Client {
             return Converter.fromRevisionSummary(message.revision)
         } catch {
             Logger.error("Failed to request create revision(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -983,7 +1033,7 @@ public class Client {
             return message.revisions.map(Converter.fromRevisionSummary)
         } catch {
             Logger.error("Failed to request list revisions(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -1025,7 +1075,7 @@ public class Client {
             return Converter.fromRevisionSummary(message.revision)
         } catch {
             Logger.error("Failed to request get revision(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -1061,7 +1111,7 @@ public class Client {
             Logger.info("[RR] c:\"\(self.key)\" restores revision d:\"\(doc.getKey())\" r:\"\(revisionID)\"")
         } catch {
             Logger.error("Failed to request restore revision(\(self.key)).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -1188,7 +1238,7 @@ public class Client {
         do {
             return try await self.performSyncInternal(false, attachment)
         } catch {
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -1199,18 +1249,18 @@ public class Client {
         }
     }
 
-    private func setSyncTimer(_ reconnect: Bool) {
+    private func setSyncTimer(_ reconnect: Bool, generation: Int, delayMs: Int? = nil) {
         let isDisconnectedWatchStream = self.attachmentMap.values.contains { value in
             if let docAttachment = value as? Attachment<Document> {
                 return docAttachment.isDisconnectedStream
             }
             return false
         }
-        let syncLoopDuration = (reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration
+        let syncLoopDuration = delayMs ?? ((reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration)
 
         let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
             Task {
-                await self.doSyncLoop()
+                await self.doSyncLoop(generation: generation)
             }
         }
 
@@ -1241,10 +1291,22 @@ public class Client {
                             continue
                         }
 
+                        let changeEventReceived = docAttachment.changeEventReceived
                         self.clearAttachmentRemoteChangeEventReceived(key)
                         result.append(docAttachment.resource)
                         if let syncMode = docAttachment.syncMode {
-                            try await self.syncParkingWriteRejection(docAttachment, syncMode)
+                            do {
+                                try await self.syncParkingWriteRejection(docAttachment, syncMode)
+                            } catch {
+                                // The pull this sync owed a remote change never happened, so put the
+                                // flag back: with no local changes, `needRealtimeSync` would otherwise
+                                // skip the document on the retry, and the change would wait for the
+                                // next remote event or Watch reconnect.
+                                if changeEventReceived == true {
+                                    docAttachment.changeEventReceived = true
+                                }
+                                throw error
+                            }
                         }
                     }
                 }
@@ -1282,7 +1344,10 @@ public class Client {
         return result
     }
 
-    private func doSyncLoop() async {
+    private func doSyncLoop(generation: Int) async {
+        guard generation == self.syncLoopGeneration else {
+            return
+        }
         guard self.isActive else {
             Logger.debug("[SL] c:\"\(self.key)\" exit sync loop")
             self.setCondition(.syncLoop, value: false)
@@ -1292,11 +1357,19 @@ public class Client {
         do {
             try await self.performSyncInternal(true)
 
-            self.setSyncTimer(false)
+            self.setSyncTimer(false, generation: generation)
         } catch {
-            if await self.handleConnectError(error) {
-                try? await Task.sleep(nanoseconds: UInt64(self.retrySyncLoopDelay * 1_000_000))
-                self.setSyncTimer(true)
+            // A pass started before `deactivate()` can fail after a later `activate()` started a new
+            // loop. Its error belongs to the old session: handling it could tear down the new one.
+            // yorkie-js-sdk drops it with its `deactivating` guard; here the generation tells.
+            guard generation == self.syncLoopGeneration else {
+                return
+            }
+            if await self.handleLoopConnectError(error) {
+                // One wait, as yorkie-js-sdk schedules it: the retry delay, or up to 5s after a 401
+                // while the token refresh backs off. Sleeping it and then arming the reconnect timer
+                // as well would add `reconnectStreamDelay` on top of the documented wait.
+                self.setSyncTimer(true, generation: generation, delayMs: self.loopRetryDelay(error, self.retrySyncLoopDelay))
             } else {
                 self.setCondition(.syncLoop, value: false)
             }
@@ -1310,7 +1383,10 @@ public class Client {
     func runSyncLoop() async {
         Logger.debug("[SL] c:\"\(self.key)\" run sync loop")
         self.setCondition(.syncLoop, value: true)
-        await self.doSyncLoop()
+        // A loop started earlier may still have a retry pending, up to 5s away after a 401
+        // (``loopRetryDelay(_:_:)``), when `activate` starts this one; it must not run alongside.
+        self.syncLoopGeneration += 1
+        await self.doSyncLoop(generation: self.syncLoopGeneration)
     }
 
     private func doWatchLoop<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
@@ -1481,8 +1557,13 @@ public class Client {
                 // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
                 let presence = docAttachment.resource.getPresence(publisher)
 
+                // NOTE(hackerwins): Only the online set is touched here; the presence itself is kept,
+                // for the same reason the watch init keeps it above. Dropping it would make
+                // `hasPresence` false, so the `documentWatched` that follows a watch-stream reconnect
+                // would publish no `watched` event and the peer would stay invisible. The retained
+                // entry is never exposed: `getPresence`, `getPresences` and `getOthersPresences` all
+                // filter by `onlineClients`.
                 docAttachment.resource.removeOnlineClient(publisher)
-                docAttachment.resource.removePresence(publisher)
 
                 if let presence {
                     docAttachment.resource.publishPresenceEvent(.unwatched, publisher, presence)
@@ -1504,7 +1585,7 @@ public class Client {
         Logger.debug("[WL] c:\"\(self.key)\" disconnected watch stream")
     }
 
-    func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>) throws {
+    func onStreamDisconnect<R: Attachable>(_ key: String, with attachment: Attachment<R>, error: Error? = nil) throws {
         let cancelled = attachment.cancelled
         self.disconnectWatchStream(key, with: attachment)
         // check if watch loop is stopped. `.manual` and `.polling` are stream-less
@@ -1518,7 +1599,8 @@ public class Client {
         // NOTE: Only schedule reconnect if the stream was not explicitly cancelled
         // The check in doWatchLoop will prevent duplicate streams
         if !cancelled {
-            attachment.watchLoopReconnectTimer = Timer(timeInterval: Double(self.reconnectStreamDelay) / 1000, repeats: false) { _ in
+            let delay = self.loopRetryDelay(error, self.reconnectStreamDelay)
+            attachment.watchLoopReconnectTimer = Timer(timeInterval: Double(delay) / 1000, repeats: false) { _ in
                 Task {
                     Logger.debug("[WL] c:\"\(self.key)\" reconnect timer fired. do watch loop")
                     try await self.doWatchLoop(key, with: attachment)
@@ -1789,10 +1871,13 @@ public class Client {
 
     /**
      * `handleConnectError` handles the given error. If the given error can be
-     * retried after handling, it returns true.
+     * retried after handling, it returns true. `inRetryLoop` is true for the
+     * loops that retry on their own (sync, Watch, broadcast retries): their
+     * 401s skip the token refresh while it backs off, and a refresh that fails
+     * does not throw. A one-shot call throws the `authTokenInjector`'s error.
      */
     @discardableResult
-    func handleConnectError(_ error: Error?) async -> Bool {
+    func handleConnectError(_ error: Error?, inRetryLoop: Bool = false) async throws -> Bool {
         guard let connectError = error as? ConnectError else {
             return false
         }
@@ -1824,9 +1909,11 @@ public class Client {
         // token is invalid or expired. In this case, the client gets a new token
         // from the `authTokenInjector` and retries the api call.
         let yorkieErrorCode = YorkieError.Code(rawValue: errorCodeOf(error: connectError))
-        if yorkieErrorCode == .errUnauthenticated, let authTokenInjector {
-            let reason = errorMetadataOf(error: connectError)["reason"]
-            try? await injectAuthTokenAfterGet(with: authTokenInjector, reason: reason)
+        if yorkieErrorCode == .errUnauthenticated {
+            if self.authTokenInjector != nil {
+                let reason = errorMetadataOf(error: connectError)["reason"]
+                try await self.refreshAuthToken(reason: reason, inRetryLoop: inRetryLoop)
+            }
             return true
         }
 
@@ -1914,7 +2001,7 @@ public extension Client {
 
             return Int(message.sessionCount)
         } catch {
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -1986,7 +2073,10 @@ public extension Client {
             case .failure(let error):
                 Logger.error("[BC] c:\(self.key)", error: error)
 
-                let recovered = await self.handleConnectError(error)
+                // Only the retries are a loop: the first try is the app's call.
+                let recovered = retryCount > 0
+                    ? await self.handleLoopConnectError(error)
+                    : try await self.handleConnectError(error)
                 if YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errUnauthenticated,
                    let channel = channelAttachment?.resource
                 {
@@ -2008,15 +2098,62 @@ public extension Client {
                     throw error
                 }
 
-                let retryInterval = self.exponentialBackoff(retryCount: retryCount - 1)
-                try await Task.sleep(nanoseconds: UInt64(retryInterval * 1_000_000))
+                let retryInterval = self.loopRetryDelay(error, Int(self.exponentialBackoff(retryCount: retryCount - 1)))
+                try await Task.sleep(nanoseconds: UInt64(retryInterval) * 1_000_000)
             }
         }
     }
 
-    private func injectAuthTokenAfterGet(with authTokenInjector: AuthTokenInjector, reason: String?) async throws {
-        let token = try await authTokenInjector.getToken(reason: reason)
-        self.authHeader.updateToken(token)
+    /// Asks `authTokenInjector` for a new token after a 401.
+    ///
+    /// For a loop, a failure is treated as transient: the previous token is kept and the loop is
+    /// still told to retry. Each failure in a row doubles the wait before the injector is called
+    /// again (``AuthRefreshBackoff/delayMs(failures:)``); a loop's 401 that arrives sooner skips it,
+    /// and the loop's retry waits until then, but at most 5s for it (``loopRetryDelay(_:_:)``). A
+    /// one-shot call (`inRetryLoop` false) always calls it and gets its error thrown: the app
+    /// retried on purpose, the token API may be back, and the injector's error is how the app learns
+    /// why it failed.
+    ///
+    /// Each 401 makes its own call; they do not join one call, since an injector that never settles
+    /// would then hold every later 401 too. A call that settles after a later one already set its
+    /// token neither sets its own nor changes the backoff, so an older token never overrides a newer
+    /// one, and a call still pending when the client activates again does not override the new
+    /// session's token. 401s that arrive together, such as the sync loop's and the Watch streams'
+    /// when the token expires, count as one failure.
+    ///
+    /// - Parameters:
+    ///   - reason: The reason from the webhook response.
+    ///   - inRetryLoop: Whether a retry loop got the 401.
+    /// - Throws: The injector's error, for a one-shot call.
+    func refreshAuthToken(reason: String?, inRetryLoop: Bool) async throws {
+        guard let authTokenInjector = self.authTokenInjector else {
+            return
+        }
+        if inRetryLoop, self.authRefreshNow() < self.authRefresh.retryAt {
+            return
+        }
+
+        self.authRefresh.generation += 1
+        let generation = self.authRefresh.generation
+        let failures = self.authRefresh.failures
+        do {
+            let token = try await authTokenInjector.getToken(reason: reason)
+            if generation > self.authRefresh.tokenGeneration {
+                self.authRefresh.tokenGeneration = generation
+                self.authHeader.updateToken(token)
+                self.authRefresh.failures = 0
+                self.authRefresh.retryAt = 0
+            }
+        } catch {
+            Logger.error("[AT] c:\"\(self.key)\" token refresh failed:", error: error)
+            if generation > self.authRefresh.tokenGeneration, self.authRefresh.failures == failures {
+                self.authRefresh.failures = failures + 1
+                self.authRefresh.retryAt = self.authRefreshNow() + AuthRefreshBackoff.delayMs(failures: failures + 1)
+            }
+            if !inRetryLoop {
+                throw error
+            }
+        }
     }
 
     internal func publishAuthErrorIfNeeded(error: ConnectError?, attachment: Attachment<Document>?, method: AuthErrorValue.Method) {
@@ -2111,7 +2248,7 @@ extension Client {
 
 // MARK: - Channel Methods
 
-extension Client {
+public extension Client {
     /**
      * `attachChannel` attaches the given channel to this client.
      *
@@ -2123,7 +2260,7 @@ extension Client {
      * via TTL once heartbeats stop.
      */
     @discardableResult
-    public func attachChannel(_ channel: Channel) async throws -> Channel {
+    func attachChannel(_ channel: Channel) async throws -> Channel {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -2188,7 +2325,7 @@ extension Client {
             try? self.detachInternal(channel.getKey())
             channel.setStatus(.detached)
             Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
-            await self.handleConnectError(error)
+            try await self.handleConnectError(error)
             throw error
         }
     }
@@ -2201,7 +2338,7 @@ extension Client {
      * lifecycle, yorkie 0.7.10).
      */
     @discardableResult
-    public func detachChannel(_ channel: Channel) async throws -> Channel {
+    func detachChannel(_ channel: Channel) async throws -> Channel {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -2330,17 +2467,31 @@ extension Client {
     /**
      * `sendHeartbeats` sends heartbeats for all attached channels.
      */
-    private func sendHeartbeats() async {
+    internal func sendHeartbeats() async {
         for (_, attachment) in self.attachmentMap {
             if let channelAttachment = attachment as? Attachment<Channel> {
                 // Only send heartbeats for realtime channels
                 if channelAttachment.resource.isRealtime() {
                     let now = Date().timeIntervalSince1970
                     if now - channelAttachment.lastHeartbeatTime >= self.channelHeartbeatInterval {
+                        let requestClientID = self.id
                         do {
                             try await self.refreshChannel(channelAttachment.resource)
                         } catch {
                             Logger.error("Failed heartbeat for channel(\(channelAttachment.resource.getKey())).", error: error)
+                            // A heartbeat sent before `deactivate()` can fail after a later `activate()`.
+                            // Its error belongs to the old session: handling it could tear down the new
+                            // one. yorkie-js-sdk runs the heartbeat in the sync loop, behind its
+                            // `deactivating` guard; this timer has none, so check the session instead.
+                            guard self.id == requestClientID else {
+                                continue
+                            }
+                            // The heartbeats are a retry loop of their own: in yorkie-js-sdk they run
+                            // inside the sync loop, whose errors go through `handleConnectError` as a
+                            // loop. Route them the same way, so a 401 refreshes the token (backing off
+                            // while the refresh fails) instead of resending the refused token until
+                            // the channel session lapses.
+                            _ = await self.handleLoopConnectError(error)
                         }
                     }
                 }
@@ -2353,7 +2504,7 @@ extension Client {
      * Returns the updated count.
      */
     @discardableResult
-    public func syncChannel(_ channel: Channel) async throws -> Int {
+    func syncChannel(_ channel: Channel) async throws -> Int {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -2362,7 +2513,12 @@ extension Client {
             throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached")
         }
 
-        try await self.refreshChannel(attachment.resource)
+        do {
+            try await self.refreshChannel(attachment.resource)
+        } catch {
+            try await self.handleConnectError(error)
+            throw error
+        }
         return attachment.resource.getSessionCount()
     }
 }

@@ -247,6 +247,17 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      */
     private(set) var removedAt: TimeTicket?
 
+    // The removal ledger. `dels` are the deletions that removed this node while it was live in the
+    // deleter's view; `cancels` are the deletions undo cancelled. `removedAt` is the latest
+    // uncancelled deletion. `!ledgered` means the ledger is just `removedAt`.
+    private var ledgered = false
+    private var dels: [TimeTicket]?
+    private var cancels: [LedgerCancel]?
+    // The reading of the ledger above, kept because a ledger grows a pair per delete-and-undo cycle
+    // and rebuilding it on every walk makes churning one quadratic. Every write of the ledger
+    // either drops it or updates it.
+    private var index: LedgerIndex?
+
     /**
      * `prev` returns a previous node of this node.
      */
@@ -372,11 +383,13 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
      * `split` creates a new split node of the given offset.
      */
     func split(_ offset: Int32) -> RGATreeSplitNode<T> {
-        RGATreeSplitNode(
+        let node = RGATreeSplitNode(
             self.id.split(offset),
             self.splitValue(offset),
             self.removedAt
         )
+        node.copyLedger(from: self)
+        return node
     }
 
     /**
@@ -425,22 +438,14 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
     }
 
     /**
-     * `setRemovedAt` sets the remove time of this node.
+     * `setRemovedAt` sets the remove time of this node. It drops the ledger.
      */
     func setRemoveAt(_ removeAt: TimeTicket?) {
         self.removedAt = removeAt
-    }
-
-    /**
-     * `remove` removes node with the given removedAt timestamp.
-     * Updates the timestamp only if the node is not yet removed or if the new timestamp is later (LWW).
-     */
-    func remove(
-        _ removedAt: TimeTicket
-    ) {
-        if self.removedAt == nil || removedAt.after(self.removedAt!) {
-            self.removedAt = removedAt
-        }
+        self.ledgered = false
+        self.dels = nil
+        self.cancels = nil
+        self.index = nil
     }
 
     /**
@@ -458,7 +463,9 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
         // from the root and applies every operation to both; a shared value means
         // the clone's split or style mutates the root as a side effect, and the
         // root's own application then sees an already-mutated value.
-        RGATreeSplitNode(self.id, self.value.substring(from: 0, to: self.value.count), self.removedAt)
+        let node = RGATreeSplitNode(self.id, self.value.substring(from: 0, to: self.value.count), self.removedAt)
+        node.copyLedger(from: self)
+        return node
     }
 
     /**
@@ -476,6 +483,334 @@ class RGATreeSplitNode<T: RGATreeSplitValue>: SplayNode<T> {
         let right = self.value.substring(from: Int(offset), to: self.value.count)
         self.value.truncate(Int(offset))
         return right
+    }
+}
+
+// MARK: - Removal ledger
+
+/// An undo that cancelled one deletion of a node.
+struct LedgerCancel {
+    let deletion: TimeTicket
+    let cancelledAt: TimeTicket
+}
+
+/// One deletion of a removal ledger beside the cancel that covers it, if an undo cancelled it.
+private final class LedgerEntry {
+    let removal: TimeTicket
+    var cancelledAt: TimeTicket?
+
+    init(removal: TimeTicket, cancelledAt: TimeTicket? = nil) {
+        self.removal = removal
+        self.cancelledAt = cancelledAt
+    }
+}
+
+/// The reading of a removal ledger every walk of it needs: each deletion with its cancel, those
+/// entries by deletion, the deletions no cancel covers, and the cancels by the deletion each one
+/// cancels -- which covers the cancel of a deletion the ledger itself does not hold.
+private final class LedgerIndex {
+    var entries: [LedgerEntry] = []
+    var byKey: [String: LedgerEntry] = [:]
+    var live: [TimeTicket] = []
+    var cancelled: [String: TimeTicket] = [:]
+}
+
+/// The removal ledger of a Text piece (yorkie-team/yorkie#2310, yorkie-js-sdk#1514).
+///
+/// Each piece keeps the deletions that removed it and the undos that cancelled some of them. An
+/// undo cancels only its own actor's removal, and a deletion or redo removes only what its author
+/// saw live. `removedAt` is the latest uncancelled deletion.
+extension RGATreeSplitNode {
+    func copyLedger(from other: RGATreeSplitNode<T>) {
+        self.ledgered = other.ledgered
+        self.dels = other.dels
+        self.cancels = other.cancels
+        self.index = nil
+    }
+
+    /// The removal ledger: whether there is one, the deletions and the cancels.
+    var ledger: (ledgered: Bool, dels: [TimeTicket], cancels: [LedgerCancel]) {
+        (self.ledgered, self.dels ?? [], self.cancels ?? [])
+    }
+
+    /// Whether the ledger holds a cancel, the only thing ``pruneStable(_:)`` can drop.
+    var hasCancels: Bool {
+        !(self.cancels?.isEmpty ?? true)
+    }
+
+    /// The deletions in the ledger without building one: a node without a ledger was removed by
+    /// `removedAt` alone, if at all.
+    private func removals() -> [TimeTicket] {
+        if self.ledgered {
+            return self.dels ?? []
+        }
+        return self.removedAt.map { [$0] } ?? []
+    }
+
+    private func ensureLedger() {
+        if !self.ledgered {
+            self.ledgered = true
+            self.dels = self.removedAt.map { [$0] } ?? []
+            self.index = nil
+        }
+    }
+
+    /// Reads the ledger into the form every walk of it wants, and keeps that reading until the
+    /// ledger is written again. A deletion is cancelled at most once (``cancelRemoval(_:at:)`` and
+    /// ``setRemovalEvents(_:)`` both pair one to one), so a cancel is indexed by the deletion it
+    /// cancels. A decoded ledger is as long as whoever sent it made it, so every walk takes this
+    /// index rather than scanning the cancels per deletion, which would be quadratic.
+    private func ledgerIndex() -> LedgerIndex {
+        if let index = self.index {
+            return index
+        }
+        let index = LedgerIndex()
+        for cancel in self.cancels ?? [] {
+            index.cancelled[cancel.deletion.toIDString] = cancel.cancelledAt
+        }
+        for deletion in self.removals() {
+            let key = deletion.toIDString
+            if index.byKey[key] != nil {
+                continue
+            }
+            let entry = LedgerEntry(removal: deletion, cancelledAt: index.cancelled[key])
+            index.entries.append(entry)
+            index.byKey[key] = entry
+            if entry.cancelledAt == nil {
+                index.live.append(deletion)
+            }
+        }
+        self.index = index
+        return index
+    }
+
+    private func recompute() {
+        var latest: TimeTicket?
+        for deletion in self.ledgerIndex().live {
+            if let current = latest, !deletion.after(current) {
+                continue
+            }
+            latest = deletion
+        }
+        self.removedAt = latest
+    }
+
+    /// Adds a deletion to the ledger.
+    ///
+    /// A node's first removal is just `removedAt`; the ledger is built only when a second removal
+    /// or a cancel needs it.
+    ///
+    /// - Parameter removedAt: The ticket of the deletion.
+    func recordRemoval(_ removedAt: TimeTicket) {
+        if !self.ledgered, self.removedAt == nil {
+            self.removedAt = removedAt
+            self.index = nil
+            return
+        }
+        self.ensureLedger()
+        // An actor removes a piece only while it is live in its view, so it never holds two
+        // uncancelled removals; a change whose vector leaves out its own earlier removal is not
+        // honest, and recording it would break the pairing `removal_events` relies on and grow the
+        // ledger.
+        let mine = self.uncancelledRemovalBy(removedAt.actorID)
+        if let mine, mine != removedAt {
+            return
+        }
+        let index = self.ledgerIndex()
+        let key = removedAt.toIDString
+        if mine == nil, index.byKey[key] == nil {
+            self.dels?.append(removedAt)
+            let entry = LedgerEntry(removal: removedAt)
+            index.entries.append(entry)
+            index.byKey[key] = entry
+            index.live.append(removedAt)
+        }
+        self.recompute()
+    }
+
+    /// Cancels one deletion (an undo of it).
+    ///
+    /// - Parameters:
+    ///   - deletion: The deletion to cancel.
+    ///   - at: The ticket of the undo.
+    /// - Returns: Whether the node is live afterwards.
+    @discardableResult
+    func cancelRemoval(_ deletion: TimeTicket, at: TimeTicket) -> Bool {
+        self.ensureLedger()
+        if self.cancels == nil {
+            self.cancels = []
+        }
+        let index = self.ledgerIndex()
+        let key = deletion.toIDString
+        if index.cancelled[key] == nil {
+            self.cancels?.append(LedgerCancel(deletion: deletion, cancelledAt: at))
+            index.cancelled[key] = at
+            if let entry = index.byKey[key] {
+                entry.cancelledAt = at
+                if let live = index.live.firstIndex(of: deletion) {
+                    index.live.remove(at: live)
+                }
+            }
+        }
+        self.recompute()
+        return self.removedAt == nil
+    }
+
+    /// Drops each removal whose cancel is known to every replica, with that cancel.
+    ///
+    /// A change that arrives later knows both, so the pair never decides
+    /// ``isRemovedInView(_:)`` again, and dropping it keeps an undo-heavy text from carrying every
+    /// removal it ever had. A removal is older than its cancel by the same actor, so the cancel
+    /// being known is enough. What is left is the default ledger once `removedAt` alone says it.
+    ///
+    /// - Parameter vector: The versions every replica has seen.
+    func pruneStable(_ vector: VersionVector) {
+        var cancels = [LedgerCancel]()
+        var dropped = Set<String>()
+        for cancel in self.cancels ?? [] {
+            if !vector.afterOrEqual(other: cancel.cancelledAt) {
+                cancels.append(cancel)
+                continue
+            }
+            dropped.insert(cancel.deletion.toIDString)
+        }
+        var dels = self.dels
+        if !dropped.isEmpty, let current = dels {
+            dels = current.filter { !dropped.contains($0.toIDString) }
+        }
+        self.dels = dels
+        self.cancels = cancels
+        self.index = nil
+        let onlyRemovedAt: Bool = {
+            guard let dels, !dels.isEmpty else {
+                return true
+            }
+            return dels.count == 1 && self.removedAt != nil && dels[0] == self.removedAt
+        }()
+        if cancels.isEmpty, onlyRemovedAt {
+            self.ledgered = false
+            self.dels = nil
+            self.cancels = nil
+        }
+    }
+
+    /// Returns the removal by `actor` no undo cancelled, if any.
+    ///
+    /// - Parameter actor: The actor whose removal to find.
+    /// - Returns: The ticket of that removal.
+    func uncancelledRemovalBy(_ actor: ActorID) -> TimeTicket? {
+        self.ledgerIndex().live.first { $0.actorID == actor }
+    }
+
+    /// Tells whether GC must keep this tombstone under `vector`, the versions every replica has
+    /// seen.
+    ///
+    /// A node removed by two or more deletions no undo cancelled stays: an undo of one of them must
+    /// find it still held by the others, and a purged node could not say so. A node whose ledger is
+    /// not yet stable stays too: every deletion and every cancel in it must be known to all
+    /// replicas, so any change that arrives after the purge already knew them, and a node a restore
+    /// recreates with only the removal it cancels answers ``isRemovedInView(_:)`` as the full
+    /// ledger would. Once that holds and a single removal is left, a restore that finds the piece
+    /// gone can only be cancelling that removal, and recreates it.
+    ///
+    /// - Parameter vector: The versions every replica has seen.
+    /// - Returns: Whether the node must stay.
+    func heldFromPurge(_ vector: VersionVector) -> Bool {
+        guard self.ledgered else {
+            return false
+        }
+        // A cancelled deletion is older than its cancel by the same actor, so a stable cancel makes
+        // it stable too; an uncancelled one is `removedAt`, which GC checks first, or one of two
+        // that keep the node anyway.
+        let liveCount = self.ledgerIndex().live.count
+        for cancel in self.cancels ?? [] where !vector.afterOrEqual(other: cancel.cancelledAt) {
+            return true
+        }
+        return liveCount >= 2
+    }
+
+    /// Tells whether the node was removed in the view of the given version vector: a deletion it
+    /// knew that no undo it knew cancelled.
+    ///
+    /// - Parameter vector: The version vector of the view.
+    /// - Returns: Whether the node is removed in that view.
+    func isRemovedInView(_ vector: VersionVector) -> Bool {
+        for entry in self.ledgerIndex().entries {
+            if !ticketKnown(vector, entry.removal) {
+                continue
+            }
+            if let cancelledAt = entry.cancelledAt, ticketKnown(vector, cancelledAt) {
+                continue
+            }
+            return true
+        }
+        return false
+    }
+
+    /// Returns the ledger as one list: every removal and every cancel's ticket except `removedAt`,
+    /// in ticket order.
+    ///
+    /// Empty when `removedAt` says it all. An actor's events alternate in ticket order -- it
+    /// removes a piece only while the piece is live in its view, and its undo cancels its one
+    /// uncancelled removal -- so ``setRemovalEvents(_:)`` can tell them apart by place.
+    ///
+    /// - Returns: The removal events.
+    func getRemovalEvents() -> [TimeTicket] {
+        guard self.ledgered else {
+            return []
+        }
+        var events = (self.dels ?? []).filter { self.removedAt == nil || $0 != self.removedAt }
+        events.append(contentsOf: (self.cancels ?? []).map { $0.cancelledAt })
+        return events.sorted()
+    }
+
+    /// Rebuilds the ledger from `removedAt` and the events ``getRemovalEvents()`` returned: per
+    /// actor, in ticket order, a removal then the cancel of it.
+    ///
+    /// - Parameter events: The removal events.
+    /// - Throws: `errInvalidArgument` on a repeated ticket, which would pair a cancel with a
+    ///   removal that is not older, and when the result does not reproduce `removedAt`. The node is
+    ///   left as it was.
+    func setRemovalEvents(_ events: [TimeTicket]) throws {
+        guard !events.isEmpty else {
+            return
+        }
+        let removedAt = self.removedAt
+        var all = events
+        if let removedAt {
+            all.append(removedAt)
+        }
+        all.sort()
+        for idx in 1 ..< all.count where all[idx] == all[idx - 1] {
+            throw YorkieError(code: .errInvalidArgument, message: "removal events repeat a ticket")
+        }
+
+        var dels = [TimeTicket]()
+        var cancels = [LedgerCancel]()
+        var open = [ActorID: TimeTicket]()
+        for ticket in all {
+            if let deletion = open[ticket.actorID] {
+                cancels.append(LedgerCancel(deletion: deletion, cancelledAt: ticket))
+                open[ticket.actorID] = nil
+                continue
+            }
+            dels.append(ticket)
+            open[ticket.actorID] = ticket
+        }
+
+        self.ledgered = true
+        self.dels = dels
+        self.cancels = cancels
+        self.index = nil
+        self.recompute()
+        if self.removedAt != removedAt {
+            self.removedAt = removedAt
+            self.ledgered = false
+            self.dels = nil
+            self.cancels = nil
+            self.index = nil
+            throw YorkieError(code: .errInvalidArgument, message: "removal events do not reproduce removed_at")
+        }
     }
 }
 
@@ -527,6 +862,56 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * `restore`) drain this buffer into their returned GC pairs.
      */
     private var pendingGCPairs: [GCPair] = []
+
+    /**
+     * `cancelled` holds the nodes whose ledger has a cancel, the only ones
+     * `pruneLedgers` can drop anything from. `nil` until first needed: a tree
+     * decoded from a snapshot or deep-copied fills it with one scan.
+     */
+    private var cancelled: [ObjectIdentifier: RGATreeSplitNode<T>]?
+
+    /// Records that the ledger of `node` has a cancel.
+    private func trackCancelled(_ node: RGATreeSplitNode<T>) {
+        if self.cancelled == nil {
+            self.scanCancelled()
+        }
+        self.cancelled?[ObjectIdentifier(node)] = node
+    }
+
+    private func scanCancelled() {
+        var cancelled = [ObjectIdentifier: RGATreeSplitNode<T>]()
+        for node in self where node.hasCancels {
+            cancelled[ObjectIdentifier(node)] = node
+        }
+        self.cancelled = cancelled
+    }
+
+    /// Whether any node's removal ledger holds a cancel.
+    var hasCancelledRemovals: Bool {
+        if self.cancelled == nil {
+            self.scanCancelled()
+        }
+        return !(self.cancelled?.isEmpty ?? true)
+    }
+
+    /// Drops, from every node's ledger, the removals whose cancels the given vector covers (see
+    /// ``RGATreeSplitNode/pruneStable(_:)``).
+    ///
+    /// - Parameter vector: The versions every replica has seen.
+    /// - Returns: How many nodes still hold a cancel.
+    @discardableResult
+    func pruneLedgers(_ vector: VersionVector) -> Int {
+        if self.cancelled == nil {
+            self.scanCancelled()
+        }
+        for (key, node) in self.cancelled ?? [:] {
+            node.pruneStable(vector)
+            if !node.hasCancels {
+                self.cancelled?.removeValue(forKey: key)
+            }
+        }
+        return self.cancelled?.count ?? 0
+    }
 
     init() {
         self.head = RGATreeSplitNode(RGATreeSplitNodeID.initial)
@@ -901,6 +1286,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         let prvSize = node.getDataSize()
 
         let splitNode = node.split(offset)
+        if splitNode.hasCancels {
+            self.cancelled?[ObjectIdentifier(splitNode)] = splitNode
+        }
         self.treeByIndex.updateWeight(splitNode)
         self.insertAfter(node, splitNode)
 
@@ -935,7 +1323,8 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * `restore` re-establishes the characters described by `spans` under
      * their ORIGINAL identities. For each span, per overlapping region:
      *   - live piece exists       → skip (idempotent; another undo restored it)
-     *   - tombstoned piece exists → clear removedAt (un-tombstone)
+     *   - tombstoned piece exists → cancel the undoing actor's own removal; the
+     *                               piece revives unless another removal holds it
      *   - no piece exists (GC'd)  → recreate a node with the original ID
      *
      * Returns `(untombstonedNodes, recreatedNodes, changes, liveDiff,
@@ -995,10 +1384,19 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     let overlapEnd = Swift.min(pieceEnd, span.end)
                     if piece.isRemoved {
                         let (target, _) = try self.isolateRange(piece, cursor, overlapEnd)
-                        target.setRemoveAt(nil)
-                        // Repair splay weights on the path to root (length 0 → len).
-                        self.treeByIndex.splayNode(target)
-                        untombstoned.append(target)
+                        // An undo reverses its own actor's change, so the removal it cancels is the
+                        // one uncancelled removal by that actor: one actor cannot remove a piece
+                        // already removed in its view. No other removal holds it if there is none.
+                        var live = false
+                        if let deletion = target.uncancelledRemovalBy(executedAt.actorID) {
+                            live = target.cancelRemoval(deletion, at: executedAt)
+                            self.trackCancelled(target)
+                        }
+                        if live {
+                            // Repair splay weights on the path to root (length 0 → len).
+                            self.treeByIndex.splayNode(target)
+                            untombstoned.append(target)
+                        }
                         chainAnchor = target
                     } else {
                         chainAnchor = piece
@@ -1008,7 +1406,9 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                         pieceIdx += 1
                     }
                 } else {
-                    // Gap: recreate [cursor, gapEnd) with its original ID.
+                    // Gap: recreate [cursor, gapEnd) with its original ID. A purged piece had a
+                    // single uncancelled removal, stable on every replica (see `heldFromPurge`),
+                    // so this restore can only be cancelling that one.
                     let gapEnd = Swift.min(pieceStart, span.end)
                     let value = span.value.substring(from: Int(cursor - span.start), to: Swift.min(Int(gapEnd - span.start), span.value.count))
                     // `substring` deep-copied the span's attributes, tombstones
@@ -1018,6 +1418,16 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     // into this call's returned pairs.
                     self.bookCopiedAttrTombstones(value)
                     let newNode = RGATreeSplitNode(RGATreeSplitNodeID(span.createdAt, cursor), value)
+                    // The purged removal was known to every replica before the purge, so every
+                    // change that can arrive later knows it. A stand-in removal by the same actor
+                    // at lamport 0, which every such change's vector covers, keeps that answer for
+                    // `isRemovedInView`, with this cancel. The pair is dropped once the cancel is
+                    // known everywhere (`pruneStable`); until then snapshots carry it, as Go
+                    // records the same.
+                    let stable = TimeTicket(lamport: 0, delimiter: 0, actorID: executedAt.actorID)
+                    newNode.recordRemoval(stable)
+                    newNode.cancelRemoval(stable, at: executedAt)
+                    self.trackCancelled(newNode)
                     liveDiff.addDataSizes(others: newNode.getDataSize())
                     let prev = try self.findRestoreAnchor(
                         span.createdAt,
@@ -1035,11 +1445,20 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                     // later edit whose boundary lands on this fragment resolves through
                     // a stale insertion pointer in `findFloorNodePreferToLeft` and
                     // miscomputes its offset (yorkie-js-sdk#1327).
-                    if cursor > 0, let insPrev = self.findPieceCovering(span.createdAt, cursor - 1) {
-                        newNode.setInsPrev(insPrev)
+                    //
+                    // The neighbours are the nearest surviving pieces, not just the ones covering
+                    // the adjacent offsets: with the piece before the gap purged too, the one
+                    // before that would keep pointing past the new fragment, and purging it later
+                    // would hand the piece after the gap an `insPrev` that skips the fragment.
+                    if cursor > 0 {
+                        let prevID = RGATreeSplitNodeID(span.createdAt, cursor - 1)
+                        if let insPrev = self.treeByID.floorEntry(prevID), insPrev.key.hasSameCreatedAt(prevID) {
+                            newNode.setInsPrev(insPrev.value)
+                        }
                     }
-                    if let insNext = self.findPieceCovering(span.createdAt, gapEnd) {
-                        newNode.setInsNext(insNext)
+                    let nextID = RGATreeSplitNodeID(span.createdAt, gapEnd)
+                    if let insNext = self.treeByID.ceilingEntry(nextID), insNext.key.hasSameCreatedAt(nextID) {
+                        newNode.setInsNext(insNext.value)
                     }
                     recreated.append(newNode)
                     chainAnchor = newNode
@@ -1065,13 +1484,17 @@ class RGATreeSplit<T: RGATreeSplitValue> {
 
     /**
      * `retombstone` re-deletes the characters described by `spans` (redo of an
-     * identity-preserving undo). Only live pieces are affected; already removed
-     * or purged regions are skipped (idempotent).
+     * identity-preserving undo). Only pieces live in the redo's view are
+     * affected: a piece removed in that view, or purged, is skipped
+     * (idempotent), and a piece removed here by a deletion the redo never saw
+     * records the redo without being re-tombstoned.
      *
-     * Returns `(pairs, changes, diff)`: GCPairs for the newly tombstoned nodes,
-     * the removed regions as deletions so editor bindings and remote sync can
-     * be driven the same way as a normal edit, and the metadata-size overhead
-     * from splitting the (live) pieces to isolate the target range. The caller
+     * Returns `(pairs, changes, diff, recorded)`: GCPairs for the newly
+     * tombstoned nodes and the born-dead remainders the splits left behind, the
+     * removed regions as deletions so editor bindings and remote sync can be
+     * driven the same way as a normal edit, the metadata-size overhead from
+     * splitting the (live) pieces to isolate the target range, and the pieces
+     * the removal was recorded on, which the reverse has to name. The caller
      * must `root.acc(diff)` before registering `pairs`, mirroring how a normal
      * edit's boundary splits are accounted before its resulting tombstones are
      * registered. Indices are captured before each removal, so applying them in
@@ -1080,24 +1503,59 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      * - Parameters:
      *   - spans: The identity-addressed runs to re-remove.
      *   - executedAt: The timestamp of the operation performing the removal.
-     * - Returns: The GC pairs, resulting changes, and the live-bucket size delta.
+     *   - versionVector: The version vector of the change carrying the redo.
+     * - Returns: The GC pairs, resulting changes, the live-bucket size delta,
+     *   and the spans the removal was recorded on.
      */
     func retombstone(
         _ spans: [RestoreSpan<T>],
-        _ executedAt: TimeTicket
-    ) throws -> ([GCPair], [ContentChange<T>], DataSize) {
+        _ executedAt: TimeTicket,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([GCPair], [ContentChange<T>], DataSize, [RestoreSpan<T>]) {
         var pairs = [GCPair]()
         var changes = [ContentChange<T>]()
         var diff = DataSize(data: 0, meta: 0)
+        // The pieces the removal was recorded on, which the reverse names: a restore never reaches
+        // a piece that holds no removal by its actor.
+        var recorded = [RestoreSpan<T>]()
+        func record(_ span: RestoreSpan<T>, _ target: RGATreeSplitNode<T>) {
+            let start = target.id.offset
+            let end = start + Int32(target.contentLength)
+            recorded.append(RestoreSpan(
+                createdAt: span.createdAt,
+                start: start,
+                end: end,
+                value: span.value.substring(from: Int(start - span.start), to: Int(end - span.start))
+            ))
+        }
+        let inView = versionVector.flatMap { $0.size() > 0 ? $0 : nil }
 
         for span in spans {
             let pieces = self.findPiecesOverlapping(span.createdAt, span.start, span.end)
             for piece in pieces {
-                if piece.isRemoved {
-                    continue
-                }
                 let pieceStart = piece.id.offset
                 let pieceEnd = pieceStart + Int32(piece.contentLength)
+                if piece.isRemoved {
+                    // A piece live in the redo's view but removed here by a deletion the redo never
+                    // saw still records the redo's deletion, so a later undo of that other deletion
+                    // keeps it removed.
+                    if let inView, !piece.isRemovedInView(inView) {
+                        let (target, _) = try self.isolateRange(
+                            piece,
+                            Swift.max(pieceStart, span.start),
+                            Swift.min(pieceEnd, span.end)
+                        )
+                        target.recordRemoval(executedAt)
+                        record(span, target)
+                    }
+                    continue
+                }
+                // A piece live here but removed in the redo's view (by a deletion whose undo the
+                // redo never saw) is left alone, as the redoing replica left it: like a deletion, a
+                // redo removes only what was live in its view.
+                if let inView, piece.isRemovedInView(inView) {
+                    continue
+                }
                 let (target, splitDiff) = try self.isolateRange(
                     piece,
                     Swift.max(pieceStart, span.start),
@@ -1108,7 +1566,8 @@ class RGATreeSplit<T: RGATreeSplitValue> {
                 diff.addDataSizes(others: splitDiff)
                 // Capture the visible range while `target` is still live.
                 let (from, to) = try self.findIndexesFromRange(target.createPosRange)
-                target.remove(executedAt)
+                target.recordRemoval(executedAt)
+                record(span, target)
                 self.treeByIndex.splayNode(target)
                 pairs.append(GCPair(parent: self, child: target))
                 if from < to {
@@ -1117,12 +1576,68 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             }
         }
 
-        // retombstone only isolates live pieces, so splitNode buffers no
-        // born-removed piece here, but a split still books the attribute
-        // tombstones it copies.
+        // Isolating a range inside an already-tombstoned piece buffers born-dead remainders, and a
+        // split books the attribute tombstones it copies. Hand them to the caller with the rest:
+        // unregistered, they would never be purged and their size would stay uncharged.
         pairs.append(contentsOf: self.drainPendingGCPairs())
 
-        return (pairs, changes, diff)
+        return (pairs, changes, diff, recorded)
+    }
+
+    /// Re-snapshots `spans` against the content they address as it stands now.
+    ///
+    /// Returns an equivalent span set (same insertion identities, same overall intervals) whose
+    /// values carry the current attributes. A span is captured when the edit it reverses runs, so
+    /// attributes applied to the run afterwards -- a peer's style, which `canStyle` admits even on a
+    /// tombstone -- are missing from it; a replica that purged the run would then recreate it with
+    /// the stale snapshot while a replica that still holds the tombstone revives the live
+    /// attributes, and the two diverge.
+    ///
+    /// Regions covered by a surviving piece (live or tombstoned) are taken from that piece, so a span
+    /// crossing several pieces splits into one span per piece. Regions with no surviving piece keep
+    /// the original snapshot -- it is all this replica knows about them. Read-only: the copies it
+    /// makes are payload, never inserted, so they book no attribute tombstones.
+    ///
+    /// - Parameter spans: The spans to re-snapshot.
+    /// - Returns: The refreshed spans.
+    func refreshSpans(_ spans: [RestoreSpan<T>]) -> [RestoreSpan<T>] {
+        var refreshed = [RestoreSpan<T>]()
+        func fromSnapshot(_ span: RestoreSpan<T>, _ start: Int32, _ end: Int32) {
+            refreshed.append(RestoreSpan(
+                createdAt: span.createdAt,
+                start: start,
+                end: end,
+                value: span.value.substring(from: Int(start - span.start), to: Int(end - span.start))
+            ))
+        }
+
+        for span in spans {
+            let pieces = self.findPiecesOverlapping(span.createdAt, span.start, span.end)
+            var cursor = span.start
+            for piece in pieces {
+                let pieceStart = piece.id.offset
+                let start = Swift.max(pieceStart, cursor)
+                let end = Swift.min(pieceStart + Int32(piece.contentLength), span.end)
+                if end <= start {
+                    continue
+                }
+                if start > cursor {
+                    fromSnapshot(span, cursor, start)
+                }
+                refreshed.append(RestoreSpan(
+                    createdAt: span.createdAt,
+                    start: start,
+                    end: end,
+                    value: piece.value.substring(from: Int(start - pieceStart), to: Int(end - pieceStart))
+                ))
+                cursor = end
+            }
+            if cursor < span.end {
+                fromSnapshot(span, cursor, span.end)
+            }
+        }
+
+        return refreshed
     }
 
     /**
@@ -1192,8 +1707,8 @@ class RGATreeSplit<T: RGATreeSplitValue> {
      *      (originally-adjacent successor; exact original slot)
      *  (b) nearest surviving piece of the same insertion left of gapStart
      *      → directly after it
-     *  (c) rightmost surviving piece of the same insertion (must be right
-     *      of the gap) → directly before it
+     *  (c) nearest surviving piece of the same insertion at or after gapEnd
+     *      → directly before it
      *  (d) chain anchor: the previously placed fragment of this same restore
      *      (document order) → after it, so a purged multi-fragment run is
      *      rebuilt left-to-right rather than reversed
@@ -1219,11 +1734,14 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             }
         }
 
-        let rightmostKey = RGATreeSplitNodeID(createdAt, Int32.max)
-        if let rightmost = self.treeByID.floorEntry(rightmostKey),
-           rightmost.key.hasSameCreatedAt(rightmostKey),
-           rightmost.value.id.offset >= gapEnd,
-           let prev = rightmost.value.prev
+        // The nearest surviving piece of the insertion after the gap, not the rightmost one:
+        // anchoring before a later piece would place the gap after the pieces in between, and a
+        // deletion that later spans from the gap to one of them would run from its start to the end
+        // of the text.
+        let afterKey = RGATreeSplitNodeID(createdAt, gapEnd)
+        if let after = self.treeByID.ceilingEntry(afterKey),
+           after.key.hasSameCreatedAt(afterKey),
+           let prev = after.value.prev
         {
             return prev
         }
@@ -1335,9 +1853,21 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             let creationKnown = isLocal || vector!.afterOrEqual(other: node.createdAt)
             let tombstoneKnown = node.isRemoved && (isLocal || vector!.afterOrEqual(other: node.removedAt!))
 
-            if node.canRemove(editedAt, creationKnown, tombstoneKnown) {
+            // Once a tombstone can be cancelled by an undo, "the deleter knew the node" is not
+            // enough -- the node has to have been LIVE in the deleter's view. A node the deleter saw
+            // removed and an undo revived here has to survive the deletion on every replica.
+            let liveInView = isLocal
+                ? !node.isRemoved
+                : creationKnown && !node.isRemovedInView(vector!)
+            if liveInView, node.canRemove(editedAt, creationKnown, tombstoneKnown) {
                 nodesToRemove.append(node)
             } else {
+                // A node this deletion saw live but someone else removed concurrently records the
+                // deletion all the same. Otherwise an undo of the other deletion revives it on
+                // replicas that applied the two in one order and not in the other.
+                if !isLocal, liveInView, node.isRemoved {
+                    node.recordRemoval(editedAt)
+                }
                 nodesToKeep.append(node)
             }
         }
@@ -1358,7 +1888,7 @@ class RGATreeSplit<T: RGATreeSplitValue> {
             if node.isRemoved {
                 alreadyRemovedIDs.insert(node.toIDString)
             }
-            node.remove(editedAt)
+            node.recordRemoval(editedAt)
             removedNodes.append(node)
         }
 
@@ -1443,6 +1973,7 @@ extension RGATreeSplit: GCParent {
         guard let node = node as? RGATreeSplitNode<T> else {
             return
         }
+        self.cancelled?.removeValue(forKey: ObjectIdentifier(node))
         self.treeByIndex.delete(node)
         self.treeByID.remove(node.id)
 

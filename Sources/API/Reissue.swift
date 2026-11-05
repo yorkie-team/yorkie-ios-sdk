@@ -158,6 +158,11 @@ final class TicketReissuer {
     // MARK: Ticket
 
     func walk(_ ticket: inout PbTimeTicket) {
+        // A lamport-0 ticket is `InitialTimeTicket` -- or the stand-in removal a restore records on
+        // a recreated Text piece (yorkie-js-sdk#1514). The stand-in keeps the provisional actor while
+        // its cancel moves to the new one, so a decoded ledger no longer pairs and is dropped with a
+        // warning; the node stays live and answers `isRemovedInView` the same. yorkie-js-sdk does the
+        // same.
         if ticket.lamport != 0, ticket.actorID == self.from {
             ticket.actorID = self.to
         }
@@ -402,6 +407,10 @@ final class TicketReissuer {
         if node.hasRemovedAt { self.walk(&node.removedAt) }
         if node.hasInsPrevID { self.walk(&node.insPrevID) }
         node.attributes = node.attributes.mapValues(self.reissued)
+        // The removal ledger beyond `removed_at` (yorkie-js-sdk#1514): its tickets name the
+        // deleting and undoing actors, so they are re-issued like `removed_at`. Lamports are kept,
+        // so the per-actor alternation `setRemovalEvents` pairs by is unchanged.
+        node.removalEvents = node.removalEvents.map(self.reissued)
     }
 
     private func walk(_ node: inout PbTreeNode) {

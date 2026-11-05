@@ -63,28 +63,54 @@ struct IncreaseOperation: Operation {
         versionVector: VersionVector? = nil,
         source: OpSource = .local
     ) throws -> ExecutionResult? {
-        try ExecutionResult(opInfos: self.executeOpInfos(root: root, versionVector: versionVector))
+        guard let opInfos = try self.executeOpInfos(root: root, versionVector: versionVector, source: source) else {
+            return nil
+        }
+        return ExecutionResult(opInfos: opInfos)
     }
 
+    /// Applies the increase and returns its operation infos, or `nil` when a remote change to a
+    /// dedup counter is skipped.
     private func executeOpInfos(
         root: CRDTRoot,
-        versionVector: VersionVector? = nil
-    ) throws -> [any OperationInfo] {
+        versionVector: VersionVector? = nil,
+        source: OpSource
+    ) throws -> [any OperationInfo]? {
         guard let parentObject = root.find(createdAt: self.parentCreatedAt) else {
             let log = "fail to find \(self.parentCreatedAt)"
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
         if let counter = parentObject as? CRDTCounter<Int32>, counter.isDedup {
-            // Dedup path — actor must be provided.
+            // NOTE: a dedup counter holds an HLL of actors, so it can only take a unit increment
+            // attributed to one actor. A change carrying neither can never be applied, and a stored
+            // one comes back on every pull -- the checkpoint does not advance past a change that
+            // throws -- so it wedges the document. Skip it on the pull path, as Go does
+            // (`pkg/document/operations/increase.go`, `skipUnlessLocal`). A local `update` or an
+            // undo/redo still reports the failure to the caller that asked for it, with the code the
+            // counter threw.
             guard !self.actor.isEmpty else {
+                if source == .remote {
+                    return nil
+                }
                 throw YorkieError(
                     code: .errInvalidArgument,
                     message: "dedup counter requires actor"
                 )
             }
             if let primitive = self.value.deepcopy() as? Primitive {
-                try counter.increaseDedup(primitive, actor: self.actor)
+                do {
+                    try counter.increaseDedup(primitive, actor: self.actor)
+                } catch {
+                    if source == .remote {
+                        return nil
+                    }
+                    throw error
+                }
+            } else if source == .remote {
+                // A value that is not a primitive cannot be applied either; skip it on the pull path
+                // like the cases above, instead of failing at the value conversion below.
+                return nil
             }
         } else if let counter = parentObject as? CRDTCounter<Int32> {
             if let value = self.value.deepcopy() as? Primitive {

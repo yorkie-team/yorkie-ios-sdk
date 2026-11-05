@@ -190,6 +190,12 @@ class CRDTRoot {
      */
     private var docSize: DocSize
 
+    /**
+     * `ledgerHolders` are the Texts whose removal ledgers hold cancels that
+     * `garbageCollect` may prune once every replica knows them.
+     */
+    private var ledgerHolders: [ObjectIdentifier: CRDTText] = [:]
+
     init(rootObject: CRDTObject = CRDTObject(createdAt: TimeTicket.initial)) {
         self.rootObject = rootObject
         self.gcPairMap = [:]
@@ -300,6 +306,9 @@ class CRDTRoot {
                 for pair in element.getGCPairs() {
                     self.registerGCPair(pair)
                 }
+            }
+            if let text = element as? CRDTText, text.hasCancelledRemovals {
+                self.registerLedgerHolder(text)
             }
             // NOTE(#1227): Register dead position nodes in CRDTArray as GC pairs
             // so they are collected once all peers have applied the winning move.
@@ -765,6 +774,9 @@ class CRDTRoot {
         // (see `GCChargeKey`); drop them so they do not accumulate.
         self.sizeInGC = self.sizeInGC.filter { $0.key.isAlive }
 
+        // Pruning first can release a tombstone whose last pending cancel the vector now covers.
+        self.pruneLedgers(minSyncedVersionVector)
+
         while true {
             let (purged, deferred) = self.collect(minSyncedVersionVector: minSyncedVersionVector)
             count += purged
@@ -772,6 +784,21 @@ class CRDTRoot {
             if purged == 0 || deferred == 0 {
                 return count
             }
+        }
+    }
+
+    /// Registers a Text whose removal ledgers may be pruned (see ``RGATreeSplit/pruneLedgers(_:)``).
+    ///
+    /// - Parameter holder: The Text to register.
+    func registerLedgerHolder(_ holder: CRDTText) {
+        self.ledgerHolders[ObjectIdentifier(holder)] = holder
+    }
+
+    /// Prunes every registered holder and drops the ones with nothing left to prune. A removed
+    /// holder is dropped too: an undo that brings it back registers its copy again.
+    private func pruneLedgers(_ vector: VersionVector) {
+        for (key, holder) in self.ledgerHolders where holder.removedAt != nil || holder.pruneLedgers(vector) == 0 {
+            self.ledgerHolders.removeValue(forKey: key)
         }
     }
 
@@ -840,6 +867,11 @@ class CRDTRoot {
             }
 
             guard let child = pair.child, let removedAt = child.removedAt, minSyncedVersionVector.afterOrEqual(other: removedAt) else {
+                continue
+            }
+
+            // A Text node whose removal ledger still matters stays; see `GCChild.heldFromPurge`.
+            if child.heldFromPurge(minSyncedVersionVector) {
                 continue
             }
 

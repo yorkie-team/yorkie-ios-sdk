@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.26] - 2026-11-05
+
+> Requires a Yorkie server v0.7.26 or later (one that includes yorkie-team/yorkie#2310). Upgrade every server node first, and do not roll the server back once clients of this SDK are connected: an older server drops the removal ledger these clients rely on when it re-encodes a document. Clients of earlier releases can still disagree with this one when an undo meets a concurrent deletion of the same text, or when an undo reverses a Tree style that both overwrote and added attributes.
+
+> **Behavioural change — token refresh.** When `authTokenInjector` throws after a 401, the sync loop, Watch streams and broadcast retries keep the previous token and back off (1s doubling to 30s, jittered; a loop's retry waits at most 5s for it) instead of retrying at once. One-shot calls (`attach`, `detach`, `remove`, `sync`, the first `broadcast` try, ...) now throw the injector's error, where iOS used to swallow it and throw the original `errUnauthenticated`. `deactivate()` refused with a 401 whose refresh also fails stops the client locally and throws the injector's error. Channel heartbeats and `syncChannel(_:)` now refresh the token on a 401 as well.
+
+> **Behavioural change — malformed restore spans.** A Text restore span without `created_at`, or whose range does not cover its content, is now rejected when decoded (as the JS SDK and the server do) instead of being clamped. The server has rejected such a span on push since restore spans were introduced (v0.7.13), so a stored change never carries one.
+
+> **Storage note.** Snapshots gain `TextNode.removal_events`. A piece of text removed by two concurrent deletions that nobody undoes is no longer collected, and counts toward the document size checked against its limit.
+
+### Changed
+
+- Keep syncing through a failed token refresh, backing off while it fails in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+
+### Fixed
+
+- Keep Text undo converging through GC with a smaller ledger protocol in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+- Keep attributes on the span a reversed insertion records in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+- Keep both halves of a combined Tree style on the wire in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+- Skip a remote change this SDK cannot apply, as Go does in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+- Keep a peer's presence when its watch stream unwatches in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+- Qualify `Document` in `YorkieDevtoolsUI` so the package builds with the Xcode 27 SDK in https://github.com/yorkie-team/yorkie-ios-sdk/pull/280
+
 ## [v0.7.25] - 2026-10-14
 
 > Requires a Yorkie server v0.7.25 or later. Upgrade every server node first, and do not roll the server back below v0.7.25 once clients of this SDK are connected: a presence patch stored by an older server is served as an unspecified change, and every client fails the pulls that include it.

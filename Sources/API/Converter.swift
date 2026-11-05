@@ -169,9 +169,19 @@ extension Converter {
             // does not normally carry a patch. It is decoded anyway -- an echo of a pushed change, or
             // a peer ahead of this SDK, must not fail the whole pack. There is no `full` on the wire:
             // `Change.execute` merges the carried keys onto the presence already held for the actor.
+            // A patch can leave `presence` unset, as Go allows (`api/converter/from_pb.go`,
+            // `FromPresenceChange`): the generated getter then yields an empty presence, so it
+            // decodes as an empty patch.
             return .patch(presence: fromPresence(pbPresence: pbPresenceChange.presence), full: nil)
         case .clear:
             return .clear
+        case .unspecified, .delete:
+            // NOTE: these two types are defined but no SDK sends them. Go still decodes them,
+            // because stored rows go through that path, into a change that stores an empty
+            // presence for the actor (`api/converter/from_pb.go`, `FromPresenceChange`). Do the
+            // same: throwing here fails the pack, and the same stored change comes back on every
+            // pull.
+            return .put(presence: [:])
         default:
             throw YorkieError(code: .errInvalidType, message: "unsupported type: \(pbPresenceChange.type)")
         }
@@ -483,24 +493,27 @@ extension Converter {
      *   - pbSpan: The Protobuf span to convert.
      *   - executedAt: Timestamp stamped on the span's attributes; the wire format
      *     carries attribute values only, so the operation's own time is used.
+     * - Throws: `errInvalidArgument` when the span has no `createdAt` or its range does not
+     *   exactly cover its content.
      */
-    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) -> RestoreSpan<CRDTTextValue> {
-        // Derive the bounds from `content` rather than trusting the wire pair:
-        // `restore` slices `content` with NSString ranges, which raise an
-        // Objective-C NSRangeException (not a Swift error, so it cannot be
-        // caught) when the range overruns the string. yorkie-js-sdk never
-        // rejects a span here, so throwing would both diverge from it and wedge
-        // `applyChangePack` — the change pack would re-pull and re-fail
-        // indefinitely. Clamp to a self-consistent span so a nonconforming peer
-        // degrades to a harmless no-op instead.
-        // `start` is also capped at `Int32.max - length`: Swift's `+` traps on
-        // overflow, so an unbounded peer-supplied `start` would terminate the
-        // process — the opposite of degrading gracefully.
-        let length = Int32((pbSpan.content as NSString).length)
-        let start = min(max(0, pbSpan.start), Int32.max - length)
-        let end = start + length
-        if start != pbSpan.start || end != pbSpan.end {
-            Logger.warning("clamped inconsistent RestoreSpan: start=\(pbSpan.start), end=\(pbSpan.end), content length=\((pbSpan.content as NSString).length)")
+    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) throws -> RestoreSpan<CRDTTextValue> {
+        // A span addresses content by insertion identity, so it is malformed without a
+        // `createdAt`, and `RGATreeSplit.restore` slices `content` by `cursor - span.start`, so
+        // `[start, end)` has to be an ordered interval exactly covering it. Reject both here, as
+        // the server's `fromRestoreSpans` and yorkie-js-sdk do, instead of failing deep in the
+        // restore path -- where an overrun NSString range raises an Objective-C exception that
+        // Swift cannot catch. The lengths are NSString (UTF-16) lengths, the unit JS counts in.
+        // `end - start` cannot overflow once `0 <= start <= end` holds.
+        let length = (pbSpan.content as NSString).length
+        guard pbSpan.hasCreatedAt,
+              pbSpan.start >= 0,
+              pbSpan.end >= pbSpan.start,
+              Int(pbSpan.end - pbSpan.start) == length
+        else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "malformed restore span: missing timestamp or invalid range"
+            )
         }
 
         let value = CRDTTextValue(pbSpan.content)
@@ -510,8 +523,8 @@ extension Converter {
 
         return RestoreSpan(
             createdAt: Self.fromTimeTicket(pbSpan.createdAt),
-            start: start,
-            end: end,
+            start: pbSpan.start,
+            end: pbSpan.end,
             value: value
         )
     }
@@ -616,6 +629,9 @@ extension Converter {
             pbTreeStyleOperation.parentCreatedAt = toTimeTicket(treeStyleOperation.parentCreatedAt)
             pbTreeStyleOperation.from = toTreePos(treeStyleOperation.fromPos)
             pbTreeStyleOperation.to = toTreePos(treeStyleOperation.toPos)
+            // Encode both fields, as Go's `toTreeStyle` does. The reverse of a style that overwrote
+            // some attributes and added others carries both, and dropping either half would let
+            // peers apply something other than what the undoing client applied.
             treeStyleOperation.attributes.forEach { key, value in
                 pbTreeStyleOperation.attributes[key] = value
             }
@@ -690,8 +706,8 @@ extension Converter {
                 var retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
                 var restoreMode: RestoreMode?
                 if !pbEditOperation.restoreSpans.isEmpty || !pbEditOperation.retombstoneSpans.isEmpty {
-                    restoreSpans = pbEditOperation.restoreSpans.map { fromRestoreSpan($0, executedAt) }
-                    retombstoneSpans = pbEditOperation.retombstoneSpans.map { fromRestoreSpan($0, executedAt) }
+                    restoreSpans = try pbEditOperation.restoreSpans.map { try fromRestoreSpan($0, executedAt) }
+                    retombstoneSpans = try pbEditOperation.retombstoneSpans.map { try fromRestoreSpan($0, executedAt) }
                     restoreMode = pbEditOperation.restoreMode == .retombstone ? .retombstone : .restore
                 }
 
@@ -739,21 +755,15 @@ extension Converter {
                 treeEdit.setSplitTickets(pbTreeEditOperation.splitTickets.map { fromTimeTicket($0) })
                 return treeEdit
             } else if case let .treeStyle(pbTreeStyleOperation) = pbOperation.body {
-                if !pbTreeStyleOperation.attributesToRemove.isEmpty {
-                    return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
-                                              fromPos: fromTreePos(pbTreeStyleOperation.from),
-                                              toPos: fromTreePos(pbTreeStyleOperation.to),
-                                              attributes: [:],
-                                              attributesToRemove: pbTreeStyleOperation.attributesToRemove,
-                                              executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
-                } else {
-                    return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
-                                              fromPos: fromTreePos(pbTreeStyleOperation.from),
-                                              toPos: fromTreePos(pbTreeStyleOperation.to),
-                                              attributes: pbTreeStyleOperation.attributes,
-                                              attributesToRemove: [],
-                                              executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
-                }
+                // A sender may set both fields at once -- that is how it encodes the reverse of a
+                // style that overwrote some attributes and added others -- so read both rather than
+                // letting either one shadow the other, as Go's `fromTreeStyle` does.
+                return TreeStyleOperation(parentCreatedAt: fromTimeTicket(pbTreeStyleOperation.parentCreatedAt),
+                                          fromPos: fromTreePos(pbTreeStyleOperation.from),
+                                          toPos: fromTreePos(pbTreeStyleOperation.to),
+                                          attributes: pbTreeStyleOperation.attributes,
+                                          attributesToRemove: pbTreeStyleOperation.attributesToRemove,
+                                          executedAt: fromTimeTicket(pbTreeStyleOperation.executedAt))
             } else if case let .arraySet(pdArraySetOperation) = pbOperation.body {
                 return ArraySetOperation(
                     parentCreatedAt: fromTimeTicket(pdArraySetOperation.parentCreatedAt),
@@ -1527,6 +1537,10 @@ extension Converter {
             if let removedAt = textNode.removedAt {
                 pbTextNode.removedAt = toTimeTicket(removedAt)
             }
+            // The removal ledger beyond removed_at. A node whose removed_at says it all writes
+            // nothing, so a character removed by one deletion and never restored encodes to the
+            // same bytes as before.
+            pbTextNode.removalEvents = textNode.getRemovalEvents().map { toTimeTicket($0) }
             pbTextNodes.append(pbTextNode)
         }
 
@@ -1545,8 +1559,28 @@ extension Converter {
                                              removed: $0.value.isRemoved)
         }
         let textNode = RGATreeSplitNode(fromTextNodeID(pbTextNode.id), textValue)
-        if  pbTextNode.hasRemovedAt {
-            textNode.remove(fromTimeTicket(pbTextNode.removedAt))
+        if pbTextNode.hasRemovedAt {
+            textNode.setRemoveAt(fromTimeTicket(pbTextNode.removedAt))
+        }
+        if !pbTextNode.removalEvents.isEmpty {
+            // A rejected ledger is logged and dropped rather than thrown on: `fromTextNode` is
+            // reached from snapshot decoding and from element payloads inside remote operations, and
+            // throwing would stop this client from attaching, restoring from local bytes, or ever
+            // draining the pull that carries one peer's bad node -- a document wedged for good
+            // rather than one node decoded coarsely.
+            //
+            // The cost is a node left with `removed_at` alone, which answers `isRemovedInView` and
+            // `uncancelledRemovalBy` differently from a replica holding the full ledger. That is a
+            // divergence of one node against a payload no honest peer emits; a wedged document is
+            // worse. No count bound: a snapshot carries the ledgers its writer's rules grew.
+            let events = pbTextNode.removalEvents.map { fromTimeTicket($0) }
+            do {
+                // `setRemovalEvents` leaves the node as it was when it refuses, so the node here
+                // still carries `removed_at` alone.
+                try textNode.setRemovalEvents(events)
+            } catch {
+                Logger.warning("discarding malformed removal ledger for text node \(textNode.id.toTestString): \(error)")
+            }
         }
         return textNode
     }

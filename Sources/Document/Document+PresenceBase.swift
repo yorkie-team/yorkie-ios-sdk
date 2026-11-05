@@ -31,8 +31,10 @@ struct PresenceBaseState: Equatable {
 
     /// Whether a presence patch is outstanding: the last presence change recorded was a patch, or one
     /// is still queued. It decides whether a reply that has dropped the capability needs healing: an
-    /// old server does not reject a patch, it stores it as an empty presence for the client, so peers
-    /// are left wrong until a full put lands.
+    /// old server (v0.7.24 or earlier) does not reject a patch, it stores it with an empty change type
+    /// and serves it back as `CHANGE_TYPE_UNSPECIFIED`, which every reader that pulls it fails to
+    /// decode (`errInvalidType`). A later put does not undo that, so the server must be upgraded first
+    /// and must not roll back below v0.7.25.
     var patchSent = false
 }
 
@@ -52,9 +54,11 @@ extension Document {
     /// presence now has to be healed with a full put.
     ///
     /// Absence means unsupported, so a reply from an old server during a rolling upgrade turns
-    /// patching off. An old server does not reject a patch -- it stores it as an empty presence for
-    /// the client -- so once a patch has been recorded, a server that does not advertise the
-    /// capability leaves the peers holding an empty presence until a full put lands.
+    /// patching off. An old server (v0.7.24 or earlier) does not reject a patch -- it stores it with an
+    /// empty change type and serves it back as `CHANGE_TYPE_UNSPECIFIED`, which every reader that
+    /// pulls it fails to decode with `errInvalidType`, stopping its sync loop. The heal only stops
+    /// further patches and re-sends a base; it cannot repair a patch already stored, so the server must
+    /// be upgraded first and must not roll back below v0.7.25 once clients of this SDK connect.
     ///
     /// The test is only whether a patch is outstanding, not whether patching was on a moment ago: a
     /// patch queued across a restore was minted in an earlier session, so there is no "was
@@ -71,7 +75,7 @@ extension Document {
     }
 
     /// Re-sends the whole presence as a put, after a patch that a server without the capability may
-    /// have stored as empty.
+    /// have stored, so no further patch follows on top of a base that server never held.
     ///
     /// Minting it is a side effect of applying a pack rather than something the caller asked for, so
     /// it defers to ``isMintable`` instead of throwing `errRefused` out of an unrelated API: inside
@@ -129,8 +133,9 @@ extension Document {
     /// this session -- and the base is gone with it. A patch still queued counts as outstanding.
     /// Persistence writes a patch as the put it stands for (see `Converter.toPersistedChange`) and
     /// records that it was minted as a patch, which ``hasPendingPresencePatch()`` counts too: that
-    /// patch may have been pushed before the restart and stored as empty by a server without the
-    /// capability, and the restored put is deduplicated, so only a heal repairs it. The flag is
+    /// patch may have been pushed before the restart and stored as an unspecified change by a server
+    /// without the capability, and the restored put is deduplicated, so only a heal stops further
+    /// patches on top of it. The flag is
     /// derived from the queue, not assumed.
     func resetPresenceStateForRestore() {
         self.presenceBase.patchable = false
@@ -154,7 +159,7 @@ extension Document {
         // The rewrite deliberately leaves the later patches alone, so the queue usually still holds
         // one. A patch is outstanding whenever it does, and clearing the flag regardless would tell
         // ``learnPresenceCapability(_:)`` there is nothing to heal -- exactly when a server without
-        // the capability is about to store those patches as an empty presence.
+        // the capability is about to store those patches as unspecified changes.
         self.presenceBase.patchSent = self.hasPendingPresencePatch()
     }
 }

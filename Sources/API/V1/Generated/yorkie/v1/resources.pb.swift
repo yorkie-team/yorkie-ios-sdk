@@ -1672,6 +1672,16 @@ public struct Yorkie_V1_TextNode: Sendable {
 
   public var attributes: Dictionary<String,Yorkie_V1_NodeAttr> = [:]
 
+  /// removal_events is the removal ledger beyond removed_at: every removal of
+  /// this node and every undo that cancelled one, except removed_at itself.
+  /// An actor's events alternate in ticket order, a removal then the undo
+  /// cancelling it, so each is told apart by its place. Empty when removed_at
+  /// says it all. A piece recreated after GC records a stand-in removal by the
+  /// undoing actor at lamport 0, then its cancel. The pairing relies on an
+  /// undo cancelling only its own actor's removal; a change to that rule needs
+  /// a new field, not a new reading of this one.
+  public var removalEvents: [Yorkie_V1_TimeTicket] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -5078,7 +5088,7 @@ extension Yorkie_V1_NodeAttr: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension Yorkie_V1_TextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TextNode"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}value\0\u{3}removed_at\0\u{3}ins_prev_id\0\u{1}attributes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}value\0\u{3}removed_at\0\u{3}ins_prev_id\0\u{1}attributes\0\u{3}removal_events\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5091,6 +5101,7 @@ extension Yorkie_V1_TextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 3: try { try decoder.decodeSingularMessageField(value: &self._removedAt) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._insPrevID) }()
       case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_NodeAttr>.self, value: &self.attributes) }()
+      case 6: try { try decoder.decodeRepeatedMessageField(value: &self.removalEvents) }()
       default: break
       }
     }
@@ -5116,6 +5127,9 @@ extension Yorkie_V1_TextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if !self.attributes.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,Yorkie_V1_NodeAttr>.self, value: self.attributes, fieldNumber: 5)
     }
+    if !self.removalEvents.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.removalEvents, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5125,6 +5139,7 @@ extension Yorkie_V1_TextNode: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs._removedAt != rhs._removedAt {return false}
     if lhs._insPrevID != rhs._insPrevID {return false}
     if lhs.attributes != rhs.attributes {return false}
+    if lhs.removalEvents != rhs.removalEvents {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

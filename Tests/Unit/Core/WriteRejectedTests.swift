@@ -37,20 +37,20 @@ func writeRejection(_ code: YorkieError.Code, _ message: String) -> ConnectError
 
 final class WriteRejectedTests: XCTestCase {
     @MainActor
-    func test_does_not_retry_a_push_the_server_will_never_accept() async {
+    func test_does_not_retry_a_push_the_server_will_never_accept() async throws {
         let client = Client("http://localhost:8080")
 
         for code in [YorkieError.Code.errDocumentSizeExceedsLimit, .errChangeTooLarge] {
-            let retry = await client.handleConnectError(writeRejection(code, "refused"))
+            let retry = try await client.handleConnectError(writeRejection(code, "refused"))
             XCTAssertFalse(retry, "\(code) must stop the sync loop instead of resending")
         }
     }
 
     @MainActor
-    func test_still_retries_a_resource_exhausted_error_that_carries_no_yorkie_code() async {
+    func test_still_retries_a_resource_exhausted_error_that_carries_no_yorkie_code() async throws {
         let client = Client("http://localhost:8080")
 
-        let retry = await client.handleConnectError(ConnectError(code: .resourceExhausted, message: "slow down"))
+        let retry = try await client.handleConnectError(ConnectError(code: .resourceExhausted, message: "slow down"))
 
         XCTAssertTrue(retry)
     }

@@ -317,11 +317,26 @@ final class CRDTText: CRDTElement {
      */
     func retombstone(
         _ spans: [RestoreSpan<CRDTTextValue>],
-        _ executedAt: TimeTicket
-    ) throws -> ([GCPair], [TextChange], DataSize) {
-        let (pairs, contentChanges, diff) = try self.rgaTreeSplit.retombstone(spans, executedAt)
+        _ executedAt: TimeTicket,
+        _ versionVector: VersionVector? = nil
+    ) throws -> ([GCPair], [TextChange], DataSize, [RestoreSpan<CRDTTextValue>]) {
+        let (pairs, contentChanges, diff, recorded) = try self.rgaTreeSplit.retombstone(spans, executedAt, versionVector)
 
-        return (pairs, self.toTextChanges(contentChanges), diff)
+        return (pairs, self.toTextChanges(contentChanges), diff, recorded)
+    }
+
+    /// Whether any piece's removal ledger holds a cancel that ``pruneLedgers(_:)`` may drop later.
+    var hasCancelledRemovals: Bool {
+        self.rgaTreeSplit.hasCancelledRemovals
+    }
+
+    /// Drops the removals whose cancels the given vector covers from the pieces' ledgers.
+    ///
+    /// - Parameter vector: The versions every replica has seen.
+    /// - Returns: How many pieces still hold a cancel.
+    @discardableResult
+    func pruneLedgers(_ vector: VersionVector) -> Int {
+        self.rgaTreeSplit.pruneLedgers(vector)
     }
 
     /**

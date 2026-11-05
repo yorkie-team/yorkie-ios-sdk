@@ -263,46 +263,64 @@ final class RestoreSpanConverterTests: XCTestCase {
         XCTAssertNoThrow(try stripped.execute(root: root), "a stripped restore op must not wedge the sync loop")
     }
 
-    /// A nonconforming peer may send a span whose `[start, end)` disagrees with
-    /// `content`. yorkie-js-sdk never rejects one, so neither may this SDK:
-    /// throwing here escapes `applyChangePack` and the change pack re-pulls and
-    /// re-fails forever. The bounds are clamped to match `content` instead, which
-    /// also keeps the NSString slicing in `restore` inside the string.
-    func test_clamps_a_restore_span_whose_bounds_disagree_with_its_content() throws {
-        // given — end overshoots the content by 40 characters, and start is negative.
+    // A span addresses content by insertion identity and `RGATreeSplit.restore` slices its
+    // content by `cursor - span.start`, so a span without `createdAt`, or with a range that does
+    // not exactly cover its content, only fails deep inside the restore path -- on every peer that
+    // applies the pack. It is rejected at the boundary, as yorkie-js-sdk and the server do.
+
+    private func malformedSpan(_ corrupt: (inout Yorkie_V1_RestoreSpan) -> Void) -> Yorkie_V1_RestoreSpan {
         var pbSpan = Yorkie_V1_RestoreSpan()
         pbSpan.createdAt = Converter.toTimeTicket(self.seed)
-        pbSpan.start = -3
-        pbSpan.end = 42
+        pbSpan.start = 4
+        pbSpan.end = 6
         pbSpan.content = "45"
-
-        // when
-        let span = Converter.fromRestoreSpan(pbSpan, self.executedAt)
-
-        // then — the span is self-consistent, so slicing cannot overrun.
-        XCTAssertEqual(span.start, 0, "a negative start is clamped to zero")
-        XCTAssertEqual(span.end, 2, "end is derived from the content length")
-        XCTAssertEqual(span.value.toString, "45", "content itself is preserved verbatim")
+        corrupt(&pbSpan)
+        return pbSpan
     }
 
-    /// The clamp derives `end` by adding the content length to `start`, and
-    /// Swift's `+` traps on overflow. An unbounded `start` from the wire would
-    /// therefore terminate the process rather than degrade to a no-op, so
-    /// `start` is capped at `Int32.max - length`.
-    func test_clamps_a_restore_span_whose_start_would_overflow() throws {
-        // given — the largest representable start, with non-empty content.
-        var pbSpan = Yorkie_V1_RestoreSpan()
-        pbSpan.createdAt = Converter.toTimeTicket(self.seed)
-        pbSpan.start = Int32.max
-        pbSpan.end = Int32.max
-        pbSpan.content = "45"
+    func test_rejects_a_malformed_span_on_a_missing_created_at() {
+        let pbSpan = self.malformedSpan { $0.clearCreatedAt() }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(pbSpan, self.executedAt))
+    }
 
-        // when — must not trap.
-        let span = Converter.fromRestoreSpan(pbSpan, self.executedAt)
+    func test_rejects_a_malformed_span_on_a_negative_start() {
+        let pbSpan = self.malformedSpan {
+            $0.start = -2
+            $0.end = 0
+        }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(pbSpan, self.executedAt))
+    }
 
-        // then — the derived span is still representable and self-consistent.
-        XCTAssertEqual(span.start, Int32.max - 2, "start is capped so start + length cannot overflow")
-        XCTAssertEqual(span.end, Int32.max, "end stays representable")
-        XCTAssertEqual(span.end - span.start, 2, "the span still matches the content length")
+    func test_rejects_a_malformed_span_on_an_inverted_interval() {
+        let pbSpan = self.malformedSpan {
+            $0.start = 6
+            $0.end = 4
+        }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(pbSpan, self.executedAt))
+    }
+
+    func test_rejects_a_malformed_span_on_an_interval_that_does_not_cover_the_content() {
+        let pbSpan = self.malformedSpan { $0.end = 9 }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(pbSpan, self.executedAt))
+    }
+
+    func test_measures_the_span_interval_in_utf16_units() {
+        // "😀" is two UTF-16 code units and one Swift character.
+        let accepted = self.malformedSpan { $0.content = "😀" }
+        XCTAssertNoThrow(try Converter.fromRestoreSpan(accepted, self.executedAt))
+        let rejected = self.malformedSpan {
+            $0.content = "😀"
+            $0.end = 5
+        }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(rejected, self.executedAt))
+    }
+
+    /// The largest representable start must be rejected, not trap on Int32 arithmetic.
+    func test_rejects_a_malformed_span_whose_start_is_int32_max() {
+        let pbSpan = self.malformedSpan {
+            $0.start = Int32.max
+            $0.end = Int32.max
+        }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(pbSpan, self.executedAt))
     }
 }
