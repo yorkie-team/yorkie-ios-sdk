@@ -493,24 +493,27 @@ extension Converter {
      *   - pbSpan: The Protobuf span to convert.
      *   - executedAt: Timestamp stamped on the span's attributes; the wire format
      *     carries attribute values only, so the operation's own time is used.
+     * - Throws: `errInvalidArgument` when the span has no `createdAt` or its range does not
+     *   exactly cover its content.
      */
-    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) -> RestoreSpan<CRDTTextValue> {
-        // Derive the bounds from `content` rather than trusting the wire pair:
-        // `restore` slices `content` with NSString ranges, which raise an
-        // Objective-C NSRangeException (not a Swift error, so it cannot be
-        // caught) when the range overruns the string. yorkie-js-sdk never
-        // rejects a span here, so throwing would both diverge from it and wedge
-        // `applyChangePack` — the change pack would re-pull and re-fail
-        // indefinitely. Clamp to a self-consistent span so a nonconforming peer
-        // degrades to a harmless no-op instead.
-        // `start` is also capped at `Int32.max - length`: Swift's `+` traps on
-        // overflow, so an unbounded peer-supplied `start` would terminate the
-        // process — the opposite of degrading gracefully.
-        let length = Int32((pbSpan.content as NSString).length)
-        let start = min(max(0, pbSpan.start), Int32.max - length)
-        let end = start + length
-        if start != pbSpan.start || end != pbSpan.end {
-            Logger.warning("clamped inconsistent RestoreSpan: start=\(pbSpan.start), end=\(pbSpan.end), content length=\((pbSpan.content as NSString).length)")
+    static func fromRestoreSpan(_ pbSpan: PbRestoreSpan, _ executedAt: TimeTicket) throws -> RestoreSpan<CRDTTextValue> {
+        // A span addresses content by insertion identity, so it is malformed without a
+        // `createdAt`, and `RGATreeSplit.restore` slices `content` by `cursor - span.start`, so
+        // `[start, end)` has to be an ordered interval exactly covering it. Reject both here, as
+        // the server's `fromRestoreSpans` and yorkie-js-sdk do, instead of failing deep in the
+        // restore path -- where an overrun NSString range raises an Objective-C exception that
+        // Swift cannot catch. The lengths are NSString (UTF-16) lengths, the unit JS counts in.
+        // `end - start` cannot overflow once `0 <= start <= end` holds.
+        let length = (pbSpan.content as NSString).length
+        guard pbSpan.hasCreatedAt,
+              pbSpan.start >= 0,
+              pbSpan.end >= pbSpan.start,
+              Int(pbSpan.end - pbSpan.start) == length
+        else {
+            throw YorkieError(
+                code: .errInvalidArgument,
+                message: "malformed restore span: missing timestamp or invalid range"
+            )
         }
 
         let value = CRDTTextValue(pbSpan.content)
@@ -520,8 +523,8 @@ extension Converter {
 
         return RestoreSpan(
             createdAt: Self.fromTimeTicket(pbSpan.createdAt),
-            start: start,
-            end: end,
+            start: pbSpan.start,
+            end: pbSpan.end,
             value: value
         )
     }
@@ -703,8 +706,8 @@ extension Converter {
                 var retombstoneSpans: [RestoreSpan<CRDTTextValue>]?
                 var restoreMode: RestoreMode?
                 if !pbEditOperation.restoreSpans.isEmpty || !pbEditOperation.retombstoneSpans.isEmpty {
-                    restoreSpans = pbEditOperation.restoreSpans.map { fromRestoreSpan($0, executedAt) }
-                    retombstoneSpans = pbEditOperation.retombstoneSpans.map { fromRestoreSpan($0, executedAt) }
+                    restoreSpans = try pbEditOperation.restoreSpans.map { try fromRestoreSpan($0, executedAt) }
+                    retombstoneSpans = try pbEditOperation.retombstoneSpans.map { try fromRestoreSpan($0, executedAt) }
                     restoreMode = pbEditOperation.restoreMode == .retombstone ? .retombstone : .restore
                 }
 

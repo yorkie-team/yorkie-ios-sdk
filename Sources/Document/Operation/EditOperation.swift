@@ -109,7 +109,7 @@ final class EditOperation: Operation {
         }
 
         if self.restoreSpans != nil || self.retombstoneSpans != nil {
-            return try self.executeIdentityPreserving(root: root, text: text)
+            return try self.executeIdentityPreserving(root: root, text: text, source: source)
         }
 
         // When replaying a reverse edit, the range may reference a split chain that has since
@@ -160,7 +160,7 @@ final class EditOperation: Operation {
     /// `retombstoneSpans`; the redo (`retombstone`) does the opposite. Both sets
     /// are revived/removed by their original identity, never re-inserted as
     /// fresh nodes, so relative order is preserved across chained undo.
-    private func executeIdentityPreserving(root: CRDTRoot, text: CRDTText) throws -> ExecutionResult {
+    private func executeIdentityPreserving(root: CRDTRoot, text: CRDTText, source: OpSource) throws -> ExecutionResult {
         let isRetombstone = self.restoreMode == .retombstone
         let toRestore = (isRetombstone ? self.retombstoneSpans : self.restoreSpans) ?? []
         let toRetombstone = (isRetombstone ? self.restoreSpans : self.retombstoneSpans) ?? []
@@ -168,6 +168,16 @@ final class EditOperation: Operation {
         let path = try root.createPath(createdAt: self.parentCreatedAt)
         var opInfos: [any OperationInfo] = []
         var totalDiff = DataSize(data: 0, meta: 0)
+
+        // The spans about to be re-tombstoned are what the reverse op will have to restore, and a
+        // replica that purged them rebuilds the nodes from that payload alone. Re-snapshot them
+        // against the live content first: the span set was captured when the reversed edit ran, so
+        // an attribute applied to the run since is missing from it and a purged replica would
+        // recreate the run without it while a replica that un-tombstones keeps it. Taken before the
+        // removal below, and only when the reverse is kept: a remote change discards it.
+        let refreshed = source != .remote && !toRetombstone.isEmpty
+            ? text.rgaTreeSplit.refreshSpans(toRetombstone)
+            : nil
 
         // 1. Remove the content the reversed edit inserted (by identity).
         if !toRetombstone.isEmpty {
@@ -216,9 +226,9 @@ final class EditOperation: Operation {
             attributes: nil,
             executedAt: TimeTicket.initial,
             isUndoOp: true,
-            restoreSpans: self.restoreSpans,
+            restoreSpans: isRetombstone ? (refreshed ?? self.restoreSpans) : self.restoreSpans,
             restoreMode: isRetombstone ? .restore : .retombstone,
-            retombstoneSpans: self.retombstoneSpans
+            retombstoneSpans: !isRetombstone ? (refreshed ?? self.retombstoneSpans) : self.retombstoneSpans
         )
 
         return ExecutionResult(opInfos: opInfos, reverseOp: reverseOp)
@@ -243,6 +253,15 @@ final class EditOperation: Operation {
             var insertedSpans: [RestoreSpan<CRDTTextValue>]?
             if !self.content.isEmpty {
                 let value = CRDTTextValue(self.content)
+                // Carry the attributes the edit applied, stamped with the same ticket
+                // `CRDTText.edit` used. The undo only re-tombstones this span, so its value is
+                // unread there -- but the redo flips `restoreMode` and the span becomes the content
+                // to restore. A replica that purged the node rebuilds it from this value alone, so
+                // an empty attribute map here makes it diverge from a replica that still
+                // un-tombstones the original.
+                for (key, attrValue) in self.attributes ?? [:] {
+                    _ = value.setAttr(key: key, value: attrValue, updatedAt: self.executedAt)
+                }
                 insertedSpans = [
                     RestoreSpan(
                         createdAt: self.executedAt,

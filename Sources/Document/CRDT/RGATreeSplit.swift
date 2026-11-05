@@ -1125,6 +1125,62 @@ class RGATreeSplit<T: RGATreeSplitValue> {
         return (pairs, changes, diff)
     }
 
+    /// Re-snapshots `spans` against the content they address as it stands now.
+    ///
+    /// Returns an equivalent span set (same insertion identities, same overall intervals) whose
+    /// values carry the current attributes. A span is captured when the edit it reverses runs, so
+    /// attributes applied to the run afterwards -- a peer's style, which `canStyle` admits even on a
+    /// tombstone -- are missing from it; a replica that purged the run would then recreate it with
+    /// the stale snapshot while a replica that still holds the tombstone revives the live
+    /// attributes, and the two diverge.
+    ///
+    /// Regions covered by a surviving piece (live or tombstoned) are taken from that piece, so a span
+    /// crossing several pieces splits into one span per piece. Regions with no surviving piece keep
+    /// the original snapshot -- it is all this replica knows about them. Read-only: the copies it
+    /// makes are payload, never inserted, so they book no attribute tombstones.
+    ///
+    /// - Parameter spans: The spans to re-snapshot.
+    /// - Returns: The refreshed spans.
+    func refreshSpans(_ spans: [RestoreSpan<T>]) -> [RestoreSpan<T>] {
+        var refreshed = [RestoreSpan<T>]()
+        func fromSnapshot(_ span: RestoreSpan<T>, _ start: Int32, _ end: Int32) {
+            refreshed.append(RestoreSpan(
+                createdAt: span.createdAt,
+                start: start,
+                end: end,
+                value: span.value.substring(from: Int(start - span.start), to: Int(end - span.start))
+            ))
+        }
+
+        for span in spans {
+            let pieces = self.findPiecesOverlapping(span.createdAt, span.start, span.end)
+            var cursor = span.start
+            for piece in pieces {
+                let pieceStart = piece.id.offset
+                let start = Swift.max(pieceStart, cursor)
+                let end = Swift.min(pieceStart + Int32(piece.contentLength), span.end)
+                if end <= start {
+                    continue
+                }
+                if start > cursor {
+                    fromSnapshot(span, cursor, start)
+                }
+                refreshed.append(RestoreSpan(
+                    createdAt: span.createdAt,
+                    start: start,
+                    end: end,
+                    value: piece.value.substring(from: Int(start - pieceStart), to: Int(end - pieceStart))
+                ))
+                cursor = end
+            }
+            if cursor < span.end {
+                fromSnapshot(span, cursor, span.end)
+            }
+        }
+
+        return refreshed
+    }
+
     /**
      * `findPiecesOverlapping` collects existing nodes (live or tombstoned)
      * belonging to the insertion `createdAt` that overlap the absolute-offset
