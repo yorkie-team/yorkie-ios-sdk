@@ -12,7 +12,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 > **Behavioural change — token refresh.** When `authTokenInjector` throws after a 401, the sync loop, Watch streams and broadcast retries keep the previous token and back off (1s doubling to 30s, jittered; a loop's retry waits at most 5s for it) instead of retrying at once. One-shot calls (`attach`, `detach`, `remove`, `sync`, the first `broadcast` try, ...) now throw the injector's error, where iOS used to swallow it and throw the original `errUnauthenticated`. `deactivate()` refused with a 401 whose refresh also fails stops the client locally and throws the injector's error. Channel heartbeats and `syncChannel(_:)` now refresh the token on a 401 as well.
 
-> **Behavioural change — malformed restore spans.** A Text restore span without `created_at`, or whose range does not cover its content, is now rejected when decoded (as the JS SDK and the server do) instead of being clamped. As in the JS SDK, a pulled change carrying one fails the pack and stops the sync loop; such a change can only have been stored by a server that did not yet validate restore spans (yorkie-team/yorkie#2277).
+> **Behavioural change — malformed restore spans.** A Text restore span without `created_at`, or whose range does not cover its content, is now rejected when decoded (as the JS SDK and the server do) instead of being clamped. The server has rejected such a span on push since restore spans were introduced (v0.7.13), so a stored change never carries one.
 
 > **Storage note.** Snapshots gain `TextNode.removal_events`. A piece of text removed by two concurrent deletions that nobody undoes is no longer collected, and counts toward the document size checked against its limit.
 
