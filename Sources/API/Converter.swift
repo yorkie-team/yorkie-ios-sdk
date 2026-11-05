@@ -169,9 +169,19 @@ extension Converter {
             // does not normally carry a patch. It is decoded anyway -- an echo of a pushed change, or
             // a peer ahead of this SDK, must not fail the whole pack. There is no `full` on the wire:
             // `Change.execute` merges the carried keys onto the presence already held for the actor.
+            // A patch can leave `presence` unset, as Go allows (`api/converter/from_pb.go`,
+            // `FromPresenceChange`): the generated getter then yields an empty presence, so it
+            // decodes as an empty patch.
             return .patch(presence: fromPresence(pbPresence: pbPresenceChange.presence), full: nil)
         case .clear:
             return .clear
+        case .unspecified, .delete:
+            // NOTE: these two types are defined but no SDK sends them. Go still decodes them,
+            // because stored rows go through that path, into a change that stores an empty
+            // presence for the actor (`api/converter/from_pb.go`, `FromPresenceChange`). Do the
+            // same: throwing here fails the pack, and the same stored change comes back on every
+            // pull.
+            return .put(presence: [:])
         default:
             throw YorkieError(code: .errInvalidType, message: "unsupported type: \(pbPresenceChange.type)")
         }
