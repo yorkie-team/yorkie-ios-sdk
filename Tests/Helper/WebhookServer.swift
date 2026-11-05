@@ -18,6 +18,26 @@ import Foundation
 import NIO
 import NIOHTTP1
 
+/// Records every auth webhook request, so a test can count what the server asked while a token
+/// refresh was failing (JS `webhookCalls`).
+final class WebhookCallLog: @unchecked Sendable {
+    struct Call: Equatable {
+        let token: String
+        let method: String
+    }
+
+    static let shared = WebhookCallLog()
+
+    private let lock = NSLock()
+    private var recorded = [Call]()
+
+    var calls: [Call] { self.lock.withLock { self.recorded } }
+
+    func record(token: String, method: String) {
+        self.lock.withLock { self.recorded.append(Call(token: token, method: method)) }
+    }
+}
+
 final class WebhookServer {
     private let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var channel: Channel?
@@ -105,6 +125,8 @@ final class WebhookRequestHandler: ChannelInboundHandler {
                 self.sendResponse(context: context, status: .unauthorized, body: #"{"allowed": false, "reason": "invalid token"}"#)
                 return
             }
+
+            WebhookCallLog.shared.record(token: token, method: (json["method"] as? String) ?? "")
 
             if token.hasPrefix("token") {
                 let parts = token.split(separator: "-")

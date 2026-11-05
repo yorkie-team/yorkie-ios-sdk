@@ -117,6 +117,38 @@ class LLRBTreeTests: XCTestCase {
         }
     }
 
+    private func checkCeiling(_ tree: LLRBTree<Int, Int>, _ arr: [Int], _ loop: Int) {
+        for ceilingKey in 0 ..< loop {
+            var expectedKey: Int?
+            for value in arr where value >= ceilingKey {
+                if expectedKey == nil || expectedKey! >= value {
+                    expectedKey = value
+                }
+            }
+
+            let resultEntry = tree.ceilingEntry(ceilingKey)
+
+            if let expectedKey {
+                XCTAssertEqual(expectedKey, resultEntry?.key)
+            } else {
+                XCTAssertNil(resultEntry)
+            }
+        }
+    }
+
+    func test_can_ceiling_entry_at_each_insertion_step() {
+        for array in self.sources {
+            var testArr = [Int]()
+            let target = LLRBTree<Int, Int>()
+            for value in array {
+                self.checkCeiling(target, testArr, 10)
+                target.put(value, value)
+                testArr.append(value)
+                self.checkCeiling(target, testArr, 10)
+            }
+        }
+    }
+
     func test_insert() {
         for array in self.sources {
             let target = LLRBTree<Int, Int>()
