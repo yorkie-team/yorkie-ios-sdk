@@ -47,6 +47,13 @@ private final class Clock {
     var nowMs: Int64 = 1_000_000
 }
 
+private final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var value: Int { self.lock.withLock { self.count } }
+    func increment() { self.lock.withLock { self.count += 1 } }
+}
+
 /// An injector whose calls the test settles by hand, so it controls the order they finish in.
 private final class ManualInjector: AuthTokenInjector, @unchecked Sendable {
     private let lock = NSLock()
@@ -462,6 +469,92 @@ final class ClientAuthRefreshTests: XCTestCase {
             // then
             XCTAssertEqual(error as? InjectorFailure, InjectorFailure(message: "token api unavailable"))
         }
+        XCTAssertEqual(injector.callCount, 2)
+    }
+
+    func test_a_channel_sync_throws_the_injectors_error_when_the_refresh_of_a_401_fails() async throws {
+        // given - a channel whose RefreshChannel is refused with a 401
+        let injector = ScriptedInjector([nil, "new-token"])
+        let client = self.makeClient(injector)
+        let channel = try Channel(key: "room")
+        client.adoptAttachment(Attachment(resource: channel, resourceID: "c", syncMode: .realtime), key: "room", actorID: "000000000000000000000001")
+        client.setMockError(for: YorkieServiceClient.Metadata.Methods.refreshChannel, error: unauthenticated(), count: Int.max)
+
+        // when - the refresh fails: the injector's error is thrown, not the 401
+        do {
+            try await client.syncChannel(channel)
+            XCTFail("expected the injector's error")
+        } catch {
+            XCTAssertEqual(error as? InjectorFailure, InjectorFailure(message: "token api unavailable"))
+        }
+        XCTAssertEqual(injector.callCount, 1)
+        XCTAssertEqual(client.authRefresh.failures, 1)
+
+        // then - once the refresh works the call sets the token and throws the 401 for the app to retry
+        do {
+            try await client.syncChannel(channel)
+            XCTFail("expected the 401")
+        } catch {
+            XCTAssertNotEqual(error as? InjectorFailure, InjectorFailure(message: "token api unavailable"), "\(error)")
+        }
+        XCTAssertEqual(injector.callCount, 2)
+        XCTAssertEqual(client.authRefresh.failures, 0)
+    }
+
+    func test_the_sync_loop_retries_after_one_timer_of_the_retry_delay() async throws {
+        // given - a long reconnect delay, so a retry that waited for it too would never come
+        let injector = ScriptedInjector([])
+        let client = Client(
+            "http://localhost:1",
+            ClientOptions(authTokenInjector: injector, retrySyncLoopDelay: 50, reconnectStreamDelay: 3_600_000),
+            isMockingEnabled: true
+        )
+        let doc = Document(key: "loop-doc")
+        doc.setActor("000000000000000000000001")
+        client.adoptAttachment(Attachment(resource: doc, resourceID: "r", syncMode: .realtime), key: "loop-doc", actorID: "000000000000000000000001")
+        try doc.update { root, _ in root.k = "v" }
+        let pushes = Counter()
+        // The predicate sees every push, and refuses each one.
+        client.setMockError(for: YorkieServiceClient.Metadata.Methods.pushPullChanges, error: unavailable()) { _ in
+            pushes.increment()
+            return true
+        }
+
+        // when
+        await client.runSyncLoop()
+
+        // then - the failed push is tried again after about the retry delay
+        let retried = await self.until { pushes.value >= 2 }
+        XCTAssertTrue(retried, "pushes: \(pushes.value)")
+    }
+
+    func test_a_channel_heartbeat_401_calls_the_injector_once_and_respects_the_backoff() async throws {
+        // given - a realtime channel whose heartbeat is due and refused with a 401
+        let injector = ScriptedInjector([nil, nil])
+        let client = self.makeClient(injector)
+        let channel = try Channel(key: "room")
+        let attachment = Attachment(resource: channel, resourceID: "c", syncMode: .realtime)
+        client.adoptAttachment(attachment, key: "room", actorID: "000000000000000000000001")
+        client.setMockError(for: YorkieServiceClient.Metadata.Methods.refreshChannel, error: unauthenticated(), count: Int.max)
+
+        // when - the first heartbeat gets a 401
+        attachment.lastHeartbeatTime = 0
+        await client.sendHeartbeats()
+
+        // then - the injector is called with the webhook's reason, and a failure starts the backoff
+        XCTAssertEqual(injector.callCount, 1)
+        XCTAssertEqual(injector.reasons.first ?? nil, expiredToken)
+        XCTAssertEqual(client.authRefresh.failures, 1)
+
+        // and a second 401 inside the backoff window does not call it again
+        attachment.lastHeartbeatTime = 0
+        await client.sendHeartbeats()
+        XCTAssertEqual(injector.callCount, 1)
+
+        // once the backoff is up it is called again
+        self.clock.nowMs = client.authRefresh.retryAt
+        attachment.lastHeartbeatTime = 0
+        await client.sendHeartbeats()
         XCTAssertEqual(injector.callCount, 2)
     }
 }
