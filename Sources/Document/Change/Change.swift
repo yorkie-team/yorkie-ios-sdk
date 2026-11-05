@@ -59,9 +59,9 @@ public struct Change {
     ///
     /// Offline persistence writes a patch as the put of its `full` presence, which leaves the
     /// restored change a put. A patch may already have been pushed before the restart, and a server
-    /// without the `presence-patch` capability stores that as an empty presence; the retry of the
-    /// restored put is deduplicated by `clientSeq`, so the presence stays empty unless the client
-    /// heals it. This mark is what tells it a heal may be owed. Local-only, like ``isUndoRedo``: it
+    /// without the `presence-patch` capability stores that as an unspecified change; the retry of the
+    /// restored put is deduplicated by `clientSeq`, so further patches would land on a base that
+    /// server never held unless the client heals it. This mark is what tells it a heal may be owed. Local-only, like ``isUndoRedo``: it
     /// is never part of a pushed pack.
     private(set) var wasMintedAsPresencePatch: Bool
 

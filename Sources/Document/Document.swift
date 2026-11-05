@@ -883,7 +883,7 @@ public class Document: Attachable {
             self.applyStatus(.removed)
         }
 
-        // 05. Heal a presence the server may have stored as empty. Deferred to here so the put is
+        // 05. Heal a presence after a patch a server without the capability may have stored. Deferred to here so the put is
         // minted against the state this pack left behind.
         self.healPresenceBase(needed: needsHeal)
 
@@ -909,8 +909,8 @@ public class Document: Attachable {
 
         // The capabilities describe the server that took this push, not the content being skipped,
         // so they are metadata as well -- and a push whose reply is dropped is exactly a push that
-        // carried the patch which a server without the capability has just stored as an empty
-        // presence. Skipping the heal here would leave a document in PushOnly/SyncOff patching into
+        // carried the patch which a server without the capability has just stored as an unspecified
+        // change. Skipping the heal here would leave a document in PushOnly/SyncOff patching into
         // the void for as long as it stays there.
         let needsHeal = self.learnPresenceCapability(pack)
 
@@ -2147,7 +2147,7 @@ extension Document {
     /// Whether a presence patch is still queued to be pushed, or a change minted as one that a
     /// restore turned into a put. That is what makes a patch "outstanding": it reaches the server
     /// verbatim (or did, before the restart), so a server without the capability would store it as an
-    /// empty presence and leave a presence to heal.
+    /// unspecified change and leave a presence to heal.
     func hasPendingPresencePatch() -> Bool {
         self.localChanges.contains {
             if $0.wasMintedAsPresencePatch {
