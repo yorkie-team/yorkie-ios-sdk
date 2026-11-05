@@ -1481,8 +1481,13 @@ public class Client {
                 // In that case, the 'unwatched' event is triggered while handling the PresenceChange.
                 let presence = docAttachment.resource.getPresence(publisher)
 
+                // NOTE(hackerwins): Only the online set is touched here; the presence itself is kept,
+                // for the same reason the watch init keeps it above. Dropping it would make
+                // `hasPresence` false, so the `documentWatched` that follows a watch-stream reconnect
+                // would publish no `watched` event and the peer would stay invisible. The retained
+                // entry is never exposed: `getPresence`, `getPresences` and `getOthersPresences` all
+                // filter by `onlineClients`.
                 docAttachment.resource.removeOnlineClient(publisher)
-                docAttachment.resource.removePresence(publisher)
 
                 if let presence {
                     docAttachment.resource.publishPresenceEvent(.unwatched, publisher, presence)

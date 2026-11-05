@@ -1745,13 +1745,6 @@ public class Document: Attachable {
     // because the old presence is still in the map, the peer becomes visible again instead of being
     // silently dropped.
 
-    /**
-     * `removePresence` removes the stored presence of the given client.
-     */
-    func removePresence(_ clientID: ActorID) {
-        self.presences[clientID] = nil
-    }
-
     // MARK: - Presence reconciliation
 
     /// Snapshot of a client's presence/online state captured before a mutation.
