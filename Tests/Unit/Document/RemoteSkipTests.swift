@@ -118,6 +118,22 @@ final class RemoteSkipTests: XCTestCase {
         XCTAssertEqual(self.counterValue(target), 0)
     }
 
+    func test_skips_a_dedup_increase_whose_value_is_not_a_primitive() throws {
+        // given - a value the counter cannot take, as a non-SDK writer could push it
+        let target = try self.targetWithCounter()
+        let id = self.changeID(clientSeq: 2, lamport: 2)
+        let op = IncreaseOperation(
+            parentCreatedAt: self.counterCreatedAt,
+            value: CRDTObject(createdAt: id.createTimeTicket(delimiter: 1)),
+            executedAt: id.createTimeTicket(delimiter: 2),
+            actor: "actor-a"
+        )
+
+        // when / then - skipped on the pull path instead of failing the pack
+        XCTAssertNoThrow(try target.applyChanges([Change(id: id, operations: [op])], source: .remote))
+        XCTAssertEqual(self.counterValue(target), 0)
+    }
+
     func test_still_reports_a_local_dedup_increase_that_cannot_be_applied() throws {
         // given
         let target = try self.targetWithCounter()

@@ -416,7 +416,7 @@ final class ClientAuthRefreshTests: XCTestCase {
             try await client.sync(doc)
             XCTFail("expected the 401")
         } catch {
-            XCTAssertNotEqual(error as? InjectorFailure, InjectorFailure(message: "token api unavailable"), "\(error)")
+            XCTAssertEqual((error as? ConnectError)?.code, .unauthenticated, "\(error)")
         }
         XCTAssertEqual(injector.callCount, 3)
         XCTAssertEqual(client.authRefresh.failures, 0)
@@ -435,7 +435,7 @@ final class ClientAuthRefreshTests: XCTestCase {
             try await client.deactivate()
             XCTFail("expected the 401")
         } catch {
-            XCTAssertNotEqual(error as? InjectorFailure, InjectorFailure(message: "token api unavailable"))
+            XCTAssertEqual((error as? ConnectError)?.code, .unauthenticated, "\(error)")
         }
         XCTAssertEqual(client.status, .activated)
 
@@ -495,7 +495,7 @@ final class ClientAuthRefreshTests: XCTestCase {
             try await client.syncChannel(channel)
             XCTFail("expected the 401")
         } catch {
-            XCTAssertNotEqual(error as? InjectorFailure, InjectorFailure(message: "token api unavailable"), "\(error)")
+            XCTAssertEqual((error as? ConnectError)?.code, .unauthenticated, "\(error)")
         }
         XCTAssertEqual(injector.callCount, 2)
         XCTAssertEqual(client.authRefresh.failures, 0)
@@ -503,7 +503,8 @@ final class ClientAuthRefreshTests: XCTestCase {
 
     func test_the_sync_loop_retries_after_one_timer_of_the_retry_delay() async throws {
         // given - a long reconnect delay, so a retry that waited for it too would never come
-        let injector = ScriptedInjector([])
+        // The loop's failures are not 401s, so only the deactivation at the end calls the injector.
+        let injector = ScriptedInjector([nil])
         let client = Client(
             "http://localhost:1",
             ClientOptions(authTokenInjector: injector, retrySyncLoopDelay: 50, reconnectStreamDelay: 3_600_000),
@@ -526,6 +527,14 @@ final class ClientAuthRefreshTests: XCTestCase {
         // then - the failed push is tried again after about the retry delay
         let retried = await self.until { pushes.value >= 2 }
         XCTAssertTrue(retried, "pushes: \(pushes.value)")
+
+        // Stop the loop, or its retries keep firing for the rest of the test run. The refused
+        // deactivation cannot be refreshed, so the client stops locally.
+        client.setMockError(for: YorkieServiceClient.Metadata.Methods.deactivateClient, error: unauthenticated(), count: Int.max)
+        try? await client.deactivate()
+        XCTAssertEqual(client.status, .deactivated)
+        let stopped = await self.until { !client.getCondition(.syncLoop) }
+        XCTAssertTrue(stopped)
     }
 
     func test_a_channel_heartbeat_401_calls_the_injector_once_and_respects_the_backoff() async throws {

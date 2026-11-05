@@ -1359,6 +1359,12 @@ public class Client {
 
             self.setSyncTimer(false, generation: generation)
         } catch {
+            // A pass started before `deactivate()` can fail after a later `activate()` started a new
+            // loop. Its error belongs to the old session: handling it could tear down the new one.
+            // yorkie-js-sdk drops it with its `deactivating` guard; here the generation tells.
+            guard generation == self.syncLoopGeneration else {
+                return
+            }
             if await self.handleLoopConnectError(error) {
                 // One wait, as yorkie-js-sdk schedules it: the retry delay, or up to 5s after a 401
                 // while the token refresh backs off. Sleeping it and then arming the reconnect timer
@@ -2468,10 +2474,18 @@ public extension Client {
                 if channelAttachment.resource.isRealtime() {
                     let now = Date().timeIntervalSince1970
                     if now - channelAttachment.lastHeartbeatTime >= self.channelHeartbeatInterval {
+                        let requestClientID = self.id
                         do {
                             try await self.refreshChannel(channelAttachment.resource)
                         } catch {
                             Logger.error("Failed heartbeat for channel(\(channelAttachment.resource.getKey())).", error: error)
+                            // A heartbeat sent before `deactivate()` can fail after a later `activate()`.
+                            // Its error belongs to the old session: handling it could tear down the new
+                            // one. yorkie-js-sdk runs the heartbeat in the sync loop, behind its
+                            // `deactivating` guard; this timer has none, so check the session instead.
+                            guard self.id == requestClientID else {
+                                continue
+                            }
                             // The heartbeats are a retry loop of their own: in yorkie-js-sdk they run
                             // inside the sync loop, whose errors go through `handleConnectError` as a
                             // loop. Route them the same way, so a 401 refreshes the token (backing off

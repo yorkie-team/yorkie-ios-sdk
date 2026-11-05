@@ -304,6 +304,17 @@ final class RestoreSpanConverterTests: XCTestCase {
         XCTAssertThrowsError(try Converter.fromRestoreSpan(pbSpan, self.executedAt))
     }
 
+    func test_measures_the_span_interval_in_utf16_units() {
+        // "😀" is two UTF-16 code units and one Swift character.
+        let accepted = self.malformedSpan { $0.content = "😀" }
+        XCTAssertNoThrow(try Converter.fromRestoreSpan(accepted, self.executedAt))
+        let rejected = self.malformedSpan {
+            $0.content = "😀"
+            $0.end = 5
+        }
+        XCTAssertThrowsError(try Converter.fromRestoreSpan(rejected, self.executedAt))
+    }
+
     /// The largest representable start must be rejected, not trap on Int32 arithmetic.
     func test_rejects_a_malformed_span_whose_start_is_int32_max() {
         let pbSpan = self.malformedSpan {

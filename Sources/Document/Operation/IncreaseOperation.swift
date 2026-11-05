@@ -107,6 +107,10 @@ struct IncreaseOperation: Operation {
                     }
                     throw error
                 }
+            } else if source == .remote {
+                // A value that is not a primitive cannot be applied either; skip it on the pull path
+                // like the cases above, instead of failing at the value conversion below.
+                return nil
             }
         } else if let counter = parentObject as? CRDTCounter<Int32> {
             if let value = self.value.deepcopy() as? Primitive {
