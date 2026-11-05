@@ -559,7 +559,11 @@ public class Client {
                     try await self.refreshAuthToken(reason: errorMetadataOf(error: connectError)["reason"], inRetryLoop: false)
                 } catch let refreshError {
                     await self.releaseAllSessions()
-                    try self.deactivateInternal()
+                    do {
+                        try self.deactivateInternal()
+                    } catch {
+                        Logger.error("Failed deactivateInternal for client (\(self.key)) with error: \(error)")
+                    }
                     throw refreshError
                 }
                 throw error
@@ -1245,14 +1249,14 @@ public class Client {
         }
     }
 
-    private func setSyncTimer(_ reconnect: Bool, generation: Int) {
+    private func setSyncTimer(_ reconnect: Bool, generation: Int, delayMs: Int? = nil) {
         let isDisconnectedWatchStream = self.attachmentMap.values.contains { value in
             if let docAttachment = value as? Attachment<Document> {
                 return docAttachment.isDisconnectedStream
             }
             return false
         }
-        let syncLoopDuration = (reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration
+        let syncLoopDuration = delayMs ?? ((reconnect || isDisconnectedWatchStream) ? self.reconnectStreamDelay : self.syncLoopDuration)
 
         let timer = Timer(timeInterval: Double(syncLoopDuration) / 1000, repeats: false) { _ in
             Task {
@@ -1356,9 +1360,10 @@ public class Client {
             self.setSyncTimer(false, generation: generation)
         } catch {
             if await self.handleLoopConnectError(error) {
-                let delay = self.loopRetryDelay(error, self.retrySyncLoopDelay)
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000))
-                self.setSyncTimer(true, generation: generation)
+                // One wait, as yorkie-js-sdk schedules it: the retry delay, or up to 5s after a 401
+                // while the token refresh backs off. Sleeping it and then arming the reconnect timer
+                // as well would add `reconnectStreamDelay` on top of the documented wait.
+                self.setSyncTimer(true, generation: generation, delayMs: self.loopRetryDelay(error, self.retrySyncLoopDelay))
             } else {
                 self.setCondition(.syncLoop, value: false)
             }
@@ -2237,7 +2242,7 @@ extension Client {
 
 // MARK: - Channel Methods
 
-extension Client {
+public extension Client {
     /**
      * `attachChannel` attaches the given channel to this client.
      *
@@ -2249,7 +2254,7 @@ extension Client {
      * via TTL once heartbeats stop.
      */
     @discardableResult
-    public func attachChannel(_ channel: Channel) async throws -> Channel {
+    func attachChannel(_ channel: Channel) async throws -> Channel {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -2327,7 +2332,7 @@ extension Client {
      * lifecycle, yorkie 0.7.10).
      */
     @discardableResult
-    public func detachChannel(_ channel: Channel) async throws -> Channel {
+    func detachChannel(_ channel: Channel) async throws -> Channel {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -2456,7 +2461,7 @@ extension Client {
     /**
      * `sendHeartbeats` sends heartbeats for all attached channels.
      */
-    private func sendHeartbeats() async {
+    internal func sendHeartbeats() async {
         for (_, attachment) in self.attachmentMap {
             if let channelAttachment = attachment as? Attachment<Channel> {
                 // Only send heartbeats for realtime channels
@@ -2467,6 +2472,12 @@ extension Client {
                             try await self.refreshChannel(channelAttachment.resource)
                         } catch {
                             Logger.error("Failed heartbeat for channel(\(channelAttachment.resource.getKey())).", error: error)
+                            // The heartbeats are a retry loop of their own: in yorkie-js-sdk they run
+                            // inside the sync loop, whose errors go through `handleConnectError` as a
+                            // loop. Route them the same way, so a 401 refreshes the token (backing off
+                            // while the refresh fails) instead of resending the refused token until
+                            // the channel session lapses.
+                            _ = await self.handleLoopConnectError(error)
                         }
                     }
                 }
@@ -2479,7 +2490,7 @@ extension Client {
      * Returns the updated count.
      */
     @discardableResult
-    public func syncChannel(_ channel: Channel) async throws -> Int {
+    func syncChannel(_ channel: Channel) async throws -> Int {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -2488,7 +2499,12 @@ extension Client {
             throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached")
         }
 
-        try await self.refreshChannel(attachment.resource)
+        do {
+            try await self.refreshChannel(attachment.resource)
+        } catch {
+            try await self.handleConnectError(error)
+            throw error
+        }
         return attachment.resource.getSessionCount()
     }
 }

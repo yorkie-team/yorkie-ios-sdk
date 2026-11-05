@@ -75,8 +75,15 @@ extension Client {
     /// - Parameter error: The error the loop got.
     /// - Returns: Whether the loop should retry.
     func handleLoopConnectError(_ error: Error?) async -> Bool {
-        // `inRetryLoop` never throws: a failed refresh is swallowed for a loop.
-        (try? await self.handleConnectError(error, inRetryLoop: true)) ?? false
+        do {
+            return try await self.handleConnectError(error, inRetryLoop: true)
+        } catch {
+            // `inRetryLoop` never throws: a failed refresh is swallowed for a loop. Should that ever
+            // change, keep the loop retrying rather than stopping it silently.
+            assertionFailure("handleConnectError threw in a retry loop: \(error)")
+            Logger.error("[AT] c:\"\(self.key)\" unexpected error in a retry loop:", error: error)
+            return true
+        }
     }
 
     /// Returns how long a loop retry waits after `error`.
