@@ -212,7 +212,7 @@ extension Client {
 
             Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
-            let retryable = await self.handleConnectError(error)
+            let retryable = await self.handleLoopConnectError(error)
             // Handling the error can suspend (an auth token refresh): the stream may have been
             // replaced meanwhile, and a replaced stream owns nothing to disconnect.
             guard attachment.watchGeneration == generation else {
@@ -225,7 +225,7 @@ extension Client {
             } else {
                 self.setCondition(.watchLoop, value: false)
             }
-            self.finishWatchStream(key, with: attachment)
+            self.finishWatchStream(key, with: attachment, error: error)
         }
     }
 
@@ -251,7 +251,7 @@ extension Client {
 
             Logger.debug("[WC] c:\"\(self.key)\" unwatches")
 
-            let retryable = await self.handleConnectError(error)
+            let retryable = await self.handleLoopConnectError(error)
             guard attachment.watchGeneration == generation else {
                 return
             }
@@ -265,13 +265,15 @@ extension Client {
                 }
                 self.setCondition(.watchLoop, value: false)
             }
-            self.finishWatchStream(key, with: attachment)
+            self.finishWatchStream(key, with: attachment, error: error)
         }
     }
 
-    private func finishWatchStream<R: Attachable>(_ key: String, with attachment: Attachment<R>) {
+    private func finishWatchStream<R: Attachable>(_ key: String, with attachment: Attachment<R>, error: Error?) {
         do {
-            try self.onStreamDisconnect(key, with: attachment)
+            // The error that ended the stream decides the reconnect delay: a 401 waits for the
+            // token refresh backoff, see `loopRetryDelay`.
+            try self.onStreamDisconnect(key, with: attachment, error: error)
         } catch {
             Logger.warning("[WL] c:\"\(self.key)\" failed to settle a finished watch stream: \(error)")
         }

@@ -110,8 +110,8 @@ final class WriteRejectedIntegrationTests: XCTestCase {
             XCTAssertTrue(failed, "sync-failed is published as well")
 
             // Retrying cannot succeed: the server re-measures the same pack and refuses it again.
-            let retry = await client.handleConnectError(error)
-            XCTAssertFalse(retry, "the sync loop stops instead of resending")
+            let retry = try? await client.handleConnectError(error)
+            XCTAssertEqual(retry, false, "the sync loop stops instead of resending")
 
             _ = try? await client.resync(doc, discardLocalChanges: true)
             try await client.detach(doc)
