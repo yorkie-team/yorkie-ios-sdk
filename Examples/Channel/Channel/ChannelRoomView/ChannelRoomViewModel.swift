@@ -24,6 +24,7 @@ struct ChannelJoinedStatus: Hashable {
     var message: String
 }
 
+@MainActor
 class ChannelRoomViewModel: ObservableObject {
     @Published var room: ChannelModel
     @Published var isLoading: Bool = false
@@ -32,11 +33,18 @@ class ChannelRoomViewModel: ObservableObject {
     @Published var joinedStatus: ChannelJoinedStatus = .init(joined: false, count: 0, message: "")
     @Published var isAnimating: Bool = false
 
-    private let client: Client = .init(Constant.serverAddress)
+    /// The app's shared client (see ``ChannelViewModel/client``). A room only attaches and
+    /// detaches its channel; it never activates or deactivates the client itself.
+    private let rooms: ChannelViewModel
+    private var client: Client { self.rooms.client }
     private var channel: Channel?
+    /// Set when the user leaves while the attach is still in flight, so the attach detaches the
+    /// channel it just took instead of leaving it attached to the shared client.
+    private var leaveRequested = false
 
-    init(channel: ChannelModel) {
+    init(channel: ChannelModel, rooms: ChannelViewModel) {
         self.room = channel
+        self.rooms = rooms
     }
 
     func joinChannel() async {
@@ -65,9 +73,14 @@ class ChannelRoomViewModel: ObservableObject {
                 self.numberOfMembers = event.count
             }
 
-            try await self.client.activate()
+            try await self.rooms.ensureActive()
             try await self.client.attachChannel(channel)
 
+            if self.leaveRequested {
+                channel.unsubscribePresenceChange()
+                try await self.client.detachChannel(channel)
+                return
+            }
             self.channel = channel
         } catch (let err) {
             errorMsg = err.localizedDescription
@@ -75,7 +88,10 @@ class ChannelRoomViewModel: ObservableObject {
     }
 
     func leaveChannel() async {
-        guard let channel = channel else { return }
+        guard let channel = channel else {
+            self.leaveRequested = true
+            return
+        }
         self.isLoading = true
         defer {
             isLoading = false
@@ -83,7 +99,6 @@ class ChannelRoomViewModel: ObservableObject {
         do {
             channel.unsubscribePresenceChange()
             try await self.client.detachChannel(channel)
-            try await self.client.deactivate()
             self.channel = nil
             self.numberOfMembers = 0
             self.joinedStatus = ChannelJoinedStatus(joined: false, count: 0, message: "")
