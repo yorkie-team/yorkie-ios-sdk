@@ -760,10 +760,9 @@ public class Client {
             try assertSession()
 
             try await self.applyAttachResponse(message, to: doc, disableGC: disableGC, resumed: resumed)
-
-            if doc.status == .removed {
-                throw YorkieError(code: .errDocumentRemoved, message: "\(doc) is removed.")
-            }
+            // Dropping a resumed copy's purged state can suspend on the store, and a teardown that
+            // finishes meanwhile must not find this attachment registered after it.
+            try assertSession()
 
             self.setAttachment(Attachment<Document>(resource: doc,
                                                     resourceID: message.documentID,
@@ -847,6 +846,7 @@ public class Client {
     ///   - doc: The document being attached.
     ///   - disableGC: Whether the attach opted out of GC.
     ///   - resumed: Whether the attach resumes a restored copy, whose purged state is dropped first.
+    /// - Throws: `errDocumentRemoved` when the change pack removed the document.
     private func applyAttachResponse(_ message: Yorkie_V1_AttachDocumentResponse,
                                      to doc: Document,
                                      disableGC: Bool,
@@ -883,6 +883,10 @@ public class Client {
         // Record the server-assigned document id so the next persisted envelope carries it
         // for the purge guard on a later restore.
         doc.setDocID(message.documentID)
+
+        if doc.status == .removed {
+            throw YorkieError(code: .errDocumentRemoved, message: "\(doc) is removed.")
+        }
     }
 
     /**
@@ -1663,7 +1667,20 @@ public class Client {
     /// The state kept by key belongs to whichever attachment the key holds. When a caller tears
     /// down an attachment the key no longer holds (a same-key resource was attached since), only
     /// that attachment's own resources go; the key's entry stays with the newer one.
-    private func detachInternal(_ key: String, _ target: AnyObject? = nil) throws {
+    /// Returns whether a newer attachment of the same ``Channel`` as `attachment` holds `key`.
+    ///
+    /// - Parameters:
+    ///   - key: The channel key.
+    ///   - attachment: The attachment being torn down.
+    /// - Returns: `true` when the Channel was detached and attached again since `attachment`.
+    private func isChannelReattached(_ key: String, replacing attachment: Attachment<Channel>) -> Bool {
+        guard let current = self.getChannelAttachment(key) else {
+            return false
+        }
+        return current !== attachment && current.resource === attachment.resource
+    }
+
+    func detachInternal(_ key: String, _ target: AnyObject? = nil) throws {
         // NOTE: If no attachment is found, the resource has already been detached by another
         // routine, such as a detach or remove that ran while the watch loop was running.
         guard let target = target ?? (self.attachmentMap[key] as AnyObject?) else {
@@ -1687,8 +1704,12 @@ public class Client {
             attachment.cancelWatchStream()
         } else if let attachment = target as? Attachment<Channel> {
             // Tear down the local-broadcast forwarder installed by `attachChannel`
-            // so a re-attach does not leave a stale forwarder behind.
-            attachment.resource.unsubscribeLocalBroadcast()
+            // so a re-attach does not leave a stale forwarder behind. The forwarder lives on the
+            // Channel, so it stays when a newer attachment of the same Channel holds the key: it
+            // is that attachment's forwarder now.
+            if !self.isChannelReattached(key, replacing: attachment) {
+                attachment.resource.unsubscribeLocalBroadcast()
+            }
             attachment.cancelWatchStream()
         }
 
@@ -1984,6 +2005,11 @@ public class Client {
             // later session under a cross-process lock, with `deactivate()` early-returning
             // because the status is already deactivated.
             await self.releaseAllSessions()
+            // Releasing the leases can suspend, and the client may have been torn down and
+            // activated again meanwhile. That newer session is not this request's to end.
+            guard ownsSession() else {
+                return false
+            }
             do {
                 try self.deactivateInternal()
             } catch {
@@ -2523,6 +2549,15 @@ public extension Client {
                                   message: "\(self.key) lost its session while attaching \(channel.getKey())")
             }
 
+            // Detached during the first-call refresh, and possibly attached again since: this
+            // attempt no longer holds the key, so it must neither report success nor start a
+            // watch loop for whichever attachment does.
+            guard (self.attachmentMap[channel.getKey()] as AnyObject?) === attachment else {
+                abandoned = true
+                throw YorkieError(code: .errNotAttached,
+                                  message: "\(channel.getKey()) was detached while attaching")
+            }
+
             // A first-call refresh that returns without a session leaves the channel
             // `.detached`; treat that as a failed attach (the catch below rolls back)
             // so callers never receive a "successful" channel without an active session.
@@ -2542,8 +2577,12 @@ public extension Client {
             // Roll back the local registration if the first-call attach failed. Only this
             // attempt's attachment goes: a same-key channel attached while the first-call
             // refresh was suspended holds the key now and stays.
+            // A newer attachment of this same Channel owns its status now.
+            let reattached = self.isChannelReattached(channel.getKey(), replacing: attachment)
             try? self.detachInternal(channel.getKey(), attachment)
-            channel.setStatus(.detached)
+            if !reattached {
+                channel.setStatus(.detached)
+            }
             Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
             // An abandoned attach is a local lifecycle cancellation, not a server error requiring
             // connection recovery.
@@ -3522,6 +3561,11 @@ extension Client {
         }
         await self.releaseSession(for: doc, attachment: attachment)
         try? self.detachInternal(doc.getKey())
+        // The attach may have published `.attached` before the step that failed. A caller that
+        // retries must find the document detached, not rejected with `errNotDetached`.
+        if doc.status == .attached {
+            doc.applyStatus(.detached)
+        }
     }
 
     /// Waits for every queued persist to finish.

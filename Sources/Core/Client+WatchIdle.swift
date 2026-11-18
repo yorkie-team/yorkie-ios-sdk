@@ -198,9 +198,9 @@ extension Client {
         case .headers:
             break
         case .message(let message):
-            // A message the stream of a torn-down attachment delivered after the teardown is
-            // routed by key, so it would reach a same-key successor.
-            guard !attachment.cancelled else {
+            // Messages are routed by key, so one from the stream of a torn-down attachment, or of
+            // one a same-key attach displaced, would reach the attachment that holds the key now.
+            guard !attachment.cancelled, (self.attachmentMap[key] as AnyObject?) === attachment else {
                 return
             }
             self.recordWatchActivity(of: message, key: key, on: attachment, generation: generation)
@@ -251,9 +251,9 @@ extension Client {
         case .headers:
             break
         case .message(let message):
-            // A message the stream of a torn-down attachment delivered after the teardown is
-            // routed by key, so it would reach a same-key successor.
-            guard !attachment.cancelled else {
+            // Messages are routed by key, so one from the stream of a torn-down attachment, or of
+            // one a same-key attach displaced, would reach the attachment that holds the key now.
+            guard !attachment.cancelled, (self.attachmentMap[key] as AnyObject?) === attachment else {
                 return
             }
             self.recordWatchActivity(of: message, key: key, on: attachment, generation: generation)

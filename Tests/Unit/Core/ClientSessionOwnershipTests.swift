@@ -295,4 +295,77 @@ final class ClientSessionOwnershipTests: XCTestCase {
         // then - the key belongs to `held`, so nothing reconnects `evicted`
         XCTAssertNil(evicted.watchLoopReconnectTimer)
     }
+
+    func test_a_displaced_attachments_watch_message_does_not_reach_the_same_key_successor() async throws {
+        // given - a same-key attach displaced `displaced` without tearing it down
+        let client = self.makeClient()
+        let displaced = try Attachment(resource: Channel(key: "same-key"), resourceID: "s1")
+        let held = try Attachment(resource: Channel(key: "same-key"), resourceID: "s2")
+        client.adoptAttachment(displaced, key: "same-key", actorID: firstActor)
+        client.adoptAttachment(held, key: "same-key", actorID: firstActor)
+        var channelInit = Yorkie_V1_ChannelInit()
+        channelInit.channelKey = "same-key"
+        channelInit.sessionCount = 5
+        channelInit.seq = 1
+        var resourceInit = Yorkie_V1_ResourceInit()
+        resourceInit.channelInit = channelInit
+        var response = WatchResponse()
+        response.initialization.resourceInits = [resourceInit]
+
+        // when - the displaced attachment's stream delivers a message
+        await client.handleChannelWatchResult(.message(response), key: "same-key",
+                                              attachment: displaced, generation: displaced.watchGeneration)
+
+        // then - it is dropped instead of being routed by key to `held`
+        XCTAssertEqual(held.resource.getSessionCount(), 0)
+
+        // and `held` still receives its own stream's messages
+        await client.handleChannelWatchResult(.message(response), key: "same-key",
+                                              attachment: held, generation: held.watchGeneration)
+        XCTAssertEqual(held.resource.getSessionCount(), 5)
+    }
+
+    func test_a_stale_teardown_keeps_the_forwarder_of_the_same_channel_attached_again() throws {
+        // given - one Channel detached and attached again: the newer attachment owns its forwarder
+        let client = self.makeClient()
+        let channel = try Channel(key: "same-key")
+        channel.setActor(firstActor)
+        channel.setStatus(.attached)
+        let stale = Attachment(resource: channel, resourceID: "")
+        let current = Attachment(resource: channel, resourceID: "s2")
+        client.adoptAttachment(stale, key: "same-key", actorID: firstActor)
+        client.adoptAttachment(current, key: "same-key", actorID: firstActor)
+        var forwarded = 0
+        channel.subscribeLocalBroadcast { _ in forwarded += 1 }
+
+        // when - the stale attempt rolls itself back
+        try client.detachInternal("same-key", stale)
+
+        // then - its own stream is cancelled, but the Channel keeps forwarding broadcasts
+        XCTAssertTrue(stale.cancelled)
+        XCTAssertFalse(current.cancelled)
+        try channel.broadcast(topic: "t", payload: Payload(["k": "v"]))
+        XCTAssertEqual(forwarded, 1)
+    }
+
+    func test_tearing_down_a_replaced_channel_removes_only_its_own_forwarder() throws {
+        // given - a different Channel of the same key took the key from `old`
+        let client = self.makeClient()
+        let old = try Channel(key: "same-key")
+        old.setActor(firstActor)
+        old.setStatus(.attached)
+        let oldAttachment = Attachment(resource: old, resourceID: "s1")
+        client.adoptAttachment(oldAttachment, key: "same-key", actorID: firstActor)
+        try client.adoptAttachment(Attachment(resource: Channel(key: "same-key"), resourceID: "s2"),
+                                   key: "same-key", actorID: firstActor)
+        var forwarded = 0
+        old.subscribeLocalBroadcast { _ in forwarded += 1 }
+
+        // when
+        try client.detachInternal("same-key", oldAttachment)
+
+        // then - `old`'s forwarder goes with it
+        try old.broadcast(topic: "t", payload: Payload(["k": "v"]))
+        XCTAssertEqual(forwarded, 0)
+    }
 }
