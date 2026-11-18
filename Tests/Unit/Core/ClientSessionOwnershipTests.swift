@@ -42,6 +42,7 @@ private func clientNotFound() -> ConnectError {
 
 private let firstActor = "000000000000000000000001"
 private let secondActor = "000000000000000000000002"
+private let thirdActor = "000000000000000000000003"
 
 @MainActor
 final class ClientSessionOwnershipTests: XCTestCase {
@@ -405,6 +406,25 @@ final class ClientSessionOwnershipTests: XCTestCase {
         // then - the status, now another attach's, is not reset
         XCTAssertEqual(doc.status, .attached)
         XCTAssertFalse(client.has("doc"))
+    }
+
+    func test_a_rollback_that_resumes_after_a_reattach_keeps_the_new_attachments_online_clients() async {
+        // given - a failed attach whose attachment a teardown cancelled while the rollback
+        // waited, and the document attached again since, with a peer online
+        let client = self.makeClient()
+        let doc = Document(key: "doc")
+        let attachment = Attachment(resource: doc, resourceID: "r", syncMode: .manual)
+        client.adoptAttachment(attachment, key: "doc", actorID: firstActor)
+        attachment.cancelWatchStream()
+        doc.setActor(secondActor)
+        doc.applyStatus(.attached)
+        doc.setOnlineClients([secondActor, thirdActor])
+
+        // when
+        await client.rollBackFailedAttach(doc)
+
+        // then - the new attachment's online peers stay
+        XCTAssertEqual(doc.onlineClients, [secondActor, thirdActor])
     }
 
     func test_a_rollback_of_an_attach_that_still_owns_the_document_detaches_it() async {

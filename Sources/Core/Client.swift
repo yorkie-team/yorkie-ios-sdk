@@ -1671,11 +1671,6 @@ public class Client {
         self.liveAttachments[ObjectIdentifier(attachment)] = (key: key, attachment: attachment)
     }
 
-    /// Tears down `target`, or the attachment `key` holds when `target` is `nil`.
-    ///
-    /// The state kept by key belongs to whichever attachment the key holds. When a caller tears
-    /// down an attachment the key no longer holds (a same-key resource was attached since), only
-    /// that attachment's own resources go; the key's entry stays with the newer one.
     /// Returns whether a newer attachment of the same ``Channel`` as `attachment` holds `key`.
     ///
     /// - Parameters:
@@ -1689,7 +1684,19 @@ public class Client {
         return current !== attachment && current.resource === attachment.resource
     }
 
-    func detachInternal(_ key: String, _ target: AnyObject? = nil) throws {
+    /// Tears down `target`, or the attachment `key` holds when `target` is `nil`.
+    ///
+    /// The state kept by key belongs to whichever attachment the key holds. When a caller tears
+    /// down an attachment the key no longer holds (a same-key resource was attached since), only
+    /// that attachment's own resources go; the key's entry stays with the newer one.
+    ///
+    /// - Parameters:
+    ///   - key: The resource key.
+    ///   - target: The attachment to tear down, or `nil` for the one `key` holds.
+    ///   - resetsDocument: Whether to clear the document's online clients. A ``Document`` can be
+    ///     attached again, possibly by another client, before a late teardown of its old
+    ///     attachment runs, and the online clients are then the new attachment's.
+    func detachInternal(_ key: String, _ target: AnyObject? = nil, resetsDocument: Bool = true) throws {
         // NOTE: If no attachment is found, the resource has already been detached by another
         // routine, such as a detach or remove that ran while the watch loop was running.
         guard let target = target ?? (self.attachmentMap[key] as AnyObject?) else {
@@ -1707,7 +1714,9 @@ public class Client {
             if let actor = self.actorID ?? self.id, attachment.resource.hasMintedOperations() {
                 self.markReissueClaim(actor, docKey: key)
             }
-            attachment.resource.resetOnlineClients()
+            if resetsDocument {
+                attachment.resource.resetOnlineClients()
+            }
             // Cancel, not just disconnect: the stream's late completion must neither reconnect
             // this torn-down attachment nor clear the stream of a same-key successor.
             attachment.cancelWatchStream()
@@ -3583,7 +3592,7 @@ extension Client {
         // Releasing the session can suspend. A teardown that ran meanwhile has already detached
         // the document, and the status may since belong to an attach by another client.
         let stillOwned = !attachment.cancelled && self.getDocumentAttachment(doc.getKey()) === attachment
-        try? self.detachInternal(doc.getKey(), attachment)
+        try? self.detachInternal(doc.getKey(), attachment, resetsDocument: stillOwned)
         // The attach may have published `.attached` before the step that failed. A caller that
         // retries must find the document detached, not rejected with `errNotDetached`.
         if stillOwned, doc.status == .attached {
