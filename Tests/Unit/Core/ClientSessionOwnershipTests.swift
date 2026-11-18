@@ -368,4 +368,58 @@ final class ClientSessionOwnershipTests: XCTestCase {
         try old.broadcast(topic: "t", payload: Payload(["k": "v"]))
         XCTAssertEqual(forwarded, 0)
     }
+
+    // MARK: - Teardown that resumes after the session moved on
+
+    func test_releaseAllSessions_stops_once_the_session_it_ends_is_no_longer_current() async {
+        // given - an attached document that is persisting
+        let client = self.makeClient()
+        let doc = Document(key: "doc")
+        client.adoptAttachment(Attachment(resource: doc, resourceID: "r", syncMode: .manual), key: "doc", actorID: firstActor)
+        doc.onLocalChange = {}
+
+        // when - the walk resumes for a session that has been replaced
+        await client.releaseAllSessions(ownsSession: { false })
+
+        // then - the document, which may belong to the new session now, keeps persisting
+        XCTAssertNotNil(doc.onLocalChange)
+
+        // and the current session's walk still releases it
+        await client.releaseAllSessions(ownsSession: { true })
+        XCTAssertNil(doc.onLocalChange)
+    }
+
+    func test_a_rollback_that_resumes_after_a_teardown_leaves_the_document_status_alone() async {
+        // given - a failed attach whose attachment a teardown cancelled while the rollback waited
+        let client = self.makeClient()
+        let doc = Document(key: "doc")
+        let attachment = Attachment(resource: doc, resourceID: "r", syncMode: .manual)
+        client.adoptAttachment(attachment, key: "doc", actorID: firstActor)
+        doc.setActor(secondActor)
+        doc.applyStatus(.attached)
+        attachment.cancelWatchStream()
+
+        // when
+        await client.rollBackFailedAttach(doc)
+
+        // then - the status, now another attach's, is not reset
+        XCTAssertEqual(doc.status, .attached)
+        XCTAssertFalse(client.has("doc"))
+    }
+
+    func test_a_rollback_of_an_attach_that_still_owns_the_document_detaches_it() async {
+        // given - a failed attach that had already published `.attached`
+        let client = self.makeClient()
+        let doc = Document(key: "doc")
+        client.adoptAttachment(Attachment(resource: doc, resourceID: "r", syncMode: .manual), key: "doc", actorID: firstActor)
+        doc.setActor(firstActor)
+        doc.applyStatus(.attached)
+
+        // when
+        await client.rollBackFailedAttach(doc)
+
+        // then - a retry finds the document detached
+        XCTAssertEqual(doc.status, .detached)
+        XCTAssertFalse(client.has("doc"))
+    }
 }

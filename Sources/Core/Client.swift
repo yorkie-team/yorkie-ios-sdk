@@ -535,6 +535,10 @@ public class Client {
         guard self.status == .activated, let clientID = self.id else {
             return
         }
+        // The request and the lease releases suspend. If the client was torn down meanwhile, and
+        // perhaps activated again, this call has nothing left to end: the newer session is not
+        // its to tear down.
+        let ownsSession = self.captureSession()
 
         do {
             let deactivateRequest = DeactivateClientRequest.with { $0.clientID = clientID }
@@ -551,7 +555,10 @@ public class Client {
             // leaked lease locks the document key out of every later activate for the
             // lifetime of the process. The stored copies stay, so a later session can resume
             // the changes they carry.
-            await self.releaseAllSessions()
+            await self.releaseAllSessions(ownsSession: ownsSession)
+            guard ownsSession() else {
+                return
+            }
             try self.deactivateInternal()
 
             Logger.info("Client(\(self.key) deactivated.")
@@ -569,18 +576,20 @@ public class Client {
                 do {
                     try await self.refreshAuthToken(reason: errorMetadataOf(error: connectError)["reason"], inRetryLoop: false)
                 } catch let refreshError {
-                    await self.releaseAllSessions()
-                    do {
-                        try self.deactivateInternal()
-                    } catch {
-                        Logger.error("Failed deactivateInternal for client (\(self.key)) with error: \(error)")
+                    await self.releaseAllSessions(ownsSession: ownsSession)
+                    if ownsSession() {
+                        do {
+                            try self.deactivateInternal()
+                        } catch {
+                            Logger.error("Failed deactivateInternal for client (\(self.key)) with error: \(error)")
+                        }
                     }
                     throw refreshError
                 }
                 throw error
             }
 
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -1916,6 +1925,18 @@ public class Client {
         }
     }
 
+    private func handleErrorResponse(_ error: Error?, defaultMessage: String) -> Error {
+        if let error = error {
+            return error
+        } else {
+            return YorkieError(code: .errRPC, message: defaultMessage)
+        }
+    }
+}
+
+// MARK: - Connection errors
+
+extension Client {
     /**
      * `handleConnectError` handles the given error. If the given error can be
      * retried after handling, it returns true. `inRetryLoop` is true for the
@@ -2004,7 +2025,7 @@ public class Client {
             // released here is never released at all -- locking the document key out of every
             // later session under a cross-process lock, with `deactivate()` early-returning
             // because the status is already deactivated.
-            await self.releaseAllSessions()
+            await self.releaseAllSessions(ownsSession: ownsSession)
             // Releasing the leases can suspend, and the client may have been torn down and
             // activated again meanwhile. That newer session is not this request's to end.
             guard ownsSession() else {
@@ -2018,14 +2039,6 @@ public class Client {
         }
 
         return false
-    }
-
-    private func handleErrorResponse(_ error: Error?, defaultMessage: String) -> Error {
-        if let error = error {
-            return error
-        } else {
-            return YorkieError(code: .errRPC, message: defaultMessage)
-        }
     }
 }
 
@@ -3363,12 +3376,19 @@ extension Client {
     /// Releases every held session lease and stops persisting every attached document.
     ///
     /// Used on deactivate, which ends this client's claim on all of its documents at once.
-    func releaseAllSessions() async {
+    ///
+    /// - Parameter ownsSession: Whether the session being ended is still the current one. Each
+    ///   release can suspend, and once the client has been torn down and activated again, the
+    ///   documents left in the snapshot may be attached to the new session, so the walk stops.
+    func releaseAllSessions(ownsSession: @MainActor () -> Bool) async {
         // The same set teardown walks, so a document a same-key attach evicted from
         // `attachmentMap` still gives its lease back.
         for entry in self.attachmentsToTearDown() {
             guard let attachment = entry.attachment as? Attachment<Document> else {
                 continue
+            }
+            guard ownsSession() else {
+                return
             }
             await self.releaseSession(for: attachment.resource, attachment: attachment)
         }
@@ -3560,10 +3580,13 @@ extension Client {
             return
         }
         await self.releaseSession(for: doc, attachment: attachment)
-        try? self.detachInternal(doc.getKey())
+        // Releasing the session can suspend. A teardown that ran meanwhile has already detached
+        // the document, and the status may since belong to an attach by another client.
+        let stillOwned = !attachment.cancelled && self.getDocumentAttachment(doc.getKey()) === attachment
+        try? self.detachInternal(doc.getKey(), attachment)
         // The attach may have published `.attached` before the step that failed. A caller that
         // retries must find the document detached, not rejected with `errNotDetached`.
-        if doc.status == .attached {
+        if stillOwned, doc.status == .attached {
             doc.applyStatus(.detached)
         }
     }
