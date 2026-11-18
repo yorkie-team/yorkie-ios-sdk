@@ -1154,6 +1154,14 @@ class IndexTree<T: IndexTreeNode> {
             throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
         }
 
+        // Only the upper bound is checked below: a child index past the end stops
+        // at the missing child, and `findTextPos` compares against the content
+        // length. A negative element passes both tests, so reject it here and
+        // keep every caller of the resolver on the same contract.
+        if path.contains(where: { $0 < 0 }) {
+            throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
+        }
+
         var node = self.root
         for pathElement in path.dropLast() {
             guard let child = node.children[safe: pathElement] else {
