@@ -44,6 +44,21 @@ private let firstActor = "000000000000000000000001"
 private let secondActor = "000000000000000000000002"
 private let thirdActor = "000000000000000000000003"
 
+/// A lease whose release runs `onRelease` first, standing in for one that suspends on real I/O.
+private final class HookedLease: SessionLockHandle, @unchecked Sendable {
+    private(set) var released = false
+    private let onRelease: @MainActor () -> Void
+
+    init(onRelease: @escaping @MainActor () -> Void = {}) {
+        self.onRelease = onRelease
+    }
+
+    func release() async {
+        await self.onRelease()
+        self.released = true
+    }
+}
+
 @MainActor
 final class ClientSessionOwnershipTests: XCTestCase {
     private func makeClient() -> Client {
@@ -401,7 +416,7 @@ final class ClientSessionOwnershipTests: XCTestCase {
         attachment.cancelWatchStream()
 
         // when
-        await client.rollBackFailedAttach(doc)
+        await client.rollBackFailedAttach(doc, attachment: attachment)
 
         // then - the status, now another attach's, is not reset
         XCTAssertEqual(doc.status, .attached)
@@ -421,7 +436,7 @@ final class ClientSessionOwnershipTests: XCTestCase {
         doc.setOnlineClients([secondActor, thirdActor])
 
         // when
-        await client.rollBackFailedAttach(doc)
+        await client.rollBackFailedAttach(doc, attachment: attachment)
 
         // then - the new attachment's online peers stay
         XCTAssertEqual(doc.onlineClients, [secondActor, thirdActor])
@@ -431,15 +446,58 @@ final class ClientSessionOwnershipTests: XCTestCase {
         // given - a failed attach that had already published `.attached`
         let client = self.makeClient()
         let doc = Document(key: "doc")
-        client.adoptAttachment(Attachment(resource: doc, resourceID: "r", syncMode: .manual), key: "doc", actorID: firstActor)
+        let attachment = Attachment(resource: doc, resourceID: "r", syncMode: .manual)
+        client.adoptAttachment(attachment, key: "doc", actorID: firstActor)
         doc.setActor(firstActor)
         doc.applyStatus(.attached)
 
         // when
-        await client.rollBackFailedAttach(doc)
+        await client.rollBackFailedAttach(doc, attachment: attachment)
 
         // then - a retry finds the document detached
         XCTAssertEqual(doc.status, .detached)
         XCTAssertFalse(client.has("doc"))
+    }
+
+    func test_a_rollback_releases_its_own_attachment_when_a_same_key_channel_took_the_key() async throws {
+        // given - a failed attach whose key a same-key Channel took while it ran
+        let client = self.makeClient()
+        let doc = Document(key: "same-key")
+        let attachment = Attachment(resource: doc, resourceID: "r", syncMode: .manual)
+        let lease = HookedLease()
+        attachment.sessionLockHandle = lease
+        client.adoptAttachment(attachment, key: "same-key", actorID: firstActor)
+        doc.setActor(firstActor)
+        doc.applyStatus(.attached)
+        let channel = try Attachment(resource: Channel(key: "same-key"), resourceID: "s1")
+        client.adoptAttachment(channel, key: "same-key", actorID: firstActor)
+
+        // when
+        await client.rollBackFailedAttach(doc, attachment: attachment)
+
+        // then - the attempt's own lease and status are undone, and the channel keeps the key
+        XCTAssertTrue(lease.released)
+        XCTAssertTrue(attachment.cancelled)
+        XCTAssertEqual(doc.status, .detached)
+        XCTAssertTrue((client.attachmentMap["same-key"] as AnyObject) === channel)
+    }
+
+    func test_releaseAllSessions_releases_a_lease_an_attach_took_while_the_walk_was_suspended() async {
+        // given - releasing the first lease lets an attach register a second document
+        let client = self.makeClient()
+        let late = Attachment(resource: Document(key: "late"), resourceID: "r2", syncMode: .manual)
+        let lateLease = HookedLease()
+        late.sessionLockHandle = lateLease
+        let first = Attachment(resource: Document(key: "first"), resourceID: "r1", syncMode: .manual)
+        first.sessionLockHandle = HookedLease {
+            client.adoptAttachment(late, key: "late", actorID: firstActor)
+        }
+        client.adoptAttachment(first, key: "first", actorID: firstActor)
+
+        // when
+        await client.releaseAllSessions(ownsSession: { true })
+
+        // then - the late attachment's lease is released before the teardown that follows
+        XCTAssertTrue(lateLease.released)
     }
 }

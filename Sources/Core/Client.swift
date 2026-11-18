@@ -708,6 +708,9 @@ public class Client {
         // both before the change pack is built below.
         let resume = try await self.prepareOfflineResume(for: doc)
         var pendingSessionLockHandle = resume.handle
+        // The attachment this attempt registers, for the rollback: the key may hold another
+        // resource by the time a later step fails.
+        var createdAttachment: Attachment<Document>?
         let didRestore = resume.didRestore
         let canPersist = resume.canPersist
 
@@ -773,21 +776,20 @@ public class Client {
             // finishes meanwhile must not find this attachment registered after it.
             try assertSession()
 
-            self.setAttachment(Attachment<Document>(resource: doc,
-                                                    resourceID: message.documentID,
-                                                    syncMode: syncMode,
-                                                    changeEventReceived: false,
-                                                    pollInterval: pollInterval,
-                                                    pollIntervalPinned: pollIntervalPinned,
-                                                    disableGC: disableGC,
-                                                    disablePresence: message.disablePresence),
-                               for: doc.getKey())
-            if let attachment = self.getDocumentAttachment(doc.getKey()) {
-                self.installOfflinePersistence(on: attachment, doc: doc, lease: pendingSessionLockHandle, persist: canPersist)
-                // Ownership of the lease has moved to the attachment, which releases it on
-                // detach. Cleared so the failure path below cannot release it a second time.
-                pendingSessionLockHandle = nil
-            }
+            let attachment = Attachment<Document>(resource: doc,
+                                                  resourceID: message.documentID,
+                                                  syncMode: syncMode,
+                                                  changeEventReceived: false,
+                                                  pollInterval: pollInterval,
+                                                  pollIntervalPinned: pollIntervalPinned,
+                                                  disableGC: disableGC,
+                                                  disablePresence: message.disablePresence)
+            self.setAttachment(attachment, for: doc.getKey())
+            createdAttachment = attachment
+            self.installOfflinePersistence(on: attachment, doc: doc, lease: pendingSessionLockHandle, persist: canPersist)
+            // Ownership of the lease has moved to the attachment, which releases it on
+            // detach. Cleared so the failure path below cannot release it a second time.
+            pendingSessionLockHandle = nil
             // Status subscribers can deactivate the client. Make the attachment visible to
             // teardown before notifying them.
             doc.applyStatus(.attached)
@@ -834,7 +836,7 @@ public class Client {
             // is persisting. Leaving that in place behind a thrown attach would hold the lease
             // for the process lifetime and keep writing for a document the caller believes is
             // not attached.
-            await self.rollBackFailedAttach(doc)
+            await self.rollBackFailedAttach(doc, attachment: createdAttachment)
             // Only reached when no attachment took ownership of it.
             await pendingSessionLockHandle?.release()
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
@@ -1184,12 +1186,6 @@ public class Client {
         }
     }
 
-    private func clearAttachmentRemoteChangeEventReceived(_ docKey: DocKey) {
-        if let docAttachment = getDocumentAttachment(docKey) {
-            docAttachment.changeEventReceived = false
-        }
-    }
-
     private func setSyncTimer(_ reconnect: Bool, generation: Int, delayMs: Int? = nil) {
         let isDisconnectedWatchStream = self.attachmentMap.values.contains { value in
             if let docAttachment = value as? Attachment<Document> {
@@ -1232,8 +1228,13 @@ public class Client {
                             continue
                         }
 
+                        // The map can change while `needRealtimeSync()` suspends. Only the
+                        // attachment still registered under `key` may consume its flag.
+                        guard (self.attachmentMap[key] as AnyObject?) === docAttachment else {
+                            continue
+                        }
                         let changeEventReceived = docAttachment.changeEventReceived
-                        self.clearAttachmentRemoteChangeEventReceived(key)
+                        docAttachment.changeEventReceived = false
                         result.append(docAttachment.resource)
                         if let syncMode = docAttachment.syncMode {
                             do {
@@ -3391,15 +3392,23 @@ extension Client {
     ///   documents left in the snapshot may be attached to the new session, so the walk stops.
     func releaseAllSessions(ownsSession: @MainActor () -> Bool) async {
         // The same set teardown walks, so a document a same-key attach evicted from
-        // `attachmentMap` still gives its lease back.
-        for entry in self.attachmentsToTearDown() {
-            guard let attachment = entry.attachment as? Attachment<Document> else {
-                continue
-            }
-            guard ownsSession() else {
+        // `attachmentMap` still gives its lease back. Walked until a pass finds nothing new: an
+        // attach can register, taking a lease, while a release suspends, and the teardown that
+        // follows this call synchronously would otherwise drop it with the lease still held.
+        var released = Set<ObjectIdentifier>()
+        while true {
+            let pending = self.attachmentsToTearDown().compactMap { $0.attachment as? Attachment<Document> }
+                .filter { !released.contains(ObjectIdentifier($0)) }
+            guard !pending.isEmpty else {
                 return
             }
-            await self.releaseSession(for: attachment.resource, attachment: attachment)
+            for attachment in pending {
+                guard ownsSession() else {
+                    return
+                }
+                released.insert(ObjectIdentifier(attachment))
+                await self.releaseSession(for: attachment.resource, attachment: attachment)
+            }
         }
     }
 
@@ -3583,15 +3592,22 @@ extension Client {
     /// document is persisting. Left in place behind a thrown attach, that holds the lease for the
     /// process lifetime and keeps writing for a document the caller believes is not attached.
     ///
-    /// - Parameter doc: The document whose attach failed.
-    func rollBackFailedAttach(_ doc: Document) async {
-        guard let attachment = self.getDocumentAttachment(doc.getKey()) else {
+    /// The attachment is the one the attempt registered, not whatever the key holds: a same-key
+    /// resource may have taken the key since, and that one stays.
+    ///
+    /// - Parameters:
+    ///   - doc: The document whose attach failed.
+    ///   - attachment: The attachment the attempt registered, or `nil` if it failed before that.
+    func rollBackFailedAttach(_ doc: Document, attachment: Attachment<Document>?) async {
+        guard let attachment else {
             return
         }
         await self.releaseSession(for: doc, attachment: attachment)
-        // Releasing the session can suspend. A teardown that ran meanwhile has already detached
-        // the document, and the status may since belong to an attach by another client.
-        let stillOwned = !attachment.cancelled && self.getDocumentAttachment(doc.getKey()) === attachment
+        // Releasing the session can suspend. A teardown, or a detach, that ran meanwhile has
+        // already detached the document (cancelling this attachment), and the status may since
+        // belong to an attach by another client. Until then the document is still this
+        // attempt's, even when a same-key resource has taken the key.
+        let stillOwned = !attachment.cancelled
         try? self.detachInternal(doc.getKey(), attachment, resetsDocument: stillOwned)
         // The attach may have published `.attached` before the step that failed. A caller that
         // retries must find the document detached, not rejected with `errNotDetached`.
