@@ -15,7 +15,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 ### Fixed
 
 - Keep a channel that is re-attached while an earlier detach of its key is still pending in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
-- Settle `deactivate({ keepalive: true })` without waiting for the response in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
+- Let a late `errClientNotFound` or `errClientNotActivated` deactivate only the session its request belonged to, and fail an attach that loses its session with `errClientNotActivated` (the iOS part of yorkie-team/yorkie-js-sdk#1522) in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
 - Reject `styleByPath(path)` for a path that names no node in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
 - Stop a torn-down attachment's watch stream from reconnecting under a same-key successor in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
 
