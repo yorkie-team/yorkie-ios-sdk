@@ -17,6 +17,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 - Keep a channel that is re-attached while an earlier detach of its key is still pending in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
 - Settle `deactivate({ keepalive: true })` without waiting for the response in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
 - Reject `styleByPath(path)` for a path that names no node in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
+- Stop a torn-down attachment's watch stream from reconnecting under a same-key successor in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
 
 ## [v0.7.26] - 2026-11-05
 
