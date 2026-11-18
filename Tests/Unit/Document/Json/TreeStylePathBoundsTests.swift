@@ -70,7 +70,10 @@ final class TreeStylePathBoundsTests: XCTestCase {
                                        _ body: @escaping (JSONTree) throws -> Void)
     {
         XCTAssertThrowsError(try doc.update { root, _ in
-            try body(root.t as! JSONTree)
+            guard let tree = root.t as? JSONTree else {
+                return XCTFail("root.t is not a JSONTree", file: file, line: line)
+            }
+            try body(tree)
         }, file: file, line: line) { error in
             XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, file: file, line: line)
         }
