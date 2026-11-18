@@ -296,6 +296,14 @@ private func namespaceOf(_ apiKey: String, _ clientKey: String, _ docKey: String
 @MainActor
 public class Client {
     private(set) var attachmentMap = [String: Any]() // Stores Attachment<Document> and Attachment<Channel>
+    /// Every attachment this client created and has not torn down yet, with the key it was
+    /// attached under.
+    ///
+    /// `attachmentMap` keeps at most one attachment per key, so an attach that takes a key
+    /// another attachment already holds drops the old one out of it; teardown still has to reach
+    /// that one, or its watch stream outlives the client. Entries are added where `attachmentMap`
+    /// is written and removed by `detachInternal`.
+    private var liveAttachments = [ObjectIdentifier: (key: String, attachment: AnyObject)]()
     /// The stable actor stamped into this client's document changes.
     ///
     /// Supplied by the server on activate and derived from the project and client key, so it
@@ -763,14 +771,15 @@ public class Client {
 
             doc.applyStatus(.attached)
 
-            self.attachmentMap[doc.getKey()] = Attachment<Document>(resource: doc,
-                                                                    resourceID: message.documentID,
-                                                                    syncMode: syncMode,
-                                                                    changeEventReceived: false,
-                                                                    pollInterval: pollInterval,
-                                                                    pollIntervalPinned: pollIntervalPinned,
-                                                                    disableGC: disableGC,
-                                                                    disablePresence: message.disablePresence)
+            self.setAttachment(Attachment<Document>(resource: doc,
+                                                    resourceID: message.documentID,
+                                                    syncMode: syncMode,
+                                                    changeEventReceived: false,
+                                                    pollInterval: pollInterval,
+                                                    pollIntervalPinned: pollIntervalPinned,
+                                                    disableGC: disableGC,
+                                                    disablePresence: message.disablePresence),
+                               for: doc.getKey())
             if let attachment = self.getDocumentAttachment(doc.getKey()) {
                 self.installOfflinePersistence(on: attachment, doc: doc, lease: pendingSessionLockHandle, persist: canPersist)
                 // Ownership of the lease has moved to the attachment, which releases it on
@@ -1620,19 +1629,31 @@ public class Client {
         self.channelHeartbeatTimer?.invalidate()
         self.channelHeartbeatTimer = nil
 
-        for (key, _) in self.attachmentMap {
-            // Update status based on resource type, but preserve removed status
-            // IMPORTANT: Do this BEFORE detachInternal which removes from attachmentMap
-            if let docAttachment = getDocumentAttachment(key) {
+        // Walk every live attachment, not just the ones `attachmentMap` still names: an
+        // attachment a same-key attach evicted from the map is unreachable by key, and leaving
+        // it here keeps its watch stream open on a client the caller has deactivated. The map is
+        // folded in too so teardown stays complete even if an attachment ever reaches it without
+        // being registered as live.
+        var pending = self.liveAttachments
+        for (key, value) in self.attachmentMap {
+            let attachment = value as AnyObject
+            let id = ObjectIdentifier(attachment)
+            if pending[id] == nil {
+                pending[id] = (key: key, attachment: attachment)
+            }
+        }
+        for (_, entry) in pending {
+            // Update status based on resource type, but preserve removed status.
+            if let docAttachment = entry.attachment as? Attachment<Document> {
                 if docAttachment.resource.getStatus() != .removed {
                     docAttachment.resource.applyStatus(.detached)
                 }
-            } else if let channelAttachment = getChannelAttachment(key) {
+            } else if let channelAttachment = entry.attachment as? Attachment<Channel> {
                 if channelAttachment.resource.getStatus() != .removed {
                     channelAttachment.resource.setStatus(.detached)
                 }
             }
-            try self.detachInternal(key)
+            try self.detachInternal(entry.key, entry.attachment)
         }
     }
 
@@ -1689,8 +1710,27 @@ public class Client {
         self.reissueClaims[docKey] = actor
     }
 
-    private func detachInternal(_ key: String) throws {
-        if let attachment = getDocumentAttachment(key) {
+    /// Records `attachment` as the one `key` holds, and as live until `detachInternal` tears it
+    /// down.
+    private func setAttachment<R: Attachable>(_ attachment: Attachment<R>, for key: String) {
+        self.attachmentMap[key] = attachment
+        self.liveAttachments[ObjectIdentifier(attachment)] = (key: key, attachment: attachment)
+    }
+
+    /// Tears down `target`, or the attachment `key` holds when `target` is `nil`.
+    ///
+    /// The state kept by key belongs to whichever attachment the key holds. When a caller tears
+    /// down an attachment the key no longer holds (a same-key resource was attached since), only
+    /// that attachment's own resources go; the key's entry stays with the newer one.
+    private func detachInternal(_ key: String, _ target: AnyObject? = nil) throws {
+        // NOTE: If no attachment is found, the resource has already been detached by another
+        // routine, such as a detach or remove that ran while the watch loop was running.
+        guard let target = target ?? (self.attachmentMap[key] as AnyObject?) else {
+            return
+        }
+        let ownsKey = (self.attachmentMap[key] as AnyObject?) === target
+
+        if let attachment = target as? Attachment<Document> {
             // Take the re-issue claim if the document minted operation tickets while it was
             // attached: those tickets are in the document this key names, so the actor's lamports
             // there are no longer free for a later document of the key to re-issue onto. One that
@@ -1702,14 +1742,19 @@ public class Client {
             }
             attachment.resource.resetOnlineClients()
             try self.stopWatchLoop(key, with: attachment)
-        } else if let attachment = getChannelAttachment(key) {
+        } else if let attachment = target as? Attachment<Channel> {
             // Tear down the local-broadcast forwarder installed by `attachChannel`
             // so a re-attach does not leave a stale forwarder behind.
             attachment.resource.unsubscribeLocalBroadcast()
             try self.stopWatchLoop(key, with: attachment)
         }
 
-        self.attachmentMap.removeValue(forKey: key)
+        if ownsKey {
+            self.attachmentMap.removeValue(forKey: key)
+        }
+        // Unconditional: this attachment is torn down whether or not the key still points at
+        // it, so teardown must stop seeing it either way.
+        self.liveAttachments.removeValue(forKey: ObjectIdentifier(target))
     }
 
     @discardableResult
@@ -1843,6 +1888,7 @@ public class Client {
                 // offline persistence is holding before the attachment is dropped.
                 await self.releaseSession(for: doc, attachment: attachment)
                 self.attachmentMap.removeValue(forKey: docKey)
+                self.liveAttachments.removeValue(forKey: ObjectIdentifier(attachment))
             }
 
             // The push the server rejected is behind us, so let the sync loop take this document
@@ -2033,7 +2079,7 @@ public extension Client {
         self.status = .activated
         self.id = actorID
         self.actorID = actorID
-        self.attachmentMap[key] = attachment
+        self.setAttachment(attachment, for: key)
     }
 
     /// Observes the messages Watch streams deliver. Test seam, active only when the client was
@@ -2277,7 +2323,8 @@ public extension Client {
 
         // Register the attachment locally with an empty session id; the first-call
         // refresh below populates it from the server response.
-        self.attachmentMap[channel.getKey()] = Attachment<Channel>(resource: channel, resourceID: "")
+        let attachment = Attachment<Channel>(resource: channel, resourceID: "")
+        self.setAttachment(attachment, for: channel.getKey())
 
         // Forward local broadcasts to the server. The Channel publishes a
         // local-broadcast event when its `broadcast` method is called; here we
@@ -2321,8 +2368,10 @@ public extension Client {
 
             return channel
         } catch {
-            // Roll back the local registration if the first-call attach failed.
-            try? self.detachInternal(channel.getKey())
+            // Roll back the local registration if the first-call attach failed. Only this
+            // attempt's attachment goes: a same-key channel attached while the first-call
+            // refresh was suspended holds the key now and stays.
+            try? self.detachInternal(channel.getKey(), attachment)
             channel.setStatus(.detached)
             Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
             try await self.handleConnectError(error)
@@ -2343,7 +2392,10 @@ public extension Client {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
 
-        guard self.getChannelAttachment(channel.getKey()) != nil else {
+        // The key alone is not enough: another Channel of the same key may hold it now
+        // (attached again after this one was replaced), and detaching through a stale object
+        // must not take that one down.
+        guard let attachment = self.getChannelAttachment(channel.getKey()), attachment.resource === channel else {
             throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached when \(#function).")
         }
 
@@ -2354,7 +2406,7 @@ public extension Client {
         // `refreshChannel`), so it cannot mutate channel state post-detach. The only
         // residue is a server session reclaimed by TTL if detach lands inside the
         // first-call window — heartbeats have already stopped, so it does expire.
-        try self.detachInternal(channel.getKey())
+        try self.detachInternal(channel.getKey(), attachment)
         channel.setStatus(.detached)
 
         Logger.info("[DP] c:\"\(self.key)\" detaches p:\"\(channel.getKey())\" (local)")
