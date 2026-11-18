@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.27] - 2026-11-18
+
+> **Behavioural change — channel detach.** Detaching through a `Channel` object that a newer `Channel` of the same key has replaced now throws `errNotAttached` instead of detaching the newer one, as the Go and JS SDKs do. `deactivate()` also tears down an attachment that a same-key attach displaced, so its Watch stream no longer outlives the client.
+
+> **Not ported.** `deactivate({ keepalive: true })` is a browser-only option (fetch `keepalive` for `pagehide` / back-forward cache) and has no iOS counterpart; the session and attachment ownership guards that change introduced are ported. The restored default export of `@yorkie-js/sdk` is JS packaging only.
+
+### Fixed
+
+- Keep a channel that is re-attached while an earlier detach of its key is still pending in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
+- Settle `deactivate({ keepalive: true })` without waiting for the response in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
+- Reject `styleByPath(path)` for a path that names no node in https://github.com/yorkie-team/yorkie-ios-sdk/pull/281
+
 ## [v0.7.26] - 2026-11-05
 
 > Requires a Yorkie server v0.7.26 or later (one that includes yorkie-team/yorkie#2310). Upgrade every server node first, and do not roll the server back once clients of this SDK are connected: an older server drops the removal ledger these clients rely on when it re-encodes a document. Clients of earlier releases can still disagree with this one when an undo meets a concurrent deletion of the same text, or when an undo reverses a Tree style that both overwrote and added attributes.
