@@ -187,7 +187,8 @@ extension Client {
         _ result: StreamResult<WatchResponse>,
         key: String,
         attachment: Attachment<Document>,
-        generation: Int
+        generation: Int,
+        ownsSession: @MainActor () -> Bool = { true }
     ) async {
         guard attachment.watchGeneration == generation else {
             return
@@ -212,7 +213,7 @@ extension Client {
 
             Logger.debug("[WD] c:\"\(self.key)\" unwatches")
 
-            let retryable = await self.handleLoopConnectError(error)
+            let retryable = await self.handleLoopConnectError(error, ownsSession: ownsSession)
             // Handling the error can suspend (an auth token refresh): the stream may have been
             // replaced meanwhile, and a replaced stream owns nothing to disconnect.
             guard attachment.watchGeneration == generation else {
@@ -229,12 +230,13 @@ extension Client {
         }
     }
 
-    /// Handles one result of a channel Watch stream. See ``handleDocumentWatchResult(_:key:attachment:generation:)``.
+    /// Handles one result of a channel Watch stream. See ``handleDocumentWatchResult(_:key:attachment:generation:ownsSession:)``.
     func handleChannelWatchResult(
         _ result: StreamResult<WatchResponse>,
         key: String,
         attachment: Attachment<Channel>,
-        generation: Int
+        generation: Int,
+        ownsSession: @MainActor () -> Bool = { true }
     ) async {
         guard attachment.watchGeneration == generation else {
             return
@@ -251,7 +253,7 @@ extension Client {
 
             Logger.debug("[WC] c:\"\(self.key)\" unwatches")
 
-            let retryable = await self.handleLoopConnectError(error)
+            let retryable = await self.handleLoopConnectError(error, ownsSession: ownsSession)
             guard attachment.watchGeneration == generation else {
                 return
             }

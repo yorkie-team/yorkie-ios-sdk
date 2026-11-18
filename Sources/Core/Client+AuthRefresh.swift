@@ -72,11 +72,14 @@ extension Client {
     /// Its 401s skip the token refresh while it backs off, and a refresh that fails does not throw:
     /// the loop retries on its own.
     ///
-    /// - Parameter error: The error the loop got.
+    /// - Parameters:
+    ///   - error: The error the loop got.
+    ///   - ownsSession: Whether the session the loop's request belonged to is still the live one. See
+    ///     ``captureSession()``.
     /// - Returns: Whether the loop should retry.
-    func handleLoopConnectError(_ error: Error?) async -> Bool {
+    func handleLoopConnectError(_ error: Error?, ownsSession: @MainActor () -> Bool = { true }) async -> Bool {
         do {
-            return try await self.handleConnectError(error, inRetryLoop: true)
+            return try await self.handleConnectError(error, inRetryLoop: true, ownsSession: ownsSession)
         } catch {
             // `inRetryLoop` never throws: a failed refresh is swallowed for a loop. Should that ever
             // change, keep the loop retrying rather than stopping it silently.

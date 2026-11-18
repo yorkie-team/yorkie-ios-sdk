@@ -363,6 +363,9 @@ public class Client {
     /// Numbers the sync loops, so a deactivate followed by an activate cannot leave two running;
     /// see ``runSyncLoop()``.
     private var syncLoopGeneration = 0
+    /// Counts teardowns, so work started under one session can tell that the client was torn
+    /// down underneath it. See ``captureSession()``.
+    private var sessionGeneration = 0
     private var semaphoresForInitialzation = [String: DispatchSemaphore]()
     /// Serialises every sync pass, and is the barrier ``resync(_:discardLocalChanges:initialPresence:)``
     /// holds across its recovery.
@@ -656,6 +659,20 @@ public class Client {
         self.attachingDocs.insert(doc.getKey())
         defer { self.attachingDocs.remove(doc.getKey()) }
 
+        // Captured before the first suspension point: this attach belongs to the session in which
+        // it was requested, even if the client is deactivated and activated again before it ends.
+        let ownsSession = self.captureSession()
+        // Set when the attach is abandoned because the session went away, so the `catch` below
+        // knows the throw is not a connection error.
+        var abandoned = false
+        func assertSession() throws {
+            guard ownsSession() else {
+                abandoned = true
+                throw YorkieError(code: .errClientNotActivated,
+                                  message: "\(self.key) lost its session while attaching \(doc.getKey())")
+            }
+        }
+
         if let interval = documentPollInterval, interval <= 0 {
             throw YorkieError(code: .errInvalidArgument, message: "documentPollInterval must be greater than 0")
         }
@@ -700,6 +717,8 @@ public class Client {
         attachRequest.disableGc = disableGC
         attachRequest.disablePresence = resolvedDisablePresence
         do {
+            // The offline-resume preamble above suspends, so the session may already be gone.
+            try assertSession()
             let docKey = doc.getKey()
             let semaphore = DispatchSemaphore(value: 0)
 
@@ -732,6 +751,13 @@ public class Client {
             guard attachResponse.error == nil, let message = attachResponse.message else {
                 throw self.handleErrorResponse(attachResponse.error, defaultMessage: "Unknown attach error")
             }
+
+            // The client may have been torn down while the round trip was in flight. Registering
+            // the attachment now would put it -- and the watch stream opened below -- on a
+            // deactivated client, where nothing will ever detach it. The same holds if the client
+            // was activated again meanwhile: this attach was made under the previous client id, so
+            // the server never associated it with the live session.
+            try assertSession()
 
             let maxSizePerDocument = message.maxSizePerDocument
             if maxSizePerDocument > 0 {
@@ -769,8 +795,6 @@ public class Client {
                 throw YorkieError(code: .errDocumentRemoved, message: "\(doc) is removed.")
             }
 
-            doc.applyStatus(.attached)
-
             self.setAttachment(Attachment<Document>(resource: doc,
                                                     resourceID: message.documentID,
                                                     syncMode: syncMode,
@@ -786,6 +810,10 @@ public class Client {
                 // detach. Cleared so the failure path below cannot release it a second time.
                 pendingSessionLockHandle = nil
             }
+            // Status subscribers can deactivate the client. Make the attachment visible to
+            // teardown before notifying them.
+            doc.applyStatus(.attached)
+            try assertSession()
 
             // Polling mode opens no watch stream; the timer-driven sync loop drives pushpull
             // via needRealtimeSync. Skip waitForInitialization too — no stream to wait for.
@@ -793,6 +821,7 @@ public class Client {
                 try self.runWatchLoop(docKey)
                 try await self.waitForInitialization(semaphore, docKey)
             }
+            try assertSession()
 
             Logger.info("[AD] c:\"\(self.key))\" attaches d:\"\(doc.getKey())\"")
 
@@ -823,7 +852,11 @@ public class Client {
             // Only reached when no attachment took ownership of it.
             await pendingSessionLockHandle?.release()
             Logger.error("Failed to request attach document(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            // An abandoned attach is a local lifecycle cancellation, not a server error requiring
+            // connection recovery.
+            if !abandoned {
+                try await self.handleConnectError(error, ownsSession: ownsSession)
+            }
             throw error
         }
     }
@@ -873,6 +906,14 @@ public class Client {
         detachDocumentRequest.clientID = clientID
         detachDocumentRequest.documentID = attachment.resourceID
 
+        // Captured with the client id the request carries, so a late `errClientNotFound` cannot
+        // deactivate a session that replaced this one, and a late response cannot touch a document
+        // that teardown already detached.
+        let ownsSession = self.captureSession()
+        let ownsAttachment = { @MainActor [weak self] () -> Bool in
+            ownsSession() && (self?.attachmentMap[doc.getKey()] as AnyObject?) === attachment
+        }
+
         do {
             let detachDocumentResponse = await self.pushWithPresenceBase(doc,
                                                                          build: { Converter.toChangePack(pack: doc.createChangePack()) },
@@ -886,6 +927,9 @@ public class Client {
                 throw self.handleErrorResponse(detachDocumentResponse.error, defaultMessage: "Unknown detach error")
             }
 
+            guard ownsAttachment() else {
+                return doc
+            }
             let pack = try Converter.fromChangePack(message.changePack)
 
             try doc.applyChangePack(pack)
@@ -902,8 +946,11 @@ public class Client {
 
             return doc
         } catch {
+            guard ownsAttachment() else {
+                return doc
+            }
             Logger.error("Failed to request detach document(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -929,6 +976,11 @@ public class Client {
         removeDocumentRequest.clientID = clientID
         removeDocumentRequest.documentID = attachment.resourceID
 
+        let ownsSession = self.captureSession()
+        let ownsAttachment = { @MainActor [weak self] () -> Bool in
+            ownsSession() && (self?.attachmentMap[doc.getKey()] as AnyObject?) === attachment
+        }
+
         do {
             let removeDocumentResponse = await self.pushWithPresenceBase(doc,
                                                                          build: { Converter.toChangePack(pack: doc.createChangePack(true)) },
@@ -940,6 +992,12 @@ public class Client {
 
             guard removeDocumentResponse.error == nil, let message = removeDocumentResponse.message else {
                 throw self.handleErrorResponse(removeDocumentResponse.error, defaultMessage: "Unknown remove error")
+            }
+
+            // A late remove response must not touch a document teardown already detached, or one
+            // attached again since.
+            guard ownsAttachment() else {
+                return doc
             }
 
             let pack = try Converter.fromChangePack(message.changePack)
@@ -956,7 +1014,7 @@ public class Client {
             return doc
         } catch {
             Logger.error("Failed to request remove document(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -986,6 +1044,7 @@ public class Client {
         request.label = label
         request.description_p = description
 
+        let ownsSession = self.captureSession()
         do {
             let response = await self.yorkieService.createRevision(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
 
@@ -1002,7 +1061,7 @@ public class Client {
             return Converter.fromRevisionSummary(message.revision)
         } catch {
             Logger.error("Failed to request create revision(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -1030,6 +1089,7 @@ public class Client {
         request.offset = offset
         request.isForward = isForward
 
+        let ownsSession = self.captureSession()
         do {
             let response = await self.yorkieService.listRevisions(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
 
@@ -1042,7 +1102,7 @@ public class Client {
             return message.revisions.map(Converter.fromRevisionSummary)
         } catch {
             Logger.error("Failed to request list revisions(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -1068,6 +1128,7 @@ public class Client {
         request.documentID = attachment.resourceID
         request.revisionID = revisionID
 
+        let ownsSession = self.captureSession()
         do {
             let response = await self.yorkieService.getRevision(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
 
@@ -1084,7 +1145,7 @@ public class Client {
             return Converter.fromRevisionSummary(message.revision)
         } catch {
             Logger.error("Failed to request get revision(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -1110,6 +1171,7 @@ public class Client {
         request.documentID = attachment.resourceID
         request.revisionID = revisionID
 
+        let ownsSession = self.captureSession()
         do {
             let response = await self.yorkieService.restoreRevision(request: request, headers: self.authHeader.makeHeader(doc.getKey()))
 
@@ -1120,7 +1182,7 @@ public class Client {
             Logger.info("[RR] c:\"\(self.key)\" restores revision d:\"\(doc.getKey())\" r:\"\(revisionID)\"")
         } catch {
             Logger.error("Failed to request restore revision(\(self.key)).", error: error)
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -1244,10 +1306,11 @@ public class Client {
             }
         }
 
+        let ownsSession = self.captureSession()
         do {
             return try await self.performSyncInternal(false, attachment)
         } catch {
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
     }
@@ -1363,6 +1426,9 @@ public class Client {
             return
         }
 
+        // The session whose client id the syncs carry, so the catch below judges the error
+        // against it.
+        let ownsSession = self.captureSession()
         do {
             try await self.performSyncInternal(true)
 
@@ -1374,7 +1440,7 @@ public class Client {
             guard generation == self.syncLoopGeneration else {
                 return
             }
-            if await self.handleLoopConnectError(error) {
+            if await self.handleLoopConnectError(error, ownsSession: ownsSession) {
                 // One wait, as yorkie-js-sdk schedules it: the retry delay, or up to 5s after a 401
                 // while the token refresh backs off. Sleeping it and then arming the reconnect timer
                 // as well would add `reconnectStreamDelay` on top of the documented wait.
@@ -1432,11 +1498,13 @@ public class Client {
         // single document ResourceDescriptor and consuming WatchResponse.
         if let docAttachment = attachment as? Attachment<Document> {
             // The capture list starts this stream's generation: see ``Attachment/watchGeneration``.
-            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { [generation = docAttachment.beginWatchStream()] result in
+            // The session is captured with the client id the stream is opened under: a late error
+            // must not deactivate a session that a deactivate and a re-activation have since replaced.
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(key), onResult: { [generation = docAttachment.beginWatchStream(), ownsSession = self.captureSession()] result in
                 // One main-actor hop, so the generation check and the work it guards cannot be
                 // split by another task bumping the generation in between.
                 Task { @MainActor in
-                    await self.handleDocumentWatchResult(result, key: key, attachment: docAttachment, generation: generation)
+                    await self.handleDocumentWatchResult(result, key: key, attachment: docAttachment, generation: generation, ownsSession: ownsSession)
                 }
             })
 
@@ -1453,9 +1521,9 @@ public class Client {
         // single channel ResourceDescriptor and dispatching presence-count
         // updates + remote broadcast events to the Channel's event system.
         if let channelAttachment = attachment as? Attachment<Channel> {
-            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { [generation = channelAttachment.beginWatchStream()] result in
+            let stream = self.yorkieService.watch(headers: self.authHeader.makeHeader(channelAttachment.resource.getFirstKeyPath()), onResult: { [generation = channelAttachment.beginWatchStream(), ownsSession = self.captureSession()] result in
                 Task { @MainActor in
-                    await self.handleChannelWatchResult(result, key: key, attachment: channelAttachment, generation: generation)
+                    await self.handleChannelWatchResult(result, key: key, attachment: channelAttachment, generation: generation, ownsSession: ownsSession)
                 }
             })
 
@@ -1623,6 +1691,7 @@ public class Client {
     }
 
     private func deactivateInternal() throws {
+        self.sessionGeneration += 1
         self.status = .deactivated
 
         // Stop heartbeat timer
@@ -1777,6 +1846,14 @@ public class Client {
         pushPullRequest.pushOnly = pushOnly
         pushPullRequest.disableGc = attachment.disableGC
 
+        let ownsSession = self.captureSession()
+        let ownsAttachment = { @MainActor [weak self] () -> Bool in
+            ownsSession() && (self?.attachmentMap[doc.getKey()] as AnyObject?) === attachment
+        }
+        guard ownsAttachment() else {
+            return doc
+        }
+
         do {
             let docKey = doc.getKey()
 
@@ -1794,6 +1871,12 @@ public class Client {
 
             guard pushpullResponse.error == nil, let message = pushpullResponse.message else {
                 throw self.handleErrorResponse(pushpullResponse.error, defaultMessage: "Unknown pushpull error")
+            }
+
+            // The document may have been detached, or attached again, while this request was in
+            // flight. Never apply its pack to an attachment this sync did not start from.
+            guard ownsAttachment() else {
+                return doc
             }
 
             let responsePack = try Converter.fromChangePack(message.changePack)
@@ -1902,6 +1985,9 @@ public class Client {
 
             return doc
         } catch {
+            guard ownsAttachment() else {
+                return doc
+            }
             doc.publishSyncEvent(.syncFailed)
             publishAuthErrorIfNeeded(error: error as? ConnectError, attachment: attachment, method: .pushPull)
             publishEpochMismatchIfNeeded(error: error as? ConnectError, attachment: attachment)
@@ -1921,9 +2007,36 @@ public class Client {
      * loops that retry on their own (sync, Watch, broadcast retries): their
      * 401s skip the token refresh while it backs off, and a refresh that fails
      * does not throw. A one-shot call throws the `authTokenInjector`'s error.
+     *
+     * `ownsSession` reports whether the caller's session is still the live one (see
+     * ``captureSession()``). Only `errClientNotActivated` / `errClientNotFound` consult it,
+     * because only they tear the client down.
      */
+    /// Captures the session (activation) the caller belongs to.
+    ///
+    /// Work that suspends -- an attach, a sync, a detach, a Watch stream -- can resume on a client
+    /// that was deactivated meanwhile, or activated again under a new client id. Recovery driven by
+    /// the old session's errors, or state from its responses, would then be applied to the new one.
+    /// Call it where the request's client id is read, so the captured id is the one the request
+    /// actually carries.
+    ///
+    /// - Returns: A predicate reporting whether the client is still in the captured session.
+    func captureSession() -> @MainActor () -> Bool {
+        let sessionID = self.id
+        let generation = self.sessionGeneration
+        return { [weak self] in
+            guard let self, generation == self.sessionGeneration else {
+                return false
+            }
+            return self.isActive && self.id == sessionID
+        }
+    }
+
     @discardableResult
-    func handleConnectError(_ error: Error?, inRetryLoop: Bool = false) async throws -> Bool {
+    func handleConnectError(_ error: Error?,
+                            inRetryLoop: Bool = false,
+                            ownsSession: @MainActor () -> Bool = { true }) async throws -> Bool
+    {
         guard let connectError = error as? ConnectError else {
             return false
         }
@@ -1985,8 +2098,11 @@ public class Client {
         }
 
         // NOTE(hackerwins): Some errors should fix the state of the client.
+        // Only the session the failed request belonged to may be torn down: the server's "no such
+        // client" is about an id that may already be gone, with the app activated again since.
         if yorkieErrorCode == YorkieError.Code.errClientNotActivated ||
-            yorkieErrorCode == YorkieError.Code.errClientNotFound
+            yorkieErrorCode == YorkieError.Code.errClientNotFound,
+            ownsSession()
         {
             // Held leases must not survive this teardown. `deactivateInternal` drops the
             // attachments, and with them the only reference to each lease, so a lease not
@@ -2105,6 +2221,7 @@ public extension Client {
     private func broadcast(channelKey: String, request: BroadcastRequest, maxRetries: Int) async throws {
         var retryCount = 0
         let channelAttachment = self.getChannelAttachment(channelKey)
+        let ownsSession = self.captureSession()
 
         while retryCount <= maxRetries {
             let message = await self.yorkieService.broadcast(
@@ -2121,8 +2238,8 @@ public extension Client {
 
                 // Only the retries are a loop: the first try is the app's call.
                 let recovered = retryCount > 0
-                    ? await self.handleLoopConnectError(error)
-                    : try await self.handleConnectError(error)
+                    ? await self.handleLoopConnectError(error, ownsSession: ownsSession)
+                    : try await self.handleConnectError(error, ownsSession: ownsSession)
                 if YorkieError.Code(rawValue: errorCodeOf(error: error)) == .errUnauthenticated,
                    let channel = channelAttachment?.resource
                 {
@@ -2347,10 +2464,20 @@ public extension Client {
             }
         }
 
+        // Captured before the first suspension point: registering the channel on a client torn
+        // down since this attach was requested would leave an attachment nothing detaches.
+        let ownsSession = self.captureSession()
+        var abandoned = false
         do {
             // First-call refresh attaches the session on the server and populates
             // the session id and session count.
             try await self.refreshChannel(channel)
+
+            guard ownsSession() else {
+                abandoned = true
+                throw YorkieError(code: .errClientNotActivated,
+                                  message: "\(self.key) lost its session while attaching \(channel.getKey())")
+            }
 
             // A first-call refresh that returns without a session leaves the channel
             // `.detached`; treat that as a failed attach (the catch below rolls back)
@@ -2374,7 +2501,11 @@ public extension Client {
             try? self.detachInternal(channel.getKey(), attachment)
             channel.setStatus(.detached)
             Logger.error("Failed to attach channel(\(channel.getKey())).", error: error)
-            try await self.handleConnectError(error)
+            // An abandoned attach is a local lifecycle cancellation, not a server error requiring
+            // connection recovery.
+            if !abandoned {
+                try await self.handleConnectError(error, ownsSession: ownsSession)
+            }
             throw error
         }
     }
@@ -2425,8 +2556,15 @@ public extension Client {
             return
         }
 
-        guard let attachment = getChannelAttachment(channel.getKey()) else {
+        guard let attachment = getChannelAttachment(channel.getKey()), attachment.resource === channel else {
             return
+        }
+        // Captured with the client id the request carries. Both the lifecycle and the attachment
+        // are checked before a response is applied: a teardown, or a same-key channel attached
+        // since, owns whatever state a late response would write.
+        let ownsSession = self.captureSession()
+        let ownsAttachment = { @MainActor [weak self] () -> Bool in
+            ownsSession() && (self?.attachmentMap[channel.getKey()] as AnyObject?) === attachment
         }
 
         // First call: no session id yet, so carry `client_key` + `metadata` so the
@@ -2449,9 +2587,14 @@ public extension Client {
         // await. Drop late responses/errors so we don't resurrect events on a channel
         // the app considers gone. Mirrors the JS `!deactivating && !isDetaching` guard
         // around both the success and error publishes.
-        let stillAttached = self.getChannelAttachment(channel.getKey()) != nil
+        let stillAttached = ownsAttachment()
 
         if let error = refreshResponse.error {
+            // In particular, an expired old session must not clear the session of an attachment
+            // that has since been torn down or replaced.
+            guard stillAttached else {
+                return
+            }
             // The server reclaimed our session (TTL expiry, restart, etc.). Clear the
             // local session id so the next refresh re-enters the first-call branch and
             // re-attaches transparently; do not surface this to the caller.
@@ -2526,7 +2669,7 @@ public extension Client {
                 if channelAttachment.resource.isRealtime() {
                     let now = Date().timeIntervalSince1970
                     if now - channelAttachment.lastHeartbeatTime >= self.channelHeartbeatInterval {
-                        let requestClientID = self.id
+                        let ownsSession = self.captureSession()
                         do {
                             try await self.refreshChannel(channelAttachment.resource)
                         } catch {
@@ -2535,7 +2678,7 @@ public extension Client {
                             // Its error belongs to the old session: handling it could tear down the new
                             // one. yorkie-js-sdk runs the heartbeat in the sync loop, behind its
                             // `deactivating` guard; this timer has none, so check the session instead.
-                            guard self.id == requestClientID else {
+                            guard ownsSession() else {
                                 continue
                             }
                             // The heartbeats are a retry loop of their own: in yorkie-js-sdk they run
@@ -2543,7 +2686,7 @@ public extension Client {
                             // loop. Route them the same way, so a 401 refreshes the token (backing off
                             // while the refresh fails) instead of resending the refused token until
                             // the channel session lapses.
-                            _ = await self.handleLoopConnectError(error)
+                            _ = await self.handleLoopConnectError(error, ownsSession: ownsSession)
                         }
                     }
                 }
@@ -2565,10 +2708,11 @@ public extension Client {
             throw YorkieError(code: .errNotAttached, message: "\(channel.getKey()) is not attached")
         }
 
+        let ownsSession = self.captureSession()
         do {
             try await self.refreshChannel(attachment.resource)
         } catch {
-            try await self.handleConnectError(error)
+            try await self.handleConnectError(error, ownsSession: ownsSession)
             throw error
         }
         return attachment.resource.getSessionCount()
