@@ -198,6 +198,11 @@ extension Client {
         case .headers:
             break
         case .message(let message):
+            // A message the stream of a torn-down attachment delivered after the teardown is
+            // routed by key, so it would reach a same-key successor.
+            guard !attachment.cancelled else {
+                return
+            }
             self.recordWatchActivity(of: message, key: key, on: attachment, generation: generation)
             self.handleWatchDocumentsResponse(docKey: key, response: message)
         case .complete(_, let error, _):
@@ -246,6 +251,11 @@ extension Client {
         case .headers:
             break
         case .message(let message):
+            // A message the stream of a torn-down attachment delivered after the teardown is
+            // routed by key, so it would reach a same-key successor.
+            guard !attachment.cancelled else {
+                return
+            }
             self.recordWatchActivity(of: message, key: key, on: attachment, generation: generation)
             self.handleWatchChannelResponse(channelKey: key, response: message)
         case .complete(_, let error, _):

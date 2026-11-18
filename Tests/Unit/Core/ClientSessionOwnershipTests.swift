@@ -251,4 +251,48 @@ final class ClientSessionOwnershipTests: XCTestCase {
         XCTAssertEqual(client.id, secondActor)
         XCTAssertTrue(client.has("d2"))
     }
+
+    // MARK: - Watch stream of a torn-down attachment
+
+    /// iOS counterpart of JS #1522's "a cancelled stream must not clear or reconnect its successor".
+    func test_a_detached_channels_late_stream_end_does_not_reconnect_it_under_a_same_key_successor() async throws {
+        // given - `old` is detached, then a new channel of the same key takes the key
+        let client = self.makeClient()
+        let old = try Channel(key: "same-key")
+        let next = try Channel(key: "same-key")
+        old.setStatus(.attached)
+        let oldAttachment = Attachment(resource: old, resourceID: "s1")
+        client.adoptAttachment(oldAttachment, key: "same-key", actorID: firstActor)
+        try await client.detachChannel(old)
+        next.setStatus(.attached)
+        let nextAttachment = Attachment(resource: next, resourceID: "s2")
+        client.adoptAttachment(nextAttachment, key: "same-key", actorID: firstActor)
+
+        // when - the old stream's completion lands after the re-attach
+        try client.onStreamDisconnect("same-key", with: oldAttachment, error: nil)
+
+        // then - no reconnect is armed for the torn-down attachment
+        XCTAssertTrue(oldAttachment.cancelled)
+        XCTAssertNil(oldAttachment.watchLoopReconnectTimer)
+
+        // and the successor still reconnects its own stream
+        try client.onStreamDisconnect("same-key", with: nextAttachment, error: nil)
+        XCTAssertNotNil(nextAttachment.watchLoopReconnectTimer)
+        nextAttachment.resetWatchLoopTimer()
+    }
+
+    func test_an_evicted_attachments_stream_end_does_not_reconnect_it() throws {
+        // given - a same-key attach evicted `evicted` from the map without tearing it down
+        let client = self.makeClient()
+        let evicted = try Attachment(resource: Channel(key: "same-key"), resourceID: "s1")
+        let held = try Attachment(resource: Channel(key: "same-key"), resourceID: "s2")
+        client.adoptAttachment(evicted, key: "same-key", actorID: firstActor)
+        client.adoptAttachment(held, key: "same-key", actorID: firstActor)
+
+        // when
+        try client.onStreamDisconnect("same-key", with: evicted, error: nil)
+
+        // then - the key belongs to `held`, so nothing reconnects `evicted`
+        XCTAssertNil(evicted.watchLoopReconnectTimer)
+    }
 }

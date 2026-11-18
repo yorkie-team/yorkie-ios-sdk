@@ -841,7 +841,15 @@ public class Client {
             doc.clearHistory()
 
             return doc
-        } catch {
+        } catch var error {
+            // A teardown during the attach can surface as some other error first -- the
+            // initialization wait it woke, or a request it cut off. Report it as the abandoned
+            // attach it is, without connection recovery.
+            if !abandoned, !ownsSession() {
+                abandoned = true
+                error = YorkieError(code: .errClientNotActivated,
+                                    message: "\(self.key) lost its session while attaching \(doc.getKey())")
+            }
             // Roll back whatever this attach had already set up. The setup after the RPC can
             // still throw -- the watch loop, the initialization wait timing out, the
             // initialRoot update -- and by then the attachment owns the lease and the document
@@ -1473,9 +1481,10 @@ public class Client {
             throw YorkieError(code: .errClientNotActivated, message: "$\(key) is not active")
         }
 
-        // NOTE: - Check if the resource is still attached to prevent
-        // watch stream creation after detachment.
-        if !self.attachmentMap.keys.contains(key) {
+        // NOTE: - Check that this attachment is still the one the key holds, to prevent watch
+        // stream creation after detachment. The key alone is not enough: a same-key resource
+        // attached since holds it, and a stream opened here would be routed to it by key.
+        if attachment.cancelled || (self.attachmentMap[key] as AnyObject?) !== attachment {
             self.conditions[ClientCondition.watchLoop] = false
             throw YorkieError(
                 code: .errNotAttached,
@@ -1667,7 +1676,9 @@ public class Client {
         self.disconnectWatchStream(key, with: attachment)
         // check if watch loop is stopped. `.manual` and `.polling` are stream-less
         // modes — never reschedule a watch-stream reconnect for them.
-        guard self.attachmentMap[key] != nil,
+        // A cancelled stream must not reconnect, nor clear the stream of a same-key successor.
+        guard !attachment.cancelled,
+              (self.attachmentMap[key] as AnyObject?) === attachment,
               attachment.syncMode != .manual,
               attachment.syncMode != .polling
         else {
@@ -1698,20 +1709,15 @@ public class Client {
         self.channelHeartbeatTimer?.invalidate()
         self.channelHeartbeatTimer = nil
 
-        // Walk every live attachment, not just the ones `attachmentMap` still names: an
-        // attachment a same-key attach evicted from the map is unreachable by key, and leaving
-        // it here keeps its watch stream open on a client the caller has deactivated. The map is
-        // folded in too so teardown stays complete even if an attachment ever reaches it without
-        // being registered as live.
-        var pending = self.liveAttachments
-        for (key, value) in self.attachmentMap {
-            let attachment = value as AnyObject
-            let id = ObjectIdentifier(attachment)
-            if pending[id] == nil {
-                pending[id] = (key: key, attachment: attachment)
-            }
+        // An attach waiting for its Watch stream's initialization would otherwise block until
+        // `maximumAttachmentTimeout`: wake it, so it sees the lost session and is abandoned with
+        // `errClientNotActivated` at once.
+        for (_, semaphore) in self.semaphoresForInitialzation {
+            semaphore.signal()
         }
-        for (_, entry) in pending {
+        self.semaphoresForInitialzation.removeAll()
+
+        for entry in self.attachmentsToTearDown() {
             // Update status based on resource type, but preserve removed status.
             if let docAttachment = entry.attachment as? Attachment<Document> {
                 if docAttachment.resource.getStatus() != .removed {
@@ -1779,6 +1785,24 @@ public class Client {
         self.reissueClaims[docKey] = actor
     }
 
+    /// Returns every attachment teardown has to reach, with the key each was attached under.
+    ///
+    /// Not just the ones `attachmentMap` still names: an attachment a same-key attach evicted from
+    /// the map is unreachable by key, and leaving it out keeps its watch stream open and its session
+    /// lease held on a client the caller has deactivated. The map is folded in too, so teardown stays
+    /// complete even if an attachment ever reaches it without being registered as live.
+    private func attachmentsToTearDown() -> [(key: String, attachment: AnyObject)] {
+        var pending = self.liveAttachments
+        for (key, value) in self.attachmentMap {
+            let attachment = value as AnyObject
+            let id = ObjectIdentifier(attachment)
+            if pending[id] == nil {
+                pending[id] = (key: key, attachment: attachment)
+            }
+        }
+        return Array(pending.values)
+    }
+
     /// Records `attachment` as the one `key` holds, and as live until `detachInternal` tears it
     /// down.
     private func setAttachment<R: Attachable>(_ attachment: Attachment<R>, for key: String) {
@@ -1810,12 +1834,14 @@ public class Client {
                 self.markReissueClaim(actor, docKey: key)
             }
             attachment.resource.resetOnlineClients()
-            try self.stopWatchLoop(key, with: attachment)
+            // Cancel, not just disconnect: the stream's late completion must neither reconnect
+            // this torn-down attachment nor clear the stream of a same-key successor.
+            attachment.cancelWatchStream()
         } else if let attachment = target as? Attachment<Channel> {
             // Tear down the local-broadcast forwarder installed by `attachChannel`
             // so a re-attach does not leave a stale forwarder behind.
             attachment.resource.unsubscribeLocalBroadcast()
-            try self.stopWatchLoop(key, with: attachment)
+            attachment.cancelWatchStream()
         }
 
         if ownsKey {
@@ -2001,17 +2027,6 @@ public class Client {
         }
     }
 
-    /**
-     * `handleConnectError` handles the given error. If the given error can be
-     * retried after handling, it returns true. `inRetryLoop` is true for the
-     * loops that retry on their own (sync, Watch, broadcast retries): their
-     * 401s skip the token refresh while it backs off, and a refresh that fails
-     * does not throw. A one-shot call throws the `authTokenInjector`'s error.
-     *
-     * `ownsSession` reports whether the caller's session is still the live one (see
-     * ``captureSession()``). Only `errClientNotActivated` / `errClientNotFound` consult it,
-     * because only they tear the client down.
-     */
     /// Captures the session (activation) the caller belongs to.
     ///
     /// Work that suspends -- an attach, a sync, a detach, a Watch stream -- can resume on a client
@@ -2032,6 +2047,17 @@ public class Client {
         }
     }
 
+    /**
+     * `handleConnectError` handles the given error. If the given error can be
+     * retried after handling, it returns true. `inRetryLoop` is true for the
+     * loops that retry on their own (sync, Watch, broadcast retries): their
+     * 401s skip the token refresh while it backs off, and a refresh that fails
+     * does not throw. A one-shot call throws the `authTokenInjector`'s error.
+     *
+     * `ownsSession` reports whether the caller's session is still the live one (see
+     * ``captureSession()``). Only `errClientNotActivated` / `errClientNotFound` consult it,
+     * because only they tear the client down.
+     */
     @discardableResult
     func handleConnectError(_ error: Error?,
                             inRetryLoop: Bool = false,
@@ -3281,8 +3307,10 @@ extension Client {
     ///
     /// Used on deactivate, which ends this client's claim on all of its documents at once.
     func releaseAllSessions() async {
-        for key in self.attachmentMap.keys {
-            guard let attachment = self.getDocumentAttachment(key) else {
+        // The same set teardown walks, so a document a same-key attach evicted from
+        // `attachmentMap` still gives its lease back.
+        for entry in self.attachmentsToTearDown() {
+            guard let attachment = entry.attachment as? Attachment<Document> else {
                 continue
             }
             await self.releaseSession(for: attachment.resource, attachment: attachment)
