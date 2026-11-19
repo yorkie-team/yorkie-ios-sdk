@@ -751,10 +751,14 @@ public class Client {
             // should re-anchor from that too rather than surfacing the rejection. Clients
             // without a store keep today's app-driven epoch-mismatch behaviour.
             if self.store != nil, self.isEpochMismatch(attachResponse.error) {
-                attachResponse = await self.retryAttachAfterReanchor(doc: doc,
-                                                                     request: &attachRequest,
-                                                                     initialPresence: initialPresence,
-                                                                     disablePresence: resolvedDisablePresence)
+                // The recovery resets the document and drops its stored copy, so it runs only
+                // for the session this attach was made in.
+                try assertSession()
+                attachResponse = try await self.retryAttachAfterReanchor(doc: doc,
+                                                                         request: &attachRequest,
+                                                                         initialPresence: initialPresence,
+                                                                         disablePresence: resolvedDisablePresence,
+                                                                         ownsSession: ownsSession)
                 // The retry is a fresh attach, so the purge guard below has nothing persisted
                 // left to compare against.
                 resumed = false
@@ -771,7 +775,7 @@ public class Client {
             // the server never associated it with the live session.
             try assertSession()
 
-            try await self.applyAttachResponse(message, to: doc, disableGC: disableGC, resumed: resumed)
+            try await self.applyAttachResponse(message, to: doc, disableGC: disableGC, resumed: resumed, ownsSession: ownsSession)
             // Dropping a resumed copy's purged state can suspend on the store, and a teardown that
             // finishes meanwhile must not find this attachment registered after it.
             try assertSession()
@@ -857,11 +861,15 @@ public class Client {
     ///   - doc: The document being attached.
     ///   - disableGC: Whether the attach opted out of GC.
     ///   - resumed: Whether the attach resumes a restored copy, whose purged state is dropped first.
-    /// - Throws: `errDocumentRemoved` when the change pack removed the document.
+    ///   - ownsSession: Whether the attach's session is still current, checked after the purge
+    ///     path suspends.
+    /// - Throws: `errDocumentRemoved` when the change pack removed the document, and
+    ///   `errClientNotActivated` when the session was lost while the purge path suspended.
     private func applyAttachResponse(_ message: Yorkie_V1_AttachDocumentResponse,
                                      to doc: Document,
                                      disableGC: Bool,
-                                     resumed: Bool) async throws
+                                     resumed: Bool,
+                                     ownsSession: @MainActor () -> Bool) async throws
     {
         let maxSizePerDocument = message.maxSizePerDocument
         if maxSizePerDocument > 0 {
@@ -883,11 +891,12 @@ public class Client {
         let pack = try Converter.fromChangePack(message.changePack)
 
         if resumed {
-            await self.dropPurgedOfflineState(doc: doc,
-                                              pack: pack,
-                                              documentID: message.documentID,
-                                              disableGC: disableGC,
-                                              disablePresence: message.disablePresence)
+            try await self.dropPurgedOfflineState(doc: doc,
+                                                  pack: pack,
+                                                  documentID: message.documentID,
+                                                  disableGC: disableGC,
+                                                  disablePresence: message.disablePresence,
+                                                  ownsSession: ownsSession)
         }
 
         try doc.applyChangePack(pack)
@@ -2937,6 +2946,19 @@ extension Client {
                                                })
     }
 
+    /// Throws when the session an attach was made in is no longer current.
+    ///
+    /// - Parameters:
+    ///   - ownsSession: The attach's session check.
+    ///   - doc: The document being attached.
+    /// - Throws: ``YorkieError`` with `errClientNotActivated` when the session was lost.
+    func assertOwnsSession(_ ownsSession: @MainActor () -> Bool, attaching doc: Document) throws {
+        guard ownsSession() else {
+            throw YorkieError(code: .errClientNotActivated,
+                              message: "\(self.key) lost its session while attaching \(doc.getKey())")
+        }
+    }
+
     /// Re-anchors a document whose resume the server rejected for a stale epoch, and retries
     /// the attach once.
     ///
@@ -2951,11 +2973,15 @@ extension Client {
     ///   - request: The attach request, re-packed here with the re-anchored change pack.
     ///   - initialPresence: The presence to seed, since the re-anchor cleared the restored map.
     ///   - disablePresence: Whether presence is disabled, in which case nothing is seeded.
+    ///   - ownsSession: Whether the attach's session is still current, checked after the store
+    ///     removal suspends and before presence is seeded or the retry is sent.
     /// - Returns: The response to the retried attach.
+    /// - Throws: `errClientNotActivated` when the session was lost during the store removal.
     func retryAttachAfterReanchor(doc: Document,
                                   request: inout Yorkie_V1_AttachDocumentRequest,
                                   initialPresence: InitialPresence,
-                                  disablePresence: Bool) async
+                                  disablePresence: Bool,
+                                  ownsSession: @MainActor () -> Bool = { true }) async throws
         -> ResponseMessage<Yorkie_V1_AttachDocumentResponse>
     {
         let docKey = doc.getKey()
@@ -2963,6 +2989,8 @@ extension Client {
         doc.publishLocalChangesDroppedEvent(reason: .epochReanchor, changes: doc.getPendingChangeStructs())
         self.reanchor(doc)
         try? await self.store?.remove(docKey: self.storeKey(docKey))
+        // Seeding presence and the retry belong to the session the attach was made in.
+        try self.assertOwnsSession(ownsSession, attaching: doc)
 
         // The retry is a fresh attach, so it needs the initial presence the resume path
         // skipped. Without this the client attaches with no presence entry at all: peers
@@ -3004,11 +3032,15 @@ extension Client {
     ///   - documentID: The document id the server returned for this attach.
     ///   - disableGC: The attach's garbage-collection opt-out, restated after a reset.
     ///   - disablePresence: The server-fixated presence gating, restated after a reset.
+    ///   - ownsSession: Whether the attach's session is still current. Checked after the store
+    ///     removal suspends, before the document is reset.
+    /// - Throws: `errClientNotActivated` when the session was lost during the store removal.
     func dropPurgedOfflineState(doc: Document,
                                 pack: ChangePack,
                                 documentID: String,
                                 disableGC: Bool,
-                                disablePresence: Bool) async
+                                disablePresence: Bool,
+                                ownsSession: @MainActor () -> Bool = { true }) async throws
     {
         let persistedDocID = doc.getDocID()
         let idChanged = persistedDocID.isEmpty == false && documentID != persistedDocID
@@ -3021,6 +3053,8 @@ extension Client {
             "(document id or server seq reset); dropping persisted offline state")
         doc.publishLocalChangesDroppedEvent(reason: .documentPurged, changes: doc.getPendingChangeStructs())
         try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
+        // A teardown that finished during the removal owns the document now.
+        try self.assertOwnsSession(ownsSession, attaching: doc)
         self.reanchor(doc)
         // Restated because the reset cleared them along with the rest of the local state.
         doc.setDisableGC(disableGC)
@@ -3603,7 +3637,14 @@ extension Client {
         guard let attachment else {
             return
         }
-        await self.releaseSession(for: doc, attachment: attachment)
+        // A teardown that already cancelled the attachment has stopped its persistence, and the
+        // document's persistence hook may belong to an attach made since, possibly by another
+        // client. Only this attachment's own lease is left to give back.
+        if attachment.cancelled {
+            await self.releaseLease(of: attachment)
+        } else {
+            await self.releaseSession(for: doc, attachment: attachment)
+        }
         // Releasing the session can suspend. A teardown, or a detach, that ran meanwhile has
         // already detached the document (cancelling this attachment), and the status may since
         // belong to an attach by another client. Until then the document is still this

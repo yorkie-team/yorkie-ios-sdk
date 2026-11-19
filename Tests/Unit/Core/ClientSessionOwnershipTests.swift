@@ -527,4 +527,73 @@ final class ClientSessionOwnershipTests: XCTestCase {
         // then - the late attachment's lease is released before the teardown that follows
         XCTAssertTrue(lateLease.released)
     }
+
+    // MARK: - Recovery paths that resume after the session moved on
+
+    func test_a_rollback_of_an_already_cancelled_attachment_leaves_the_documents_persistence_alone() async {
+        // given - a teardown cancelled the failed attach's attachment, and the document has been
+        // attached since, so its persistence hook is the new attachment's
+        let client = self.makeClient()
+        let doc = Document(key: "doc")
+        let attachment = Attachment(resource: doc, resourceID: "r", syncMode: .manual)
+        let lease = HookedLease()
+        attachment.sessionLockHandle = lease
+        client.adoptAttachment(attachment, key: "doc", actorID: firstActor)
+        attachment.cancelWatchStream()
+        doc.onLocalChange = {}
+
+        // when
+        await client.rollBackFailedAttach(doc, attachment: attachment)
+
+        // then - only the attachment's own lease is given back
+        XCTAssertTrue(lease.released)
+        XCTAssertNotNil(doc.onLocalChange)
+    }
+
+    func test_dropPurgedOfflineState_stops_before_the_reset_once_the_session_is_lost() async throws {
+        // given - a resumed copy whose document the server purged (the document id changed)
+        let client = self.makeClient()
+        let doc = Document(key: "doc")
+        doc.setDocID("persisted-id")
+        let pack = ChangePack(key: "doc", checkpoint: .initial, isRemoved: false, changes: [], versionVector: nil)
+
+        // when - the session is gone by the time the store removal returns
+        do {
+            try await client.dropPurgedOfflineState(doc: doc, pack: pack, documentID: "new-id",
+                                                    disableGC: false, disablePresence: false,
+                                                    ownsSession: { false })
+            XCTFail("the purge recovery must stop")
+        } catch {
+            // then - it stops before resetting the document
+            XCTAssertEqual((error as? YorkieError)?.code, .errClientNotActivated)
+        }
+        XCTAssertEqual(doc.getDocID(), "persisted-id")
+
+        // and the current session's recovery still resets it
+        try await client.dropPurgedOfflineState(doc: doc, pack: pack, documentID: "new-id",
+                                                disableGC: false, disablePresence: false,
+                                                ownsSession: { true })
+        XCTAssertEqual(doc.getDocID(), "")
+    }
+
+    func test_retryAttachAfterReanchor_sends_no_retry_once_the_session_is_lost() async {
+        // given
+        let client = self.makeClient()
+        client.adoptAttachment(Attachment(resource: Document(key: "other"), resourceID: "r", syncMode: .manual),
+                               key: "other", actorID: firstActor)
+        let doc = Document(key: "doc")
+        var request = Yorkie_V1_AttachDocumentRequest()
+
+        // when - the session is gone by the time the store removal returns
+        do {
+            _ = try await client.retryAttachAfterReanchor(doc: doc, request: &request,
+                                                          initialPresence: .values(["name": "a"]),
+                                                          disablePresence: false,
+                                                          ownsSession: { false })
+            XCTFail("the retry must not be sent")
+        } catch {
+            // then - it fails as an abandoned attach instead of retrying
+            XCTAssertEqual((error as? YorkieError)?.code, .errClientNotActivated)
+        }
+    }
 }
