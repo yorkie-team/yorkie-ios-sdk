@@ -43,8 +43,12 @@ extension Client {
         build: () -> PbChangePack,
         send: (PbChangePack) async -> ResponseMessage<Response>
     ) async -> ResponseMessage<Response> {
+        let ownsSession = self.captureSession()
         let response = await send(build())
-        guard let error = response.error,
+        // A session torn down while the request was in flight gets no resend: the retry would
+        // carry the old client id and restore presence patches into a document teardown let go.
+        guard ownsSession(),
+              let error = response.error,
               isErrorCode(error, YorkieError.Code.errPresenceBaseUnavailable.rawValue)
         else {
             return response

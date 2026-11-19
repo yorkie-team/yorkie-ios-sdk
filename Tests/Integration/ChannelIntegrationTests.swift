@@ -28,7 +28,7 @@ final class ChannelIntegrationTests: XCTestCase {
 
     @MainActor
     func test_should_subscribe_to_specific_topic_for_broadcast_events() async throws {
-        try await withTwoClientsAndChannels(self.description) { _, ch1, _, ch2 in
+        try await withTwoClientsAndChannels(self.description, waitForWatch: true) { _, ch1, _, ch2 in
             let chatCollector = ChannelEventCollector<Payload>()
             let notificationCollector = ChannelEventCollector<Payload>()
 
@@ -85,7 +85,7 @@ final class ChannelIntegrationTests: XCTestCase {
 
     @MainActor
     func test_should_support_legacy_broadcast_subscription() async throws {
-        try await withTwoClientsAndChannels(self.description) { _, ch1, _, ch2 in
+        try await withTwoClientsAndChannels(self.description, waitForWatch: true) { _, ch1, _, ch2 in
             let collector = ChannelEventCollector<String>()
             let topic = "test-topic"
 
@@ -105,7 +105,7 @@ final class ChannelIntegrationTests: XCTestCase {
 
     @MainActor
     func test_should_mix_topic_based_and_type_based_subscriptions() async throws {
-        try await withTwoClientsAndChannels(self.description) { _, ch1, _, ch2 in
+        try await withTwoClientsAndChannels(self.description, waitForWatch: true) { _, ch1, _, ch2 in
             let chatCollector = ChannelEventCollector<String>()
             let allCollector = ChannelEventCollector<String>()
 
@@ -140,9 +140,18 @@ final class ChannelIntegrationTests: XCTestCase {
 /// Mirrors `withTwoClientsAndDocuments` but for Channels: activates two clients,
 /// attaches a channel with the same key on each, runs the test body, then
 /// detaches and deactivates.
+/// Attaches one channel on each of two clients and runs `callback`.
+///
+/// - Parameters:
+///   - title: The test description the channel key derives from.
+///   - waitForWatch: Waits for both Watch streams to be subscribed on the server before running
+///     `callback`. `attachChannel` returns before that, and a broadcast sent earlier never reaches
+///     a client. Off for tests that observe the streams' initialization events themselves.
+///   - callback: The test body.
 @MainActor
 private func withTwoClientsAndChannels(
     _ title: String,
+    waitForWatch: Bool = false,
     callback: (Client, Channel, Client, Channel) async throws -> Void
 ) async throws {
     let rpcAddress = "http://localhost:8080"
@@ -151,8 +160,17 @@ private func withTwoClientsAndChannels(
         .replacingOccurrences(of: " ", with: "-")
         .filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "." }
 
-    let c1 = Client(rpcAddress)
-    let c2 = Client(rpcAddress)
+    // Mocking only enables the test seams; both clients talk to the real server. The seam lets
+    // the helper see each Watch stream's initialization.
+    let c1 = Client(rpcAddress, ClientOptions(), isMockingEnabled: true)
+    let c2 = Client(rpcAddress, ClientOptions(), isMockingEnabled: true)
+    let initialized = ChannelEventCollector<Int>()
+    c1.observeWatchResponses { response in
+        if case .initialization = response.body { initialized.add(1) }
+    }
+    c2.observeWatchResponses { response in
+        if case .initialization = response.body { initialized.add(2) }
+    }
 
     try await c1.activate()
     try await c2.activate()
@@ -162,6 +180,12 @@ private func withTwoClientsAndChannels(
 
     _ = try await c1.attachChannel(ch1)
     _ = try await c2.attachChannel(ch2)
+
+    if waitForWatch {
+        try await ChannelEventCollector<Int>.waitUntil(timeout: 5.0) {
+            Set(initialized.values) == [1, 2]
+        }
+    }
 
     let result: Result<Void, Error>
     do {

@@ -2611,9 +2611,32 @@ class CRDTTree: CRDTElement {
      * ``findPosUnchecked(_:_:)``: the caller named a node by path, and refusing the range
      * because the index one past that node happens to land inside a surrogate pair would
      * reject a request that is valid as given.
+     *
+     * The path has to name an existing node or character, because the derived range is one
+     * index wide around it. ``pathToTreePos(_:)`` is laxer: it accepts the offset one past the
+     * parent's content, which is where an insertion goes. For an element parent that offset is
+     * the parent's closing tag, and for a text-only parent it is the end of the last character,
+     * which resolves to the same closing tag; either way the derived range would cover the
+     * parent and style it instead of failing.
      */
     func pathToPosRange(_ path: [Int]) throws -> TreePosRange {
-        let fromIdx = try self.pathToIndex(path)
+        let treePos = try self.indexTree.pathToTreePos(path)
+        let node = treePos.node
+        let offset = Int(treePos.offset)
+        // A path into a text-only parent names a character offset rather than a node, so it
+        // is bounded by the text node's own length. The offset at the end of one text node
+        // still names the first character of the next one, so it is only out of range once
+        // there is no following sibling. A negative offset is already rejected by
+        // `pathToTreePos`, which every path-taking entry point shares, so only the upper bound
+        // is left here.
+        let pastTheEnd = node.isText
+            ? offset >= node.size && node.nextSibling == nil
+            : offset >= node.children.count
+        if pastTheEnd {
+            throw YorkieError(code: .errInvalidArgument, message: "unacceptable path")
+        }
+
+        let fromIdx = try self.indexTree.indexOf(treePos)
 
         return try (self.findPos(fromIdx), self.findPosUnchecked(fromIdx + 1))
     }

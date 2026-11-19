@@ -39,8 +39,11 @@ final class ChannelViewModel: ObservableObject {
     /// Live member count per room id, populated via `peekChannel` without joining.
     @Published var memberCounts: [String: Int] = [:]
 
-    private let client = Client(Constant.serverAddress)
-    private var didActivate = false
+    /// The one client the whole app uses, as `YorkieProvider` does in the JS example: the room
+    /// list peeks counts with it, and each room attaches and detaches its channel on it. Leaving a
+    /// room and entering it again is therefore a detach and an attach of the same key on one client.
+    let client = Client(Constant.serverAddress)
+    private var activation: Task<Void, Error>?
 
     /// Returns the rooms that belong to the given category.
     func channels(in category: ChannelCategory) -> [ChannelModel] {
@@ -57,10 +60,7 @@ final class ChannelViewModel: ObservableObject {
     /// subscribing. The caller (this list) polls on its own cadence.
     func refreshMemberCounts() async {
         do {
-            if !self.didActivate {
-                try await self.client.activate()
-                self.didActivate = true
-            }
+            try await self.ensureActive()
         } catch {
             return
         }
@@ -77,11 +77,18 @@ final class ChannelViewModel: ObservableObject {
         }
     }
 
-    /// Deactivates the peek client when the list goes away.
-    func stop() async {
-        guard self.didActivate else { return }
-        try? await self.client.deactivate()
-        self.didActivate = false
+    /// Activates the shared client once, however many callers ask at the same time.
+    func ensureActive() async throws {
+        if self.client.isActive {
+            return
+        }
+        if let activation = self.activation {
+            return try await activation.value
+        }
+        let activation = Task { try await self.client.activate() }
+        self.activation = activation
+        defer { self.activation = nil }
+        try await activation.value
     }
 
     private static let defaultCategories: [ChannelCategory] = [
