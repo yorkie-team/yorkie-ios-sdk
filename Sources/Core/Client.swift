@@ -1881,11 +1881,12 @@ public class Client {
             }
 
             if doc.status == .removed {
-                // Nothing will call `detachInternal` for this document, so release what
-                // offline persistence is holding before the attachment is dropped.
+                // Release what offline persistence is holding, then tear the attachment down as
+                // upstream does: `detachInternal` cancels its Watch stream, which nothing could
+                // reach otherwise, and leaves the key alone if a newer attachment took it while
+                // the release suspended.
                 await self.releaseSession(for: doc, attachment: attachment)
-                self.attachmentMap.removeValue(forKey: docKey)
-                self.liveAttachments.removeValue(forKey: ObjectIdentifier(attachment))
+                try? self.detachInternal(docKey, attachment)
             }
 
             // The push the server rejected is behind us, so let the sync loop take this document
