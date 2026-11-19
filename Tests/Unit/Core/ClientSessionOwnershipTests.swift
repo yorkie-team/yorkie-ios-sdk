@@ -341,6 +341,33 @@ final class ClientSessionOwnershipTests: XCTestCase {
         XCTAssertEqual(held.resource.getSessionCount(), 5)
     }
 
+    func test_a_displaced_document_attachments_watch_message_does_not_reach_the_same_key_successor() async {
+        // given - a same-key attach displaced `displaced` without tearing it down
+        let client = self.makeClient()
+        let displaced = Attachment(resource: Document(key: "same-key"), resourceID: "r1", syncMode: .manual)
+        let held = Attachment(resource: Document(key: "same-key"), resourceID: "r2", syncMode: .manual)
+        client.adoptAttachment(displaced, key: "same-key", actorID: firstActor)
+        client.adoptAttachment(held, key: "same-key", actorID: firstActor)
+        var documentInit = Yorkie_V1_DocumentInit()
+        documentInit.clientIds = [secondActor, thirdActor]
+        var resourceInit = Yorkie_V1_ResourceInit()
+        resourceInit.documentInit = documentInit
+        var response = WatchResponse()
+        response.initialization.resourceInits = [resourceInit]
+
+        // when - the displaced attachment's stream delivers a message
+        await client.handleDocumentWatchResult(.message(response), key: "same-key",
+                                               attachment: displaced, generation: displaced.watchGeneration)
+
+        // then - it is dropped instead of being routed by key to `held`
+        XCTAssertTrue(held.resource.onlineClients.isEmpty)
+
+        // and `held` still receives its own stream's messages
+        await client.handleDocumentWatchResult(.message(response), key: "same-key",
+                                               attachment: held, generation: held.watchGeneration)
+        XCTAssertEqual(held.resource.onlineClients, [secondActor, thirdActor])
+    }
+
     func test_a_stale_teardown_keeps_the_forwarder_of_the_same_channel_attached_again() throws {
         // given - one Channel detached and attached again: the newer attachment owns its forwarder
         let client = self.makeClient()
