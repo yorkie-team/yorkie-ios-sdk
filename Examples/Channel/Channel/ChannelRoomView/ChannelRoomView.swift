@@ -22,8 +22,8 @@ struct ChannelRoomView: View {
 
     @StateObject var viewModel: ChannelRoomViewModel
 
-    init(channel: ChannelModel) {
-        self._viewModel = StateObject(wrappedValue: ChannelRoomViewModel(channel: channel))
+    init(channel: ChannelModel, rooms: ChannelViewModel) {
+        self._viewModel = StateObject(wrappedValue: ChannelRoomViewModel(channel: channel, rooms: rooms))
     }
 
     var body: some View {
@@ -115,5 +115,6 @@ struct RoomErrorView: View {
 }
 
 #Preview {
-    ChannelRoomView(channel: ChannelModel(id: "development.1", name: "💻 Development #1", roomDescription: "Tech talk and coding", categoryId: "development"))
+    ChannelRoomView(channel: ChannelModel(id: "development.1", name: "💻 Development #1", roomDescription: "Tech talk and coding", categoryId: "development"),
+                    rooms: ChannelViewModel())
 }

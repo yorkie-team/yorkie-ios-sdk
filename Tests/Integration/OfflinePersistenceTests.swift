@@ -449,7 +449,7 @@ final class OfflinePersistenceTests: XCTestCase {
         XCTAssertTrue(client.has(docKey))
 
         // when
-        await client.rollBackFailedAttach(doc)
+        await client.rollBackFailedAttach(doc, attachment: client.getDocumentAttachment(docKey))
 
         // then: nothing the attach took is still held.
         XCTAssertFalse(client.has(docKey), "the attachment must not survive the rollback")

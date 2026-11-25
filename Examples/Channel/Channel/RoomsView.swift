@@ -46,7 +46,7 @@ struct RoomsView: View {
                 .ignoresSafeArea()
         }
         .navigationDestination(for: ChannelModel.self) { channel in
-            ChannelRoomView(channel: channel)
+            ChannelRoomView(channel: channel, rooms: self.viewModel)
         }
         .task {
             // Poll each room's live member count without joining, using peekChannel.
@@ -54,9 +54,6 @@ struct RoomsView: View {
                 await self.viewModel.refreshMemberCounts()
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
-        }
-        .onDisappear {
-            Task { await self.viewModel.stop() }
         }
     }
 }
