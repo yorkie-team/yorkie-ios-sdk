@@ -90,6 +90,20 @@ private final class Gate: @unchecked Sendable {
     }
 }
 
+/// A lease whose release runs `onRelease` first: the last await of the detach's persistence
+/// cleanup, after the document is already marked detached.
+private final class HookedLease: SessionLockHandle, @unchecked Sendable {
+    private let onRelease: @MainActor () async -> Void
+
+    init(onRelease: @escaping @MainActor () async -> Void) {
+        self.onRelease = onRelease
+    }
+
+    func release() async {
+        await self.onRelease()
+    }
+}
+
 final class ResyncIntegrationTests: XCTestCase {
     let rpcAddress = "http://localhost:8080"
 
@@ -657,5 +671,41 @@ final class ResyncIntegrationTests: XCTestCase {
         XCTAssertEqual(attaches.value, 0)
         XCTAssertFalse(client.has(key))
         XCTAssertFalse(doc.getDocID().isEmpty, "a re-anchor would have reset the document")
+    }
+
+    @MainActor
+    func test_does_not_reanchor_a_document_registered_again_during_the_persistence_cleanup() async throws {
+        // given: a new attachment of the document is registered while the resync's detach awaits
+        // its persistence cleanup, after the document is already marked detached.
+        //
+        // It is registered directly: a real attach cannot get through this window today. The
+        // document refuses to mint its initial presence while it waits to be re-anchored, and
+        // with presence disabled the server refuses the attach, as the document still carries
+        // the id it just detached. The guard is there so the re-anchor never depends on that.
+        let key = self.docKey
+        let client = try await self.makeClient()
+        let doc = Document(key: key)
+        try await client.attach(doc, [:], .manual)
+        try doc.update { root, _ in
+            root.text = "refused edit"
+        }
+        let actorID = try XCTUnwrap(client.id)
+        let attachment = try XCTUnwrap(client.getDocumentAttachment(key))
+        let newAttachment = Attachment(resource: doc, resourceID: "new", syncMode: .manual)
+        attachment.sessionLockHandle = HookedLease {
+            client.adoptAttachment(newAttachment, key: key, actorID: actorID)
+        }
+
+        // when
+        do {
+            try await client.resync(doc, discardLocalChanges: true)
+            XCTFail("the resync must not re-anchor a document someone else attached")
+        } catch {
+            // then: it stops and leaves the document to its new attachment.
+            XCTAssertEqual((error as? YorkieError)?.code, .errNotDetached, "\(error)")
+        }
+        XCTAssertTrue(client.getDocumentAttachment(key) === newAttachment)
+        XCTAssertFalse(doc.getDocID().isEmpty, "a re-anchor would have reset the new attachment's document")
+        try client.detachInternal(key)
     }
 }

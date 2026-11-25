@@ -70,8 +70,9 @@ extension Client {
     /// before the re-attach, which can still fail.
     ///
     /// If a teardown or another detach takes the document over while the detach is in flight,
-    /// the recovery stops there: the changes are still reported as dropped, but the document is
-    /// neither re-anchored nor re-attached, and the call throws.
+    /// or the app attaches it again before the re-anchor, the recovery stops there: the changes
+    /// are still reported as dropped, but the document is neither re-anchored nor re-attached,
+    /// and the call throws.
     ///
     /// The whole recovery runs under the client's sync semaphore, so no sync can start or be in
     /// flight while the queue is touched.
@@ -90,6 +91,8 @@ extension Client {
     /// - Throws: ``YorkieError/Code/errClientNotActivated`` when the client is not active or
     ///   loses its session during the detach, ``YorkieError/Code/errNotAttached`` when the
     ///   document is not attached or another call detaches it during the detach,
+    ///   ``YorkieError/Code/errNotDetached`` when the document is attached again before the
+    ///   re-anchor,
     ///   ``YorkieError/Code/errInvalidArgument`` when `discardLocalChanges` is `false`, or the
     ///   error of the detach or the re-attach.
     @discardableResult
@@ -224,6 +227,20 @@ extension Client {
             }
             throw YorkieError(code: .errNotAttached,
                               message: "\(doc.getKey()) was detached by another call while resyncing")
+        }
+
+        // The detach marks the document detached before it awaits the persistence cleanup, and
+        // the app may attach the same instance again in that wait. If it did, the document has
+        // a new owner, and the re-anchor would reset the state that attachment uses.
+        guard ownsSession() else {
+            throw YorkieError(code: .errClientNotActivated,
+                              message: "\(self.key) lost its session while resyncing \(doc.getKey())")
+        }
+        guard doc.status != .attached, self.getDocumentAttachment(doc.getKey()) == nil else {
+            Logger.warning("[RS] c:\"\(self.key)\" resync d:\"\(doc.getKey())\" was attached again during detach; " +
+                "not re-anchoring")
+            throw YorkieError(code: .errNotDetached,
+                              message: "\(doc.getKey()) was attached again while resyncing")
         }
 
         self.reanchor(doc)
