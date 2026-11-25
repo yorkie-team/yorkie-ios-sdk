@@ -69,6 +69,10 @@ extension Client {
     /// as a ``LocalChangesDroppedEvent`` with reason ``LocalChangesDroppedValue/Reason/writeDenied``,
     /// before the re-attach, which can still fail.
     ///
+    /// If a teardown or another detach takes the document over while the detach is in flight,
+    /// the recovery stops there: the changes are still reported as dropped, but the document is
+    /// neither re-anchored nor re-attached, and the call throws.
+    ///
     /// The whole recovery runs under the client's sync semaphore, so no sync can start or be in
     /// flight while the queue is touched.
     ///
@@ -83,8 +87,9 @@ extension Client {
     ///     presence, so the user keeps their cursor: presence is not what the server refused.
     /// - Returns: The discarded changes, so the app can report them. Re-applying them is
     ///   deliberately not the default.
-    /// - Throws: ``YorkieError/Code/errClientNotActivated`` when the client is not active,
-    ///   ``YorkieError/Code/errNotAttached`` when the document is not attached,
+    /// - Throws: ``YorkieError/Code/errClientNotActivated`` when the client is not active or
+    ///   loses its session during the detach, ``YorkieError/Code/errNotAttached`` when the
+    ///   document is not attached or another call detaches it during the detach,
     ///   ``YorkieError/Code/errInvalidArgument`` when `discardLocalChanges` is `false`, or the
     ///   error of the detach or the re-attach.
     @discardableResult
@@ -177,14 +182,17 @@ extension Client {
         // server has already refused them for.
         await self.discardPersistedState(for: doc)
 
+        // Captured before the detach, to tell a lost session from a key another attachment took.
+        let ownsSession = self.captureSession()
         let discarded = doc.discardLocalChanges()
         Logger.info("[RS] c:\"\(self.key)\" resync d:\"\(doc.getKey())\", discarded:\(discarded.count)")
 
+        let detached: Bool
         do {
             // The queue is empty and the counter is past the acked checkpoint, so any change
             // minted here would present a `clientSeq` hole. The presence clear is skipped for
             // that reason; the server drops this client's presence on detach anyway.
-            _ = try await self.detachDocument(doc, skipPresenceClear: true)
+            detached = try await self.detachDocument(doc, skipPresenceClear: true)
         } catch {
             // The detach did not happen: hand the refused changes back so the document is left
             // as it was found, attached, queue intact, counter untouched.
@@ -202,6 +210,21 @@ extension Client {
         // Past here the changes are gone for good, so report them before the step that can still
         // fail: an app listening for the data-loss event gets them even if the re-attach throws.
         doc.publishLocalChangesDroppedEvent(reason: .writeDenied, changes: discarded)
+
+        // A teardown, or another attachment of the key, took the document over while the detach
+        // was in flight. It owns the document now: re-anchoring would reset the state a newer
+        // attachment uses, and re-attaching would attach it under a session that never asked to.
+        // The refused changes stay dropped, since handing them back would only replay them.
+        guard detached else {
+            Logger.warning("[RS] c:\"\(self.key)\" resync d:\"\(doc.getKey())\" lost the document during detach; " +
+                "not re-attaching")
+            guard ownsSession() else {
+                throw YorkieError(code: .errClientNotActivated,
+                                  message: "\(self.key) lost its session while resyncing \(doc.getKey())")
+            }
+            throw YorkieError(code: .errNotAttached,
+                              message: "\(doc.getKey()) was detached by another call while resyncing")
+        }
 
         self.reanchor(doc)
         _ = try await self.attachInternal(doc,

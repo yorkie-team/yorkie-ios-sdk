@@ -579,4 +579,83 @@ final class ResyncIntegrationTests: XCTestCase {
         try await client.resync(doc, discardLocalChanges: true)
         try await client.detach(doc)
     }
+
+    // MARK: - Ownership lost during the detach
+
+    @MainActor
+    func test_stops_without_reattaching_when_the_session_is_lost_during_the_detach() async throws {
+        // given: the client is deactivated while the resync's DetachDocument is in flight.
+        let client = try await self.makeClient()
+        let doc = Document(key: self.docKey)
+        try await client.attach(doc, [:], .manual)
+        try doc.update { root, _ in
+            root.text = "refused edit"
+        }
+        let attaches = Box(0)
+        client.observeRequests(for: Self.attach) { _ in attaches.value += 1 }
+        var dropped = [LocalChangesDroppedValue]()
+        doc.subscribe { event, _ in
+            if let event = event as? LocalChangesDroppedEvent {
+                dropped.append(event.value)
+            }
+        }
+        let fired = Box(false)
+        client.setResponseHook(for: Self.detach) { _ in
+            guard !fired.value else { return }
+            fired.value = true
+            try? await client.deactivate()
+        }
+
+        // when
+        do {
+            try await client.resync(doc, discardLocalChanges: true)
+            XCTFail("the resync must not report a recovery it did not make")
+        } catch {
+            // then: it fails as a lost session, and neither re-anchors nor re-attaches.
+            XCTAssertEqual((error as? YorkieError)?.code, .errClientNotActivated, "\(error)")
+        }
+        XCTAssertEqual(attaches.value, 0, "no re-attach under a session that never asked for one")
+        XCTAssertEqual(doc.status, .detached)
+        XCTAssertFalse(doc.getDocID().isEmpty, "the teardown owns the document; a re-anchor would have reset it")
+        // The refused changes are gone either way, so the app is still told.
+        XCTAssertEqual(dropped.map(\.reason), [.writeDenied])
+    }
+
+    @MainActor
+    func test_stops_without_reattaching_when_another_detach_takes_the_document() async throws {
+        // given: in the same session, the attachment is taken out of the map while the resync's
+        // DetachDocument is in flight, as a concurrent detach that won the race would. The
+        // teardown is local because the server has already processed the resync's detach, so a
+        // second DetachDocument from here would only fail. (A re-activation cannot be driven
+        // from this hook either: activate starts the sync loop, which waits for the sync
+        // semaphore the resync holds.)
+        let key = self.docKey
+        let client = try await self.makeClient()
+        let doc = Document(key: key)
+        try await client.attach(doc, [:], .manual)
+        try doc.update { root, _ in
+            root.text = "refused edit"
+        }
+        let attaches = Box(0)
+        client.observeRequests(for: Self.attach) { _ in attaches.value += 1 }
+        let fired = Box(false)
+        client.setResponseHook(for: Self.detach) { _ in
+            guard !fired.value else { return }
+            fired.value = true
+            try? client.detachInternal(key)
+        }
+
+        // when
+        do {
+            try await client.resync(doc, discardLocalChanges: true)
+            XCTFail("the resync must not report a recovery it did not make")
+        } catch {
+            // then: the session is intact, so it fails as a document someone else detached,
+            // and it does not attach the document back behind that call's back.
+            XCTAssertEqual((error as? YorkieError)?.code, .errNotAttached, "\(error)")
+        }
+        XCTAssertEqual(attaches.value, 0)
+        XCTAssertFalse(client.has(key))
+        XCTAssertFalse(doc.getDocID().isEmpty, "a re-anchor would have reset the document")
+    }
 }

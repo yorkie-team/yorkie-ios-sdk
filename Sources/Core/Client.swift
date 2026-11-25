@@ -920,6 +920,7 @@ public class Client {
     @discardableResult
     public func detach(_ doc: Document) async throws -> Document {
         try await self.detachDocument(doc, skipPresenceClear: false)
+        return doc
     }
 
     /// The detach behind ``detach(_:)``.
@@ -929,7 +930,11 @@ public class Client {
     ///   - skipPresenceClear: Suppresses the presence-clear change a detach normally mints. For
     ///     ``resync(_:discardLocalChanges:initialPresence:)``, whose premise is that this client
     ///     may mint no further change. The server drops the client's presence on detach regardless.
-    func detachDocument(_ doc: Document, skipPresenceClear: Bool) async throws -> Document {
+    /// - Returns: `true` when this call detached the document, `false` when a teardown or another
+    ///   attachment of the key took it over while the request was in flight. A `false` detach
+    ///   touched nothing, so a caller that goes on to act on the document must not.
+    @discardableResult
+    func detachDocument(_ doc: Document, skipPresenceClear: Bool) async throws -> Bool {
         guard self.isActive else {
             throw YorkieError(code: .errClientNotActivated, message: "\(self.key) is not active")
         }
@@ -976,7 +981,7 @@ public class Client {
             }
 
             guard ownsAttachment() else {
-                return doc
+                return false
             }
             let pack = try Converter.fromChangePack(message.changePack)
 
@@ -992,10 +997,10 @@ public class Client {
 
             Logger.info("[DD] c:\"\(self.key)\" detaches d:\"\(doc.getKey())\"")
 
-            return doc
+            return true
         } catch {
             guard ownsAttachment() else {
-                return doc
+                return false
             }
             Logger.error("Failed to request detach document(\(self.key)).", error: error)
             try await self.handleConnectError(error, ownsSession: ownsSession)
