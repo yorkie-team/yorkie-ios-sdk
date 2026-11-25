@@ -550,7 +550,7 @@ final class ClientSessionOwnershipTests: XCTestCase {
         XCTAssertNotNil(doc.onLocalChange)
     }
 
-    func test_dropPurgedOfflineState_stops_before_the_reset_once_the_session_is_lost() async throws {
+    func test_dropPurgedOfflineState_resets_the_document_before_it_stops_once_the_session_is_lost() async throws {
         // given - a resumed copy whose document the server purged (the document id changed)
         let client = self.makeClient()
         let doc = Document(key: "doc")
@@ -564,15 +564,11 @@ final class ClientSessionOwnershipTests: XCTestCase {
                                                     ownsSession: { false })
             XCTFail("the purge recovery must stop")
         } catch {
-            // then - it stops before resetting the document
+            // then - it fails as an abandoned attach
             XCTAssertEqual((error as? YorkieError)?.code, .errClientNotActivated)
         }
-        XCTAssertEqual(doc.getDocID(), "persisted-id")
-
-        // and the current session's recovery still resets it
-        try await client.dropPurgedOfflineState(doc: doc, pack: pack, documentID: "new-id",
-                                                disableGC: false, disablePresence: false,
-                                                ownsSession: { true })
+        // and the document was already re-anchored: the stored copy and the dropped changes are
+        // gone, so a later attach of the same document must not start from the purged state
         XCTAssertEqual(doc.getDocID(), "")
     }
 

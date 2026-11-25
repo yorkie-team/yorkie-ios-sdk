@@ -3033,7 +3033,7 @@ extension Client {
     ///   - disableGC: The attach's garbage-collection opt-out, restated after a reset.
     ///   - disablePresence: The server-fixated presence gating, restated after a reset.
     ///   - ownsSession: Whether the attach's session is still current. Checked after the store
-    ///     removal suspends, before the document is reset.
+    ///     removal suspends; the document is already reset by then.
     /// - Throws: `errClientNotActivated` when the session was lost during the store removal.
     func dropPurgedOfflineState(doc: Document,
                                 pack: ChangePack,
@@ -3052,13 +3052,17 @@ extension Client {
         Logger.warning("[AD] c:\"\(self.key)\" server purged d:\"\(doc.getKey())\" " +
             "(document id or server seq reset); dropping persisted offline state")
         doc.publishLocalChangesDroppedEvent(reason: .documentPurged, changes: doc.getPendingChangeStructs())
-        try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
-        // A teardown that finished during the removal owns the document now.
-        try self.assertOwnsSession(ownsSession, attaching: doc)
+        // Reset before the removal suspends, as `retryAttachAfterReanchor` does: once the
+        // stored copy is gone and the drop is announced, the document must not keep the purged
+        // state, or a later attach of it resumes from nothing and sends the dropped changes.
         self.reanchor(doc)
         // Restated because the reset cleared them along with the rest of the local state.
         doc.setDisableGC(disableGC)
         doc.setDisablePresence(disablePresence)
+        try? await self.store?.remove(docKey: self.storeKey(doc.getKey()))
+        // A teardown that finished during the removal owns the document now, so the lost
+        // session's attach response must not be applied to it.
+        try self.assertOwnsSession(ownsSession, attaching: doc)
     }
 
     /// Takes the session lease and restores any stored copy of `doc`, before its change pack
