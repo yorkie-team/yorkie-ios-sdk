@@ -149,6 +149,7 @@ public enum YSON {
         static let rbrace: UInt8 = 0x7D
         static let comma: UInt8 = 0x2C
         static let underscore: UInt8 = 0x5F
+        static let colon: UInt8 = 0x3A
     }
 
     /// Reports whether `byte` can appear inside an identifier.
@@ -379,7 +380,15 @@ public enum YSON {
             // as structure.
             if byte == Byte.quote {
                 let end = try self.skipString(bytes, idx)
-                result.append(contentsOf: bytes[idx ..< end])
+                if self.isReservedKeyLiteral(bytes, idx, end) {
+                    // Insert the escape prefix right after the opening quote; the rest of the
+                    // literal is copied byte-for-byte, so the result is still a valid literal.
+                    result.append(Byte.quote)
+                    result.append(contentsOf: self.escapedKeyPrefixBytes)
+                    result.append(contentsOf: bytes[(idx + 1) ..< end])
+                } else {
+                    result.append(contentsOf: bytes[idx ..< end])
+                }
                 idx = end
                 continue
             }
@@ -442,6 +451,66 @@ public enum YSON {
     private static let dataKey = "__yson_data"
     private static let registersKey = "__yson_registers"
 
+    /// Namespace of the marker keys the preprocessor emits.
+    private static let reservedKeyPrefix = "__yson_"
+
+    /// Prefix prepended to a user key inside the reserved namespace so it cannot be read as
+    /// a marker. It starts with ``reservedKeyPrefix``, so the escape is injective:
+    /// `__yson_esc_x` becomes `__yson_esc___yson_esc_x` and strips back to `__yson_esc_x`.
+    private static let escapedKeyPrefix = "__yson_esc_"
+
+    private static let reservedKeyPrefixBytes = Array(reservedKeyPrefix.utf8)
+    private static let escapedKeyPrefixBytes = Array(escapedKeyPrefix.utf8)
+
+    /// Reports whether the string literal `bytes[start ..< end]` is an object key whose decoded
+    /// value starts with ``reservedKeyPrefix``.
+    ///
+    /// Only literals in key position (followed by `:` after JSON whitespace) qualify, so string
+    /// values and constructor arguments are left alone. The decision is made on the decoded key,
+    /// so `"\u005f_yson_type"` is caught too. Prefixes are compared as UTF-8 bytes, never as
+    /// `Character`s, to avoid grapheme merging (grapheme hazard noted in ``preprocessYSON``).
+    private static func isReservedKeyLiteral(_ bytes: [UInt8], _ start: Int, _ end: Int) -> Bool {
+        // The body excludes both quotes. A decoded key starting with `__yson_` can only start
+        // with a literal underscore or with an escape.
+        guard end - start > 2, bytes[start + 1] == Byte.underscore || bytes[start + 1] == Byte.backslash else {
+            return false
+        }
+
+        var next = end
+        while next < bytes.count, bytes[next] == 0x20 || bytes[next] == 0x09 || bytes[next] == 0x0A
+            || bytes[next] == 0x0D
+        {
+            next += 1
+        }
+        guard next < bytes.count, bytes[next] == Byte.colon else {
+            return false
+        }
+
+        let body = bytes[(start + 1) ..< (end - 1)]
+        guard body.contains(Byte.backslash) else {
+            return body.starts(with: self.reservedKeyPrefixBytes)
+        }
+
+        // An undecodable literal (e.g. a lone surrogate) is passed through verbatim so that
+        // the later JSONSerialization reports it.
+        guard let decoded = try? JSONSerialization.jsonObject(with: Data(bytes[start ..< end]),
+                                                              options: [.fragmentsAllowed]) as? String
+        else {
+            return false
+        }
+        return decoded.utf8.starts(with: self.reservedKeyPrefixBytes)
+    }
+
+    /// Strips one ``escapedKeyPrefix`` from `key`, undoing what the preprocessor added.
+    private static func unescapeKey(_ key: String) -> String {
+        guard key.utf8.starts(with: self.escapedKeyPrefixBytes) else {
+            return key
+        }
+        // Slice by UTF-8 units, not Characters: the prefix is ASCII, but a following combining
+        // mark must not be merged into it.
+        return String(key.utf8.dropFirst(self.escapedKeyPrefixBytes.count)) ?? key
+    }
+
     /// Recursively restores YSON types from the parsed JSON object graph.
     private static func postprocessValue(_ value: Any) throws -> YSONValue {
         if value is NSNull {
@@ -474,7 +543,7 @@ public enum YSON {
 
             var object = [String: YSONValue]()
             for (key, val) in dict {
-                object[key] = try self.postprocessValue(val)
+                object[self.unescapeKey(key)] = try self.postprocessValue(val)
             }
             return .object(object)
         }
@@ -560,7 +629,7 @@ public enum YSON {
         if let rawAttrs = dict["attrs"] as? [String: Any] {
             var mapped = [String: YSONValue]()
             for (key, value) in rawAttrs {
-                mapped[key] = try self.postprocessValue(value)
+                mapped[self.unescapeKey(key)] = try self.postprocessValue(value)
             }
             attrs = mapped
         }
@@ -579,7 +648,9 @@ public enum YSON {
         }
 
         // Element node.
-        let attrs = dict["attrs"] as? [String: String]
+        let attrs = (dict["attrs"] as? [String: String]).map { raw in
+            Dictionary(raw.map { (self.unescapeKey($0.key), $0.value) }, uniquingKeysWith: { _, last in last })
+        }
 
         var children: [YSONTreeNode]?
         if let rawChildren = dict["children"] as? [Any] {
