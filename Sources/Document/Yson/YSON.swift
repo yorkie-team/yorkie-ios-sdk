@@ -625,16 +625,26 @@ public enum YSON {
             throw YorkieError(code: .errInvalidArgument, message: "invalid text node format")
         }
 
-        var attrs: [String: YSONValue]?
-        if let rawAttrs = dict["attrs"] as? [String: Any] {
-            var mapped = [String: YSONValue]()
-            for (key, value) in rawAttrs {
-                mapped[self.unescapeKey(key)] = try self.postprocessValue(value)
-            }
-            attrs = mapped
-        }
+        return try YSONTextNode(val: val, rawAttrs: self.postprocessAttrs(dict["attrs"]))
+    }
 
-        return YSONTextNode(val: val, attrs: attrs)
+    /// Restores a node's `attrs`, keeping any object or array as the JS SDK does.
+    ///
+    /// The keys are walked here instead of handing the object to ``postprocessValue(_:)``, so
+    /// an `attrs` object that happens to look like a type marker is read as plain data. Any
+    /// other shape (string, number, boolean, null, absent) is dropped, as in JS.
+    private static func postprocessAttrs(_ raw: Any?) throws -> YSONValue? {
+        if let dict = raw as? [String: Any] {
+            var object = [String: YSONValue]()
+            for (key, value) in dict {
+                object[self.unescapeKey(key)] = try self.postprocessValue(value)
+            }
+            return .object(object)
+        }
+        if let array = raw as? [Any] {
+            return try .array(array.map { try self.postprocessValue($0) })
+        }
+        return nil
     }
 
     private static func postprocessTreeNode(_ node: Any) throws -> YSONTreeNode {
@@ -648,20 +658,23 @@ public enum YSON {
         }
 
         // Element node.
-        let attrs = (dict["attrs"] as? [String: String]).map { raw in
-            Dictionary(raw.map { (self.unescapeKey($0.key), $0.value) }, uniquingKeysWith: { _, last in last })
-        }
+        let attrs = try self.postprocessAttrs(dict["attrs"])
 
         var children: [YSONTreeNode]?
         if let rawChildren = dict["children"] as? [Any] {
             children = try rawChildren.map { try self.postprocessTreeNode($0) }
         }
 
-        return YSONTreeNode(type: type, attrs: attrs, children: children)
+        return YSONTreeNode(type: type, rawAttrs: attrs, children: children)
     }
 
     // MARK: - XML
 
+    /// Renders `node` as XML.
+    ///
+    /// Only string-valued attributes are rendered (``YSONTreeNode/attrs``): an attribute whose
+    /// value is not a string has no XML form and is skipped. Read ``YSONTreeNode/rawAttrs``
+    /// for the full attributes.
     private static func treeNodeToXML(_ node: YSONTreeNode) -> String {
         let attrs = node.attrs?.map { " \($0.key)=\"\(self.escapeXML($0.value))\"" }.joined() ?? ""
 

@@ -693,20 +693,24 @@ final class YSONTests: XCTestCase {
         // given / when
         let result = try YSON.parse(#"{"t":Tree({"type":"doc","attrs":{"k":[{"__yson_type":"b"}]},"children":[]})}"#)
 
-        // then: pins current iOS behaviour (tree attrs are [String: String], so the whole
-        // attrs are dropped; JS keeps the value). Flip when the divergence is fixed.
-        XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: YSONTreeNode(
-            type: "doc", attrs: nil, children: []
-        )))]))
+        // then: the whole attrs are kept, as JS does; the string-valued view is empty
+        let root = YSONTreeNode(
+            type: "doc",
+            rawAttrs: .object(["k": .array([.object(["__yson_type": .string("b")])])]),
+            children: []
+        )
+        XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: root))]))
+        XCTAssertEqual(root.attrs, [:])
     }
 
     func test_should_keep_an_array_valued_attrs_an_array() throws {
         // given / when
         let result = try YSON.parse(#"{"t":Text([{"val":"a","attrs":[{"__yson_type":"b"}]}])}"#)
 
-        // then: pins current iOS behaviour (array-valued attrs are dropped; JS keeps the
-        // array). Flip when the divergence is fixed.
-        XCTAssertEqual(result, .object(["t": .text(YSONText(nodes: [YSONTextNode(val: "a", attrs: nil)]))]))
+        // then: the array is kept in rawAttrs, as JS does; the object view is nil
+        let node = YSONTextNode(val: "a", rawAttrs: .array([.object(["__yson_type": .string("b")])]))
+        XCTAssertEqual(result, .object(["t": .text(YSONText(nodes: [node]))]))
+        XCTAssertNil(node.attrs)
     }
 
     func test_should_keep_a_proto_key_an_own_property_of_an_object() throws {
@@ -721,9 +725,11 @@ final class YSONTests: XCTestCase {
         // given / when
         let result = try YSON.parse(#"{"t":Tree({"type":"doc","attrs":{"__proto__":{"polluted":true}},"children":[]})}"#)
 
-        // then: pins current iOS behaviour (non-string attr value drops all attrs). Flip when fixed.
+        // then
         XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: YSONTreeNode(
-            type: "doc", attrs: nil, children: []
+            type: "doc",
+            rawAttrs: .object(["__proto__": .object(["polluted": .bool(true)])]),
+            children: []
         )))]))
     }
 
@@ -813,5 +819,147 @@ final class YSONTests: XCTestCase {
             "__yson_type": .string("Int"), "__yson_data": .number(7), "__yson_registers": .string("r"),
             "__yson_esc_x": .number(5), "__yson_other": .number(8)
         ])
+    }
+
+    // MARK: Attrs of any shape (rawAttrs)
+
+    private func treeRoot(_ input: String, file: StaticString = #filePath, line: UInt = #line) throws -> YSONTreeNode {
+        let object = try self.parseObject(input, file: file, line: line)
+        guard case .tree(let tree)? = object["t"] else {
+            XCTFail("expected a tree", file: file, line: line)
+            return YSONTreeNode(type: "")
+        }
+        return tree.root
+    }
+
+    private func textNode(_ input: String, file: StaticString = #filePath, line: UInt = #line) throws -> YSONTextNode {
+        let object = try self.parseObject(input, file: file, line: line)
+        guard case .text(let text)? = object["t"], let node = text.nodes.first else {
+            XCTFail("expected a text node", file: file, line: line)
+            return YSONTextNode(val: "")
+        }
+        return node
+    }
+
+    func test_should_keep_every_attribute_of_a_tree_node_with_mixed_value_types() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{"class":"p","n":1,"on":true,"z":null},"children":[]})}"#)
+
+        // then: rawAttrs is lossless, attrs is the string-valued subset
+        XCTAssertEqual(root.rawAttrs, .object([
+            "class": .string("p"), "n": .number(1), "on": .bool(true), "z": .null
+        ]))
+        XCTAssertEqual(root.attrs, ["class": "p"])
+    }
+
+    func test_should_parse_all_string_tree_attrs_equal_to_a_node_built_with_the_legacy_init() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"a":"1","b":"2"},"children":[]})}"#)
+
+        // then: nothing changes for string-only attrs
+        XCTAssertEqual(root, YSONTreeNode(type: "p", attrs: ["a": "1", "b": "2"], children: []))
+        XCTAssertEqual(root.attrs, ["a": "1", "b": "2"])
+        XCTAssertEqual(root.rawAttrs, .object(["a": .string("1"), "b": .string("2")]))
+    }
+
+    func test_should_parse_text_attrs_equal_to_a_node_built_with_the_legacy_init() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":{"bold":true}}])}"#)
+
+        // then
+        XCTAssertEqual(node, YSONTextNode(val: "a", attrs: ["bold": .bool(true)]))
+        XCTAssertEqual(node.attrs, ["bold": .bool(true)])
+    }
+
+    func test_should_keep_an_array_valued_attrs_of_a_tree_node() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":[1,"a"],"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(root.rawAttrs, .array([.number(1), .string("a")]))
+        XCTAssertNil(root.attrs)
+    }
+
+    func test_should_drop_attrs_that_are_neither_an_object_nor_an_array() throws {
+        // given / when / then: JS keeps only object-typed attrs, so every other shape is dropped
+        for attrs in [#""x""#, "5", "true", "null"] {
+            let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":\#(attrs)}])}"#)
+            XCTAssertNil(node.rawAttrs, "text attrs \(attrs)")
+            XCTAssertNil(node.attrs, "text attrs \(attrs)")
+
+            let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":\#(attrs),"children":[]})}"#)
+            XCTAssertNil(root.rawAttrs, "tree attrs \(attrs)")
+            XCTAssertNil(root.attrs, "tree attrs \(attrs)")
+        }
+        XCTAssertNil(try self.textNode(#"{"t":Text([{"val":"a"}])}"#).rawAttrs)
+        XCTAssertNil(try self.treeRoot(#"{"t":Tree({"type":"doc","children":[]})}"#).rawAttrs)
+    }
+
+    func test_should_keep_empty_attrs_objects_and_arrays() throws {
+        // given / when / then
+        XCTAssertEqual(try self.textNode(#"{"t":Text([{"val":"a","attrs":{}}])}"#).rawAttrs, .object([:]))
+        XCTAssertEqual(try self.textNode(#"{"t":Text([{"val":"a","attrs":[]}])}"#).rawAttrs, .array([]))
+        XCTAssertEqual(try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{},"children":[]})}"#).attrs, [:])
+        XCTAssertEqual(try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":[],"children":[]})}"#).rawAttrs, .array([]))
+    }
+
+    func test_should_unescape_a_reserved_key_of_a_tree_attribute_with_a_non_string_value() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{"__yson_type":1,"c":"s"},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(root.rawAttrs, .object(["__yson_type": .number(1), "c": .string("s")]))
+        XCTAssertEqual(root.attrs, ["c": "s"])
+    }
+
+    func test_should_keep_a_reserved_key_nested_in_an_array_valued_attrs_element() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":[{"__yson_type":"b"},[{"__yson_data":1}]]}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .array([
+            .object(["__yson_type": .string("b")]),
+            .array([.object(["__yson_data": .number(1)])])
+        ]))
+    }
+
+    func test_should_read_a_constructor_in_attrs_position_as_a_plain_object() throws {
+        // given / when: JS reads attrs by walking keys only, so the marker is not interpreted
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":Int(3)}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .object(["__yson_type": .string("Int"), "__yson_data": .number(3)]))
+    }
+
+    func test_should_type_a_constructor_inside_an_attrs_object_value() throws {
+        // given / when: pre-existing iOS behaviour, kept
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":{"k":Int(3)}}])}"#)
+
+        // then
+        XCTAssertEqual(node.attrs, ["k": .int(3)])
+    }
+
+    func test_should_expose_raw_attrs_of_nodes_built_with_the_legacy_inits() {
+        // given / when
+        let text = YSONTextNode(val: "a", attrs: ["b": .bool(true)])
+        let tree = YSONTreeNode(type: "p", attrs: ["a": "1"])
+
+        // then
+        XCTAssertEqual(text.rawAttrs, .object(["b": .bool(true)]))
+        XCTAssertEqual(tree.rawAttrs, .object(["a": .string("1")]))
+        XCTAssertNil(YSONTextNode(val: "a").rawAttrs)
+        XCTAssertNil(YSONTreeNode(type: "p").rawAttrs)
+    }
+
+    func test_should_skip_non_string_tree_attrs_when_rendering_xml() throws {
+        // given
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"class":"x","n":1,"on":true},"children":[]})}"#)
+
+        // when / then: attributes with no string form are left out of the XML, string ones stay
+        XCTAssertEqual(YSON.treeToXML(YSONTree(root: root)), #"<p class="x" />"#)
+        XCTAssertEqual(
+            YSON.treeToXML(YSONTree(root: YSONTreeNode(type: "p", rawAttrs: .array([.number(1)]), children: []))),
+            "<p />"
+        )
     }
 }

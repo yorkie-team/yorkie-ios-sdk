@@ -21,12 +21,32 @@ public struct YSONTextNode: Equatable {
     /// The character value.
     public let val: String
 
-    /// Optional attributes (e.g. formatting).
-    public let attrs: [String: YSONValue]?
+    /// The attributes exactly as parsed: an object, or an array when the document stored
+    /// an array-valued `attrs`; `nil` when absent or of any other shape.
+    ///
+    /// This is the lossless view, matching the JS SDK, which keeps any object or array.
+    public let rawAttrs: YSONValue?
+
+    /// Optional attributes (e.g. formatting), when ``rawAttrs`` is an object.
+    ///
+    /// This is a convenience view: it is `nil` for an array-valued `attrs`. Use ``rawAttrs``
+    /// to read every shape.
+    public var attrs: [String: YSONValue]? {
+        if case .object(let object) = self.rawAttrs {
+            return object
+        }
+        return nil
+    }
 
     public init(val: String, attrs: [String: YSONValue]? = nil) {
         self.val = val
-        self.attrs = attrs
+        self.rawAttrs = attrs.map { .object($0) }
+    }
+
+    /// Creates a node from raw attributes, which may be an object or an array.
+    public init(val: String, rawAttrs: YSONValue?) {
+        self.val = val
+        self.rawAttrs = rawAttrs
     }
 }
 
@@ -49,8 +69,28 @@ public struct YSONTreeNode: Equatable {
     /// Text content (for text nodes).
     public let value: String?
 
-    /// Attributes (for element nodes).
-    public let attrs: [String: String]?
+    /// The attributes exactly as parsed, with values of any type (for element nodes): an
+    /// object, or an array when the document stored an array-valued `attrs`; `nil` when
+    /// absent or of any other shape.
+    ///
+    /// This is the lossless view, matching the JS SDK, which keeps any object or array.
+    public let rawAttrs: YSONValue?
+
+    /// The string-valued entries of ``rawAttrs`` when it is an object (for element nodes).
+    ///
+    /// This is a lossy convenience view: entries whose value is not a string are left out,
+    /// and an array-valued `attrs` gives `nil`. Use ``rawAttrs`` to read everything.
+    public var attrs: [String: String]? {
+        guard case .object(let object) = self.rawAttrs else {
+            return nil
+        }
+        return object.compactMapValues { value in
+            if case .string(let string) = value {
+                return string
+            }
+            return nil
+        }
+    }
 
     /// Child nodes (for element nodes).
     public let children: [YSONTreeNode]?
@@ -58,7 +98,15 @@ public struct YSONTreeNode: Equatable {
     public init(type: String, value: String? = nil, attrs: [String: String]? = nil, children: [YSONTreeNode]? = nil) {
         self.type = type
         self.value = value
-        self.attrs = attrs
+        self.rawAttrs = attrs.map { .object($0.mapValues { .string($0) }) }
+        self.children = children
+    }
+
+    /// Creates a node from raw attributes, whose values may be of any type, or an array.
+    public init(type: String, value: String? = nil, rawAttrs: YSONValue?, children: [YSONTreeNode]? = nil) {
+        self.type = type
+        self.value = value
+        self.rawAttrs = rawAttrs
         self.children = children
     }
 }
