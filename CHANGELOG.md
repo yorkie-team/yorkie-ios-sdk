@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.28] - 2026-11-26
+
+> **Behavioural change — YSON reserved keys.** A document whose data holds an object key in the `__yson_` namespace (for example `__yson_type`) now parses as plain data and keeps that key, instead of being read as a type marker (mis-typed, or rejected with `invalid YSON <marker> format`). Hand-written JSON in the marker shape, with no `Int(...)`-style constructor behind it, is therefore plain data too.
+
+> **Not ported.** The example apps, pointer-ink and agent-harness changes, and the JS CI hardening in 0.7.28 touch no SDK source. The JS `__proto__` hardening has no Swift counterpart: a Swift dictionary has no prototype, so `__proto__` is already an ordinary key.
+
+### Fixed
+
+- Keep an object key in YSON's `__yson_` namespace from being read as a type marker in https://github.com/yorkie-team/yorkie-ios-sdk/pull/<N>
+
 ## [v0.7.27] - 2026-11-18
 
 > **Behavioural change — channel detach.** Detaching through a `Channel` object that a newer `Channel` of the same key has replaced now throws `errNotAttached` instead of detaching the newer one, as the Go and JS SDKs do. `deactivate()` also tears down an attachment that a same-key attach displaced, so its Watch stream no longer outlives the client.
