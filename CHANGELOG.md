@@ -14,7 +14,7 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ### Fixed
 
-- Keep an object key in YSON's `__yson_` namespace from being read as a type marker in https://github.com/yorkie-team/yorkie-ios-sdk/pull/<N>
+- Keep an object key in YSON's `__yson_` namespace from being read as a type marker in https://github.com/yorkie-team/yorkie-ios-sdk/pull/282
 
 ## [v0.7.27] - 2026-11-18
 
