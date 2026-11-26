@@ -783,16 +783,14 @@ final class YSONTests: XCTestCase {
         }
     }
 
-    func test_should_treat_a_duplicated_reserved_key_like_any_duplicated_key() throws {
+    func test_should_keep_the_last_value_of_a_duplicated_reserved_key_like_any_duplicated_key() throws {
         // given / when
         let reserved = try YSON.parse(#"{"x":{"__yson_type":1,"__yson_type":2}}"#)
         let plain = try YSON.parse(#"{"x":{"k":1,"k":2}}"#)
 
-        // then: escaping must not change duplicate-key handling. Pins current iOS behaviour:
-        // Foundation's JSONSerialization keeps the first value, while JS keeps the last.
-        // Flip when the divergence is fixed.
-        XCTAssertEqual(reserved, .object(["x": .object(["__yson_type": .number(1)])]))
-        XCTAssertEqual(plain, .object(["x": .object(["k": .number(1)])]))
+        // then: escaping must not change duplicate-key handling, and the last value wins as in JS
+        XCTAssertEqual(reserved, .object(["x": .object(["__yson_type": .number(2)])]))
+        XCTAssertEqual(plain, .object(["x": .object(["k": .number(2)])]))
     }
 
     func test_should_round_trip_a_reserved_key_with_a_combining_mark() throws {
@@ -939,6 +937,33 @@ final class YSONTests: XCTestCase {
         XCTAssertEqual(node.attrs, ["k": .int(3)])
     }
 
+    func test_should_parse_an_invalid_constructor_in_tree_attrs_keeping_its_raw_value() throws {
+        // given / when: the old code parsed this (attrs nil) and JS parses it; it must not throw
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":Int(1.5)},"children":[]})}"#)
+
+        // then: the raw marker object is kept, not typed and not dropped
+        XCTAssertEqual(root.rawAttrs, .object(["k": .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])]))
+        XCTAssertEqual(root.attrs, [:])
+    }
+
+    func test_should_still_type_a_valid_constructor_in_tree_attrs() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":Int(3),"bad":Long(true),"s":"x"},"children":[]})}"#)
+
+        // then
+        guard case .object(let attrs)? = root.rawAttrs else {
+            return XCTFail("expected object attrs")
+        }
+        XCTAssertEqual(attrs["k"], .int(3))
+        XCTAssertEqual(attrs["s"], .string("x"))
+        XCTAssertNotNil(attrs["bad"])
+    }
+
+    func test_should_still_reject_an_invalid_constructor_in_text_attrs() {
+        // given / when / then: Text attrs behaviour is unchanged
+        XCTAssertThrowsError(try YSON.parse(#"{"t":Text([{"val":"a","attrs":{"k":Int(1.5)}}])}"#))
+    }
+
     func test_should_expose_raw_attrs_of_nodes_built_with_the_legacy_inits() {
         // given / when
         let text = YSONTextNode(val: "a", attrs: ["b": .bool(true)])
@@ -961,5 +986,191 @@ final class YSONTests: XCTestCase {
             YSON.treeToXML(YSONTree(root: YSONTreeNode(type: "p", rawAttrs: .array([.number(1)]), children: []))),
             "<p />"
         )
+    }
+
+    // MARK: Duplicated keys (last value wins)
+
+    func test_should_keep_the_last_value_of_a_key_repeated_three_times() throws {
+        XCTAssertEqual(try self.parseObject(#"{"k":1,"k":2,"k":3}"#), ["k": .number(3)])
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_nested_key() throws {
+        XCTAssertEqual(try YSON.parse(#"{"a":{"k":1,"k":2}}"#), .object(["a": .object(["k": .number(2)])]))
+    }
+
+    func test_should_keep_the_last_value_when_a_duplicate_is_spelled_with_an_escape() throws {
+        // given / when
+        let result = try self.parseObject(#"{"k":1,"\u006b":2}"#)
+        let reversed = try self.parseObject(#"{"\u006b":1,"k":2,"k":3}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .number(2)])
+        XCTAssertEqual(reversed, ["k": .number(3)])
+    }
+
+    func test_should_not_merge_the_same_key_of_sibling_objects() throws {
+        XCTAssertEqual(
+            try YSON.parse(#"[{"k":1},{"k":2},{"k":3,"k":4}]"#),
+            .array([.object(["k": .number(1)]), .object(["k": .number(2)]), .object(["k": .number(4)])])
+        )
+    }
+
+    func test_should_keep_the_last_value_of_a_key_repeated_at_different_depths() throws {
+        // given / when
+        let result = try self.parseObject(#"{"k":{"k":1},"k":{"k":2}}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .object(["k": .number(2)])])
+    }
+
+    func test_should_keep_the_last_value_of_a_key_that_reappears_after_a_nested_scope_closed() throws {
+        XCTAssertEqual(
+            try self.parseObject(#"{"a":1,"o":{"a":9},"a":2}"#),
+            ["a": .number(2), "o": .object(["a": .number(9)])]
+        )
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_attrs_key() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":{"b":1,"b":2}}])}"#)
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{"c":"x","c":"y"},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(node.attrs, ["b": .number(2)])
+        XCTAssertEqual(root.attrs, ["c": "y"])
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_node_field() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","val":"b"}])}"#)
+        let root = try self.treeRoot(#"{"t":Tree({"type":"x","type":"doc","children":[{"type":"a"}],"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(node.val, "b")
+        XCTAssertEqual(root, YSONTreeNode(type: "doc", children: []))
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_key_next_to_constructors() throws {
+        // given / when / then
+        XCTAssertEqual(try self.parseObject(#"{"a":Int(1),"a":Int(2)}"#), ["a": .int(2)])
+        XCTAssertEqual(try self.parseObject(#"{"a":Int(1),"a":"s"}"#), ["a": .string("s")])
+        XCTAssertEqual(try self.parseObject(#"{"a":"s","a":Int(1)}"#), ["a": .int(1)])
+        XCTAssertEqual(try self.parseObject(#"{"a":Counter(Int(1)),"a":Counter(Long(2))}"#), ["a": .counter(.long(2))])
+    }
+
+    func test_should_not_validate_a_value_that_a_later_duplicate_overwrote() throws {
+        // given / when: JS never looks at the overwritten value either
+        let result = try self.parseObject(#"{"a":Int(1.5),"a":2}"#)
+
+        // then
+        XCTAssertEqual(result, ["a": .number(2)])
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_key_inside_a_constructor_argument() throws {
+        // given / when
+        let object = try self.parseObject(#"{"t":Tree({"type":"doc","children":[{"type":"p","attrs":{"k":"1","k":"2"}}]})}"#)
+
+        // then
+        guard case .tree(let tree)? = object["t"] else {
+            return XCTFail("expected a tree")
+        }
+        XCTAssertEqual(tree.root.children?.first?.attrs, ["k": "2"])
+    }
+
+    func test_should_keep_a_user_key_in_the_junk_namespace_next_to_a_duplicate() throws {
+        // given / when: a key spelled like the internal rename must neither vanish nor be read as junk
+        let result = try self.parseObject(#"{"k":1,"__yson_dup_k":7,"k":2,"__yson_dup_k":8}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .number(2), "__yson_dup_k": .number(8)])
+    }
+
+    func test_should_keep_the_last_value_of_an_escaped_duplicate_key_in_index_mode() throws {
+        // given / when: more than 16 keys, then an escaped spelling of an earlier plain `k`
+        let result = try self.parseObject(#"{"f0":0,"f1":0,"f2":0,"f3":0,"f4":0,"f5":0,"f6":0,"f7":0,"f8":0,"f9":0,"f10":0,"f11":0,"f12":0,"f13":0,"f14":0,"f15":0,"f16":0,"f17":0,"f18":0,"f19":0,"k":1,"\u006b":2}"#)
+
+        // then
+        XCTAssertEqual(result["k"], .number(2))
+        XCTAssertEqual(result.count, 21)
+    }
+
+    func test_should_keep_an_escaped_literal_of_the_junk_namespace_as_a_user_key() throws {
+        // given / when: `__yson_dup_k` spelled with an escape must survive next to a real duplicate
+        let result = try self.parseObject(#"{"k":1,"\u005f_yson_dup_k":7,"k":2}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .number(2), "__yson_dup_k": .number(7)])
+    }
+
+    func test_should_keep_the_last_value_of_an_escaped_reserved_key_repeated_three_times() throws {
+        // given / when
+        let result = try self.parseObject(#"{"x":{"__yson_type":1,"\u005f_yson_type":2,"__yson_type":3}}"#)
+
+        // then
+        XCTAssertEqual(result, ["x": .object(["__yson_type": .number(3)])])
+    }
+
+    func test_should_keep_a_document_without_duplicates_unchanged() throws {
+        // given
+        let input = #"{"a":1,"b":{"c":[1,2,{"d":3}],"e":"x"},"f":[{"a":1},{"a":2}],"g":Text([{"val":"v","attrs":{"k":1}}])}"#
+
+        // when / then
+        XCTAssertEqual(try self.parseObject(input), [
+            "a": .number(1),
+            "b": .object(["c": .array([.number(1), .number(2), .object(["d": .number(3)])]), "e": .string("x")]),
+            "f": .array([.object(["a": .number(1)]), .object(["a": .number(2)])]),
+            "g": .text(YSONText(nodes: [YSONTextNode(val: "v", attrs: ["k": .number(1)])]))
+        ])
+    }
+
+    func test_should_reject_unbalanced_closers_without_trapping() {
+        // given / when / then: the dedup scope stack must tolerate a stray closer
+        for input in [#"}{"a":1,"a":2}"#, #"{"a":1}}"#, #"]"#, #"{"a":1,"a":2}]}"#, #"{"a":1,"a":2"#] {
+            XCTAssertThrowsError(try YSON.parse(input), input)
+        }
+    }
+
+    func test_should_pass_an_undecodable_duplicate_key_through_to_the_parse_error() {
+        // given / when / then: a lone surrogate cannot be decoded, so dedup is skipped and parsing fails
+        XCTAssertThrowsError(try YSON.parse(#"{"\ud800":1,"\ud800":2}"#)) { error in
+            XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument)
+        }
+    }
+
+    func test_should_not_trap_on_very_deep_array_nesting() {
+        // given
+        let input = String(repeating: "[", count: 100_000) + String(repeating: "]", count: 100_000)
+
+        // when / then: parsing or rejecting are both fine, crashing is not
+        _ = try? YSON.parse(input)
+    }
+
+    func test_should_keep_the_last_value_of_one_key_repeated_a_hundred_thousand_times() throws {
+        // given: the shape that made a per-duplicate insert quadratic
+        let members = (0 ..< 100_000).map { #""k":\#($0)"# }.joined(separator: ",")
+
+        // when
+        let result = try self.parseObject("{\(members)}")
+
+        // then
+        XCTAssertEqual(result, ["k": .number(99999)])
+    }
+
+    func test_should_keep_the_last_value_of_many_duplicated_keys_in_a_large_document() throws {
+        // given: ~5 MB, 50k distinct keys each present twice with different values
+        let pad = String(repeating: "x", count: 30)
+        let first = (0 ..< 50000).map { #""key_\#($0)":"first_\#(pad)""# }
+        let second = (0 ..< 50000).map { #""key_\#($0)":"last_\#($0)_\#(pad)""# }
+        let input = "{" + (first + second).joined(separator: ",") + "}"
+        XCTAssertGreaterThan(input.utf8.count, 4_500_000)
+
+        // when
+        let result = try self.parseObject(input)
+
+        // then
+        XCTAssertEqual(result.count, 50000)
+        XCTAssertEqual(result["key_0"], .string("last_0_\(pad)"))
+        XCTAssertEqual(result["key_49999"], .string("last_49999_\(pad)"))
+        XCTAssertEqual(result["key_1234"], .string("last_1234_\(pad)"))
     }
 }
