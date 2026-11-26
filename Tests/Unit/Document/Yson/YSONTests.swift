@@ -959,6 +959,57 @@ final class YSONTests: XCTestCase {
         XCTAssertNotNil(attrs["bad"])
     }
 
+    func test_should_parse_an_invalid_constructor_in_array_valued_text_attrs_keeping_its_raw_value() throws {
+        // given / when: array attrs were ignored at the merge base, so this parsed there
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":[Int(1.5)]}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .array([.object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])]))
+    }
+
+    func test_should_type_a_valid_sibling_of_an_invalid_constructor_in_array_valued_text_attrs() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":[Int(3),Int(1.5)]}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .array([.int(3), .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])]))
+    }
+
+    func test_should_keep_a_valid_element_typed_next_to_an_invalid_one_in_tree_attrs_array() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":[Int(3),Int(1.5)]},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(
+            root.rawAttrs,
+            .object(["k": .array([.int(3), .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])])])
+        )
+    }
+
+    func test_should_keep_a_valid_member_typed_next_to_an_invalid_one_in_nested_tree_attrs_object() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":{"a":Int(3),"b":Int(1.5)}},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(
+            root.rawAttrs,
+            .object(["k": .object(["a": .int(3), "b": .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])])])
+        )
+    }
+
+    func test_should_fall_back_at_the_outermost_failing_marker_in_tree_attrs() throws {
+        // given / when: Counter(Int(1.5)) fails as a whole, so the Counter marker is raw, not just its data
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":[Counter(Int(1.5)),Counter(Int(2))]},"children":[]})}"#)
+
+        // then
+        guard case .object(let attrs)? = root.rawAttrs, case .array(let items)? = attrs["k"], items.count == 2 else {
+            return XCTFail("expected an array of two")
+        }
+        guard case .object(let first) = items[0] else { return XCTFail("expected raw object") }
+        XCTAssertEqual(first["__yson_type"], .string("Counter"))
+        XCTAssertEqual(items[1], .counter(.int(2)))
+    }
+
     func test_should_still_reject_an_invalid_constructor_in_text_attrs() {
         // given / when / then: Text attrs behaviour is unchanged
         XCTAssertThrowsError(try YSON.parse(#"{"t":Text([{"val":"a","attrs":{"k":Int(1.5)}}])}"#))

@@ -777,7 +777,10 @@ public enum YSON {
             throw YorkieError(code: .errInvalidArgument, message: "invalid text node format")
         }
 
-        return try YSONTextNode(val: val, rawAttrs: self.postprocessAttrs(dict["attrs"], lenient: false))
+        // Object attrs stay strict (iOS has always rejected an invalid constructor there); array
+        // attrs were ignored before, so they must not start to fail a parse that used to pass.
+        let rawAttrs = dict["attrs"]
+        return try YSONTextNode(val: val, rawAttrs: self.postprocessAttrs(rawAttrs, lenient: rawAttrs is [Any]))
     }
 
     /// Restores a node's `attrs`, keeping any object or array as the JS SDK does.
@@ -786,9 +789,9 @@ public enum YSON {
     /// an `attrs` object that happens to look like a type marker is read as plain data. Any
     /// other shape (string, number, boolean, null, absent) is dropped, as in JS.
     ///
-    /// With `lenient`, a value whose constructor marker is invalid (for example `Int(1.5)`)
-    /// falls back to its raw, check-free form instead of failing the whole parse, because the
-    /// JS SDK parses such Tree attrs. Valid constructors are still typed.
+    /// With `lenient`, the values are walked element by element and only a constructor marker
+    /// that is invalid (for example `Int(1.5)`) falls back to its raw, check-free form instead
+    /// of failing the whole parse, as the JS SDK parses such attrs. Valid siblings stay typed.
     private static func postprocessAttrs(_ raw: Any?, lenient: Bool) throws -> YSONValue? {
         if let dict = raw as? [String: Any] {
             var object = [String: YSONValue]()
@@ -805,6 +808,18 @@ public enum YSON {
 
     private static func postprocessAttrValue(_ value: Any, lenient: Bool) throws -> YSONValue {
         guard lenient else { return try self.postprocessValue(value) }
+        if let array = value as? [Any] {
+            return try .array(array.map { try self.postprocessAttrValue($0, lenient: true) })
+        }
+        if let dict = value as? [String: Any], !(dict[self.typeKey] is String) {
+            // Plain object: recurse so one bad constructor does not untype its siblings.
+            var object = [String: YSONValue]()
+            for (key, val) in dict where !self.isSupersededKey(key) {
+                object[self.unescapeKey(key)] = try self.postprocessAttrValue(val, lenient: true)
+            }
+            return .object(object)
+        }
+        // A scalar or a constructor marker: strict, and raw at the outermost marker that fails.
         do {
             return try self.postprocessValue(value)
         } catch {
