@@ -69,8 +69,24 @@ struct IncreaseOperation: Operation {
         return ExecutionResult(opInfos: opInfos)
     }
 
-    /// Applies the increase and returns its operation infos, or `nil` when a remote change to a
-    /// dedup counter is skipped.
+    /// Reports a delta that cannot be applied to the caller of a local `update` or an undo/redo, and
+    /// skips it with a warning on the pull path, as Go does (`pkg/document/operations/increase.go`,
+    /// `skipUnlessLocal`).
+    ///
+    /// A stored change that throws comes back on every pull -- the checkpoint does not advance past
+    /// it -- so a value that is not a primitive, a delta the counter refuses or a dedup increase
+    /// without an actor would wedge the document. Dropping the delta is the same on every replica,
+    /// so they still converge.
+    private func skipUnlessLocal(source: OpSource, cause: Error) throws -> [any OperationInfo]? {
+        guard source == .remote else {
+            throw cause
+        }
+        Logger.warning("[Increase] skipped a remote increase that cannot apply: \(cause)")
+        return nil
+    }
+
+    /// Applies the increase and returns its operation infos, or `nil` when the increase is skipped
+    /// or changes nothing.
     private func executeOpInfos(
         root: CRDTRoot,
         versionVector: VersionVector? = nil,
@@ -81,56 +97,66 @@ struct IncreaseOperation: Operation {
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
-        if let counter = parentObject as? CRDTCounter<Int32>, counter.isDedup {
-            // NOTE: a dedup counter holds an HLL of actors, so it can only take a unit increment
-            // attributed to one actor. A change carrying neither can never be applied, and a stored
-            // one comes back on every pull -- the checkpoint does not advance past a change that
-            // throws -- so it wedges the document. Skip it on the pull path, as Go does
-            // (`pkg/document/operations/increase.go`, `skipUnlessLocal`). A local `update` or an
-            // undo/redo still reports the failure to the caller that asked for it, with the code the
-            // counter threw.
-            guard !self.actor.isEmpty else {
-                if source == .remote {
-                    return nil
-                }
-                throw YorkieError(
-                    code: .errInvalidArgument,
-                    message: "dedup counter requires actor"
-                )
-            }
-            if let primitive = self.value.deepcopy() as? Primitive {
-                do {
-                    try counter.increaseDedup(primitive, actor: self.actor)
-                } catch {
-                    if source == .remote {
-                        return nil
-                    }
-                    throw error
-                }
-            } else if source == .remote {
-                // A value that is not a primitive cannot be applied either; skip it on the pull path
-                // like the cases above, instead of failing at the value conversion below.
-                return nil
-            }
-        } else if let counter = parentObject as? CRDTCounter<Int32> {
-            if let value = self.value.deepcopy() as? Primitive {
-                try counter.increase(value)
-            }
-        } else if let counter = parentObject as? CRDTCounter<Int64> {
-            if let value = self.value.deepcopy() as? Primitive {
-                try counter.increase(value)
-            }
-        } else {
+        // NOTE: the target must be a counter for every source: Go returns `ErrNotApplicableDataType`
+        // whatever the source, and so does JS. Only a fault of the delta itself is skipped below.
+        guard parentObject is CRDTCounter<Int32> || parentObject is CRDTCounter<Int64> else {
             let log = "fail to execute, only Counter can execute increase"
             throw YorkieError(code: .errInvalidArgument, message: log)
         }
 
+        // NOTE: the wire format does not restrict the value, so it can be anything an element can be.
+        guard let primitive = self.value.deepcopy() as? Primitive else {
+            return try self.skipUnlessLocal(
+                source: source,
+                cause: YorkieError(
+                    code: .errInvalidArgument,
+                    message: "fail to execute, only Primitive can be increased"
+                )
+            )
+        }
+
+        do {
+            if let counter = parentObject as? CRDTCounter<Int32>, counter.isDedup {
+                guard !self.actor.isEmpty else {
+                    throw YorkieError(code: .errInvalidArgument, message: "dedup counter requires actor")
+                }
+                try counter.increaseDedup(primitive, actor: self.actor)
+            } else if let counter = parentObject as? CRDTCounter<Int32> {
+                try counter.increase(primitive)
+            } else if let counter = parentObject as? CRDTCounter<Int64> {
+                try counter.increase(primitive)
+            }
+        } catch {
+            return try self.skipUnlessLocal(source: source, cause: error)
+        }
+
         let path = try root.createPath(createdAt: self.parentCreatedAt)
 
-        guard let value = Int((value as? Primitive)?.toJSON() ?? "") else {
-            throw YorkieError(code: .errUnexpected, message: "fail to get counter value")
+        guard let value = Self.opInfoValue(of: primitive) else {
+            // A NaN or infinite Double delta leaves the counter untouched: nothing to report.
+            return nil
         }
 
         return [IncreaseOpInfo(path: path, value: value)]
+    }
+
+    /// Returns the delta an increase reports in its ``IncreaseOpInfo``.
+    ///
+    /// The public `IncreaseOpInfo.value` is an `Int`, so a `Double` delta is reported as the delta
+    /// truncated toward zero (`-2.7` gives `-2`; JS reports the raw double) and wrapped to 64 bits.
+    /// It is the delta, not the change in the counter's value: for an `Int32` counter given a delta
+    /// outside the int32 range the counter wraps at 32 bits, so read the counter for its value.
+    /// Returns `nil` for a delta that changes nothing (NaN or an infinity) or that is not numeric.
+    private static func opInfoValue(of primitive: Primitive) -> Int? {
+        switch primitive.value {
+        case .integer(let value):
+            return Int(value)
+        case .long(let value):
+            return Int(truncatingIfNeeded: value)
+        case .double(let value):
+            return value.isFinite ? Int(truncatingIfNeeded: Int64(wrapping: value)) : nil
+        default:
+            return nil
+        }
     }
 }

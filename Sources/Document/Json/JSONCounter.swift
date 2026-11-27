@@ -95,9 +95,29 @@ public class JSONCounter<T: YorkieCountable> {
         return self
     }
 
+    /**
+     * `increase` increases numeric data by a floating-point delta, truncated toward zero and wrapped
+     * at the counter's width. A NaN or an infinity is logged and ignored.
+     *
+     * The delta is converted to `Double` first, so a `Float80` is rounded before it is truncated and
+     * one beyond `Double`'s range is treated as an infinity.
+     */
     @discardableResult
     public func increase(value: any BinaryFloatingPoint) -> Self {
-        self.increase(value: T(value))
+        let delta = Double(value)
+
+        // NOTE: Go's `json.Counter.Increase` panics and JS's `Counter.increase` throws a RangeError for
+        // a NaN or an infinity. This overload does not throw, so it reports the failure the way the
+        // integer overload does and leaves the counter, and the change, untouched.
+        guard delta.isFinite else {
+            Logger.critical("a NaN or an infinity cannot increase a counter: \(delta)")
+            return self
+        }
+
+        // NOTE: `T(delta)` traps outside `T`'s range. Truncate toward zero and wrap at 64 bits, then at
+        // the counter's width, as Go's `TruncFloatToInt32` / `TruncFloatToInt64` and a remote
+        // Increase do, so every replica ends at the same value.
+        return self.increase(value: T(truncatingIfNeeded: Int64(wrapping: delta)))
     }
 }
 

@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.29] - 2026-11-27
+
+> **Behavioural change — remote Increase.** A pulled change whose Increase carries a value that is not a primitive, or a delta the counter refuses (for example a string), is now skipped with a warning instead of failing the whole pack and holding the checkpoint, as the Go server and the JS SDK do. A local `update`, undo and redo still throw, and an Increase whose target is missing or is not a counter still fails for every source. A non-primitive value in a local `update` or undo now throws `errInvalidArgument` instead of `errUnexpected`.
+
+> **Behavioural change — Double counter delta.** A counter now applies a Double delta that a JS peer sends (for example `increase(1.5)`): it is truncated toward zero and wrapped at the counter width, as Go and JS do, and a NaN or infinite delta is a no-op. Before, such a change failed the pack. `IncreaseOpInfo.value` is the delta truncated toward zero and wrapped to 64 bits; for an Int32 counter given a delta outside the int32 range it is not the change in the counter's value, so read the counter. `JSONCounter.increase(value:)` with a Double no longer crashes the process for a NaN, an infinity or a value outside the counter's range: a finite value is truncated toward zero and wrapped at the counter width, as Go does, and a NaN or an infinite value is logged and ignored (Go panics, JS throws).
+
+> **Not ported.** The React chat example (#1557) and the devtools `activeTab` fix (#1558) touch no SDK source. A presence value that is not JSON (#1559) needs no change: iOS keeps presence values as raw wire strings and decodes them lazily with a raw-text fallback, so this release only adds tests that pin it.
+
+### Fixed
+
+- Skip a remote Increase that cannot apply, with a warning, instead of failing the pack in https://github.com/yorkie-team/yorkie-ios-sdk/pull/283
+- Apply a Double delta to a plain counter as the Go and JS SDKs do in https://github.com/yorkie-team/yorkie-ios-sdk/pull/283
+- Stop `JSONCounter.increase(value:)` from crashing on a NaN, infinite or out-of-range Double in https://github.com/yorkie-team/yorkie-ios-sdk/pull/283
+
 ## [v0.7.28] - 2026-11-26
 
 > **Behavioural change — YSON reserved keys.** A document whose data holds an object key in the `__yson_` namespace (for example `__yson_type`) now parses as plain data and keeps that key, instead of being read as a type marker (mis-typed, or rejected with `invalid YSON <marker> format`). Hand-written JSON in the marker shape, with no `Int(...)`-style constructor behind it, is therefore plain data too.
