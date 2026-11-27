@@ -24,6 +24,9 @@ import XCTest
 /// fixed-depth regular expressions: nesting past three levels was left untransformed, and
 /// brackets inside string values were counted as structure. `preprocessYSON` is now a
 /// string-aware scanner without either limitation.
+///
+/// The `Reserved Marker Keys` section ports yorkie-js-sdk v0.7.28 (yorkie-js-sdk#1545
+/// "Escape user keys in YSON's reserved marker namespace").
 final class YSONTests: XCTestCase {
     // MARK: - parse
 
@@ -269,10 +272,15 @@ final class YSONTests: XCTestCase {
         XCTAssertThrowsError(try YSON.parse("{\"content\":Tree({\"invalid\":\"tree\"})}"))
     }
 
-    func test_should_throw_on_dedupcounter_missing_registers() {
-        // Manually crafted JSON that bypasses preprocessing — __yson_registers is absent.
-        let malformed = "{\"v\":{\"__yson_type\":\"DedupCounter\",\"__yson_data\":{\"__yson_type\":\"Int\",\"__yson_data\":5}}}"
-        XCTAssertThrowsError(try YSON.parse(malformed))
+    func test_should_treat_hand_written_marker_json_as_plain_data() throws {
+        // Hand-written JSON in the marker shape never went through the constructor syntax,
+        // so since yorkie-js-sdk v0.7.28 (#1545) its `__yson_*` keys are user data, not a
+        // DedupCounter, and are not validated as one (a missing `__yson_registers` no longer throws).
+        let handWritten = "{\"v\":{\"__yson_type\":\"DedupCounter\",\"__yson_data\":{\"__yson_type\":\"Int\",\"__yson_data\":5}}}"
+        XCTAssertEqual(try YSON.parse(handWritten), .object(["v": .object([
+            "__yson_type": .string("DedupCounter"),
+            "__yson_data": .object(["__yson_type": .string("Int"), "__yson_data": .number(5)])
+        ])]))
     }
 
     // MARK: - Deep nesting (regression: regex depth ceiling)
@@ -546,5 +554,674 @@ final class YSONTests: XCTestCase {
             // untransformed literal with the same code from a different origin.
             XCTAssertEqual(yorkieError.message, "Failed to parse YSON: DedupCounter expects two arguments, got 1")
         }
+    }
+
+    // MARK: - Reserved Marker Keys
+
+    // Ports `describe('Reserved Marker Keys')` from yorkie-js-sdk v0.7.28
+    // (yorkie-js-sdk#1545): a user key in the `__yson_` namespace must stay plain data
+    // rather than be read as a type marker.
+
+    private func parseObject(_ input: String, file: StaticString = #filePath, line: UInt = #line) throws -> [String: YSONValue] {
+        guard case .object(let object) = try YSON.parse(input) else {
+            XCTFail("expected object", file: file, line: line)
+            return [:]
+        }
+        return object
+    }
+
+    private var reservedIntObject: YSONValue {
+        .object(["x": .object(["__yson_type": .string("Int"), "__yson_data": .number(7)])])
+    }
+
+    func test_should_not_read_a_user_key_as_a_type_marker() throws {
+        // given / when
+        let result = try YSON.parse(#"{"x":{"__yson_type":"Int","__yson_data":7}}"#)
+
+        // then
+        XCTAssertEqual(result, self.reservedIntObject)
+    }
+
+    func test_should_not_read_a_user_key_as_a_dedupcounter_marker() throws {
+        // given / when
+        let result = try YSON.parse(
+            #"{"x":{"__yson_type":"DedupCounter","__yson_data":{"__yson_type":"Int","__yson_data":1},"__yson_registers":"aGk="}}"#
+        )
+
+        // then
+        XCTAssertEqual(result, .object(["x": .object([
+            "__yson_type": .string("DedupCounter"),
+            "__yson_data": .object(["__yson_type": .string("Int"), "__yson_data": .number(1)]),
+            "__yson_registers": .string("aGk=")
+        ])]))
+    }
+
+    func test_should_recognize_a_marker_key_however_it_is_spelled() throws {
+        // given / when / then: JSON escapes decode to the reserved keys before any decision is made
+        XCTAssertEqual(
+            try YSON.parse(#"{"x":{"\u005f_yson_type":"Int","__yson_\u0064ata":7}}"#),
+            self.reservedIntObject
+        )
+        // uppercase hex digits and an escaped trailing character
+        XCTAssertEqual(
+            try YSON.parse(#"{"x":{"\u005F_yson_typ\u0065":"Int","__yson_dat\u0061":7}}"#),
+            self.reservedIntObject
+        )
+    }
+
+    func test_should_recognize_a_reserved_key_spelled_with_a_backslash_first() throws {
+        // given / when: the literal starts with an escape, not with a literal underscore
+        let result = try YSON.parse(#"{"x":{"\u005f\u005fyson_type":"Int","__yson_data":7}}"#)
+
+        // then
+        XCTAssertEqual(result, self.reservedIntObject)
+    }
+
+    func test_should_keep_an_escaped_backslash_key_unchanged() throws {
+        // given / when: the literal decodes to the 9-character key `\__yson_a`, which is not reserved
+        let result = try YSON.parse(#"{"x":{"\\__yson_a":1}}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["x": .object(["\\__yson_a": .number(1)])]))
+    }
+
+    func test_should_keep_a_reserved_key_nested_in_an_array_valued_text_attribute() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Text([{"val":"a","attrs":{"k":[{"__yson_type":"b"}]}}])}"#)
+
+        // then: the nested key is user data and survives unescaped
+        XCTAssertEqual(result, .object(["t": .text(YSONText(nodes: [
+            YSONTextNode(val: "a", attrs: ["k": .array([.object(["__yson_type": .string("b")])])])
+        ]))]))
+    }
+
+    func test_should_round_trip_a_key_that_collides_with_the_escape_prefix() throws {
+        // given / when
+        let result = try YSON.parse(#"{"__yson_esc_x":1,"__yson_esc___yson_type":2}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["__yson_esc_x": .number(1), "__yson_esc___yson_type": .number(2)]))
+    }
+
+    func test_should_keep_a_reserved_key_that_holds_a_constructor() throws {
+        // given / when
+        let result = try YSON.parse(#"{"__yson_data":Int(3)}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["__yson_data": .int(3)]))
+    }
+
+    func test_should_leave_a_reserved_name_used_as_a_string_value_alone() throws {
+        // given / when
+        let result = try YSON.parse(#"{"v":"__yson_type","w":"__yson_esc_a"}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["v": .string("__yson_type"), "w": .string("__yson_esc_a")]))
+    }
+
+    func test_should_keep_a_reserved_key_in_text_node_attributes() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Text([{"val":"a","attrs":{"__yson_type":"b"}}])}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["t": .text(YSONText(nodes: [
+            YSONTextNode(val: "a", attrs: ["__yson_type": .string("b")])
+        ]))]))
+    }
+
+    func test_should_keep_a_reserved_key_in_tree_node_attributes() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Tree({"type":"doc","attrs":{"__yson_type":"b"},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: YSONTreeNode(
+            type: "doc", attrs: ["__yson_type": "b"], children: []
+        )))]))
+    }
+
+    func test_should_keep_a_reserved_key_nested_in_a_text_attribute_value() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Text([{"val":"a","attrs":{"k":{"__yson_type":"b"}}}])}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["t": .text(YSONText(nodes: [
+            YSONTextNode(val: "a", attrs: ["k": .object(["__yson_type": .string("b")])])
+        ]))]))
+    }
+
+    func test_should_keep_a_reserved_key_nested_in_a_tree_attribute_value() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Tree({"type":"doc","attrs":{"k":[{"__yson_type":"b"}]},"children":[]})}"#)
+
+        // then: the whole attrs are kept, as JS does; the string-valued view is empty
+        let root = YSONTreeNode(
+            type: "doc",
+            rawAttrs: .object(["k": .array([.object(["__yson_type": .string("b")])])]),
+            children: []
+        )
+        XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: root))]))
+        XCTAssertEqual(root.attrs, [:])
+    }
+
+    func test_should_keep_an_array_valued_attrs_an_array() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Text([{"val":"a","attrs":[{"__yson_type":"b"}]}])}"#)
+
+        // then: the array is kept in rawAttrs, as JS does; the object view is nil
+        let node = YSONTextNode(val: "a", rawAttrs: .array([.object(["__yson_type": .string("b")])]))
+        XCTAssertEqual(result, .object(["t": .text(YSONText(nodes: [node]))]))
+        XCTAssertNil(node.attrs)
+    }
+
+    func test_should_keep_a_proto_key_an_own_property_of_an_object() throws {
+        // given / when
+        let result = try YSON.parse(#"{"x":{"__proto__":{"polluted":true}}}"#)
+
+        // then: a Swift dictionary has no prototype, so this is an ordinary key
+        XCTAssertEqual(result, .object(["x": .object(["__proto__": .object(["polluted": .bool(true)])])]))
+    }
+
+    func test_should_keep_a_proto_attribute_an_own_property() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Tree({"type":"doc","attrs":{"__proto__":{"polluted":true}},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: YSONTreeNode(
+            type: "doc",
+            rawAttrs: .object(["__proto__": .object(["polluted": .bool(true)])]),
+            children: []
+        )))]))
+    }
+
+    func test_should_keep_a_proto_attribute_with_a_string_value() throws {
+        // given / when
+        let result = try YSON.parse(#"{"t":Tree({"type":"doc","attrs":{"__proto__":"x"},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["t": .tree(YSONTree(root: YSONTreeNode(
+            type: "doc", attrs: ["__proto__": "x"], children: []
+        )))]))
+    }
+
+    // MARK: Reserved Marker Keys (iOS-specific)
+
+    func test_should_recognize_a_reserved_key_followed_by_whitespace_before_the_colon() throws {
+        // given / when
+        let result = try YSON.parse("{\"x\":{\"__yson_type\" \n\t\r :\"Int\",\"__yson_data\" :7}}")
+
+        // then
+        XCTAssertEqual(result, self.reservedIntObject)
+    }
+
+    func test_should_not_escape_a_reserved_name_in_a_constructor_argument() throws {
+        // given / when: the string argument is a value, never a key
+        let result = try YSON.parse(#"{"d":Date("__yson_type"),"b":BinData("__yson_data")}"#)
+
+        // then
+        XCTAssertEqual(result, .object(["d": .date("__yson_type"), "b": .binData("__yson_data")]))
+    }
+
+    func test_should_escape_a_reserved_key_inside_a_constructor_argument() throws {
+        // given / when
+        let result = try YSON.parse(#"{"c":Counter(Int(1)),"t":Text([{"val":"a","attrs":{"__yson_data":1}}])}"#)
+
+        // then
+        XCTAssertEqual(result, .object([
+            "c": .counter(.int(1)),
+            "t": .text(YSONText(nodes: [YSONTextNode(val: "a", attrs: ["__yson_data": .number(1)])]))
+        ]))
+    }
+
+    func test_should_pass_an_undecodable_reserved_key_through_to_the_parse_error() {
+        // given / when / then: a lone surrogate cannot be decoded, so it is left for the JSON parser to reject
+        XCTAssertThrowsError(try YSON.parse(#"{"__yson_\ud800":1}"#)) { error in
+            guard let yorkieError = error as? YorkieError else {
+                return XCTFail("expected YorkieError but got \(error)")
+            }
+            XCTAssertEqual(yorkieError.code, .errInvalidArgument)
+            XCTAssertTrue(yorkieError.message.hasPrefix("Failed to parse YSON:"), yorkieError.message)
+        }
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_reserved_key_like_any_duplicated_key() throws {
+        // given / when
+        let reserved = try YSON.parse(#"{"x":{"__yson_type":1,"__yson_type":2}}"#)
+        let plain = try YSON.parse(#"{"x":{"k":1,"k":2}}"#)
+
+        // then: escaping must not change duplicate-key handling, and the last value wins as in JS
+        XCTAssertEqual(reserved, .object(["x": .object(["__yson_type": .number(2)])]))
+        XCTAssertEqual(plain, .object(["x": .object(["k": .number(2)])]))
+    }
+
+    func test_should_round_trip_a_reserved_key_with_a_combining_mark() throws {
+        // given: "__yson_" followed by U+0301, which merges with the underscore into one grapheme
+        let key = "__yson_\u{0301}"
+
+        // when
+        let result = try YSON.parse("{\"x\":{\"\(key)\":1}}")
+
+        // then
+        XCTAssertEqual(result, .object(["x": .object([key: .number(1)])]))
+    }
+
+    func test_should_round_trip_a_document_with_many_reserved_and_plain_keys() throws {
+        // given
+        let input = #"{"a":1,"__yson_type":"Int","b":2,"__yson_data":7,"c":3,"__yson_registers":"r","d":4,"__yson_esc_x":5,"e":6,"__yson_other":8}"#
+
+        // when
+        let result = try self.parseObject(input)
+
+        // then
+        XCTAssertEqual(result, [
+            "a": .number(1), "b": .number(2), "c": .number(3), "d": .number(4), "e": .number(6),
+            "__yson_type": .string("Int"), "__yson_data": .number(7), "__yson_registers": .string("r"),
+            "__yson_esc_x": .number(5), "__yson_other": .number(8)
+        ])
+    }
+
+    // MARK: Attrs of any shape (rawAttrs)
+
+    private func treeRoot(_ input: String, file: StaticString = #filePath, line: UInt = #line) throws -> YSONTreeNode {
+        let object = try self.parseObject(input, file: file, line: line)
+        guard case .tree(let tree)? = object["t"] else {
+            XCTFail("expected a tree", file: file, line: line)
+            return YSONTreeNode(type: "")
+        }
+        return tree.root
+    }
+
+    private func textNode(_ input: String, file: StaticString = #filePath, line: UInt = #line) throws -> YSONTextNode {
+        let object = try self.parseObject(input, file: file, line: line)
+        guard case .text(let text)? = object["t"], let node = text.nodes.first else {
+            XCTFail("expected a text node", file: file, line: line)
+            return YSONTextNode(val: "")
+        }
+        return node
+    }
+
+    func test_should_keep_every_attribute_of_a_tree_node_with_mixed_value_types() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{"class":"p","n":1,"on":true,"z":null},"children":[]})}"#)
+
+        // then: rawAttrs is lossless, attrs is the string-valued subset
+        XCTAssertEqual(root.rawAttrs, .object([
+            "class": .string("p"), "n": .number(1), "on": .bool(true), "z": .null
+        ]))
+        XCTAssertEqual(root.attrs, ["class": "p"])
+    }
+
+    func test_should_parse_all_string_tree_attrs_equal_to_a_node_built_with_the_legacy_init() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"a":"1","b":"2"},"children":[]})}"#)
+
+        // then: nothing changes for string-only attrs
+        XCTAssertEqual(root, YSONTreeNode(type: "p", attrs: ["a": "1", "b": "2"], children: []))
+        XCTAssertEqual(root.attrs, ["a": "1", "b": "2"])
+        XCTAssertEqual(root.rawAttrs, .object(["a": .string("1"), "b": .string("2")]))
+    }
+
+    func test_should_parse_text_attrs_equal_to_a_node_built_with_the_legacy_init() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":{"bold":true}}])}"#)
+
+        // then
+        XCTAssertEqual(node, YSONTextNode(val: "a", attrs: ["bold": .bool(true)]))
+        XCTAssertEqual(node.attrs, ["bold": .bool(true)])
+    }
+
+    func test_should_keep_an_array_valued_attrs_of_a_tree_node() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":[1,"a"],"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(root.rawAttrs, .array([.number(1), .string("a")]))
+        XCTAssertNil(root.attrs)
+    }
+
+    func test_should_drop_attrs_that_are_neither_an_object_nor_an_array() throws {
+        // given / when / then: JS keeps only object-typed attrs, so every other shape is dropped
+        for attrs in [#""x""#, "5", "true", "null"] {
+            let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":\#(attrs)}])}"#)
+            XCTAssertNil(node.rawAttrs, "text attrs \(attrs)")
+            XCTAssertNil(node.attrs, "text attrs \(attrs)")
+
+            let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":\#(attrs),"children":[]})}"#)
+            XCTAssertNil(root.rawAttrs, "tree attrs \(attrs)")
+            XCTAssertNil(root.attrs, "tree attrs \(attrs)")
+        }
+        XCTAssertNil(try self.textNode(#"{"t":Text([{"val":"a"}])}"#).rawAttrs)
+        XCTAssertNil(try self.treeRoot(#"{"t":Tree({"type":"doc","children":[]})}"#).rawAttrs)
+    }
+
+    func test_should_keep_empty_attrs_objects_and_arrays() throws {
+        // given / when / then
+        XCTAssertEqual(try self.textNode(#"{"t":Text([{"val":"a","attrs":{}}])}"#).rawAttrs, .object([:]))
+        XCTAssertEqual(try self.textNode(#"{"t":Text([{"val":"a","attrs":[]}])}"#).rawAttrs, .array([]))
+        XCTAssertEqual(try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{},"children":[]})}"#).attrs, [:])
+        XCTAssertEqual(try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":[],"children":[]})}"#).rawAttrs, .array([]))
+    }
+
+    func test_should_unescape_a_reserved_key_of_a_tree_attribute_with_a_non_string_value() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{"__yson_type":1,"c":"s"},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(root.rawAttrs, .object(["__yson_type": .number(1), "c": .string("s")]))
+        XCTAssertEqual(root.attrs, ["c": "s"])
+    }
+
+    func test_should_keep_a_reserved_key_nested_in_an_array_valued_attrs_element() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":[{"__yson_type":"b"},[{"__yson_data":1}]]}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .array([
+            .object(["__yson_type": .string("b")]),
+            .array([.object(["__yson_data": .number(1)])])
+        ]))
+    }
+
+    func test_should_read_a_constructor_in_attrs_position_as_a_plain_object() throws {
+        // given / when: JS reads attrs by walking keys only, so the marker is not interpreted
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":Int(3)}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .object(["__yson_type": .string("Int"), "__yson_data": .number(3)]))
+    }
+
+    func test_should_type_a_constructor_inside_an_attrs_object_value() throws {
+        // given / when: pre-existing iOS behaviour, kept
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":{"k":Int(3)}}])}"#)
+
+        // then
+        XCTAssertEqual(node.attrs, ["k": .int(3)])
+    }
+
+    func test_should_parse_an_invalid_constructor_in_tree_attrs_keeping_its_raw_value() throws {
+        // given / when: the old code parsed this (attrs nil) and JS parses it; it must not throw
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":Int(1.5)},"children":[]})}"#)
+
+        // then: the raw marker object is kept, not typed and not dropped
+        XCTAssertEqual(root.rawAttrs, .object(["k": .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])]))
+        XCTAssertEqual(root.attrs, [:])
+    }
+
+    func test_should_still_type_a_valid_constructor_in_tree_attrs() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":Int(3),"bad":Long(true),"s":"x"},"children":[]})}"#)
+
+        // then
+        guard case .object(let attrs)? = root.rawAttrs else {
+            return XCTFail("expected object attrs")
+        }
+        XCTAssertEqual(attrs["k"], .int(3))
+        XCTAssertEqual(attrs["s"], .string("x"))
+        XCTAssertNotNil(attrs["bad"])
+    }
+
+    func test_should_parse_an_invalid_constructor_in_array_valued_text_attrs_keeping_its_raw_value() throws {
+        // given / when: array attrs were ignored at the merge base, so this parsed there
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":[Int(1.5)]}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .array([.object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])]))
+    }
+
+    func test_should_type_a_valid_sibling_of_an_invalid_constructor_in_array_valued_text_attrs() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":[Int(3),Int(1.5)]}])}"#)
+
+        // then
+        XCTAssertEqual(node.rawAttrs, .array([.int(3), .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])]))
+    }
+
+    func test_should_keep_a_valid_element_typed_next_to_an_invalid_one_in_tree_attrs_array() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":[Int(3),Int(1.5)]},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(
+            root.rawAttrs,
+            .object(["k": .array([.int(3), .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])])])
+        )
+    }
+
+    func test_should_keep_a_valid_member_typed_next_to_an_invalid_one_in_nested_tree_attrs_object() throws {
+        // given / when
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":{"a":Int(3),"b":Int(1.5)}},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(
+            root.rawAttrs,
+            .object(["k": .object(["a": .int(3), "b": .object(["__yson_type": .string("Int"), "__yson_data": .number(1.5)])])])
+        )
+    }
+
+    func test_should_fall_back_at_the_outermost_failing_marker_in_tree_attrs() throws {
+        // given / when: Counter(Int(1.5)) fails as a whole, so the Counter marker is raw, not just its data
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"k":[Counter(Int(1.5)),Counter(Int(2))]},"children":[]})}"#)
+
+        // then
+        guard case .object(let attrs)? = root.rawAttrs, case .array(let items)? = attrs["k"], items.count == 2 else {
+            return XCTFail("expected an array of two")
+        }
+        guard case .object(let first) = items[0] else { return XCTFail("expected raw object") }
+        XCTAssertEqual(first["__yson_type"], .string("Counter"))
+        XCTAssertEqual(items[1], .counter(.int(2)))
+    }
+
+    func test_should_still_reject_an_invalid_constructor_in_text_attrs() {
+        // given / when / then: Text attrs behaviour is unchanged
+        XCTAssertThrowsError(try YSON.parse(#"{"t":Text([{"val":"a","attrs":{"k":Int(1.5)}}])}"#))
+    }
+
+    func test_should_expose_raw_attrs_of_nodes_built_with_the_legacy_inits() {
+        // given / when
+        let text = YSONTextNode(val: "a", attrs: ["b": .bool(true)])
+        let tree = YSONTreeNode(type: "p", attrs: ["a": "1"])
+
+        // then
+        XCTAssertEqual(text.rawAttrs, .object(["b": .bool(true)]))
+        XCTAssertEqual(tree.rawAttrs, .object(["a": .string("1")]))
+        XCTAssertNil(YSONTextNode(val: "a").rawAttrs)
+        XCTAssertNil(YSONTreeNode(type: "p").rawAttrs)
+    }
+
+    func test_should_skip_non_string_tree_attrs_when_rendering_xml() throws {
+        // given
+        let root = try self.treeRoot(#"{"t":Tree({"type":"p","attrs":{"class":"x","n":1,"on":true},"children":[]})}"#)
+
+        // when / then: attributes with no string form are left out of the XML, string ones stay
+        XCTAssertEqual(YSON.treeToXML(YSONTree(root: root)), #"<p class="x" />"#)
+        XCTAssertEqual(
+            YSON.treeToXML(YSONTree(root: YSONTreeNode(type: "p", rawAttrs: .array([.number(1)]), children: []))),
+            "<p />"
+        )
+    }
+
+    // MARK: Duplicated keys (last value wins)
+
+    func test_should_keep_the_last_value_of_a_key_repeated_three_times() throws {
+        XCTAssertEqual(try self.parseObject(#"{"k":1,"k":2,"k":3}"#), ["k": .number(3)])
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_nested_key() throws {
+        XCTAssertEqual(try YSON.parse(#"{"a":{"k":1,"k":2}}"#), .object(["a": .object(["k": .number(2)])]))
+    }
+
+    func test_should_keep_the_last_value_when_a_duplicate_is_spelled_with_an_escape() throws {
+        // given / when
+        let result = try self.parseObject(#"{"k":1,"\u006b":2}"#)
+        let reversed = try self.parseObject(#"{"\u006b":1,"k":2,"k":3}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .number(2)])
+        XCTAssertEqual(reversed, ["k": .number(3)])
+    }
+
+    func test_should_not_merge_the_same_key_of_sibling_objects() throws {
+        XCTAssertEqual(
+            try YSON.parse(#"[{"k":1},{"k":2},{"k":3,"k":4}]"#),
+            .array([.object(["k": .number(1)]), .object(["k": .number(2)]), .object(["k": .number(4)])])
+        )
+    }
+
+    func test_should_keep_the_last_value_of_a_key_repeated_at_different_depths() throws {
+        // given / when
+        let result = try self.parseObject(#"{"k":{"k":1},"k":{"k":2}}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .object(["k": .number(2)])])
+    }
+
+    func test_should_keep_the_last_value_of_a_key_that_reappears_after_a_nested_scope_closed() throws {
+        XCTAssertEqual(
+            try self.parseObject(#"{"a":1,"o":{"a":9},"a":2}"#),
+            ["a": .number(2), "o": .object(["a": .number(9)])]
+        )
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_attrs_key() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","attrs":{"b":1,"b":2}}])}"#)
+        let root = try self.treeRoot(#"{"t":Tree({"type":"doc","attrs":{"c":"x","c":"y"},"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(node.attrs, ["b": .number(2)])
+        XCTAssertEqual(root.attrs, ["c": "y"])
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_node_field() throws {
+        // given / when
+        let node = try self.textNode(#"{"t":Text([{"val":"a","val":"b"}])}"#)
+        let root = try self.treeRoot(#"{"t":Tree({"type":"x","type":"doc","children":[{"type":"a"}],"children":[]})}"#)
+
+        // then
+        XCTAssertEqual(node.val, "b")
+        XCTAssertEqual(root, YSONTreeNode(type: "doc", children: []))
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_key_next_to_constructors() throws {
+        // given / when / then
+        XCTAssertEqual(try self.parseObject(#"{"a":Int(1),"a":Int(2)}"#), ["a": .int(2)])
+        XCTAssertEqual(try self.parseObject(#"{"a":Int(1),"a":"s"}"#), ["a": .string("s")])
+        XCTAssertEqual(try self.parseObject(#"{"a":"s","a":Int(1)}"#), ["a": .int(1)])
+        XCTAssertEqual(try self.parseObject(#"{"a":Counter(Int(1)),"a":Counter(Long(2))}"#), ["a": .counter(.long(2))])
+    }
+
+    func test_should_not_validate_a_value_that_a_later_duplicate_overwrote() throws {
+        // given / when: JS never looks at the overwritten value either
+        let result = try self.parseObject(#"{"a":Int(1.5),"a":2}"#)
+
+        // then
+        XCTAssertEqual(result, ["a": .number(2)])
+    }
+
+    func test_should_keep_the_last_value_of_a_duplicated_key_inside_a_constructor_argument() throws {
+        // given / when
+        let object = try self.parseObject(#"{"t":Tree({"type":"doc","children":[{"type":"p","attrs":{"k":"1","k":"2"}}]})}"#)
+
+        // then
+        guard case .tree(let tree)? = object["t"] else {
+            return XCTFail("expected a tree")
+        }
+        XCTAssertEqual(tree.root.children?.first?.attrs, ["k": "2"])
+    }
+
+    func test_should_keep_a_user_key_in_the_junk_namespace_next_to_a_duplicate() throws {
+        // given / when: a key spelled like the internal rename must neither vanish nor be read as junk
+        let result = try self.parseObject(#"{"k":1,"__yson_dup_k":7,"k":2,"__yson_dup_k":8}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .number(2), "__yson_dup_k": .number(8)])
+    }
+
+    func test_should_keep_the_last_value_of_an_escaped_duplicate_key_in_index_mode() throws {
+        // given / when: more than 16 keys, then an escaped spelling of an earlier plain `k`
+        let result = try self.parseObject(#"{"f0":0,"f1":0,"f2":0,"f3":0,"f4":0,"f5":0,"f6":0,"f7":0,"f8":0,"f9":0,"f10":0,"f11":0,"f12":0,"f13":0,"f14":0,"f15":0,"f16":0,"f17":0,"f18":0,"f19":0,"k":1,"\u006b":2}"#)
+
+        // then
+        XCTAssertEqual(result["k"], .number(2))
+        XCTAssertEqual(result.count, 21)
+    }
+
+    func test_should_keep_an_escaped_literal_of_the_junk_namespace_as_a_user_key() throws {
+        // given / when: `__yson_dup_k` spelled with an escape must survive next to a real duplicate
+        let result = try self.parseObject(#"{"k":1,"\u005f_yson_dup_k":7,"k":2}"#)
+
+        // then
+        XCTAssertEqual(result, ["k": .number(2), "__yson_dup_k": .number(7)])
+    }
+
+    func test_should_keep_the_last_value_of_an_escaped_reserved_key_repeated_three_times() throws {
+        // given / when
+        let result = try self.parseObject(#"{"x":{"__yson_type":1,"\u005f_yson_type":2,"__yson_type":3}}"#)
+
+        // then
+        XCTAssertEqual(result, ["x": .object(["__yson_type": .number(3)])])
+    }
+
+    func test_should_keep_a_document_without_duplicates_unchanged() throws {
+        // given
+        let input = #"{"a":1,"b":{"c":[1,2,{"d":3}],"e":"x"},"f":[{"a":1},{"a":2}],"g":Text([{"val":"v","attrs":{"k":1}}])}"#
+
+        // when / then
+        XCTAssertEqual(try self.parseObject(input), [
+            "a": .number(1),
+            "b": .object(["c": .array([.number(1), .number(2), .object(["d": .number(3)])]), "e": .string("x")]),
+            "f": .array([.object(["a": .number(1)]), .object(["a": .number(2)])]),
+            "g": .text(YSONText(nodes: [YSONTextNode(val: "v", attrs: ["k": .number(1)])]))
+        ])
+    }
+
+    func test_should_reject_unbalanced_closers_without_trapping() {
+        // given / when / then: the dedup scope stack must tolerate a stray closer
+        for input in [#"}{"a":1,"a":2}"#, #"{"a":1}}"#, #"]"#, #"{"a":1,"a":2}]}"#, #"{"a":1,"a":2"#] {
+            XCTAssertThrowsError(try YSON.parse(input), input)
+        }
+    }
+
+    func test_should_pass_an_undecodable_duplicate_key_through_to_the_parse_error() {
+        // given / when / then: a lone surrogate cannot be decoded, so dedup is skipped and parsing fails
+        XCTAssertThrowsError(try YSON.parse(#"{"\ud800":1,"\ud800":2}"#)) { error in
+            XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument)
+        }
+    }
+
+    func test_should_not_trap_on_very_deep_array_nesting() {
+        // given
+        let input = String(repeating: "[", count: 100_000) + String(repeating: "]", count: 100_000)
+
+        // when / then: parsing or rejecting are both fine, crashing is not
+        _ = try? YSON.parse(input)
+    }
+
+    func test_should_keep_the_last_value_of_one_key_repeated_a_hundred_thousand_times() throws {
+        // given: the shape that made a per-duplicate insert quadratic
+        let members = (0 ..< 100_000).map { #""k":\#($0)"# }.joined(separator: ",")
+
+        // when
+        let result = try self.parseObject("{\(members)}")
+
+        // then
+        XCTAssertEqual(result, ["k": .number(99999)])
+    }
+
+    func test_should_keep_the_last_value_of_many_duplicated_keys_in_a_large_document() throws {
+        // given: ~5 MB, 50k distinct keys each present twice with different values
+        let pad = String(repeating: "x", count: 30)
+        let first = (0 ..< 50000).map { #""key_\#($0)":"first_\#(pad)""# }
+        let second = (0 ..< 50000).map { #""key_\#($0)":"last_\#($0)_\#(pad)""# }
+        let input = "{" + (first + second).joined(separator: ",") + "}"
+        XCTAssertGreaterThan(input.utf8.count, 4_500_000)
+
+        // when
+        let result = try self.parseObject(input)
+
+        // then
+        XCTAssertEqual(result.count, 50000)
+        XCTAssertEqual(result["key_0"], .string("last_0_\(pad)"))
+        XCTAssertEqual(result["key_49999"], .string("last_49999_\(pad)"))
+        XCTAssertEqual(result["key_1234"], .string("last_1234_\(pad)"))
     }
 }

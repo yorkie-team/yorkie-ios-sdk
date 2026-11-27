@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 This file was reconstructed from the project's [GitHub Releases](https://github.com/yorkie-team/yorkie-ios-sdk/releases).
 
+## [v0.7.28] - 2026-11-26
+
+> **Behavioural change — YSON reserved keys.** A document whose data holds an object key in the `__yson_` namespace (for example `__yson_type`) now parses as plain data and keeps that key, instead of being read as a type marker (mis-typed, or rejected with `invalid YSON <marker> format`). Hand-written JSON in the marker shape, with no `Int(...)`-style constructor behind it, is therefore plain data too.
+
+> **Behavioural change — YSON attrs and duplicate keys.** The YSON parser now matches the JS SDK in two places it used to differ. (1) A Tree node's `attrs` with non-string values, and an array-valued `attrs` on a Text or Tree node, are kept instead of dropped; read them from the new `rawAttrs` property of `YSONTextNode` and `YSONTreeNode`. `attrs` is unchanged for string-only attrs, but a Tree node whose attrs hold any non-string value now gives the string-valued subset (possibly empty, `[:]`) instead of `nil` (`rawAttrs` has everything). In Tree attrs and array-valued Text attrs, a constructor that is valid is typed and one that is invalid (for example `Int(1.5)`) keeps its raw value instead of failing the parse, without untyping its valid siblings. `treeToXML` skips attributes that are not strings. (2) A key that is repeated in one object now keeps its LAST value, as `JSON.parse` does; it used to keep the first.
+
+> **Not ported.** The example apps, pointer-ink and agent-harness changes, and the JS CI hardening in 0.7.28 touch no SDK source. The JS `__proto__` hardening has no Swift counterpart: a Swift dictionary has no prototype, so `__proto__` is already an ordinary key.
+
+### Fixed
+
+- Keep an object key in YSON's `__yson_` namespace from being read as a type marker in https://github.com/yorkie-team/yorkie-ios-sdk/pull/282
+- Keep Tree attrs with non-string values and array-valued Text and Tree attrs when parsing YSON, and add `rawAttrs` to read them in https://github.com/yorkie-team/yorkie-ios-sdk/pull/282
+- Keep the last value of a key that is repeated in a YSON object in https://github.com/yorkie-team/yorkie-ios-sdk/pull/282
+
 ## [v0.7.27] - 2026-11-18
 
 > **Behavioural change — channel detach.** Detaching through a `Channel` object that a newer `Channel` of the same key has replaced now throws `errNotAttached` instead of detaching the newer one, as the Go and JS SDKs do. `deactivate()` also tears down an attachment that a same-key attach displaced, so its Watch stream no longer outlives the client.

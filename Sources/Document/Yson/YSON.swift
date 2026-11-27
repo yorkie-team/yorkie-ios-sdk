@@ -149,6 +149,7 @@ public enum YSON {
         static let rbrace: UInt8 = 0x7D
         static let comma: UInt8 = 0x2C
         static let underscore: UInt8 = 0x5F
+        static let colon: UInt8 = 0x3A
     }
 
     /// Reports whether `byte` can appear inside an identifier.
@@ -370,6 +371,7 @@ public enum YSON {
 
         var result: [UInt8] = []
         result.reserveCapacity(bytes.count)
+        var keys = DuplicateKeyTracker()
         var idx = 0
 
         while idx < bytes.count {
@@ -379,9 +381,45 @@ public enum YSON {
             // as structure.
             if byte == Byte.quote {
                 let end = try self.skipString(bytes, idx)
-                result.append(contentsOf: bytes[idx ..< end])
+                // Key position: followed by `:` after JSON whitespace. String values and
+                // constructor arguments never are.
+                var decodedKey: [UInt8]?
+                var reserved = false
+                if self.isKeyPosition(bytes, end) {
+                    let body = bytes[(idx + 1) ..< (end - 1)]
+                    if body.contains(Byte.backslash) {
+                        // An undecodable literal (e.g. a lone surrogate) is passed through
+                        // verbatim, and left out of duplicate tracking, so that the later
+                        // JSONSerialization reports it.
+                        decodedKey = self.decodeKeyLiteral(bytes, idx, end)
+                        reserved = decodedKey?.starts(with: self.reservedKeyPrefixBytes) ?? false
+                        if decodedKey != nil {
+                            keys.register(bytes, idx + 1, end - 1, decodedKey, outIndex: result.count)
+                        }
+                    } else {
+                        reserved = body.starts(with: self.reservedKeyPrefixBytes)
+                        keys.register(bytes, idx + 1, end - 1, nil, outIndex: result.count)
+                    }
+                }
+                if reserved {
+                    // Insert the escape prefix right after the opening quote; the rest of the
+                    // literal is copied byte-for-byte, so the result is still a valid literal.
+                    result.append(Byte.quote)
+                    result.append(contentsOf: self.escapedKeyPrefixBytes)
+                    result.append(contentsOf: bytes[(idx + 1) ..< end])
+                } else {
+                    result.append(contentsOf: bytes[idx ..< end])
+                }
                 idx = end
                 continue
+            }
+
+            // Track object and array scopes for duplicate-key detection. A stray closer
+            // is ignored here; the JSON parser rejects the unbalanced input later.
+            if byte == Byte.lbrace || byte == Byte.lbracket {
+                keys.push(isObject: byte == Byte.lbrace)
+            } else if byte == Byte.rbrace || byte == Byte.rbracket {
+                keys.pop()
             }
 
             guard let match = self.matchConstructorAt(bytes, idx) else {
@@ -433,7 +471,133 @@ public enum YSON {
             idx = argEnd + 1
         }
 
-        return result
+        return keys.markingDuplicates(in: result)
+    }
+
+    // MARK: - Duplicate keys
+
+    /// Prefix the scanner puts on every occurrence of a key that is repeated later in the
+    /// same object. `JSONSerialization` keeps the first of two equal keys, JS `JSON.parse`
+    /// keeps the last, so the earlier ones are renamed out of the way and postprocessing
+    /// skips them. It starts with ``reservedKeyPrefix``, so a user key spelled like it is
+    /// itself escaped and cannot collide.
+    private static let duplicateKeyPrefix = "__yson_dup_"
+    private static let duplicateKeyPrefixBytes = Array(duplicateKeyPrefix.utf8)
+
+    /// Finds object keys that are repeated within one object, in a single pass over the scan.
+    ///
+    /// Keys are identified by their decoded UTF-8 bytes. Each scope keeps its keys in one shared
+    /// log (a scope owns the log suffix that starts at its `start`), searched linearly while
+    /// small and through a hash index once it has more than ``linearLimit`` keys. The hash is
+    /// only a filter: candidates are always compared byte for byte.
+    private struct DuplicateKeyTracker {
+        private static let linearLimit = 16
+
+        private var scopes: [DuplicateKeyScope] = []
+        private var log: [DuplicateKeyEntry] = []
+        /// Output positions of the opening quote of every superseded key.
+        private var junk: [Int] = []
+
+        mutating func push(isObject: Bool) {
+            self.scopes.append(DuplicateKeyScope(isObject: isObject, start: self.log.count, index: nil))
+        }
+
+        mutating func pop() {
+            guard let scope = self.scopes.popLast() else {
+                return
+            }
+            self.log.removeSubrange(scope.start...)
+        }
+
+        /// Registers the key literal whose body is `bytes[start ..< end]` (quotes excluded), or
+        /// `decoded` when it has escapes, and whose opening quote will be written at
+        /// `outIndex`. An earlier equal key of the same object is marked as superseded.
+        mutating func register(_ bytes: [UInt8], _ srcStart: Int, _ srcEnd: Int, _ decoded: [UInt8]?, outIndex: Int) {
+            guard let scopeIndex = self.scopes.indices.last, self.scopes[scopeIndex].isObject else {
+                return
+            }
+            let hash = decoded.map { Self.hash($0, 0, $0.count) } ?? Self.hash(bytes, srcStart, srcEnd)
+            let start = self.scopes[scopeIndex].start
+            var entry = DuplicateKeyEntry(hash: hash, outIndex: outIndex, srcStart: srcStart, srcEnd: srcEnd, decoded: decoded,
+                                          prev: -1)
+
+            if self.scopes[scopeIndex].index != nil {
+                // Mutate the dictionary in place; copying it per key would be quadratic.
+                let newest = self.scopes[scopeIndex].index?[hash] ?? -1
+                var candidate = newest
+                while candidate >= 0 {
+                    if self.isEqual(self.log[candidate], bytes, srcStart, srcEnd, decoded) {
+                        self.junk.append(self.log[candidate].outIndex)
+                        break
+                    }
+                    candidate = self.log[candidate].prev
+                }
+                entry.prev = newest
+                self.scopes[scopeIndex].index?[hash] = self.log.count
+                self.log.append(entry)
+                return
+            }
+
+            var position = self.log.count - 1
+            while position >= start {
+                if self.log[position].hash == hash, self.isEqual(self.log[position], bytes, srcStart, srcEnd, decoded) {
+                    self.junk.append(self.log[position].outIndex)
+                    break
+                }
+                position -= 1
+            }
+            self.log.append(entry)
+
+            if self.log.count - start > Self.linearLimit {
+                var index = [Int: Int](minimumCapacity: self.log.count - start)
+                for position in start ..< self.log.count {
+                    self.log[position].prev = index[self.log[position].hash] ?? -1
+                    index[self.log[position].hash] = position
+                }
+                self.scopes[scopeIndex].index = index
+            }
+        }
+
+        /// Returns `result` with ``duplicateKeyPrefix`` spliced in after the opening quote of
+        /// every superseded key, in one pass.
+        func markingDuplicates(in result: [UInt8]) -> [UInt8] {
+            guard self.junk.isEmpty == false else {
+                return result
+            }
+            let prefix = YSON.duplicateKeyPrefixBytes
+            var marked: [UInt8] = []
+            marked.reserveCapacity(result.count + self.junk.count * prefix.count)
+            var copied = 0
+            for quote in self.junk.sorted() where quote >= copied {
+                marked.append(contentsOf: result[copied ... quote])
+                marked.append(contentsOf: prefix)
+                copied = quote + 1
+            }
+            marked.append(contentsOf: result[copied...])
+            return marked
+        }
+
+        private func isEqual(_ entry: DuplicateKeyEntry, _ bytes: [UInt8], _ start: Int, _ end: Int, _ decoded: [UInt8]?) -> Bool {
+            if entry.decoded == nil, decoded == nil {
+                let length = end - start
+                guard entry.srcEnd - entry.srcStart == length else {
+                    return false
+                }
+                return bytes[entry.srcStart ..< entry.srcEnd].elementsEqual(bytes[start ..< end])
+            }
+            let lhs = entry.decoded ?? Array(bytes[entry.srcStart ..< entry.srcEnd])
+            let rhs = decoded ?? Array(bytes[start ..< end])
+            return lhs == rhs
+        }
+
+        /// Seeded per process, so keys cannot be crafted to collide.
+        private static func hash(_ bytes: [UInt8], _ start: Int, _ end: Int) -> Int {
+            var hasher = Hasher()
+            bytes.withUnsafeBytes { buffer in
+                hasher.combine(bytes: UnsafeRawBufferPointer(rebasing: buffer[start ..< end]))
+            }
+            return hasher.finalize()
+        }
     }
 
     // MARK: - Postprocessing
@@ -441,6 +605,63 @@ public enum YSON {
     private static let typeKey = "__yson_type"
     private static let dataKey = "__yson_data"
     private static let registersKey = "__yson_registers"
+
+    /// Namespace of the marker keys the preprocessor emits.
+    private static let reservedKeyPrefix = "__yson_"
+
+    /// Prefix prepended to a user key inside the reserved namespace so it cannot be read as
+    /// a marker. It starts with ``reservedKeyPrefix``, so the escape is injective:
+    /// `__yson_esc_x` becomes `__yson_esc___yson_esc_x` and strips back to `__yson_esc_x`.
+    private static let escapedKeyPrefix = "__yson_esc_"
+
+    private static let reservedKeyPrefixBytes = Array(reservedKeyPrefix.utf8)
+    private static let escapedKeyPrefixBytes = Array(escapedKeyPrefix.utf8)
+
+    /// Reports whether the byte at `end` begins `:` after JSON whitespace, i.e. whether the
+    /// string literal ending just before it is an object key.
+    ///
+    /// Only literals in key position qualify, so string values and constructor arguments are
+    /// left alone.
+    private static func isKeyPosition(_ bytes: [UInt8], _ end: Int) -> Bool {
+        var next = end
+        while next < bytes.count, bytes[next] == 0x20 || bytes[next] == 0x09 || bytes[next] == 0x0A
+            || bytes[next] == 0x0D
+        {
+            next += 1
+        }
+        return next < bytes.count && bytes[next] == Byte.colon
+    }
+
+    /// Decodes the JSON string literal `bytes[start ..< end]` to its UTF-8 bytes, or `nil`
+    /// when it cannot be decoded (e.g. a lone surrogate).
+    ///
+    /// The key is decided on its decoded value, so `"\u005f_yson_type"` is caught as a reserved
+    /// key and `"\u006b"` as a repeat of `"k"`. Bytes are compared, never `Character`s, to avoid
+    /// grapheme merging (grapheme hazard noted in ``preprocessYSON``).
+    private static func decodeKeyLiteral(_ bytes: [UInt8], _ start: Int, _ end: Int) -> [UInt8]? {
+        guard let decoded = try? JSONSerialization.jsonObject(with: Data(bytes[start ..< end]),
+                                                              options: [.fragmentsAllowed]) as? String
+        else {
+            return nil
+        }
+        return Array(decoded.utf8)
+    }
+
+    /// Reports whether `key` was renamed by the scanner because a later key of the same object
+    /// repeats it (see ``duplicateKeyPrefix``).
+    private static func isSupersededKey(_ key: String) -> Bool {
+        key.utf8.starts(with: self.duplicateKeyPrefixBytes)
+    }
+
+    /// Strips one ``escapedKeyPrefix`` from `key`, undoing what the preprocessor added.
+    private static func unescapeKey(_ key: String) -> String {
+        guard key.utf8.starts(with: self.escapedKeyPrefixBytes) else {
+            return key
+        }
+        // Slice by UTF-8 units, not Characters: the prefix is ASCII, but a following combining
+        // mark must not be merged into it.
+        return String(key.utf8.dropFirst(self.escapedKeyPrefixBytes.count)) ?? key
+    }
 
     /// Recursively restores YSON types from the parsed JSON object graph.
     private static func postprocessValue(_ value: Any) throws -> YSONValue {
@@ -473,8 +694,8 @@ public enum YSON {
             }
 
             var object = [String: YSONValue]()
-            for (key, val) in dict {
-                object[key] = try self.postprocessValue(val)
+            for (key, val) in dict where !self.isSupersededKey(key) {
+                object[self.unescapeKey(key)] = try self.postprocessValue(val)
             }
             return .object(object)
         }
@@ -556,16 +777,78 @@ public enum YSON {
             throw YorkieError(code: .errInvalidArgument, message: "invalid text node format")
         }
 
-        var attrs: [String: YSONValue]?
-        if let rawAttrs = dict["attrs"] as? [String: Any] {
-            var mapped = [String: YSONValue]()
-            for (key, value) in rawAttrs {
-                mapped[key] = try self.postprocessValue(value)
-            }
-            attrs = mapped
-        }
+        // Object attrs stay strict (iOS has always rejected an invalid constructor there); array
+        // attrs were ignored before, so they must not start to fail a parse that used to pass.
+        let rawAttrs = dict["attrs"]
+        return try YSONTextNode(val: val, rawAttrs: self.postprocessAttrs(rawAttrs, lenient: rawAttrs is [Any]))
+    }
 
-        return YSONTextNode(val: val, attrs: attrs)
+    /// Restores a node's `attrs`, keeping any object or array as the JS SDK does.
+    ///
+    /// The keys are walked here instead of handing the object to ``postprocessValue(_:)``, so
+    /// an `attrs` object that happens to look like a type marker is read as plain data. Any
+    /// other shape (string, number, boolean, null, absent) is dropped, as in JS.
+    ///
+    /// With `lenient`, the values are walked element by element and only a constructor marker
+    /// that is invalid (for example `Int(1.5)`) falls back to its raw, check-free form instead
+    /// of failing the whole parse, as the JS SDK parses such attrs. Valid siblings stay typed.
+    private static func postprocessAttrs(_ raw: Any?, lenient: Bool) throws -> YSONValue? {
+        if let dict = raw as? [String: Any] {
+            var object = [String: YSONValue]()
+            for (key, value) in dict where !self.isSupersededKey(key) {
+                object[self.unescapeKey(key)] = try self.postprocessAttrValue(value, lenient: lenient)
+            }
+            return .object(object)
+        }
+        if let array = raw as? [Any] {
+            return try .array(array.map { try self.postprocessAttrValue($0, lenient: lenient) })
+        }
+        return nil
+    }
+
+    private static func postprocessAttrValue(_ value: Any, lenient: Bool) throws -> YSONValue {
+        guard lenient else { return try self.postprocessValue(value) }
+        if let array = value as? [Any] {
+            return try .array(array.map { try self.postprocessAttrValue($0, lenient: true) })
+        }
+        if let dict = value as? [String: Any], !(dict[self.typeKey] is String) {
+            // Plain object: recurse so one bad constructor does not untype its siblings.
+            var object = [String: YSONValue]()
+            for (key, val) in dict where !self.isSupersededKey(key) {
+                object[self.unescapeKey(key)] = try self.postprocessAttrValue(val, lenient: true)
+            }
+            return .object(object)
+        }
+        // A scalar or a constructor marker: strict, and raw at the outermost marker that fails.
+        do {
+            return try self.postprocessValue(value)
+        } catch {
+            return self.rawValue(value)
+        }
+    }
+
+    /// Converts `value` without validating constructor markers; marker keys stay plain keys.
+    private static func rawValue(_ value: Any) -> YSONValue {
+        if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                return .bool(number.boolValue)
+            }
+            return .number(number.doubleValue)
+        }
+        if let string = value as? String {
+            return .string(string)
+        }
+        if let array = value as? [Any] {
+            return .array(array.map { self.rawValue($0) })
+        }
+        if let dict = value as? [String: Any] {
+            var object = [String: YSONValue]()
+            for (key, val) in dict where !self.isSupersededKey(key) {
+                object[self.unescapeKey(key)] = self.rawValue(val)
+            }
+            return .object(object)
+        }
+        return .null
     }
 
     private static func postprocessTreeNode(_ node: Any) throws -> YSONTreeNode {
@@ -579,18 +862,23 @@ public enum YSON {
         }
 
         // Element node.
-        let attrs = dict["attrs"] as? [String: String]
+        let attrs = try self.postprocessAttrs(dict["attrs"], lenient: true)
 
         var children: [YSONTreeNode]?
         if let rawChildren = dict["children"] as? [Any] {
             children = try rawChildren.map { try self.postprocessTreeNode($0) }
         }
 
-        return YSONTreeNode(type: type, attrs: attrs, children: children)
+        return YSONTreeNode(type: type, rawAttrs: attrs, children: children)
     }
 
     // MARK: - XML
 
+    /// Renders `node` as XML.
+    ///
+    /// Only string-valued attributes are rendered (``YSONTreeNode/attrs``): an attribute whose
+    /// value is not a string has no XML form and is skipped. Read ``YSONTreeNode/rawAttrs``
+    /// for the full attributes.
     private static func treeNodeToXML(_ node: YSONTreeNode) -> String {
         let attrs = node.attrs?.map { " \($0.key)=\"\(self.escapeXML($0.value))\"" }.joined() ?? ""
 
@@ -616,4 +904,22 @@ public enum YSON {
             .replacingOccurrences(of: "\"", with: "&quot;")
             .replacingOccurrences(of: "'", with: "&apos;")
     }
+}
+
+// MARK: - Duplicate key tracking state
+
+private struct DuplicateKeyScope {
+    var isObject: Bool
+    var start: Int
+    var index: [Int: Int]?
+}
+
+private struct DuplicateKeyEntry {
+    var hash: Int
+    var outIndex: Int
+    var srcStart: Int
+    var srcEnd: Int
+    var decoded: [UInt8]?
+    /// Previous log position with the same hash, in index mode.
+    var prev: Int
 }
