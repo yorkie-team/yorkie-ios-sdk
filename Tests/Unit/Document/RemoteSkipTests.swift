@@ -254,6 +254,99 @@ final class RemoteSkipTests: XCTestCase {
         (doc.getRootObject().get(key: "c") as? CRDTCounter<T>)?.value
     }
 
+    func test_skips_a_plain_increase_whose_delta_the_counter_refuses() throws {
+        // given - a later change in the same pack must still land
+        let target = try self.plainTarget(Int32.self, initial: 0)
+        let goodID = self.changeID(clientSeq: 3, lamport: 3)
+        let good = Change(id: goodID, operations: [SetOperation(
+            key: "k",
+            value: Primitive(value: .string("v"), createdAt: goodID.createTimeTicket(delimiter: 1)),
+            parentCreatedAt: TimeTicket.initial,
+            executedAt: goodID.createTimeTicket(delimiter: 1)
+        )])
+        let pack = ChangePack(
+            key: "d",
+            checkpoint: Checkpoint(serverSeq: 2, clientSeq: 0),
+            isRemoved: false,
+            changes: [self.plainIncrease(.string("1")), good],
+            versionVector: VersionVector.initial
+        )
+
+        // when
+        try target.applyChangePack(pack)
+
+        // then
+        XCTAssertEqual(self.plainValue(target, Int32.self), 0)
+        XCTAssertEqual((target.getRootObject().get(key: "k") as? Primitive)?.value, .string("v"))
+        XCTAssertEqual(target.checkpoint.getServerSeq(), 2)
+    }
+
+    func test_skips_an_increase_whose_value_is_not_a_primitive() throws {
+        // given - a value the counter cannot take, as a non-SDK writer could push it
+        let id = self.changeID(clientSeq: 2, lamport: 2)
+        let op = IncreaseOperation(
+            parentCreatedAt: self.plainCounterCreatedAt,
+            value: CRDTObject(createdAt: id.createTimeTicket(delimiter: 1)),
+            executedAt: id.createTimeTicket(delimiter: 2)
+        )
+        let change = Change(id: id, operations: [op])
+
+        // when / then - an Int32 counter
+        let int32Target = try self.plainTarget(Int32.self, initial: 0)
+        XCTAssertNoThrow(try int32Target.applyChanges([change], source: .remote))
+        XCTAssertEqual(self.plainValue(int32Target, Int32.self), 0)
+
+        // when / then - an Int64 counter
+        let int64Target = try self.plainTarget(Int64.self, initial: 0)
+        XCTAssertNoThrow(try int64Target.applyChanges([change], source: .remote))
+        XCTAssertEqual(self.plainValue(int64Target, Int64.self), 0)
+    }
+
+    func test_still_reports_a_local_plain_increase_that_cannot_be_applied() throws {
+        // given
+        let target = try self.plainTarget(Int32.self, initial: 0)
+        let crdtRoot = CRDTRoot(rootObject: target.getRootObject())
+        let id = self.changeID(clientSeq: 2, lamport: 2)
+        let nonPrimitive = IncreaseOperation(
+            parentCreatedAt: self.plainCounterCreatedAt,
+            value: CRDTObject(createdAt: id.createTimeTicket(delimiter: 1)),
+            executedAt: id.createTimeTicket(delimiter: 2)
+        )
+        let badDelta = try XCTUnwrap(self.plainIncrease(.string("1")).operations.first)
+
+        for source in [OpSource.local, OpSource.undoRedo] {
+            // when / then - a delta the counter refuses keeps the code the counter threw
+            XCTAssertThrowsError(try badDelta.execute(root: crdtRoot, versionVector: nil, source: source)) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errUnimplemented, "\(error)")
+                XCTAssertTrue((error as? YorkieError)?.message.contains("Unsupported type of value") == true, "\(error)")
+            }
+
+            // when / then - a value that is not a primitive is an invalid argument, as in JS
+            XCTAssertThrowsError(try nonPrimitive.execute(root: crdtRoot, versionVector: nil, source: source)) { error in
+                XCTAssertEqual((error as? YorkieError)?.code, .errInvalidArgument, "\(error)")
+                XCTAssertTrue((error as? YorkieError)?.message.contains("only Primitive can be increased") == true, "\(error)")
+            }
+        }
+        XCTAssertEqual(self.plainValue(target, Int32.self), 0)
+    }
+
+    func test_keeps_failing_a_remote_increase_on_an_element_that_is_not_a_counter() throws {
+        // given - the target is the root object, and another one does not exist at all
+        let target = try self.plainTarget(Int32.self, initial: 0)
+        let id = self.changeID(clientSeq: 2, lamport: 2)
+        let value = Primitive(value: .integer(1), createdAt: id.createTimeTicket(delimiter: 1))
+
+        for parent in [TimeTicket.initial, TimeTicket(lamport: 99, delimiter: 1, actorID: self.actorID)] {
+            let op = IncreaseOperation(parentCreatedAt: parent, value: value, executedAt: id.createTimeTicket(delimiter: 2))
+
+            // when / then - not skipped for any source
+            for source in [OpSource.remote, .local, .undoRedo] {
+                XCTAssertThrowsError(try target.applyChanges([Change(id: id, operations: [op])], source: source), "\(parent) \(source)")
+            }
+        }
+        XCTAssertEqual(self.plainValue(target, Int32.self), 0)
+    }
+
     // MARK: - Double delta on a plain counter (Go counter.go Increase / JS counter.ts increase)
 
     func test_applies_a_double_delta_to_a_plain_counter_truncated_toward_zero() throws {
@@ -315,6 +408,41 @@ final class RemoteSkipTests: XCTestCase {
         let result = try XCTUnwrap(op.execute(root: crdtRoot, versionVector: nil, source: .remote))
 
         XCTAssertEqual((result.opInfos.first as? IncreaseOpInfo)?.value, -2)
+    }
+
+    func test_applies_the_same_pack_the_same_way_on_a_counter_that_skipped() throws {
+        // convergence: a refused delta is dropped, so a following good increase lands on both replicas
+        let first = try self.plainTarget(Int32.self, initial: 0)
+        let second = try self.plainTarget(Int32.self, initial: 0)
+        let pack = [self.plainIncrease(.string("x"), clientSeq: 2, lamport: 2), self.plainIncrease(.integer(5), clientSeq: 3, lamport: 3)]
+        try first.applyChanges(pack, source: .remote)
+        try second.applyChanges(pack, source: .remote)
+        XCTAssertEqual(self.plainValue(first, Int32.self), 5)
+        XCTAssertEqual(self.plainValue(second, Int32.self), 5)
+    }
+
+    func test_emits_no_increase_op_info_and_no_executed_operation_for_a_skipped_increase() throws {
+        // given
+        let target = try self.plainTarget(Int32.self, initial: 0)
+        let crdtRoot = CRDTRoot(rootObject: target.getRootObject())
+        let id = self.changeID(clientSeq: 2, lamport: 2)
+        let nonPrimitive = IncreaseOperation(
+            parentCreatedAt: self.plainCounterCreatedAt,
+            value: CRDTObject(createdAt: id.createTimeTicket(delimiter: 1)),
+            executedAt: id.createTimeTicket(delimiter: 2)
+        )
+        let refused = try XCTUnwrap(self.plainIncrease(.string("1")).operations.first)
+        let nonFinite = try XCTUnwrap(self.plainIncrease(.double(.nan)).operations.first)
+        let change = Change(id: id, operations: [nonPrimitive, refused, nonFinite])
+        var presences: [ActorID: StringValueTypeDictionary] = [:]
+
+        // when
+        let result = try change.execute(root: crdtRoot, presences: &presences, source: .remote)
+
+        // then
+        XCTAssertTrue(result.opInfos.isEmpty)
+        XCTAssertTrue(result.operations.isEmpty)
+        XCTAssertEqual(self.plainValue(target, Int32.self), 0)
     }
 
     func test_applies_a_wire_level_increase_that_carries_a_double() throws {

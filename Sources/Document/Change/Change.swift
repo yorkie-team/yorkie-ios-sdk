@@ -136,8 +136,9 @@ public struct Change {
         for (opIndex, operation) in self.operations.enumerated() {
             let result: ExecutionResult?
             do {
-                // NOTE: a nil result means the operation was skipped during undo/redo
-                // (e.g. the target element was already removed).
+                // NOTE: a nil result means the operation did not run: it was skipped during
+                // undo/redo (e.g. the target element was already removed), a remote Increase that
+                // cannot apply was skipped with a warning, or a non-finite Double delta was a no-op.
                 result = try operation.execute(root: root, versionVector: versionVector, source: source)
             } catch {
                 // NOTE(yorkie-js-sdk#1403): only a remote change is named. The checkpoint
