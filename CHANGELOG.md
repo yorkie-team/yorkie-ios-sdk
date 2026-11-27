@@ -16,9 +16,9 @@ This file was reconstructed from the project's [GitHub Releases](https://github.
 
 ### Fixed
 
-- Skip a remote Increase that cannot apply, with a warning, instead of failing the pack in https://github.com/yorkie-team/yorkie-ios-sdk/pull/TBD
-- Apply a Double delta to a plain counter as the Go and JS SDKs do in https://github.com/yorkie-team/yorkie-ios-sdk/pull/TBD
-- Stop `JSONCounter.increase(value:)` from crashing on a NaN, infinite or out-of-range Double in https://github.com/yorkie-team/yorkie-ios-sdk/pull/TBD
+- Skip a remote Increase that cannot apply, with a warning, instead of failing the pack in https://github.com/yorkie-team/yorkie-ios-sdk/pull/283
+- Apply a Double delta to a plain counter as the Go and JS SDKs do in https://github.com/yorkie-team/yorkie-ios-sdk/pull/283
+- Stop `JSONCounter.increase(value:)` from crashing on a NaN, infinite or out-of-range Double in https://github.com/yorkie-team/yorkie-ios-sdk/pull/283
 
 ## [v0.7.28] - 2026-11-26
 
