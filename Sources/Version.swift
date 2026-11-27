@@ -16,4 +16,4 @@
 
 import Foundation
 
-let yorkieVersion = "0.7.28"
+let yorkieVersion = "0.7.29"
