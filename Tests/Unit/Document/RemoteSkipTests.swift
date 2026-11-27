@@ -19,8 +19,9 @@ import XCTest
 
 /// Ported from `remote_skip_test.ts` (yorkie-js-sdk#1502).
 ///
-/// The JS-only case for a non-JSON presence (#1509) has no Swift analogue: presence travels as a
-/// `[String: String]` map on the wire here, so there is nothing to fail to parse.
+/// The JS-only case for a non-JSON presence (#1509) has no failing Swift analogue: presence travels as
+/// a `[String: String]` map on the wire here, so there is nothing to fail to parse. It is pinned in
+/// `PresenceValueTests` (yorkie-js-sdk#1559).
 @MainActor
 final class RemoteSkipTests: XCTestCase {
     private let actorID = "000000000000000000000001"
