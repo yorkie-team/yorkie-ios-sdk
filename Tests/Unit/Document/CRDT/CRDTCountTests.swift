@@ -96,4 +96,70 @@ final class CRDTCountTests: XCTestCase {
         // then
         XCTAssertEqual(counter.value, Int64.min)
     }
+
+    func test_can_increase_int_counter_by_double_and_truncate_toward_zero() throws {
+        for (delta, expected) in [(1.5, Int32(11)), (-1.5, 9), (2.9, 12), (-0.9, 10), (-0.0, 10)] {
+            let counter = CRDTCounter(value: Int32(10), createdAt: TimeTicket.initial)
+            try counter.increase(Primitive(value: .double(delta), createdAt: TimeTicket.initial))
+            XCTAssertEqual(counter.value, expected, "\(delta)")
+        }
+    }
+
+    func test_can_wrap_around_int_counter_when_increased_by_out_of_range_double() throws {
+        let cases: [(Int32, Double, Int32)] = [
+            (Int32.max, 1, Int32.min),
+            (10, 0x1p60, 0),
+            (10, 1e19, -1_981_284_352),
+            (0, -1e19, 1_981_284_352)
+        ]
+        for (initial, delta, expected) in cases {
+            let counter = CRDTCounter(value: initial, createdAt: TimeTicket.initial)
+            try counter.increase(Primitive(value: .double(delta), createdAt: TimeTicket.initial))
+            XCTAssertEqual(counter.value, expected, "\(initial) + \(delta)")
+        }
+    }
+
+    func test_can_wrap_around_long_counter_when_increased_by_out_of_range_double() throws {
+        let cases: [(Int64, Double, Int64)] = [
+            (0, 1e19, -8_446_744_073_709_551_616),
+            (Int64.max, 1, Int64.min),
+            (0, -0x1p63, Int64.min),
+            (0, 0x1p63, Int64.min),
+            (0, -1e19, 8_446_744_073_709_551_616),
+            (0, 0x1p64.nextDown, -2048),
+            (0, 0x1p64, 0),
+            (0, (-0x1p63).nextDown, 9_223_372_036_854_773_760),
+            // 1e300 is a multiple of 2^64, so it wraps to 0
+            (5, 1e300, 5)
+        ]
+        for (initial, delta, expected) in cases {
+            let counter = CRDTCounter(value: initial, createdAt: TimeTicket.initial)
+            try counter.increase(Primitive(value: .double(delta), createdAt: TimeTicket.initial))
+            XCTAssertEqual(counter.value, expected, "\(initial) + \(delta)")
+        }
+    }
+
+    func test_ignores_a_non_finite_double_on_both_counter_widths() throws {
+        for delta in [Double.nan, .infinity, -.infinity] {
+            let int = CRDTCounter(value: Int32(7), createdAt: TimeTicket.initial)
+            let long = CRDTCounter(value: Int64(7), createdAt: TimeTicket.initial)
+            try int.increase(Primitive(value: .double(delta), createdAt: TimeTicket.initial))
+            try long.increase(Primitive(value: .double(delta), createdAt: TimeTicket.initial))
+            XCTAssertEqual(int.value, 7, "\(delta)")
+            XCTAssertEqual(long.value, 7, "\(delta)")
+        }
+    }
+
+    func test_wraps_a_double_to_int64_modulo_2_64_without_trapping() {
+        let cases: [(Double, Int64)] = [
+            (0, 0), (1.9, 1), (-1.9, -1),
+            (0x1p63, Int64.min), (-0x1p63, Int64.min),
+            (0x1p64, 0), (0x1p64.nextDown, -2048),
+            (1e19, -8_446_744_073_709_551_616), (-1e19, 8_446_744_073_709_551_616),
+            ((-0x1p63).nextDown, 9_223_372_036_854_773_760)
+        ]
+        for (input, expected) in cases {
+            XCTAssertEqual(Int64(wrapping: input), expected, "\(input)")
+        }
+    }
 }

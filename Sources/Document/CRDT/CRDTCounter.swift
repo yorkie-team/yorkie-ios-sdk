@@ -129,6 +129,11 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
     /// an `Int32` counter increased by an out-of-int32 `Long` wraps around instead of
     /// trapping, converging with the other SDKs.
     ///
+    /// A `Double` delta (a JS peer's `increase(1.5)` travels as one) is truncated toward zero, as in
+    /// Go's `Counter.Increase` and JS's `removeDecimal`: an `Int32` counter adds it in `Double` and
+    /// wraps the sum to 32 bits, an `Int64` counter wraps it to 64 bits and adds it. A NaN or an
+    /// infinity has no integer value, so it is a no-op, as in Go.
+    ///
     /// - Throws: ``YorkieError`` when called on a dedup counter; use
     ///   ``increaseDedup(_:actor:)`` instead.
     @discardableResult
@@ -149,6 +154,18 @@ class CRDTCounter<T: YorkieCountable>: CRDTElement {
             self.value = T(truncatingIfNeeded: Int64(truncatingIfNeeded: self.value) &+ Int64(int32Value))
         case .long(let int64Value):
             self.value = T(truncatingIfNeeded: Int64(truncatingIfNeeded: self.value) &+ int64Value)
+        case .double(let doubleValue):
+            guard doubleValue.isFinite else {
+                return self
+            }
+            let truncated = doubleValue.rounded(.towardZero)
+            if MemoryLayout<T>.size == MemoryLayout<Int32>.size {
+                // float64 add, then wrap (Go `TruncFloatToInt32(float64(old) + Trunc(delta))`).
+                let sum = Double(Int64(truncatingIfNeeded: self.value)) + truncated
+                self.value = T(truncatingIfNeeded: Int64(wrapping: sum))
+            } else {
+                self.value = T(truncatingIfNeeded: Int64(truncatingIfNeeded: self.value) &+ Int64(wrapping: truncated))
+            }
         default:
             throw YorkieError(code: .errUnimplemented, message: "Unsupported type of value: \(type(of: primitive.value))")
         }

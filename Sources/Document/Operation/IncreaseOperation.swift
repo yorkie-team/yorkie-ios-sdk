@@ -127,10 +127,33 @@ struct IncreaseOperation: Operation {
 
         let path = try root.createPath(createdAt: self.parentCreatedAt)
 
-        guard let value = Int((value as? Primitive)?.toJSON() ?? "") else {
-            throw YorkieError(code: .errUnexpected, message: "fail to get counter value")
+        guard let value = Self.opInfoValue(of: self.value) else {
+            // A NaN or infinite Double delta leaves the counter untouched: nothing to report.
+            return nil
         }
 
         return [IncreaseOpInfo(path: path, value: value)]
+    }
+
+    /// Returns the delta an increase reports in its ``IncreaseOpInfo``.
+    ///
+    /// The public `IncreaseOpInfo.value` is an `Int`, so a `Double` delta is reported as the
+    /// truncated delta the counter applied (`-2.7` gives `-2`; JS reports the raw double), wrapped to
+    /// 64 bits when it is out of range. Returns `nil` for a delta that changes nothing (NaN or an
+    /// infinity) or that is not numeric.
+    private static func opInfoValue(of element: CRDTElement) -> Int? {
+        guard let primitive = element as? Primitive else {
+            return nil
+        }
+        switch primitive.value {
+        case .integer(let value):
+            return Int(value)
+        case .long(let value):
+            return Int(truncatingIfNeeded: value)
+        case .double(let value):
+            return value.isFinite ? Int(truncatingIfNeeded: Int64(wrapping: value)) : nil
+        default:
+            return nil
+        }
     }
 }

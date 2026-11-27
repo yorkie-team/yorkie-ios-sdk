@@ -217,4 +217,124 @@ final class RemoteSkipTests: XCTestCase {
             XCTAssertEqual((error as? YorkieError)?.code, .errInvalidType)
         }
     }
+
+    // MARK: - Plain counters (yorkie-js-sdk#1525)
+
+    private var plainCounterCreatedAt: TimeTicket {
+        TimeTicket(lamport: 1, delimiter: 1, actorID: self.actorID)
+    }
+
+    private func createPlainCounterChange<T: YorkieCountable>(_ type: T.Type, initial: T) -> Change {
+        let set = SetOperation(
+            key: "c",
+            value: CRDTCounter<T>(value: initial, createdAt: self.plainCounterCreatedAt),
+            parentCreatedAt: TimeTicket.initial,
+            executedAt: self.plainCounterCreatedAt
+        )
+        return Change(id: self.changeID(clientSeq: 1, lamport: 1), operations: [set])
+    }
+
+    private func plainIncrease(_ value: PrimitiveValue, clientSeq: UInt32 = 2, lamport: Int64 = 2) -> Change {
+        let id = self.changeID(clientSeq: clientSeq, lamport: lamport)
+        let op = IncreaseOperation(
+            parentCreatedAt: self.plainCounterCreatedAt,
+            value: Primitive(value: value, createdAt: id.createTimeTicket(delimiter: 1)),
+            executedAt: id.createTimeTicket(delimiter: 2)
+        )
+        return Change(id: id, operations: [op])
+    }
+
+    private func plainTarget<T: YorkieCountable>(_ type: T.Type, initial: T) throws -> Document {
+        let target = Document(key: "d")
+        try target.applyChanges([self.createPlainCounterChange(type, initial: initial)], source: .remote)
+        return target
+    }
+
+    private func plainValue<T: YorkieCountable>(_ doc: Document, _: T.Type) -> T? {
+        (doc.getRootObject().get(key: "c") as? CRDTCounter<T>)?.value
+    }
+
+    // MARK: - Double delta on a plain counter (Go counter.go Increase / JS counter.ts increase)
+
+    func test_applies_a_double_delta_to_a_plain_counter_truncated_toward_zero() throws {
+        let cases: [(Double, Int32)] = [(1.5, 1), (-1.5, -1), (2.9, 2), (-0.9, 0), (0.0, 0)]
+        for (delta, expected) in cases {
+            let target = try self.plainTarget(Int32.self, initial: 0)
+            try target.applyChanges([self.plainIncrease(.double(delta))], source: .remote)
+            XCTAssertEqual(self.plainValue(target, Int32.self), expected, "Int32 counter + \(delta)")
+
+            let long = try self.plainTarget(Int64.self, initial: 0)
+            try long.applyChanges([self.plainIncrease(.double(delta))], source: .remote)
+            XCTAssertEqual(self.plainValue(long, Int64.self), Int64(expected), "Int64 counter + \(delta)")
+        }
+    }
+
+    func test_wraps_a_double_delta_at_the_counter_width() throws {
+        // Int32 counter: sum computed in float64, then wrapped to 32 bits (Go TruncFloatToInt32).
+        let int32Max = try self.plainTarget(Int32.self, initial: Int32.max)
+        try int32Max.applyChanges([self.plainIncrease(.double(1))], source: .remote)
+        XCTAssertEqual(self.plainValue(int32Max, Int32.self), Int32.min)
+
+        // 10 + 2^60 rounds the 10 away in float64 -> 2^60 -> low 32 bits are 0 (Go counter.go comment).
+        let tenPlus = try self.plainTarget(Int32.self, initial: 10)
+        try tenPlus.applyChanges([self.plainIncrease(.double(0x1p60))], source: .remote)
+        XCTAssertEqual(self.plainValue(tenPlus, Int32.self), 0)
+
+        // Int64 counter: Double -> int64 wraps modulo 2^64 (Go TruncFloatToInt64, JS BigInt.asIntN(64)).
+        let longBig = try self.plainTarget(Int64.self, initial: 0)
+        try longBig.applyChanges([self.plainIncrease(.double(1e19))], source: .remote)
+        XCTAssertEqual(self.plainValue(longBig, Int64.self), -8_446_744_073_709_551_616)
+
+        // 10 + 1e19: the 10 is rounded away in float64, 1e19 mod 2^64 has the low 32 bits 0x89E80000.
+        let tenPlusBig = try self.plainTarget(Int32.self, initial: 10)
+        try tenPlusBig.applyChanges([self.plainIncrease(.double(1e19))], source: .remote)
+        XCTAssertEqual(self.plainValue(tenPlusBig, Int32.self), -1_981_284_352)
+
+        let longMax = try self.plainTarget(Int64.self, initial: Int64.max)
+        try longMax.applyChanges([self.plainIncrease(.double(1))], source: .remote)
+        XCTAssertEqual(self.plainValue(longMax, Int64.self), Int64.min)
+    }
+
+    func test_leaves_a_plain_counter_alone_for_a_non_finite_double_delta() throws {
+        for delta in [Double.nan, .infinity, -.infinity] {
+            let intCounter = try self.plainTarget(Int32.self, initial: 7)
+            XCTAssertNoThrow(try intCounter.applyChanges([self.plainIncrease(.double(delta))], source: .remote), "\(delta)")
+            XCTAssertEqual(self.plainValue(intCounter, Int32.self), 7, "\(delta)")
+
+            let longCounter = try self.plainTarget(Int64.self, initial: 7)
+            XCTAssertNoThrow(try longCounter.applyChanges([self.plainIncrease(.double(delta))], source: .remote), "\(delta)")
+            XCTAssertEqual(self.plainValue(longCounter, Int64.self), 7, "\(delta)")
+        }
+    }
+
+    func test_reports_the_truncated_delta_in_the_increase_op_info_of_a_double() throws {
+        let target = try self.plainTarget(Int32.self, initial: 0)
+        let crdtRoot = CRDTRoot(rootObject: target.getRootObject())
+        let op = try XCTUnwrap(self.plainIncrease(.double(-2.7)).operations.first)
+
+        let result = try XCTUnwrap(op.execute(root: crdtRoot, versionVector: nil, source: .remote))
+
+        XCTAssertEqual((result.opInfos.first as? IncreaseOpInfo)?.value, -2)
+    }
+
+    func test_applies_a_wire_level_increase_that_carries_a_double() throws {
+        // given - a JS peer's `counter.increase(1.5)` travels as a Double primitive
+        let target = try self.plainTarget(Int32.self, initial: 0)
+        let id = self.changeID(clientSeq: 2, lamport: 2)
+        let op = IncreaseOperation(
+            parentCreatedAt: self.plainCounterCreatedAt,
+            value: Primitive(value: .double(1.5), createdAt: id.createTimeTicket(delimiter: 1)),
+            executedAt: id.createTimeTicket(delimiter: 2)
+        )
+        let pbOps = Converter.toOperations([op])
+
+        // when
+        let decoded = try Converter.fromOperations(pbOps)
+        let increase = try XCTUnwrap(decoded.first as? IncreaseOperation)
+        try target.applyChanges([Change(id: id, operations: [increase])], source: .remote)
+
+        // then
+        XCTAssertEqual((increase.value as? Primitive)?.value, .double(1.5))
+        XCTAssertEqual(self.plainValue(target, Int32.self), 1)
+    }
 }
